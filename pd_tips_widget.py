@@ -21,11 +21,11 @@ def register(app):
         if 'pd-contact-icons.css' not in html:
             css='<link rel="stylesheet" href="/assets/pd-contact-icons.css?v=20261028">'
             html=html.replace('</head>',css+'</head>') if '</head>' in html else css+html
-        if 'src="/assets/pd-tips-widget.js?v=20261028-tips-entry-v2"' not in html:
+        if 'src="/assets/pd-tips-widget.js?v=20261028-tips-entry-v3"' not in html:
             scripts=''
             if 'telegram-web-app.js' not in html:
                 scripts+='<script src="https://telegram.org/js/telegram-web-app.js"></script>'
-            scripts+='<script src="/assets/pd-tips-widget.js?v=20261028-tips-entry-v2"></script>'
+            scripts+='<script src="/assets/pd-tips-widget.js?v=20261028-tips-entry-v3"></script>'
             html=html.replace('</body>',scripts+'</body>') if '</body>' in html else html+scripts
         response.set_data(html)
         return response

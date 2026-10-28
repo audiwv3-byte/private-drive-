@@ -803,6 +803,19 @@ def referral_admin_promo(message):
     say(message.chat.id,'Создать: /promocreate КОД БАЛЛЫ ЛИМИТ\nОтключить: /promostop КОД\nБаллы: 1–1000; лимит: 1–10000. Это не денежная скидка.')
 
 
+def pd_tips_miniapp_entry(message):
+    mini_url = os.getenv('MINIAPP_URL', 'https://wilsonpark.pythonanywhere.com').strip()
+    if not mini_url.startswith('https://'):
+        raise ValueError('MINIAPP_URL must be HTTPS')
+    parsed = urllib.parse.urlsplit(mini_url)
+    query = [(k, v) for k, v in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True) if k != 'start']
+    query.append(('start', 'tips'))
+    url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), ''))
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton('💛 Открыть чаевые', web_app=types.WebAppInfo(url)))
+    say(message.chat.id, 'Чаевые PRIVATE DRIVE. Откройте приложение кнопкой ниже. Заказывать поездку не нужно.', kb)
+
+
 def pd_driver_miniapp_entry(message):
     mini_url = os.getenv('MINIAPP_URL', 'https://wilsonpark.pythonanywhere.com').strip()
     if not mini_url.startswith('https://'):
@@ -821,6 +834,9 @@ def start(message):
     if message.chat.type != 'private':
         return
     parts=(message.text or '').split(maxsplit=1)
+    if len(parts) > 1 and parts[1].strip() == 'tips':
+        pd_tips_miniapp_entry(message)
+        return
     if len(parts) > 1 and parts[1].strip() == 'driver_taxi_lt':
         pd_driver_miniapp_entry(message)
         return

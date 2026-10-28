@@ -14,3 +14,4 @@ jobs:
           cache-dependency-path: requirements-runtime.lock.txt
       - run: pip install -r requirements-runtime.lock.txt
       - run: python test_release_validation.py
+      - run: python test_tips_entry.py

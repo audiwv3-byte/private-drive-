@@ -61,7 +61,10 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     for path in ['/api/admin/orders','/api/pilot-info','/api/payment/1','/api/driver/work']:
         resp=call(path,uid=102)
         assert resp.status_code in (401,403),path
+    for path in ['/api/admin/orders','/api/driver/work','/api/admin/console/orders','/api/admin/pilot-assignments']:
+        assert call(path,uid=101).status_code in (401,403),path
     print('PASS registration and private access')
+    print('PASS registered passengers cannot access administrator or pilot APIs')
     request={'origin':'Vilnius','destination':'Kaunas','origin_coordinates':[25.28,54.68],'destination_coordinates':[23.90,54.89],'roundtrip':False,'extras':['Перевозка животного']}
     feature={'properties':{'summary':{'distance':100000,'duration':7200}},'geometry':{'coordinates':[[25.28,54.68],[23.90,54.89]]}}
     with patch.object(server.pd_stops,'directions',return_value=(feature,[25.28,54.68],[23.90,54.89])):

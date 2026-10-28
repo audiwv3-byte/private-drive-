@@ -18,7 +18,7 @@ function buttons(){
 }
 pdEnterPilot=function(){
  const user=window.pdOnboardingUser;if(!user||(!pdPilotEnabled&&!user.driver_application))return;
- pdHideOnboarding();document.body.classList.add('admin-home','pd-pilot-cabinet');
+ pdApplyRoleAccess(user,'driver');pdHideOnboarding();document.body.classList.add('admin-home','pd-pilot-cabinet');
  document.querySelectorAll('section[id^="step"]').forEach(x=>x.classList.add('hidden'));
  document.getElementById('pdPilotWork').classList.remove('hidden');document.getElementById('mainNav').classList.add('hidden');document.getElementById('pdPilotBack').classList.add('hidden');
  document.getElementById('pdPilotWorkTitle').textContent=tr('Кабинет пилота','Pilot cabinet','Piloto paskyra');
@@ -100,7 +100,7 @@ window.pdOpenAdminTripV4=async function(id){
  }catch(e){line(content,tr('Ошибка','Error','Klaida'),e.message)}
 };
 const originalOnboarding=pdOnboardingStart;
-pdOnboardingStart=function(user){originalOnboarding(user);const source=new URLSearchParams(window.location.search).get('start')||window.Telegram?.WebApp?.initDataUnsafe?.start_param;if(source==='driver_taxi_lt'&&user&&!user.driver_application&&!user.pilot_access)pdStartDriverRegistration()};
+pdOnboardingStart=function(user){originalOnboarding(user);const source=new URLSearchParams(window.location.search).get('start')||window.Telegram?.WebApp?.initDataUnsafe?.start_param;if(source==='driver_taxi_lt'&&user&&!user.registered&&!user.driver_application&&!user.pilot_access)pdStartDriverRegistration()};
 if(window.pdOnboardingUser?.driver_application&&!window.pdOnboardingUser.admin)pdEnterPilot();
 else if(window.pdOnboardingUser&&(new URLSearchParams(window.location.search).get('start')==='driver_taxi_lt'))pdStartDriverRegistration();
 })();

@@ -1,0 +1,5 @@
+Flask>=3.0,<4
+pyTelegramBotAPI>=4.26,<5
+python-dotenv>=1.0,<2
+requests>=2.31,<3
+qrcode[pil]>=7.4,<9

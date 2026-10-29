@@ -17,7 +17,118 @@ placeTipsAboveContacts();
 new MutationObserver(placeTipsAboveContacts).observe(document.body,{attributes:true,subtree:true,attributeFilter:['class']});
 
 function paragraph(parent,text){const p=document.createElement('p');p.textContent=text;parent.append(p);return p}
-button.onclick=async()=>{if(document.getElementById('pdGlobalTipDialog'))return;const d=document.createElement('dialog');d.id='pdGlobalTipDialog';d.className='pd-global-tip-dialog';const h=document.createElement('h2');h.textContent=t('Оставить чаевые','Leave a tip','Palikti arbatpinigių');const close=document.createElement('button');close.type='button';close.textContent=t('Закрыть','Close','Uždaryti');close.onclick=()=>d.close();d.append(h,close);paragraph(d,t('Чаевые добровольные. Выберите удобный способ и сумму. Перевод выполняется в вашем банке или кошельке.','Tips are optional. Choose a method and amount. Complete the transfer in your bank or wallet.','Arbatpinigiai savanoriški. Pasirinkite būdą ir sumą. Pervedimą atlikite savo banke arba piniginėje.'));const status=paragraph(d,t('Загрузка…','Loading…','Įkeliama…'));status.setAttribute('role','status');d.addEventListener('close',()=>d.remove());document.body.append(d);d.showModal();
-try{const signed=window.Telegram?.WebApp?.initData||'';const response=await fetch('/api/tips/options',{headers:{'X-Telegram-Init-Data':signed},cache:'no-store',signal:AbortSignal.timeout(10000)});if(response.status===401||response.status===403){status.textContent=t('Откройте Mini App через Telegram, чтобы увидеть реквизиты.','Open the Mini App through Telegram to view the details. No trip booking is required.','Atidarykite mini programėlę per Telegram, kad matytumėte rekvizitus. Kelionės užsakymas nebūtinas.');const open=document.createElement('a');open.href='https://t.me/EuroBalticTransferBot?start=tips';open.textContent=t('💛 Открыть чаевые в Telegram','💛 Open tips in Telegram','💛 Atidaryti arbatpinigius per Telegram');open.className='pd-tip-open-telegram';open.style.cssText='display:block;padding:12px 16px;margin:12px 0;border:1px solid #d6b467;border-radius:10px;color:#f4d38d;text-align:center;text-decoration:none';open.onclick=e=>{const tg=window.Telegram?.WebApp;if(tg?.openTelegramLink){e.preventDefault();tg.openTelegramLink(open.href)}};d.append(open);const choices=document.createElement('div');choices.className='pd-tip-methods';for(const [label,kind]of [[t('💶 Наличными пилоту','💶 Cash to pilot','💶 Grynaisiais pilotui'),'cash'],[t('🏦 Банковский перевод','🏦 Bank transfer','🏦 Banko pavedimas'),'bank'],[t('◇ Криптовалюта','◇ Cryptocurrency','◇ Kriptovaliuta'),'crypto']]){const b=document.createElement('button');b.type='button';b.className='pd-tip-method';b.textContent=label;b.onclick=()=>{if(kind==='cash')status.textContent=t('Передай чаевые пилоту наличными. Размер выбираешь ты.','Give the pilot a cash tip. You choose the amount.','Duokite pilotui arbatpinigių grynaisiais. Sumą pasirenkate patys.');else status.textContent=t('Открой мини-приложение через Telegram, чтобы увидеть реквизиты.','Open the Mini App through Telegram to view the details.','Atidarykite mini programėlę per Telegram, kad matytumėte rekvizitus.')};choices.append(b)}d.append(choices);return}if(!response.ok)throw Error(t('Не удалось загрузить способы перевода. Попробуй ещё раз.','Unable to load transfer methods. Please try again.','Nepavyko įkelti pavedimo būdų. Bandykite dar kartą.'));const r=await response.json();status.remove();const label=document.createElement('p');label.textContent=t('Выбери способ','Choose a method','Pasirinkite būdą');const choices=document.createElement('div');choices.className='pd-tip-methods';choices.setAttribute('role','group');choices.setAttribute('aria-label',label.textContent);let selected=-1;const methods=[{label:t('Наличными пилоту','Cash to pilot','Grynaisiais pilotui'),type:'cash'},...(r.banks||[]).map(b=>({label:b.bank,type:'bank',data:b})),...(r.crypto||[]).map(c=>({label:c.currency+' · '+c.network,type:'crypto',data:c}))];methods.forEach((m,i)=>{const option=document.createElement('button');option.type='button';option.className='pd-tip-method';option.textContent=(m.type==='cash'?'💶 ':m.type==='bank'?'🏦 ':'◇ ')+m.label;option.setAttribute('aria-pressed','false');option.onclick=()=>{selected=i;for(const [index,button]of [...choices.children].entries())button.setAttribute('aria-pressed',String(index===i));render()};choices.append(option)});d.append(label,choices);const detail=document.createElement('div');d.append(detail);function copy(value,label){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=async()=>{try{await navigator.clipboard.writeText(value);b.textContent=t('Скопировано','Copied','Nukopijuota')}catch(_){paragraph(detail,value)}};detail.append(b)}function render(){detail.replaceChildren();const m=methods[selected];if(!m)return;if(m.type==='cash'){paragraph(detail,t('Передай чаевые пилоту наличными. Размер выбираешь ты.','Give the pilot a cash tip. You choose the amount.','Duokite pilotui arbatpinigių grynaisiais. Sumą pasirenkate patys.'));return}const b=m.data;if(m.type==='bank'){paragraph(detail,b.recipient+' · '+b.bank+' · '+b.iban+(b.bic?' · BIC '+b.bic:''));copy(b.iban,t('Копировать IBAN','Copy IBAN','Kopijuoti IBAN'));paragraph(detail,t('Любая сумма в EUR. Назначение: ','Any amount in EUR. Reference: ','Bet kokia suma EUR. Paskirtis: ')+r.reference);copy(r.reference,t('Копировать назначение','Copy reference','Kopijuoti paskirtį'))}else{paragraph(detail,b.currency+' · '+b.network+' · '+b.address);copy(b.address,t('Копировать адрес','Copy address','Kopijuoti adresą'));paragraph(detail,t('Используй только указанную валюту и сеть. Автоматической конвертации EUR нет. Комиссия сети оплачивается отдельно.','Use only this currency and network. There is no automatic EUR conversion. Network fees are separate.','Naudokite tik nurodytą valiutą ir tinklą. Automatinio EUR keitimo nėra. Tinklo mokesčiai mokami atskirai.'))}}render()}catch(e){status.textContent=e.name==='TimeoutError'?t('Сервер отвечает слишком долго. Закрой окно и попробуй ещё раз.','The server is taking too long. Close and retry.','Serveris atsako per ilgai. Uždarykite ir bandykite dar kartą.'):e.message}};
+
+button.onclick=async()=>{
+ if(document.getElementById('pdGlobalTipDialog'))return;
+ const d=document.createElement('dialog');d.id='pdGlobalTipDialog';d.className='pd-global-tip-dialog';
+ const h=document.createElement('h2');h.textContent=t('Оставить чаевые','Leave a tip','Palikti arbatpinigių');
+ const close=document.createElement('button');close.type='button';close.textContent=t('Закрыть','Close','Uždaryti');
+ close.onclick=()=>d.close();d.append(h,close);
+ paragraph(d,t('Чаевые добровольные. Выберите удобный способ. Перевод выполняется в банке или кошельке, без автоматического списания.',
+  'Tips are optional. Choose a method; transfers happen in your bank or wallet without automatic debits.',
+  'Arbatpinigiai savanoriški. Pasirinkite būdą; pervedimai atliekami banke arba piniginėje be automatinio nuskaitymo.'));
+ const choices=document.createElement('div');choices.className='pd-tip-methods';choices.setAttribute('role','group');
+ choices.setAttribute('aria-label',t('Способ чаевых','Tip method','Arbatpinigių būdas'));
+ const info=document.createElement('div');const status=document.createElement('p');status.setAttribute('role','status');
+ d.append(choices,info,status);d.addEventListener('close',()=>d.remove(),{once:true});document.body.append(d);d.showModal();
+ const menu=[
+  {id:'paysera',label:'Paysera'},
+  {id:'swedbank',label:'Swedbank'},
+  {id:'crypto',label:t('Криптовалюта','Cryptocurrency','Kriptovaliuta')}
+ ];
+ let response=null,pending=null,selected=null;
+ const tops=new Map();
+ const line=(parent,value)=>paragraph(parent,value);
+ function buttonInto(parent,value,fn){
+  const el=document.createElement('button');el.type='button';el.textContent=value;el.onclick=fn;parent.append(el);return el;
+ }
+ async function copy(value){
+  try{await navigator.clipboard.writeText(value);status.textContent=t('Скопировано','Copied','Nukopijuota')}
+  catch(_){status.textContent=t('Скопируйте вручную','Copy manually','Nukopijuokite rankiniu būdu')}
+ }
+ async function fetchOptions(){
+  if(response)return response;
+  if(pending)return pending;
+  pending=(async()=>{
+   const initData=window.Telegram?.WebApp?.initData||'';
+   if(!initData)throw Error('TELEGRAM_REQUIRED');
+   const res=await fetch('/api/tips/options',{headers:{'X-Telegram-Init-Data':initData},cache:'no-store'});
+   if(res.status===401||res.status===403)throw Error('TELEGRAM_REQUIRED');
+   if(!res.ok)throw Error('LOAD_FAILED');
+   return await res.json();
+  })();
+  try{response=await pending;return response}finally{pending=null}
+ }
+ function openTelegram(){
+  const a=document.createElement('a');a.href='https://t.me/EuroBalticTransferBot?start=tips';
+  a.className='pd-tip-open-telegram';
+  a.style.cssText='display:block;padding:12px 16px;margin:12px 0;border:1px solid #d6b467;border-radius:10px;color:#f4d38d;text-align:center;text-decoration:none';
+  a.textContent=t('Открыть в Telegram','Open in Telegram','Atidaryti Telegram');
+  a.onclick=e=>{const tg=window.Telegram?.WebApp;if(tg?.openTelegramLink){e.preventDefault();tg.openTelegramLink(a.href)}};
+  info.append(a);
+ }
+ async function select(id){
+  selected=id;for(const [k,btn] of tops)btn.setAttribute('aria-pressed',String(k===id));
+  info.replaceChildren();status.textContent=t('Загружаем реквизиты…','Loading details…','Įkeliami duomenys…');
+  let opts;
+  try{opts=await fetchOptions()}catch(e){
+   if(id!==selected)return;
+   if(e.message==='TELEGRAM_REQUIRED'){
+    status.textContent=t('Откройте Mini App через Telegram, чтобы увидеть реквизиты. Регистрация не нужна.',
+      'Open the Mini App through Telegram to view the details. No registration needed.',
+      'Atidarykite mini programėlę per Telegram, kad matytumėte duomenis. Registracija nebūtina.');
+    openTelegram();
+   }else status.textContent=t('Не удалось загрузить реквизиты. Попробуйте ещё раз.',
+     'Could not load payment details. Please retry.',
+     'Nepavyko įkelti mokėjimo duomenų. Bandykite dar kartą.');
+   return;
+  }
+  if(id!==selected)return;status.textContent='';
+  if(id==='crypto'){
+   line(info,t('Выберите криптовалюту','Choose cryptocurrency','Pasirinkite kriptovaliutą'));
+   const coins=document.createElement('div');coins.className='pd-tip-methods';coins.setAttribute('role','group');
+   coins.setAttribute('aria-label',t('Валюта','Currency','Valiuta'));
+   info.append(coins);const details=document.createElement('div');info.append(details);
+   for(const ticker of ['USDC','BTC','ETH']){
+    const coin=buttonInto(coins,ticker,()=>{
+     for(const other of coins.children)other.setAttribute('aria-pressed',String(other===coin));
+     details.replaceChildren();
+     const x=(opts.crypto||[]).find(v=>v.currency===ticker&&v.address);
+     if(!x){line(details,t('Кошелёк для этой валюты пока не настроен. Не отправляйте перевод.',
+       'Wallet unavailable for this currency. Do not send funds.',
+       'Šios valiutos piniginė nenustatyta. Nesiųskite lėšų.'));return}
+     line(details,x.currency+' · '+x.network);line(details,x.address);
+     buttonInto(details,t('Копировать адрес','Copy address','Kopijuoti adresą'),()=>copy(x.address));
+     line(details,t('Переводите только в указанной сети. Комиссия сети оплачивается отдельно.',
+       'Use only the displayed network. Network fees are separate.',
+       'Naudokite tik nurodytą tinklą. Tinklo mokesčiai mokami atskirai.'));
+    });coin.className='pd-tip-method';coin.setAttribute('aria-pressed','false');
+   }
+   return;
+  }
+  const bank=(opts.banks||[]).find(v=>v.id===id);
+  if(!bank?.iban||!bank?.recipient){
+   line(info,t('Реквизиты банка пока не подключены. Не выполняйте перевод.',
+     'Bank details are not configured yet. Do not transfer.',
+     'Banko duomenys dar nenustatyti. Nesiųskite pervedimo.'));return
+  }
+  line(info,bank.bank+' · '+bank.recipient);
+  line(info,'IBAN: '+bank.iban+(bank.bic?' · BIC: '+bank.bic:''));
+  buttonInto(info,t('Копировать IBAN','Copy IBAN','Kopijuoti IBAN'),()=>copy(bank.iban));
+  if(opts.reference){
+   line(info,t('Назначение: ','Reference: ','Paskirtis: ')+opts.reference);
+   buttonInto(info,t('Копировать назначение','Copy reference','Kopijuoti paskirtį'),()=>copy(opts.reference));
+  }
+  line(info,t('Сумма чаевых — на ваше усмотрение, в EUR.',
+    'Tip any amount in EUR.','Pasirinkite norimą arbatpinigių sumą eurais.'));
+ }
+ for(const item of menu){
+  const option=document.createElement('button');option.type='button';option.className='pd-tip-method';
+  option.textContent=(item.id==='crypto'?'◇ ':'🏦 ')+item.label;
+  option.setAttribute('aria-pressed','false');option.onclick=()=>select(item.id);
+  choices.append(option);tops.set(item.id,option);
+ }
+};
+window.pdOpenTipInfo=()=>button.click();
 const tipStart=new URLSearchParams(window.location.search).get('start')||window.Telegram?.WebApp?.initDataUnsafe?.start_param;if(tipStart==='tips')requestAnimationFrame(()=>button.click());
 })();

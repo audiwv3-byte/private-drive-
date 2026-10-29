@@ -59,4 +59,15 @@ assert.ok(runtime.includes("r.stop_active?'resume':'pause'"), 'pilot stop/resume
 assert.ok(runtime.includes("map.on('dblclick',expand)"), 'double click map expansion');
 assert.ok(fullscreen.includes("Изменить маршрут")&&fullscreen.includes("Остановка")&&fullscreen.includes("Завершить поездку"), 'fullscreen controls');
 console.log('PASS: pilot cabinet map click, stop/resume/route buttons, fullscreen double-tap, single work GPS and role isolation');
+const tips = fs.readFileSync('pd_tips_widget.js','utf8');
+new vm.Script(tips);
+assert.ok(tips.includes("{id:'paysera',label:'Paysera'}"), 'Paysera displayed as first top-level choice');
+assert.ok(tips.includes("{id:'swedbank',label:'Swedbank'}"), 'Swedbank displayed as second top-level choice');
+assert.ok(tips.includes("{id:'crypto',label:t('Криптовалюта'"), 'cryptocurrency displayed as third top-level choice');
+assert.ok(tips.includes("for(const ticker of ['USDC','BTC','ETH'])"), 'crypto options nested behind crypto selection');
+assert.ok(tips.includes("if(id==='crypto'){"), 'crypto choices not offered at top level');
+assert.ok(!tips.includes("type:'cash'"), 'cash is not a top-level tip method');
+const tipInjector = fs.readFileSync('pd_tips_widget.py','utf8');
+assert.ok(tipInjector.includes('pd-tips-widget.js?v=20261029-tips-three-methods-v4'), 'new tip widget cache version');
+console.log('PASS: tips top level is Paysera, Swedbank, Cryptocurrency; USDC/BTC/ETH nested; JS syntax valid');
 console.log('PASS: passenger, administrator, pilot and applicant roles; passenger mode hides work controls; stale role controls cleared; inline scripts compile');

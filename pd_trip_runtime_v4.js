@@ -33,6 +33,25 @@ window.pdOpenLiveTripV4=async function(id){
  await refresh();
 };
 async function action(name){await requestTrip(active,'/action',{action:name});await refresh();if(name==='finish'){stopPosition();closing(false);if(typeof pdCheckTripCompletion==='function')pdCheckTripCompletion()}}
+async function changeTripRoute(){
+ if(!active)return;
+ const currentId=active;
+ const dialogRoute=pdSimpleDialog(label('Изменить маршрут','Change route','Keisti maršrutą'));
+ const input=document.createElement('input');input.type='text';input.maxLength=200;
+ input.placeholder=label('Новый адрес назначения','New destination address','Naujas kelionės tikslas');
+ const notice=document.createElement('p');
+ notice.textContent=label(
+  'Новый адрес отправляется пассажиру на согласование. Цена не меняется автоматически. Изменяйте маршрут, только остановив автомобиль.',
+  'Passenger approval is required. The fare does not change automatically. Only edit while parked.',
+  'Reikia keleivio patvirtinimo. Kaina automatiškai nesikeičia. Keiskite maršrutą tik sustoję.');
+ const send=button(label('Отправить пассажиру','Send to passenger','Siųsti keleiviui'),async()=>{
+  const destination=input.value.trim();
+  if(destination.length<2)throw Error(label('Укажите адрес назначения','Enter a destination','Įveskite kelionės tikslą'));
+  await requestTrip(currentId,'/route-change',{destination});
+  dialogRoute.close();await refresh();
+ });
+ dialogRoute.append(input,notice,send);input.focus();
+}
 async function offerExtra(){
  const d=pdSimpleDialog(label('Дополнительная услуга','Additional service','Papildoma paslauga'));
  const reason=document.createElement('input');reason.placeholder=label('Остановка или пожелание','Stop or request','Sustojimas ar pageidavimas');reason.maxLength=300;
@@ -98,10 +117,20 @@ async function refresh(){
    body.append(item);
   }
   if(r.role==='pilot'&&r.status==='В пути'){
+   const tools=document.createElement('div');tools.className='actions pd-pilot-trip-actions';
+   tools.style.cssText='display:flex;flex-wrap:wrap;gap:8px;position:sticky;bottom:0;z-index:50;padding:12px 8px;background:#121315f0;border-top:1px solid #90784b;border-radius:12px';
    const timer=document.createElement('p');timer.dataset.stopTimer='1';timer.dataset.base=String(r.stop_seconds||0);
-   timer.dataset.ticked=String(Date.now());timer.dataset.running=r.stop_active?'1':'0';body.append(timer);
-   body.append(button(r.stop_active?label('В путь','Resume','Tęsti'):label('Остановка','Stop','Sustojimas'),()=>action(r.stop_active?'resume':'pause')));
-   body.append(button(label('Поездка завершена','Trip completed','Kelionė baigta'),()=>action('finish')));
+   timer.dataset.ticked=String(Date.now());timer.dataset.running=r.stop_active?'1':'0';
+   timer.style.cssText='font-variant-numeric:tabular-nums;flex:1 1 100%;margin:0 0 4px';
+   tools.append(timer);
+   tools.append(button(r.stop_active?label('В путь','Resume trip','Tęsti kelionę'):label('Остановка','Stop','Sustojimas'),()=>action(r.stop_active?'resume':'pause')));
+   tools.append(button(label('Изменить маршрут','Change route','Keisti maršrutą'),changeTripRoute));
+   tools.append(button(label('Завершить поездку','Finish trip','Baigti kelionę'),async()=>{
+    if(r.stop_active)throw Error(label('Сначала нажмите «В путь»','Resume trip before finishing','Pirma tęskite kelionę'));
+    if(!window.confirm(label('Завершить поездку №','Finish trip #','Baigti kelionę Nr. ')+id+'?'))return;
+    await action('finish');
+   }));
+   body.append(tools);
   }
   if(r.route_pending){
    p(label('Новый маршрут на согласовании: ','Route proposal: ','Maršruto pasiūlymas: ')+r.route_pending.destination);

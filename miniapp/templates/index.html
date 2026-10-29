@@ -286,7 +286,7 @@ async function bootstrap(){
  if(!initData){pdOnboardingStart(null);return}
  try{const r=await api('/api/me');admin=Boolean(r.admin);pdRegistrationAccess(r);
  $('name').value=r.name||r.first_name||'';$('phone').value=r.phone||'';
- pdbUpdateProfile(r);pdReviewNotice(r.pending_reviews);pdInitRoles();if(!admin)go(11);pdOnboardingStart(r);
+ pdbUpdateProfile(r);pdReviewNotice(r.pending_reviews);pdInitRoles();if(!admin&&!r.pilot_access&&!r.driver_application)go(11);pdOnboardingStart(r);
  }catch(e){message(pdL(e.message),true)}
 }bootstrap().finally(()=>{if(!window.pdOnboardingStarted)pdOnboardingStart(null);window.pdBootstrapDone=true;pdMaybeRestoreLanguageDraft()});
 
@@ -673,7 +673,7 @@ async function pdbSendOrder(){
  finally{pdbOrderBusy=false;btt.disabled=false}
 }
 pdbInit();
-const pdbOldGo=go;go=function(n){pdbOldGo(n);document.body.classList.toggle('pdb-active',n===11);if(n===11){setTimeout(()=>{pdbMapInit();pdbAutoLocate()},80);window.scrollTo(0,0)}};
+const pdbOldGo=go;go=function(n){pdbOldGo(n);document.body.classList.toggle('pdb-active',n===11);if(n===11&&!document.body.classList.contains('pd-pilot-cabinet')){setTimeout(()=>{if(!document.body.classList.contains('pd-pilot-cabinet')){pdbMapInit();pdbAutoLocate()}},80);window.scrollTo(0,0)}};
 const pdbOldBootstrap=bootstrap; // launch dashboard after Telegram authentication completes via the existing bootstrap's server reply
 
 

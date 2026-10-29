@@ -77,7 +77,7 @@ window.pdOpenAdminTripV4=async function(id){
     [tr('Расстояние, км','Distance, km','Atstumas, km'),o.distance_km],[tr('Прогноз времени, мин','Estimated time, min','Numatoma trukmė, min'),o.duration_min]]],
    [tr('Фактическое время','Actual timing','Faktinis laikas'),[
     [tr('Пилот прибыл','Pilot arrived','Pilotas atvyko'),stamp(r.arrived_at)],[tr('Начало движения','Driving started','Važiavimo pradžia'),stamp(r.started_at)],[tr('Завершение','Completed','Baigta'),stamp(r.ended_at)],
-    [tr('Время движения','Driving time','Važiavimo laikas'),duration(r.drive_seconds)],[tr('Ожидание','Waiting','Laukimas'),duration(r.waiting_seconds)],[tr('Всего с момента прибытия','Total since arrival','Iš viso nuo atvykimo'),duration(r.total_service_seconds)]]],
+    [tr('Время движения','Driving time','Važiavimo laikas'),duration(r.drive_seconds)],[tr('Остановок','Stops','Sustojimų'),r.stop_count],[tr('Ожидание на остановках','Time at stops','Laukimas sustojimuose'),duration(r.stop_seconds)],[tr('Ожидание подачи','Pickup waiting','Laukimas atvykus'),duration(r.waiting_seconds)],[tr('Всего с момента прибытия','Total since arrival','Iš viso nuo atvykimo'),duration(r.total_service_seconds)]]],
    [tr('Стоимость и оплата','Fare and payment','Kaina ir mokėjimas'),[
     [tr('Основная цена','Base fare','Pagrindinė kaina'),euro(r.base_cents)],[tr('Ожидание','Waiting','Laukimas'),euro(r.wait_cents)],[tr('Итог','Final fare','Galutinė kaina'),r.final_cents===null||r.final_cents===undefined?tr('Ещё не зафиксирован','Not finalized','Dar neužfiksuota'):euro(r.final_cents)],
     [tr('Способ оплаты','Payment method','Mokėjimo būdas'),o.payment_method],[tr('Статус оплаты','Payment status','Mokėjimo būsena'),o.payment_status],[tr('Статус списания','Capture state','Nuskaitymo būsena'),r.capture?.state||'—'],[tr('Возврат','Refund','Grąžinimas'),r.cancellation?r.cancellation.state+' · '+euro(r.cancellation.refund_cents):'—']]]
@@ -95,6 +95,8 @@ window.pdOpenAdminTripV4=async function(id){
   }
   const extraHeading=document.createElement('h3');extraHeading.textContent=tr('Остановки и доплаты','Stops and extras','Sustojimai ir priemokos');content.append(extraHeading);
   for(const extra of r.extras)line(content,extra.reason,euro(extra.amount_cents)+' · '+extra.state);
+  const routeHistory=document.createElement('h3');routeHistory.textContent=tr('Изменения маршрута','Route changes','Maršruto pakeitimai');content.append(routeHistory);
+  for(const item of r.route_history||[])line(content,stamp(item.created_at),item.destination+' · '+item.state);
   const eventLabels={arrived:tr('Пилот прибыл','Pilot arrived','Pilotas atvyko'),started:tr('Движение началось','Driving started','Važiavimas prasidėjo'),completed:tr('Поездка окончена','Trip completed','Kelionė baigta'),waiting_tariff_accepted:tr('Пассажир подтвердил тариф ожидания','Passenger accepted waiting tariff','Keleivis patvirtino laukimo tarifą'),extra_proposed:tr('Предложена доплата','Extra proposed','Pasiūlyta priemoka'),extra_accepted:tr('Доплата принята','Extra accepted','Priemoka priimta'),extra_rejected:tr('Доплата отклонена','Extra rejected','Priemoka atmesta')};
   const h=document.createElement('h3');h.textContent=tr('Хронология','Timeline','Chronologija');content.append(h);for(const ev of r.events)line(content,stamp(ev.created_at),(eventLabels[ev.event]||ev.event)+' · ID '+ev.actor_id);
  }catch(e){line(content,tr('Ошибка','Error','Klaida'),e.message)}

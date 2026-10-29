@@ -11,7 +11,7 @@ const requestTrip=(id,suffix='',data)=>api('/api/trip/'+Number(id)+suffix,data);
 function stopPosition(){if(watch!==null)navigator.geolocation.clearWatch(watch);watch=null;watchOrder=null}
 function closing(activeTrip){try{if(activeTrip)window.Telegram?.WebApp?.enableClosingConfirmation();else window.Telegram?.WebApp?.disableClosingConfirmation()}catch(_){}}
 async function position(id){
- if(watchOrder===id){stopPosition();await refresh();return}
+ if(watchOrder===id){await refresh();return}
  if(!navigator.geolocation)throw Error(label('Геолокация недоступна','Geolocation is unavailable','Geolokacija nepasiekiama'));
  stopPosition();watchOrder=id;closing(true);
  watch=navigator.geolocation.watchPosition(async pos=>{
@@ -23,6 +23,7 @@ async function position(id){
  {enableHighAccuracy:true,maximumAge:5000,timeout:15000});
  await refresh();
 }
+window.pdWorkGpsEnableForTrip=position;
 function cleanDialog(){if(map)map.remove();map=null;marker=null;dialog=null;body=null;active=null}
 window.pdOpenLiveTripV4=async function(id){
  if(dialog){dialog.close();cleanDialog()}
@@ -51,8 +52,7 @@ async function refresh(){
   const live=['Подтверждена','В пути'].includes(r.status);closing(live);
   if(!live&&watchOrder===id)stopPosition();
   if(r.role==='pilot'&&live){
-   body.append(button(watchOrder===id?label('Остановить передачу геопозиции','Stop sharing location','Stabdyti vietovės bendrinimą'):label('Передавать мою геопозицию','Share my location','Bendrinti mano vietovę'),()=>position(id)));
-   p(label('Геопозиция обновляется только при открытом приложении и разрешённом доступе. Не закрывайте Mini App до конца поездки.','Location updates require the app to stay open and location permission. Keep the Mini App open until the trip ends.','Vietovė atnaujinama tik atidarius programėlę ir leidus prieigą. Laikykite ją atidarytą iki kelionės pabaigos.'));
+   p(label('GPS включается одной кнопкой «Включить GPS для работы» в кабинете пилота. Обновление работает при открытом Mini App.','Enable work GPS from the pilot cabinet. Location updates while the Mini App is open.','Įjunkite darbo GPS piloto paskyroje. Vietovė atnaujinama atidarius programėlę.'));
   }
   if(live&&window.L){
    const box=document.createElement('div');box.style.cssText='height:240px;margin:14px 0;border-radius:12px';body.append(box);
@@ -62,8 +62,14 @@ async function refresh(){
    if(hasGPS){marker=L.marker([r.lat,r.lon]).addTo(map);L.circle([r.lat,r.lon],{radius:Math.min(r.accuracy||0,1000)}).addTo(map)}
    if(Number.isFinite(r.route_lat)&&Number.isFinite(r.route_lon))L.marker([r.route_lat,r.route_lon]).addTo(map);
    if(r.role==='pilot'){
-    const expand=()=>window.pdPilotFullMapV5?.(id);
+    let expanding=false;
+    const expand=()=>{if(expanding)return;expanding=true;
+     const task=window.pdPilotFullMapV5?.(id);
+     Promise.resolve(task).catch(e=>message(e.message,true)).finally(()=>setTimeout(()=>{expanding=false},450));
+    };
     map.on('dblclick',expand);
+    box.style.touchAction='manipulation';
+    box.addEventListener('dblclick',expand,true);
     let last=0,start=null;
     box.addEventListener('touchstart',e=>{if(e.touches.length===1)start=[e.touches[0].clientX,e.touches[0].clientY]},{passive:true});
     box.addEventListener('touchend',e=>{if(!start||e.changedTouches.length!==1)return;

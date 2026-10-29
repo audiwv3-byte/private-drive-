@@ -31,6 +31,18 @@ def waiting_cents(arrived_at, accepted_at, end):
     return math.ceil(seconds / 60) * WAIT_CENTS_PER_MINUTE
 
 
+def pause_data(c, oid, now):
+    """Cumulative stop duration, including a currently running stop; no billing."""
+    rows = c.execute(
+        'SELECT started_at,ended_at FROM pd_trip_pauses_v4 WHERE order_id=? ORDER BY id',
+        (oid,)
+    ).fetchall()
+    seconds = sum(max(0, (r['ended_at'] if r['ended_at'] is not None else now) - r['started_at']) for r in rows)
+    active_start = next((r['started_at'] for r in rows if r['ended_at'] is None), None)
+    return dict(stop_seconds=seconds, stop_count=len(rows),
+                stop_active=active_start is not None, stop_started_at=active_start)
+
+
 def schema(core):
     with core.db(core.ORDERS_DB) as c:
         c.executescript('''
@@ -46,6 +58,11 @@ CREATE TABLE IF NOT EXISTS pd_trip_extras_v4 (
  state TEXT NOT NULL DEFAULT 'proposed', proposed_by INTEGER NOT NULL,
  created_at INTEGER NOT NULL, accepted_at INTEGER,
  UNIQUE(order_id,request_key));
+CREATE TABLE IF NOT EXISTS pd_trip_pauses_v4 (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL,
+ started_at INTEGER NOT NULL, ended_at INTEGER, started_by INTEGER NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS pd_trip_single_active_pause
+ ON pd_trip_pauses_v4(order_id) WHERE ended_at IS NULL;
 CREATE TABLE IF NOT EXISTS pd_trip_events_v4 (
  id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL,
  actor_id INTEGER NOT NULL, event TEXT NOT NULL, created_at INTEGER NOT NULL);
@@ -120,6 +137,7 @@ def register(app, core, auth, provider=None, clock=None):
                         free_seconds=FREE_SECONDS, wait_cents_per_minute=WAIT_CENTS_PER_MINUTE,
                         rounding='started_minute', extras=extras, capture=dict(cap) if cap else None,
                         base_cents=data.get('base_cents') or (money(r['price']) if r['price'] else 0))
+            data.update(pause_data(c, oid, clock()))
             if data.get('arrived_at') and not data.get('ended_at'):
                 end = data.get('started_at') or clock()
                 data['wait_cents'] = waiting_cents(data['arrived_at'], data.get('wait_accepted_at'), end)
@@ -129,7 +147,7 @@ def register(app, core, auth, provider=None, clock=None):
                 for k in ('lat', 'lon', 'accuracy', 'location_at', 'location_pilot_id'):
                     data.pop(k, None)
             data['card_capture_available'] = provider is not None
-            data['drive_seconds'] = max(0,(data.get('ended_at') or clock())-data['started_at']) if data.get('started_at') else None
+            data['drive_seconds'] = max(0,(data.get('ended_at') or clock())-data['started_at']-data['stop_seconds']) if data.get('started_at') else None
             data['waiting_seconds'] = max(0,(data.get('started_at') or data.get('ended_at') or clock())-data['arrived_at']) if data.get('arrived_at') else None
             data['total_service_seconds'] = max(0,(data.get('ended_at') or clock())-data['arrived_at']) if data.get('arrived_at') else None
             data['location_stale'] = not data.get('location_at') or clock() - data['location_at'] > 45
@@ -238,9 +256,30 @@ def register(app, core, auth, provider=None, clock=None):
                 c.execute("UPDATE orders SET status='В пути',updated_at=? WHERE id=?", (core.now().isoformat(), oid))
                 event(c, oid, uid, 'started')
                 text = f'🚘 Заказ №{oid}: поездка началась.'
+            elif action in ('pause', 'resume'):
+                if r['status'] != 'В пути' or not t['started_at'] or t['ended_at']:
+                    raise ValueError('Остановка доступна только во время поездки')
+                open_pause = c.execute(
+                    'SELECT id FROM pd_trip_pauses_v4 WHERE order_id=? AND ended_at IS NULL', (oid,)
+                ).fetchone()
+                if action == 'pause' and not open_pause:
+                    c.execute('INSERT INTO pd_trip_pauses_v4(order_id,started_at,started_by) VALUES(?,?,?)',
+                              (oid, clock(), uid))
+                    event(c, oid, uid, 'stop_started')
+                elif action == 'resume' and open_pause:
+                    c.execute('UPDATE pd_trip_pauses_v4 SET ended_at=? WHERE id=?', (clock(), open_pause['id']))
+                    event(c, oid, uid, 'stop_ended')
+                elif action == 'resume' and not c.execute(
+                    'SELECT 1 FROM pd_trip_pauses_v4 WHERE order_id=?', (oid,)
+                ).fetchone():
+                    raise ValueError('Активной остановки нет')
             elif action == 'finish':
                 if r['status'] != 'В пути' or not t['started_at']:
                     raise ValueError('Сначала начните поездку')
+                if c.execute(
+                    'SELECT 1 FROM pd_trip_pauses_v4 WHERE order_id=? AND ended_at IS NULL', (oid,)
+                ).fetchone():
+                    raise ValueError('Сначала нажмите «В путь» для завершения остановки')
                 if c.execute("SELECT 1 FROM pd_trip_extras_v4 WHERE order_id=? AND state='proposed'", (oid,)).fetchone():
                     raise ValueError('Пассажир должен принять или отклонить предложенные доплаты')
                 extras = c.execute("SELECT COALESCE(SUM(amount_cents),0) FROM pd_trip_extras_v4 WHERE order_id=? AND state='accepted'", (oid,)).fetchone()[0]
@@ -335,7 +374,9 @@ def register(app, core, auth, provider=None, clock=None):
                     timings = {r['order_id']:dict(r) for r in rows}
                     for order in orders:
                         t = timings.get(order['id'],{})
-                        order['drive_seconds'] = max(0,(t.get('ended_at') or clock())-t['started_at']) if t.get('started_at') else None
+                        stop = pause_data(c, order['id'], clock())
+                        order['drive_seconds'] = max(0,(t.get('ended_at') or clock())-t['started_at']-stop['stop_seconds']) if t.get('started_at') else None
+                        order.update(stop)
                         order['waiting_seconds'] = max(0,(t.get('started_at') or t.get('ended_at') or clock())-t['arrived_at']) if t.get('arrived_at') else None
                         order['final_cents'] = t.get('final_cents')
                 return jsonify(data)

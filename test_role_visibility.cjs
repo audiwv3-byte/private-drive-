@@ -35,6 +35,7 @@ check(null, '', {passengerView: false, adminControls: false, pilotControls: fals
 check(passenger, '', {passengerView: true, adminControls: false, pilotControls: false});
 check(owner, 'admin', {passengerView: false, adminControls: true, pilotControls: false});
 check(owner, 'client', {passengerView: true, adminControls: false, pilotControls: false});
+check(owner, 'driver', {passengerView: false, adminControls: false, pilotControls: false});
 check(pilot, 'driver', {passengerView: false, adminControls: false, pilotControls: true});
 check(pilot, 'client', {passengerView: true, adminControls: false, pilotControls: false});
 assert.equal(elements.get('pdPilotBack').hidden, true);
@@ -43,4 +44,19 @@ check(applicant, '', {passengerView: false, adminControls: false, pilotControls:
 check(passenger, '', {passengerView: true, adminControls: false, pilotControls: false});
 assert.ok(!html.includes('onclick="pdStartDriverRegistration()">Регистрация водителя</button>'));
 assert.ok(html.includes('body:not(.pd-role-admin) #pdRoleBar'));
+const fs2 = require('node:fs');
+const pilotCabinet = fs2.readFileSync('pd_pilot_cabinet_v4.js','utf8');
+const runtime = fs2.readFileSync('pd_trip_runtime_v4.js','utf8');
+const fullscreen = fs2.readFileSync('miniapp/static/pd-pilot-fullscreen-v5.js','utf8');
+for(const src of [pilotCabinet,runtime,fullscreen]) new vm.Script(src);
+assert.ok(!html.includes('id="pdPilotPassenger"'), 'pilot passenger switch removed');
+assert.ok(html.includes('body.pd-pilot-cabinet #pdRoleBar'), 'role selector hidden in pilot mode');
+assert.ok(html.includes('body.pd-pilot-cabinet #mainNav'), 'passenger nav hidden in pilot mode');
+assert.ok(pilotCabinet.includes('openPilotTrip(order)'), 'pilot work trip clickable');
+assert.ok(pilotCabinet.includes('Включить GPS для работы'), 'single work GPS entry');
+assert.ok(runtime.includes('label(\'Изменить маршрут\''), 'pilot inline route change');
+assert.ok(runtime.includes("r.stop_active?'resume':'pause'"), 'pilot stop/resume buttons');
+assert.ok(runtime.includes("map.on('dblclick',expand)"), 'double click map expansion');
+assert.ok(fullscreen.includes("Изменить маршрут")&&fullscreen.includes("Остановка")&&fullscreen.includes("Завершить поездку"), 'fullscreen controls');
+console.log('PASS: pilot cabinet map click, stop/resume/route buttons, fullscreen double-tap, single work GPS and role isolation');
 console.log('PASS: passenger, administrator, pilot and applicant roles; passenger mode hides work controls; stale role controls cleared; inline scripts compile');

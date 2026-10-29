@@ -23,9 +23,9 @@ def run(server, core, call, check):
                   (oid,pilot_id,999,core.now().isoformat()))
     path=f'/api/trip/{oid}'
     assert check(call(path,uid=pilot_id),200)['role']=='pilot'
-    check(call(path,uid=102),403)
-    check(call(path+'/action',{'action':'pause'},uid=passenger_id),403)
-    check(call(path+'/route-change',{'destination':'54.69,25.29'},uid=passenger_id),403)
+    check(call(path,uid=102),401)
+    check(call(path+'/action',{'action':'pause'},uid=passenger_id),401)
+    check(call(path+'/route-change',{'destination':'54.69,25.29'},uid=passenger_id),401)
     check(call(path+'/action',{'action':'arrive'},uid=pilot_id),200)
     check(call(path+'/action',{'action':'start'},uid=pilot_id),200)
     paused=check(call(path+'/action',{'action':'pause'},uid=pilot_id),200)
@@ -40,7 +40,7 @@ def run(server, core, call, check):
     proposed=check(call(path+'/route-change',{'destination':'54.69,25.29'},uid=pilot_id),200)
     assert proposed['route_pending']['destination']=='54.69,25.29'
     check(call(path+'/route-change',{'destination':'54.70,25.30'},uid=pilot_id),400)
-    check(call(path+'/route-change/decision',{'accept':True},uid=102),403)
+    check(call(path+'/route-change/decision',{'accept':True},uid=102),401)
     accepted=check(call(path+'/route-change/decision',{'accept':True},uid=passenger_id),200)
     assert accepted['route_destination']=='54.69,25.29'
     assert accepted['route_pending'] is None

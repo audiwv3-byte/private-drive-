@@ -54,11 +54,26 @@ async function refresh(){
    body.append(button(watchOrder===id?label('Остановить передачу геопозиции','Stop sharing location','Stabdyti vietovės bendrinimą'):label('Передавать мою геопозицию','Share my location','Bendrinti mano vietovę'),()=>position(id)));
    p(label('Геопозиция обновляется только при открытом приложении и разрешённом доступе. Не закрывайте Mini App до конца поездки.','Location updates require the app to stay open and location permission. Keep the Mini App open until the trip ends.','Vietovė atnaujinama tik atidarius programėlę ir leidus prieigą. Laikykite ją atidarytą iki kelionės pabaigos.'));
   }
-  if(live&&Number.isFinite(r.lat)&&Number.isFinite(r.lon)&&window.L){
+  if(live&&window.L){
    const box=document.createElement('div');box.style.cssText='height:240px;margin:14px 0;border-radius:12px';body.append(box);
-   map=L.map(box).setView([r.lat,r.lon],15);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(map);
-   marker=L.marker([r.lat,r.lon]).addTo(map);L.circle([r.lat,r.lon],{radius:Math.min(r.accuracy||0,1000)}).addTo(map);
-   p(r.location_stale?label('Последняя геопозиция устарела — положение сейчас неизвестно.','Location is stale — current position is unknown.','Vietovė pasenusi — dabartinė padėtis nežinoma.'):label('Местоположение пилота · обновлено: ','Pilot location · updated: ','Piloto vietovė · atnaujinta: ')+new Date(r.location_at*1000).toLocaleTimeString());
+   const hasGPS=Number.isFinite(r.lat)&&Number.isFinite(r.lon);
+   map=L.map(box,{doubleClickZoom:false}).setView(hasGPS?[r.lat,r.lon]:[54.6872,25.2797],hasGPS?15:10);
+   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(map);
+   if(hasGPS){marker=L.marker([r.lat,r.lon]).addTo(map);L.circle([r.lat,r.lon],{radius:Math.min(r.accuracy||0,1000)}).addTo(map)}
+   if(Number.isFinite(r.route_lat)&&Number.isFinite(r.route_lon))L.marker([r.route_lat,r.route_lon]).addTo(map);
+   if(r.role==='pilot'){
+    const expand=()=>window.pdPilotFullMapV5?.(id);
+    map.on('dblclick',expand);
+    let last=0,start=null;
+    box.addEventListener('touchstart',e=>{if(e.touches.length===1)start=[e.touches[0].clientX,e.touches[0].clientY]},{passive:true});
+    box.addEventListener('touchend',e=>{if(!start||e.changedTouches.length!==1)return;
+     const point=e.changedTouches[0];if(Math.hypot(point.clientX-start[0],point.clientY-start[1])>18){last=0;return}
+     const now=Date.now();if(now-last<340){e.preventDefault();last=0;expand()}else last=now;
+    },{passive:false});
+    body.append(button(label('Развернуть карту','Expand map','Išplėsti žemėlapį'),expand));
+    p(label('Дважды нажмите на карту, чтобы раскрыть её на весь экран.','Double-tap the map for full screen.','Dukart bakstelėkite žemėlapį, kad jį padidintumėte.'));
+   }
+   p(hasGPS?(r.location_stale?label('Геопозиция устарела','Location is stale','Vietovė pasenusi'):label('GPS пилота активен','Pilot GPS active','Piloto GPS aktyvus')):label('Карта доступна. Включите GPS пилота.','Map ready. Enable pilot GPS.','Žemėlapis paruoštas. Įjunkite piloto GPS.'));
   }else if(live){p(label('Ожидаем геопозицию пилота.','Waiting for pilot location.','Laukiama piloto vietovės.'))}
   if(r.role==='passenger'&&!r.wait_accepted_at&&['Новая','Подтверждена'].includes(r.status)){
    p(label('Ожидание: 5 минут бесплатно, далее 0,25 € за каждую начатую минуту. До подтверждения тарифа платное ожидание не начисляется.','Waiting: 5 minutes free, then €0.25 per started minute. No paid waiting is charged before you accept.','Laukimas: 5 minutės nemokamai, vėliau 0,25 € už kiekvieną pradėtą minutę. Mokestis neskaičiuojamas iki patvirtinimo.'));
@@ -70,13 +85,24 @@ async function refresh(){
    time.textContent=label('Ожидание: ','Waiting: ','Laukimas: ')+Math.floor(elapsed/60)+':'+String(elapsed%60).padStart(2,'0')+' · '+eur(r.wait_cents);
   }
   if(r.role==='pilot'&&r.status==='Подтверждена')body.append(button(r.arrived_at?label('Начать поездку','Start trip','Pradėti kelionę'):label('Прибыл','Arrived','Atvykau'),()=>action(r.arrived_at?'start':'arrive')));
-  if(r.role==='pilot'&&live)body.append(button(label('Остановка / дополнительная услуга','Stop / extra service','Sustojimas / papildoma paslauga'),offerExtra));
+  if(r.role==='pilot'&&live)body.append(button(label('Дополнительная услуга','Extra service','Papildoma paslauga'),offerExtra));
   for(const extra of r.extras){
    const item=document.createElement('div');item.className='item';p(extra.reason+' · '+eur(extra.amount_cents)+' · '+extra.state,item);
    if(r.role==='passenger'&&extra.state==='proposed')for(const accept of [true,false])item.append(button(accept?label('Согласен с доплатой','Accept extra','Sutinku primokėti'):label('Отклонить','Reject','Atmesti'),async()=>{await requestTrip(id,'/extras/'+extra.id,{accept});await refresh()}));
    body.append(item);
   }
-  if(r.role==='pilot'&&r.status==='В пути')body.append(button(label('Поездка завершена','Trip completed','Kelionė baigta'),()=>action('finish')));
+  if(r.role==='pilot'&&r.status==='В пути'){
+   const timer=document.createElement('p');timer.dataset.stopTimer='1';timer.dataset.base=String(r.stop_seconds||0);
+   timer.dataset.ticked=String(Date.now());timer.dataset.running=r.stop_active?'1':'0';body.append(timer);
+   body.append(button(r.stop_active?label('В путь','Resume','Tęsti'):label('Остановка','Stop','Sustojimas'),()=>action(r.stop_active?'resume':'pause')));
+   body.append(button(label('Поездка завершена','Trip completed','Kelionė baigta'),()=>action('finish')));
+  }
+  if(r.route_pending){
+   p(label('Новый маршрут на согласовании: ','Route proposal: ','Maršruto pasiūlymas: ')+r.route_pending.destination);
+   if(r.role==='passenger')for(const accept of [true,false])body.append(button(accept?label('Подтвердить маршрут','Approve route','Patvirtinti maršrutą'):label('Отклонить маршрут','Reject route','Atmesti maršrutą'),async()=>{
+    await requestTrip(id,'/route-change/decision',{accept});await refresh();
+   }));
+  }
   if(r.final_cents!==null&&r.final_cents!==undefined){
    p(label('Итоговая стоимость: ','Final fare: ','Galutinė kaina: ')+eur(r.final_cents));
    p(label('Основная цена: ','Base fare: ','Pagrindinė kaina: ')+eur(r.base_cents)+' · '+label('Ожидание: ','Waiting: ','Laukimas: ')+eur(r.wait_cents));
@@ -104,7 +130,10 @@ async function hubs(){
  }catch(_){/* Existing lists remain usable if the V4 service is unavailable. */}finally{hubBusy=false}
 }
 setInterval(()=>{if(!document.hidden){refresh();hubs()}},10000);
-setInterval(()=>{document.querySelectorAll('[data-wait-start]').forEach(e=>{if(!e.dataset.waitEnd||Number(e.dataset.waitEnd)===0){const elapsed=Math.max(0,Math.floor((Date.now()+Number(e.dataset.serverOffset))/1000)-Number(e.dataset.waitStart));e.textContent=label('Ожидание: ','Waiting: ','Laukimas: ')+Math.floor(elapsed/60)+':'+String(elapsed%60).padStart(2,'0')+label(' · стоимость уточняется сервером',' · server updates the fare',' · kainą atnaujina serveris')}})},1000);
+setInterval(()=>{document.querySelectorAll('[data-stop-timer]').forEach(e=>{
+ const seconds=Number(e.dataset.base)+(e.dataset.running==='1'?Math.max(0,Math.floor((Date.now()-Number(e.dataset.ticked))/1000)):0);
+ const n=Math.floor(seconds);e.textContent=label('Ожидание на остановке: ','Stop duration: ','Sustojimo trukmė: ')+String(Math.floor(n/3600)).padStart(2,'0')+':'+String(Math.floor(n%3600/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+});document.querySelectorAll('[data-wait-start]').forEach(e=>{if(!e.dataset.waitEnd||Number(e.dataset.waitEnd)===0){const elapsed=Math.max(0,Math.floor((Date.now()+Number(e.dataset.serverOffset))/1000)-Number(e.dataset.waitStart));e.textContent=label('Ожидание: ','Waiting: ','Laukimas: ')+Math.floor(elapsed/60)+':'+String(elapsed%60).padStart(2,'0')+label(' · стоимость уточняется сервером',' · server updates the fare',' · kainą atnaujina serveris')}})},1000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPosition();else{refresh();hubs()}});
 window.addEventListener('pagehide',stopPosition);setTimeout(hubs,1500);
 })();

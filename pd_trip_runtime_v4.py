@@ -63,6 +63,13 @@ CREATE TABLE IF NOT EXISTS pd_trip_pauses_v4 (
  started_at INTEGER NOT NULL, ended_at INTEGER, started_by INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS pd_trip_single_active_pause
  ON pd_trip_pauses_v4(order_id) WHERE ended_at IS NULL;
+CREATE TABLE IF NOT EXISTS pd_trip_route_changes_v4 (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL,
+ destination TEXT NOT NULL, lon REAL NOT NULL, lat REAL NOT NULL,
+ state TEXT NOT NULL DEFAULT 'proposed', proposed_by INTEGER NOT NULL,
+ created_at INTEGER NOT NULL, decided_at INTEGER);
+CREATE UNIQUE INDEX IF NOT EXISTS pd_trip_single_proposed_route
+ ON pd_trip_route_changes_v4(order_id) WHERE state='proposed';
 CREATE TABLE IF NOT EXISTS pd_trip_events_v4 (
  id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL,
  actor_id INTEGER NOT NULL, event TEXT NOT NULL, created_at INTEGER NOT NULL);
@@ -138,6 +145,18 @@ def register(app, core, auth, provider=None, clock=None):
                         rounding='started_minute', extras=extras, capture=dict(cap) if cap else None,
                         base_cents=data.get('base_cents') or (money(r['price']) if r['price'] else 0))
             data.update(pause_data(c, oid, clock()))
+            accepted_route = c.execute(
+                "SELECT destination,lat,lon FROM pd_trip_route_changes_v4 "
+                "WHERE order_id=? AND state='accepted' ORDER BY id DESC LIMIT 1", (oid,)
+            ).fetchone()
+            pending_route = c.execute(
+                "SELECT id,destination FROM pd_trip_route_changes_v4 "
+                "WHERE order_id=? AND state='proposed' ORDER BY id DESC LIMIT 1", (oid,)
+            ).fetchone()
+            data['route_destination'] = accepted_route['destination'] if accepted_route else r['destination']
+            data['route_lat'] = accepted_route['lat'] if accepted_route else None
+            data['route_lon'] = accepted_route['lon'] if accepted_route else None
+            data['route_pending'] = dict(pending_route) if pending_route else None
             if data.get('arrived_at') and not data.get('ended_at'):
                 end = data.get('started_at') or clock()
                 data['wait_cents'] = waiting_cents(data['arrived_at'], data.get('wait_accepted_at'), end)
@@ -162,6 +181,9 @@ def register(app, core, auth, provider=None, clock=None):
         with core.db(core.ORDERS_DB) as c:
             order = dict(row(c, oid))
             events = [dict(r) for r in c.execute('SELECT actor_id,event,created_at FROM pd_trip_events_v4 WHERE order_id=? ORDER BY id',(oid,))]
+            route_history = [dict(r) for r in c.execute(
+                'SELECT destination,state,created_at,decided_at FROM pd_trip_route_changes_v4 WHERE order_id=? ORDER BY id', (oid,)
+            )]
             capture = c.execute('SELECT amount_cents,state,agreed_at,accepted_at,paid_at FROM pd_booking_capture_v4 WHERE order_id=?',(oid,)).fetchone()
             cancellation = c.execute('SELECT actor_id,driver_cancel,requested_at,state,refund_cents FROM pd_booking_cancel_v4 WHERE order_id=?',(oid,)).fetchone()
         with core.db(core.USERS_DB) as c:
@@ -172,13 +194,94 @@ def register(app, core, auth, provider=None, clock=None):
         data.update(order={k:order[k] for k in fields if k in order},
                     customer=dict(customer) if customer else None,
                     pilot=dict(driver,document_sides=photos) if driver else None,
-                    events=events, capture=dict(capture) if capture else None,
+                    events=events, route_history=route_history, capture=dict(capture) if capture else None,
                     cancellation=dict(cancellation) if cancellation else None)
         return jsonify(data)
 
     @app.get('/api/trip/<int:oid>')
     def pd_v4_trip(oid):
         return jsonify(view(oid, identity()))
+
+    @app.post('/api/trip/<int:oid>/route-change')
+    def pd_v4_propose_route(oid):
+        uid = identity()
+        body = request.get_json(silent=True) or {}
+        destination = body.get('destination')
+        if not isinstance(destination, str):
+            raise ValueError('Укажите новый адрес назначения')
+        destination = ' '.join(destination.split())
+        if not 2 <= len(destination) <= 200:
+            raise ValueError('Укажите новый адрес назначения')
+        with core.db(core.ORDERS_DB) as c:
+            r = row(c, oid)
+            if r['pilot_id'] != uid:
+                raise PermissionError('Маршрут меняет только назначенный пилот')
+            if r['status'] != 'В пути':
+                raise ValueError('Изменение маршрута доступно во время поездки')
+            with core.db(core.USERS_DB) as users:
+                if not users.execute(
+                    "SELECT 1 FROM pd_driver_applications WHERE telegram_id=? AND status='approved'", (uid,)
+                ).fetchone():
+                    raise PermissionError('Доступ пилота отсутствует')
+            latest = c.execute(
+                "SELECT destination FROM pd_trip_route_changes_v4 "
+                "WHERE order_id=? AND state='accepted' ORDER BY id DESC LIMIT 1", (oid,)
+            ).fetchone()
+            current_destination = latest['destination'] if latest else r['destination']
+            if destination.casefold() == str(current_destination).casefold():
+                raise ValueError('Новый адрес совпадает с текущим')
+        coords = core.geocode(destination)
+        if len(coords) != 2 or not all(type(v) in (int, float) and math.isfinite(v) for v in coords):
+            raise ValueError('Не удалось определить новый адрес')
+        lon, lat = coords
+        if not -180 <= lon <= 180 or not -90 <= lat <= 90:
+            raise ValueError('Некорректный адрес назначения')
+        with core.db(core.ORDERS_DB) as c:
+            attach(c)
+            r = row(c, oid)
+            pilot(c, r, uid)
+            if r['status'] != 'В пути':
+                raise ValueError('Поездка уже не в пути')
+            t = runtime(c, oid)
+            if not t['started_at'] or t['ended_at']:
+                raise ValueError('Изменение маршрута недоступно')
+            if c.execute(
+                "SELECT 1 FROM pd_trip_route_changes_v4 WHERE order_id=? AND state='proposed'", (oid,)
+            ).fetchone():
+                raise ValueError('Сначала дождитесь ответа пассажира на предложенный маршрут')
+            c.execute(
+                'INSERT INTO pd_trip_route_changes_v4(order_id,destination,lon,lat,proposed_by,created_at) '
+                'VALUES(?,?,?,?,?,?)', (oid, destination, lon, lat, uid, clock())
+            )
+            event(c, oid, uid, 'route_proposed')
+        notify(r['telegram_id'], f'Заказ №{oid}: пилот предложил новый адрес назначения: {destination}. Откройте поездку и подтвердите либо отклоните изменение. Цена не меняется автоматически.')
+        return jsonify(view(oid, uid))
+
+    @app.post('/api/trip/<int:oid>/route-change/decision')
+    def pd_v4_decide_route(oid):
+        uid = identity()
+        body = request.get_json(silent=True) or {}
+        if type(body.get('accept')) is not bool:
+            raise ValueError('Выберите подтверждение или отклонение маршрута')
+        with core.db(core.ORDERS_DB) as c:
+            c.execute('BEGIN IMMEDIATE')
+            r = row(c, oid)
+            if r['telegram_id'] != uid:
+                raise PermissionError('Новый маршрут подтверждает только пассажир')
+            if r['status'] != 'В пути':
+                raise ValueError('Поездка уже не в пути')
+            proposal = c.execute(
+                "SELECT id,destination FROM pd_trip_route_changes_v4 "
+                "WHERE order_id=? AND state='proposed' ORDER BY id DESC LIMIT 1", (oid,)
+            ).fetchone()
+            if not proposal:
+                raise ValueError('Нет маршрута, ожидающего подтверждения')
+            state = 'accepted' if body['accept'] else 'rejected'
+            c.execute('UPDATE pd_trip_route_changes_v4 SET state=?,decided_at=? WHERE id=?',
+                      (state, clock(), proposal['id']))
+            event(c, oid, uid, 'route_' + state)
+        notify(r['pilot_id'], f'Заказ №{oid}: пассажир {"подтвердил" if state == "accepted" else "отклонил"} новый маршрут: {proposal["destination"]}.')
+        return jsonify(view(oid, uid))
 
     @app.post('/api/trip/<int:oid>/waiting-consent')
     def pd_v4_wait_consent(oid):

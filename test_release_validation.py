@@ -119,5 +119,7 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     run(server,core,client,call,signed,check)
     from pd_invoice_tests import run as invoice_checks
     invoice_checks(server,core,call,check)
+    from pd_pilot_trip_tests import run as pilot_trip_checks
+    pilot_trip_checks(server,core,call,check)
     gc.collect()
 print('ALL RELEASE CHECKS PASSED; production data and payment providers were not used')

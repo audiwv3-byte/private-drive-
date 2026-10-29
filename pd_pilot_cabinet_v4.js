@@ -7,7 +7,51 @@ const stamp=s=>s?new Date(s*1000).toLocaleString(window.PD_LANG||'ru',{timeZone:
 const euro=c=>(Number(c||0)/100).toFixed(2)+' €';
 const photoLabels={license_front:tr('Права — лицевая сторона','Licence — front','Pažymėjimas — priekis'),license_back:tr('Права — обратная сторона','Licence — back','Pažymėjimas — galas'),car_front:tr('Автомобиль — спереди','Car — front','Automobilis — priekis'),car_rear:tr('Автомобиль — сзади','Car — rear','Automobilis — galas'),car_interior:tr('Автомобиль — салон','Car — interior','Automobilis — salonas')};
 Object.entries(photoLabels).forEach(([key,value])=>{window.PD_UI[pdDocumentLabels[key]||key]=value});
-let tab='active',busy=false;
+let tab='active',busy=false,workOrders=[],gpsEnabled=false;
+function workGPSControls(){
+ let wrap=document.getElementById('pdPilotGpsControls');
+ if(wrap)return wrap;
+ wrap=document.createElement('div');wrap.id='pdPilotGpsControls';wrap.className='item';
+ const title=document.createElement('h3');title.textContent=tr('GPS пилота','Pilot GPS','Piloto GPS');
+ const status=document.createElement('p');status.id='pdPilotGpsStatus';
+ status.textContent=tr('Для отображения на рабочей карте включите GPS.','Enable GPS to appear on your work map.','Įjunkite GPS, kad matytumėte darbo žemėlapį.');
+ const control=b(tr('Включить GPS для работы','Enable GPS for work','Įjungti GPS darbui'),async()=>{
+  if(!navigator.geolocation){status.textContent=tr('GPS недоступен на устройстве','GPS unavailable on this device','GPS įrenginyje nepasiekiamas');return}
+  control.disabled=true;
+  try{
+   const current=workOrders.find(o=>['Подтверждена','В пути'].includes(o.status));
+   if(current&&typeof window.pdWorkGpsEnableForTrip==='function'){
+    await window.pdWorkGpsEnableForTrip(Number(current.id));
+   }else{
+    await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:15000,maximumAge:5000}));
+   }
+   gpsEnabled=true;control.classList.add('hidden');
+   status.textContent=tr('GPS включён для работы','Work GPS enabled','Darbo GPS įjungtas');
+  }catch(e){
+   control.disabled=false;
+   status.textContent=tr('Не удалось включить GPS. Проверьте разрешение геолокации в Telegram или браузере.','GPS permission unavailable. Check Telegram or browser location settings.','GPS neįjungtas. Patikrinkite vietovės leidimą Telegram arba naršyklėje.');
+  }
+ });control.id='pdPilotGpsStart';
+ wrap.append(title,status,control);
+ const section=document.getElementById('pdPilotWork');section.insertBefore(wrap,document.getElementById('pdPilotWorkList'));
+ return wrap;
+}
+function tripError(error){
+ let notice=document.getElementById('pdPilotTripError');
+ if(!notice){notice=document.createElement('p');notice.id='pdPilotTripError';notice.setAttribute('role','alert');
+ const list=document.getElementById('pdPilotWorkList');if(list)list.prepend(notice)}
+ if(notice)notice.textContent=error?.message||String(error);
+}
+async function openPilotTrip(order){
+ const id=Number(order.id);
+ try{
+  // Open the work trip first. The pilot can double-tap its map to expand it.
+  if(typeof window.pdOpenLiveTripV4==='function')return await window.pdOpenLiveTripV4(id);
+  if(['Подтверждена','В пути'].includes(order.status)&&typeof window.pdPilotFullMapV5==='function'&&window.L)
+   return await window.pdPilotFullMapV5(id);
+  throw Error(tr('Экран поездки не загрузился. Обновите Mini App.','Trip screen was not loaded. Reload the Mini App.','Kelionės langas neįkeltas. Atnaujinkite programėlę.'));
+ }catch(e){tripError(e)}
+}
 function b(label,action){const el=document.createElement('button');el.type='button';el.className='secondary';el.textContent=label;el.onclick=action;return el}
 function line(parent,label,value){const p=document.createElement('p');const strong=document.createElement('strong');strong.textContent=label+': ';p.append(strong,document.createTextNode(value===null||value===undefined?'—':String(value)));parent.append(p)}
 function buttons(){
@@ -23,10 +67,9 @@ pdEnterPilot=function(){
  document.getElementById('pdPilotWork').classList.remove('hidden');document.getElementById('mainNav').classList.add('hidden');document.getElementById('pdPilotBack').classList.add('hidden');
  document.getElementById('pdPilotWorkTitle').textContent=tr('Кабинет пилота','Pilot cabinet','Piloto paskyra');
  document.getElementById('pdPilotWorkRefresh').textContent=tr('Обновить','Refresh','Atnaujinti');
- const passenger=document.getElementById('pdPilotPassenger');passenger.textContent=tr('Перейти в пассажирский кабинет','Open passenger cabinet','Atidaryti keleivio paskyrą');passenger.classList.toggle('hidden',!user.registered);
- buttons();pdPilotWork();window.scrollTo(0,0);
+ const roleBar=document.getElementById('pdRoleBar');if(roleBar){roleBar.hidden=true;roleBar.classList.add('hidden')}
+ workGPSControls();buttons();pdPilotWork();window.scrollTo(0,0);
 };
-const oldPassenger=pdPilotPassenger;pdPilotPassenger=function(){document.body.classList.remove('pd-pilot-cabinet');oldPassenger()};
 pdPilotWork=async function(){
  if(busy)return;busy=true;const box=document.getElementById('pdPilotWorkList');box.replaceChildren();buttons();
  try{
@@ -49,10 +92,16 @@ pdPilotWork=async function(){
    line(box,tr('Изменение данных','Update details','Duomenų keitimas'),tr('Повторная отправка заявки возвращает её на проверку администратора.','Resubmitting returns the application to admin review.','Pakartotinai pateikta paraiška vėl tikrinama administratoriaus.'));
    box.append(b(tr('Обновить данные и фотографии','Update details and photos','Atnaujinti duomenis ir nuotraukas'),pdStartDriverRegistration));return;
   }
-  const result=await api('/api/driver/work');const rows=result.orders.filter(o=>tab==='history'?['Выполнена','Отменена'].includes(o.status):!['Выполнена','Отменена'].includes(o.status));
+  const result=await api('/api/driver/work');workOrders=result.orders||[];
+  const rows=workOrders.filter(o=>tab==='history'?['Выполнена','Отменена'].includes(o.status):!['Выполнена','Отменена'].includes(o.status));
   if(!rows.length){line(box,tr('Поездки','Trips','Kelionės'),tr('В этом разделе поездок пока нет','No trips in this section','Šiame skyriuje kelionių nėra'));return}
   for(const order of rows){
-   const article=document.createElement('article');article.className='item';const h=document.createElement('h3');h.textContent='№'+order.id+' · '+pdL(order.status);article.append(h);
+   const article=document.createElement('article');article.className='item';
+   article.tabIndex=0;article.setAttribute('role','button');
+   article.setAttribute('aria-label',tr('Открыть заказ №','Open order #','Atidaryti užsakymą Nr. ')+order.id);
+   article.addEventListener('click',e=>{if(e.target.closest('a,button'))return;void openPilotTrip(order)});
+   article.addEventListener('keydown',e=>{if(e.target!==article||!['Enter',' '].includes(e.key))return;e.preventDefault();void openPilotTrip(order)});
+   const h=document.createElement('h3');h.textContent='№'+order.id+' · '+pdL(order.status);article.append(h);
    line(article,tr('Маршрут','Route','Maršrutas'),[order.origin,order.stop_address,order.destination].filter(Boolean).join(' → '));
    line(article,tr('Дата и время подачи','Pickup date and time','Paėmimo data ir laikas'),order.trip_date+' '+order.trip_time);
    line(article,tr('Пассажир','Passenger','Keleivis'),order.customer?.name);
@@ -61,7 +110,7 @@ pdPilotWork=async function(){
    line(article,tr('Стоимость','Fare','Kaina'),order.final_cents!==null&&order.final_cents!==undefined?euro(order.final_cents):order.price+' €');
    line(article,tr('Оплата','Payment','Mokėjimas'),order.payment_status);
    line(article,tr('Время движения','Driving time','Važiavimo laikas'),duration(order.drive_seconds));
-   article.append(b(tr('Открыть рабочую поездку','Open work trip','Atidaryti darbo kelionę'),()=>pdOpenLiveTripV4(order.id)));box.append(article);
+   article.append(b(tr('Открыть рабочую поездку','Open work trip','Atidaryti darbo kelionę'),()=>void openPilotTrip(order)));box.append(article);
   }
  }catch(e){line(box,tr('Ошибка','Error','Klaida'),e.message)}finally{busy=false}
 };
@@ -77,7 +126,7 @@ window.pdOpenAdminTripV4=async function(id){
     [tr('Расстояние, км','Distance, km','Atstumas, km'),o.distance_km],[tr('Прогноз времени, мин','Estimated time, min','Numatoma trukmė, min'),o.duration_min]]],
    [tr('Фактическое время','Actual timing','Faktinis laikas'),[
     [tr('Пилот прибыл','Pilot arrived','Pilotas atvyko'),stamp(r.arrived_at)],[tr('Начало движения','Driving started','Važiavimo pradžia'),stamp(r.started_at)],[tr('Завершение','Completed','Baigta'),stamp(r.ended_at)],
-    [tr('Время движения','Driving time','Važiavimo laikas'),duration(r.drive_seconds)],[tr('Ожидание','Waiting','Laukimas'),duration(r.waiting_seconds)],[tr('Всего с момента прибытия','Total since arrival','Iš viso nuo atvykimo'),duration(r.total_service_seconds)]]],
+    [tr('Время движения','Driving time','Važiavimo laikas'),duration(r.drive_seconds)],[tr('Остановок','Stops','Sustojimų'),r.stop_count],[tr('Ожидание на остановках','Time at stops','Laukimas sustojimuose'),duration(r.stop_seconds)],[tr('Ожидание подачи','Pickup waiting','Laukimas atvykus'),duration(r.waiting_seconds)],[tr('Всего с момента прибытия','Total since arrival','Iš viso nuo atvykimo'),duration(r.total_service_seconds)]]],
    [tr('Стоимость и оплата','Fare and payment','Kaina ir mokėjimas'),[
     [tr('Основная цена','Base fare','Pagrindinė kaina'),euro(r.base_cents)],[tr('Ожидание','Waiting','Laukimas'),euro(r.wait_cents)],[tr('Итог','Final fare','Galutinė kaina'),r.final_cents===null||r.final_cents===undefined?tr('Ещё не зафиксирован','Not finalized','Dar neužfiksuota'):euro(r.final_cents)],
     [tr('Способ оплаты','Payment method','Mokėjimo būdas'),o.payment_method],[tr('Статус оплаты','Payment status','Mokėjimo būsena'),o.payment_status],[tr('Статус списания','Capture state','Nuskaitymo būsena'),r.capture?.state||'—'],[tr('Возврат','Refund','Grąžinimas'),r.cancellation?r.cancellation.state+' · '+euro(r.cancellation.refund_cents):'—']]]
@@ -95,6 +144,8 @@ window.pdOpenAdminTripV4=async function(id){
   }
   const extraHeading=document.createElement('h3');extraHeading.textContent=tr('Остановки и доплаты','Stops and extras','Sustojimai ir priemokos');content.append(extraHeading);
   for(const extra of r.extras)line(content,extra.reason,euro(extra.amount_cents)+' · '+extra.state);
+  const routeHistory=document.createElement('h3');routeHistory.textContent=tr('Изменения маршрута','Route changes','Maršruto pakeitimai');content.append(routeHistory);
+  for(const item of r.route_history||[])line(content,stamp(item.created_at),item.destination+' · '+item.state);
   const eventLabels={arrived:tr('Пилот прибыл','Pilot arrived','Pilotas atvyko'),started:tr('Движение началось','Driving started','Važiavimas prasidėjo'),completed:tr('Поездка окончена','Trip completed','Kelionė baigta'),waiting_tariff_accepted:tr('Пассажир подтвердил тариф ожидания','Passenger accepted waiting tariff','Keleivis patvirtino laukimo tarifą'),extra_proposed:tr('Предложена доплата','Extra proposed','Pasiūlyta priemoka'),extra_accepted:tr('Доплата принята','Extra accepted','Priemoka priimta'),extra_rejected:tr('Доплата отклонена','Extra rejected','Priemoka atmesta')};
   const h=document.createElement('h3');h.textContent=tr('Хронология','Timeline','Chronologija');content.append(h);for(const ev of r.events)line(content,stamp(ev.created_at),(eventLabels[ev.event]||ev.event)+' · ID '+ev.actor_id);
  }catch(e){line(content,tr('Ошибка','Error','Klaida'),e.message)}

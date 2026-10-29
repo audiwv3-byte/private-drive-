@@ -140,7 +140,7 @@ def register(app, core, auth, provider=None, clock=None):
             extras = [dict(x) for x in c.execute('SELECT id,reason,amount_cents,state FROM pd_trip_extras_v4 WHERE order_id=? ORDER BY id', (oid,))]
             cap = c.execute('SELECT state,amount_cents FROM pd_booking_capture_v4 WHERE order_id=?', (oid,)).fetchone()
             data = dict(t) if t else {'order_id': oid}
-            data.update(status=r['status'], server_now=clock(), role='admin' if core.is_admin(uid) else 'pilot' if uid == r['pilot_id'] else 'passenger',
+            data.update(status=r['status'], server_now=clock(), role='pilot' if uid == r['pilot_id'] else 'admin' if core.is_admin(uid) else 'passenger',
                         free_seconds=FREE_SECONDS, wait_cents_per_minute=WAIT_CENTS_PER_MINUTE,
                         rounding='started_minute', extras=extras, capture=dict(cap) if cap else None,
                         base_cents=data.get('base_cents') or (money(r['price']) if r['price'] else 0))

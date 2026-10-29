@@ -45,10 +45,10 @@ function tripError(error){
 async function openPilotTrip(order){
  const id=Number(order.id);
  try{
-  if(['Подтверждена','В пути'].includes(order.status)&&typeof window.pdPilotFullMapV5==='function'&&window.L){
-   return await window.pdPilotFullMapV5(id);
-  }
+  // Open the work trip first. The pilot can double-tap its map to expand it.
   if(typeof window.pdOpenLiveTripV4==='function')return await window.pdOpenLiveTripV4(id);
+  if(['Подтверждена','В пути'].includes(order.status)&&typeof window.pdPilotFullMapV5==='function'&&window.L)
+   return await window.pdPilotFullMapV5(id);
   throw Error(tr('Экран поездки не загрузился. Обновите Mini App.','Trip screen was not loaded. Reload the Mini App.','Kelionės langas neįkeltas. Atnaujinkite programėlę.'));
  }catch(e){tripError(e)}
 }

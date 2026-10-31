@@ -3,3 +3,4 @@ This commit intentionally triggers the restricted GitHub Actions backup job.
 The job never reloads the website or processes payments.
 Retry requested after normalizing API token whitespace, 2026-10-31.
 Check revised API authentication and protected backup; requested 2026-10-31.
+Verify official PythonAnywhere US and EU API authentication; requested 2026-10-31.

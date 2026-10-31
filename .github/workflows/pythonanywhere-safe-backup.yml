@@ -1,0 +1,27 @@
+name: PRIVATE DRIVE - production backup (manual only)
+on:
+  workflow_dispatch:
+    inputs:
+      bash_console_id:
+        description: "Existing connected PythonAnywhere Bash console ID"
+        required: true
+        default: "48900994"
+permissions:
+  contents: read
+jobs:
+  backup:
+    name: Verify and backup PythonAnywhere (no deployment)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m py_compile pd_safe_backup.py pa_remote_backup_api.py
+      - run: python -m pip install requests
+      - name: Verify production files and create consistent source/SQLite backup
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PA_CONSOLE_ID: ${{ inputs.bash_console_id }}
+        run: python pa_remote_backup_api.py

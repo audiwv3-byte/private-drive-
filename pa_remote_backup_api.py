@@ -33,11 +33,8 @@ def main():
     # Normalize formatting only; never print or persist the credential.
     token = re.sub(r"^Token\s+", "", os.environ.get("PA_API_TOKEN", "").strip(), flags=re.I)
     token = "".join(token.split())
-    console = os.environ.get("PA_CONSOLE_ID", "").strip()
     if not token:
         raise RuntimeError("GitHub secret PA_API_TOKEN has not been configured")
-    if not re.fullmatch(r"[0-9]{1,12}", console):
-        raise RuntimeError("PA_CONSOLE_ID must be a numeric Bash console ID")
     prefix = f"https://{PA_HOST}/api/v0/user/{PA_USER}"
     session = requests.Session()
     # Validate credentials with the documented lightweight endpoint first.
@@ -69,9 +66,26 @@ def main():
         if len(data) < 100:
             raise RuntimeError("Unexpected empty production source: " + relative)
         print(relative, "bytes", len(data), "sha256", hashlib.sha256(data).hexdigest()[:16])
+    # Select an existing Bash console dynamically; never create or guess one.
+    consoles = api("GET", "/consoles/").json()
+    if not isinstance(consoles, list):
+        raise RuntimeError("Unexpected consoles API response")
+    bash_consoles = [
+        item for item in consoles
+        if isinstance(item, dict)
+        and str(item.get("executable", "")).split("/")[-1] == "bash"
+        and re.fullmatch(r"[0-9]{1,12}", str(item.get("id", "")))
+    ]
+    if len(bash_consoles) != 1:
+        raise RuntimeError(
+            f"Expected exactly one existing Bash console, found {len(bash_consoles)}; "
+            "refusing to select an ambiguous console"
+        )
+    console = str(bash_consoles[0]["id"])
     current = api("GET", "/consoles/" + console + "/").json()
-    if not str(current.get("id", console)) == console:
+    if str(current.get("id", console)) != console:
         raise RuntimeError("Console identity check failed")
+    print("Selected existing Bash console:", console)
     print("Bash console exists, uploading verified backup runner outside web root...")
     contents = Path(__file__).with_name("pd_safe_backup.py").read_bytes()
     try:

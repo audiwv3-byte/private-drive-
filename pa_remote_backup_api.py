@@ -76,16 +76,31 @@ def main():
         and str(item.get("executable", "")).split("/")[-1] == "bash"
         and re.fullmatch(r"[0-9]{1,12}", str(item.get("id", "")))
     ]
-    if len(bash_consoles) != 1:
+    # The console listing can include stale IDs that return 404 when opened.
+    # Probe every listed Bash console before deciding which one to use.
+    verified_consoles = []
+    for item in bash_consoles:
+        candidate = str(item["id"])
+        response = session.get(prefix + "/consoles/" + candidate + "/", timeout=35)
+        if response.status_code == 404:
+            print("Skipping stale Bash console:", candidate)
+            continue
+        if response.status_code != 200:
+            raise RuntimeError(
+                "Bash console verification failed: HTTP " + str(response.status_code)
+            )
+        details = response.json()
+        if str(details.get("id", candidate)) != candidate:
+            raise RuntimeError("Console identity check failed")
+        verified_consoles.append(candidate)
+    if len(verified_consoles) != 1:
         raise RuntimeError(
-            f"Expected exactly one existing Bash console, found {len(bash_consoles)}; "
-            "refusing to select an ambiguous console"
+            f"Expected one accessible Bash console, found {len(verified_consoles)} "
+            f"out of {len(bash_consoles)} listed; refusing an ambiguous selection. "
+            f"Accessible console IDs: {', '.join(verified_consoles)}"
         )
-    console = str(bash_consoles[0]["id"])
-    current = api("GET", "/consoles/" + console + "/").json()
-    if str(current.get("id", console)) != console:
-        raise RuntimeError("Console identity check failed")
-    print("Selected existing Bash console:", console)
+    console = verified_consoles[0]
+    print("Selected verified Bash console:", console)
     print("Bash console exists, uploading verified backup runner outside web root...")
     contents = Path(__file__).with_name("pd_safe_backup.py").read_bytes()
     try:

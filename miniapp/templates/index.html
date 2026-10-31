@@ -231,7 +231,7 @@ function pdOnboardingStart(user){
  const restored=pdObRead('pdOnboardingStage');pdShowOnboarding(!chosen?'language':['passenger','driver','role'].includes(restored)?restored:'role');
 }
 async function pdCompletePassengerRegistration(){const r=await api('/api/me');window.pdOnboardingUser=r;pdbUpdateProfile(r);$('name').value=r.name||'';$('phone').value=r.phone||'';pdObStore('pdDriverPassengerView:'+r.id,'yes');pdHideOnboarding();go(11)}
-function pdObSigned(){if(initData)return true;$('pdObStatus').textContent=pdL('Откройте приложение из Telegram-бота для регистрации.');return false}
+function pdObSigned(){if(initData)return true;const status=$('pdObStatus');status.textContent=pdL('Регистрация доступна через Telegram-бот PRIVATE DRIVE. ');const a=document.createElement('a');a.href='https://t.me/EuroBalticTransferBot?start=register';a.target='_blank';a.rel='noopener noreferrer';a.textContent=pdL('Открыть Telegram →');status.append(a);return false}
 async function pdRegisterPassenger(){
  if(pdObBusy||!pdObSigned())return;pdObBusy=true;$('pdObPassengerSubmit').disabled=true;$('pdObStatus').textContent=pdL('Сохраняем…');
  try{await api('/api/register',{name:$('pdObPassengerName').value.trim(),phone:$('pdObPassengerPhone').value.trim()});await pdCompletePassengerRegistration()}
@@ -865,7 +865,7 @@ async function pdbSaveProfile(){
 }
 async function pdbRegisterTelegram(){
  if(pdbProfileBusy)return;const status=$('pdbProfileStatus');
- if(!initData){status.textContent=pdL("Откройте приложение из Telegram-бота для регистрации.");return}
+ if(!initData){status.textContent=pdL("Для регистрации через Telegram откройте бота PRIVATE DRIVE.");const a=document.createElement('a');a.href='https://t.me/EuroBalticTransferBot?start=register';a.textContent=pdL('Открыть Telegram-бот PRIVATE DRIVE →');a.target='_blank';a.rel='noopener noreferrer';a.style.cssText='display:inline-block;padding:12px;margin-top:8px;border:1px solid #d6b467;border-radius:10px;color:#f4d38d';status.append(document.createElement('br'),a);return}
  if(!tg?.isVersionAtLeast?.('6.9')||typeof tg.requestContact!=='function'){status.textContent=pdL("В этой версии Telegram недоступна передача контакта. Укажите данные вручную.");pdbEditProfile();return}
  pdbProfileBusy=true;$('pdbTelegramRegister').disabled=true;
  try{const prepared=await api('/api/register/telegram');if(prepared.registered){pdbUpdateProfile(prepared);return}

@@ -68,29 +68,39 @@ def main():
     finally:
         pass
     nonce = secrets.token_hex(8)
-    command = "echo PD_BACKUP_START_" + nonce + " && python " + RUNNER + " --root " + PROJECT + " --backup"
-    api("POST", "/consoles/" + console + "/send_input/", data={"input": command + "\n"})
-    print("Backup command submitted; checking PythonAnywhere console output...")
-    start_seen = False
-    pattern = re.compile(r"BACKUP_VERIFIED\s+(/home/wilsonpark/private_drive_backups/snapshot_[A-Za-z0-9_]+)")
-    snapshot = None
-    for _ in range(18):
+    status_path = "/home/wilsonpark/pd_backup_status_" + nonce + ".txt"
+    log_path = "/home/wilsonpark/pd_backup_log_" + nonce + ".txt"
+    # Never depend on the browser console's rolling 500-character buffer.
+    # Shell writes a private status file even if the backup utility fails.
+    command = (
+        "umask 077; python3 " + RUNNER + " --root " + PROJECT
+        + " --backup > " + log_path
+        + " 2>&1; status=$?; if [ \"$status\" -eq 0 ]; "
+        + "then printf 'OK\\n' > " + status_path
+        + "; else printf 'FAILED\\n' > " + status_path + "; fi"
+    )
+    api("POST", "/consoles/" + console + "/send_input/", data={"input": command + "\\n"})
+    print("Backup command submitted; waiting for private status file...")
+    status = ""
+    for _ in range(24):
         time.sleep(5)
-        result = api("GET", "/consoles/" + console + "/get_latest_output/")
-        output = result.text
-        try:
-            payload = result.json()
-            if isinstance(payload, dict):
-                output = str(payload.get("output", payload))
-        except ValueError:
-            pass
-        start_seen = start_seen or "PD_BACKUP_START_" + nonce in output
-        match = pattern.search(output)
-        if start_seen and match:
-            snapshot = match.group(1)
-            break
-    if not snapshot:
-        raise RuntimeError("Backup confirmation not received; remote source files were not altered")
+        response = session.get(prefix + "/files/path" + status_path, timeout=35)
+        if response.status_code == 404:
+            continue
+        if response.status_code != 200:
+            raise RuntimeError("Backup status check failed: HTTP " + str(response.status_code))
+        status = response.text.strip()
+        break
+    if status != "OK":
+        if status == "FAILED":
+            raise RuntimeError("Remote backup failed. Review private PythonAnywhere log: " + log_path)
+        raise RuntimeError("No verified completion status from remote console; source files unchanged")
+    log = api("GET", "/files/path" + log_path).text
+    pattern = re.compile(r"BACKUP_VERIFIED\\s+(/home/wilsonpark/private_drive_backups/snapshot_[A-Za-z0-9_]+)")
+    match = pattern.search(log)
+    if not match:
+        raise RuntimeError("Remote script reported OK but no snapshot path was found")
+    snapshot = match.group(1)
     manifest_resp = api("GET", "/files/path" + snapshot + "/MANIFEST.json")
     manifest = manifest_resp.json()
     names = manifest.get("files", {})

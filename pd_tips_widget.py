@@ -18,7 +18,7 @@ def register(app):
     @app.get('/assets/pd-contact-icons.css')
     def pd_contact_icons_style():
         response=Response(Path(__file__).with_name('pd_contact_icons.css').read_text(),mimetype='text/css')
-        response.headers['Cache-Control']='public, max-age=300'
+        response.headers['Cache-Control']='no-store, max-age=0'
         return response
     @app.after_request
     def pd_add_paypal_tips_option(response):

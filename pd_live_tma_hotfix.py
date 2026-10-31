@@ -46,6 +46,14 @@ def sha(data):
 def transform_widget(text):
     if 'def asset_version(' in text and "asset_version('pd_tips_widget.js')" in text:
         return text  # Already using content-addressed assets.
+    guard = GUARD.search(text)
+    script = JS.search(text)
+    if not guard or not script:
+        raise RuntimeError('Missing matched cached asset references; refusing edit')
+    guard_version = guard.group(0).split('?v=',1)[1].split('"',1)[0]
+    script_version = script.group(0).split('?v=',1)[1].split('"',1)[0]
+    if guard_version != script_version:
+        raise RuntimeError('Inconsistent script guard and asset version; refusing edit')
     if text.count('from pathlib import Path') != 1:
         raise RuntimeError('Unexpected widget imports; refusing live edit')
     text=text.replace('from pathlib import Path', 'from pathlib import Path\nfrom hashlib import sha256', 1)

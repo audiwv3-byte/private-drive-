@@ -913,3 +913,7 @@ pd_crypto_manual.register(app, core, auth, cents_for_order)
 
 import pd_tips_widget
 pd_tips_widget.register(app)
+
+# Read-only deployment fingerprint, without sensitive data.
+import pd_release_probe
+pd_release_probe.register(app)

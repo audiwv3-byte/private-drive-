@@ -93,14 +93,17 @@ def main():
         if str(details.get("id", candidate)) != candidate:
             raise RuntimeError("Console identity check failed")
         verified_consoles.append(candidate)
-    if len(verified_consoles) != 1:
-        raise RuntimeError(
-            f"Expected one accessible Bash console, found {len(verified_consoles)} "
-            f"out of {len(bash_consoles)} listed; refusing an ambiguous selection. "
-            f"Accessible console IDs: {', '.join(verified_consoles)}"
-        )
-    console = verified_consoles[0]
-    print("Selected verified Bash console:", console)
+    if not verified_consoles:
+        raise RuntimeError("No accessible Bash console found")
+    requested = os.environ.get("PA_CONSOLE_ID", "").strip()
+    if requested in verified_consoles:
+        console = requested
+    else:
+        # The user opened a fresh Bash console for this backup. Use the
+        # highest verified numeric console ID, not an unverified stale default.
+        console = max(verified_consoles, key=int)
+    print("Selected verified Bash console:", console,
+          "out of", len(verified_consoles), "accessible consoles")
     print("Bash console exists, uploading verified backup runner outside web root...")
     contents = Path(__file__).with_name("pd_safe_backup.py").read_bytes()
     try:

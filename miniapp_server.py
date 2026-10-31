@@ -194,6 +194,13 @@ def pd_pet_price(base, data):
     amount = Decimal(str(base).replace(',', '.'))
     if pd_pet_extras(data):
         amount *= Decimal('1.10')
+    extras = data.get('extras') or []
+    if not isinstance(extras, list):
+        raise ValueError('Некорректные дополнительные услуги')
+    if 'Трезвый водитель' in extras:
+        amount *= Decimal('2')
+    if 'Встреча с табличкой' in extras:
+        amount += Decimal('15.00')
     return format(amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP), '.2f')
 
 @app.post('/api/route')
@@ -267,6 +274,10 @@ def create_order():
     details=str(d.get('details','')).strip()
     if len(details)>1000: raise ValueError('Пожелания слишком длинные')
     if has_pet: details += '; С питомцем: доплата 10% к базовой стоимости'
+    chosen_extras=d.get('extras') or []
+    if not isinstance(chosen_extras,list): raise ValueError('Некорректные дополнительные услуги')
+    if 'Трезвый водитель' in chosen_extras: details += '; Трезвый водитель: тариф x2'
+    if 'Встреча с табличкой' in chosen_extras: details += '; Встреча с табличкой: +15 EUR'
     if point_details:details+='; '+point_details
     if stop_address:details+='\nОстановка: '+stop_address
     km = minutes = None

@@ -191,10 +191,10 @@ def validate_route_data(data):
         pd_map_points.read_point(data, key)
 
 def pd_pet_price(base, data):
-    amount = Decimal(str(base).replace(',', '.'))
-    if pd_pet_extras(data):
-        amount *= Decimal('1.10')
-    return format(amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP), '.2f')
+    # Единая формула: основная поездка, питомец, трезвый водитель и встреча.
+    # Клиент не может передать свою цену; расчёт выполняется на сервере.
+    import pd_extra_services
+    return pd_extra_services.breakdown(base, data)['total']
 
 @app.post('/api/route')
 def route():
@@ -267,6 +267,10 @@ def create_order():
     details=str(d.get('details','')).strip()
     if len(details)>1000: raise ValueError('Пожелания слишком длинные')
     if has_pet: details += '; С питомцем: доплата 10% к базовой стоимости'
+    if 'Встреча с табличкой' in d.get('extras', []):
+        details += '; Встреча с табличкой: +20 EUR'
+    if 'Трезвый водитель' in d.get('extras', []):
+        details += '; Трезвый водитель: пилот управляет автомобилем клиента, тариф поездки x2; выполнение после подтверждения пилотом'
     if point_details:details+='; '+point_details
     if stop_address:details+='\nОстановка: '+stop_address
     km = minutes = None
@@ -909,3 +913,7 @@ pd_crypto_manual.register(app, core, auth, cents_for_order)
 
 import pd_tips_widget
 pd_tips_widget.register(app)
+
+# Read-only deployment fingerprint, without sensitive data.
+import pd_release_probe
+pd_release_probe.register(app)

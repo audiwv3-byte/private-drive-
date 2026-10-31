@@ -75,6 +75,13 @@ body.pd-passenger-view #pdRoleBar,body.pd-passenger-view #adminNav,
 body.pd-passenger-view #pdPilotBack,body.pd-passenger-view .pd-driver-entry,
 body.pd-passenger-view #step10,body.pd-passenger-view #step13,
 body.pd-passenger-view #pdPilotWork{display:none!important}
+</style><style id="pd-cabin-temperature-layout">
+/* Температура: отдельные строки и нормальный поток, без наложения текста на значение. */
+#pdbTemperatureField{display:flex;flex-direction:column;align-items:stretch;gap:8px;clear:both;position:relative;min-width:0;width:100%;max-width:100%;box-sizing:border-box;margin:12px 0 16px;overflow:visible}
+#pdbTemperatureField label{display:block;position:static!important;transform:none!important;float:none!important;width:100%;margin:0;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
+#pdbTemperatureField select{display:block;position:static!important;float:none!important;width:100%;max-width:100%;min-width:0;min-height:50px;box-sizing:border-box;padding:10px 16px;line-height:1.4;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;appearance:auto;transform:none!important;z-index:auto}
+#pdbTemperatureField select option{white-space:normal}
+@media(max-width:600px){#pdbTemperatureField{width:100%}#pdbTemperatureField label{font-size:14px}#pdbTemperatureField select{font-size:16px;min-height:52px}}
 </style></head><body class="pd-onboarding-active"><main class="shell"><header class="brand pd-branded-header"><div class="pd-brand-lockup"><img class="pd-monogram pd-official-logo" src="/assets/private-drive-official-logo.jpeg" alt="Фирменный логотип PD — privatdrive" width="76" height="76" fetchpriority="high"><div class="pd-brand-wordmark"><strong>privatdrive</strong><span>EURO BALTIC TRANSFER</span></div></div><small>Premium Transfers</small><button type="button" class="secondary" id="pdTipsAlways" onclick="pdOpenTipInfo()" style="flex:none;padding:10px 12px;font-size:13px">💛 Чаевые</button></header><section id="pdOnboarding" class="panel pd-onboarding-panel" aria-live="polite">
 <div id="pdObLoading">Загрузка…</div>
 <div id="pdObLanguage" class="hidden"><h1>Выберите язык</h1><p class="muted">Choose language · Pasirinkite kalbą</p><div class="pd-ob-language-options"><button type="button" lang="en" onclick="pdChooseInitialLanguage('en')">EN</button><button type="button" lang="lt" onclick="pdChooseInitialLanguage('lt')">LT</button><button type="button" lang="ru" onclick="pdChooseInitialLanguage('ru')">RU</button></div></div>
@@ -110,7 +117,7 @@ body.pd-passenger-view #pdPilotWork{display:none!important}
 <div class="pdb-grid"><div><label>📅 Дата поездки</label><input id="pdbDate" type="date"></div><div><label>🕘 Время (Вильнюс)</label><input id="pdbTime" type="time" value="12:00"></div></div>
 
 <div class="pdb-grid"><div><label id="pdbPassengersLabel" for="pdbPassengers">Пассажиры</label><select id="pdbPassengers"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div><div><label id="pdbLuggageLabel" for="pdbLuggage">Багаж</label><select id="pdbLuggage"><option value="Не указано">Не указано</option><option value="Без багажа">Без багажа</option><option value="1 чемодан">1 чемодан</option><option value="2 чемодана">2 чемодана</option><option value="3+ чемодана">3+ чемодана</option></select></div></div>
-<label>Что сделает дорогу удобнее?</label><div class="pdb-opts" id="pdbExtras"><button type="button" class="active" data-extra="Без пожеланий">✓ Без пожеланий</button><button type="button" data-extra="Дополнительная остановка">Доп. остановка</button><button type="button" data-extra="Встреча с табличкой">+ Встреча с табличкой</button><button type="button" data-extra="Перевозка животного">🐾 С питомцем</button><button type="button" data-extra="Тишина в салоне">+ Тишина</button></div>
+<label>Что сделает дорогу удобнее?</label><div class="pdb-temperature-field" id="pdbTemperatureField"><label for="pdbCabinTemp">Температура в салоне автомобиля</label><select id="pdbCabinTemp" aria-label="Температура в салоне автомобиля"><option value="">Температура не указана</option><option value="18">18 °C</option><option value="19">19 °C</option><option value="20">20 °C</option><option value="21">21 °C</option><option value="22">22 °C</option><option value="23">23 °C</option><option value="24">24 °C</option><option value="25">25 °C</option><option value="26">26 °C</option></select></div><div class="pdb-opts" id="pdbExtras"><button type="button" class="active" data-extra="Без пожеланий">✓ Без пожеланий</button><button type="button" data-extra="Дополнительная остановка">Доп. остановка</button><button type="button" data-extra="Встреча с табличкой">+ Встреча с табличкой</button><button type="button" data-extra="Трезвый водитель">Трезвый водитель</button><button type="button" data-extra="Перевозка животного">🐾 С питомцем</button><button type="button" data-extra="Тишина в салоне">+ Тишина</button></div>
 <label>Дополнительный комментарий</label><textarea id="pdbWishes" maxlength="550" placeholder="Номер рейса, пожелания по времени, адресу подачи…"></textarea>
 <label>Как хотите оплатить?</label><div class="pdb-pay" id="pdbPays"><button type="button" class="active" data-method="Наличными">💶 Наличными</button><button type="button" data-method="Банковский перевод">🏦 Банковский перевод</button><button type="button" data-method="Криптовалюта">₿ Крипто</button></div>
 <div id="pdBookingProfileHome"><div class="pdb-price" id="pdbProfile"><h3>Ваш профиль</h3><p id="pdbProfileSummary">Зарегистрируйтесь через Telegram или укажите данные вручную.</p><p class="pdb-note pd-privacy-notice">Имя, телефон и сведения о поездке используются для регистрации и выполнения заказа. Email, город и постоянные пожелания необязательны. <a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="/legal" target="_blank" rel="noopener noreferrer">Условия поездки и оплаты</a>. Обращения о данных: <a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a> · <a href="https://t.me/PrivatDraiv" target="_blank" rel="noopener noreferrer" data-pd-telegram-contact="true">@PrivatDraiv</a>.</p><button type="button" id="pdbTelegramRegister" class="pay-choice" onclick="pdbRegisterTelegram()">Продолжить с Telegram</button><button type="button" class="secondary pay-choice" onclick="pdbEditProfile()">Изменить данные</button><div id="pdbProfileFields" class="hidden"><label for="pdbName">Ваше имя</label><input id="pdbName" autocomplete="name" placeholder="Имя"><label for="pdbPhone">Телефон</label><input id="pdbPhone" autocomplete="tel" type="tel" placeholder="+370..."><details class="pd-profile-details"><summary>Дополнить профиль (необязательно)</summary><p>Контакты и пожелания для связи по вашим поездкам. Эти данные видны администратору и водителю сервиса. Дополнительные поля необязательны. История изменений доступна только администратору. По вопросам удаления данных свяжитесь с нами.</p><label for="pdbEmail">Электронная почта</label><input id="pdbEmail" type="email" maxlength="254" autocomplete="email" placeholder="name@example.com"><label for="pdbHomeCity">Ваш город</label><input id="pdbHomeCity" maxlength="120" autocomplete="address-level2"><label for="pdbPreferences">Постоянные пожелания к поездкам</label><textarea id="pdbPreferences" maxlength="1000" placeholder="Например: тишина в салоне"></textarea><p>Для конкретного заказа укажите пожелания также в деталях поездки.</p></details><button type="button" class="pay-choice" id="pdbSaveProfile" onclick="pdbSaveProfile()">Сохранить данные</button></div><p id="pdbProfileStatus" class="pdb-note" role="status">Телефон передаётся только с вашего разрешения. Данные можно изменить.</p></div></div>
@@ -596,19 +603,25 @@ function pdbInit(){
  $('pdbPopular').addEventListener('click',e=>{const b=e.target.closest('button[data-origin]');if(!b)return;$('pdbOrigin').value=b.dataset.origin;$('pdbDest').value=b.dataset.dest;pdbSelectedPoints={};pdbPointVersion++;pdbInvalidate();pdbSummary();$('pdbDest').focus()});
 
  for(const id of ['pdbOrigin','pdbDest'])$(id).addEventListener('input',()=>{delete pdbSelectedPoints[id];pdbPointVersion++;pdbInvalidate();pdbSummary()});
- for(const id of ['pdbDate','pdbTime'])$(id).addEventListener('change',pdbSummary);
+ for(const id of ['pdbDate','pdbTime','pdbCabinTemp'])$(id).addEventListener('change',pdbSummary);
  pdbSummary();
 }
 
 function pdbUpdatePetPrice(){
  if(!pdbRoute?.available)return;
  const base=Number(String(pdbRoute.base_price??pdbRoute.price).replace(',','.'));
- const hasPet=pdbChosen.has('Перевозка животного');
- const total=Math.round((base*(hasPet?1.10:1)+Number.EPSILON)*100)/100;
+ const pet=pdbChosen.has('Перевозка животного')?base*.10:0;
+ const sober=pdbChosen.has('Трезвый водитель')?base:0;
+ const meeting=pdbChosen.has('Встреча с табличкой')?20:0;
+ const total=Math.round((base+pet+sober+meeting+Number.EPSILON)*100)/100;
  $('pdbPrice').textContent=total.toFixed(2)+' €';
  let note=$('pdbPetPriceNote');
  if(!note){note=document.createElement('p');note.id='pdbPetPriceNote';note.className='pdb-note';note.setAttribute('role','status');$('pdbPrice').parentElement.append(note)}
- note.textContent=hasPet?pdL("Включена доплата за питомца: 10% (")+(total-base).toFixed(2)+' €)':'';
+ const services=[];
+ if(pet)services.push(pdL("Питомец")+': +'+pet.toFixed(2)+' €');
+ if(sober)services.push(pdL("Трезвый водитель")+': +'+sober.toFixed(2)+' €');
+ if(meeting)services.push(pdL("Встреча с табличкой")+': +'+meeting.toFixed(2)+' €');
+ note.textContent=services.join(' · ');
 }
 
 function pdbSummary(){ pdbUpdatePetPrice(); $('pdbSummary').innerHTML='<div>📍 '+escapeHtml($('pdbOrigin').value||pdL("Откуда"))+($('pdbStop').value.trim()?' → '+escapeHtml($('pdbStop').value.trim()):'')+' → '+escapeHtml($('pdbDest').value||pdL("Куда"))+(pdIsRoundtrip()?' · '+escapeHtml(pdBookingText('return')):'')+'</div><div>📅 '+escapeHtml($('pdbDate').value||pdL("Дата"))+' · '+escapeHtml($('pdbTime').value)+'</div><div>💳 '+escapeHtml(pdL(pdbPay))+'</div>';}
@@ -662,7 +675,8 @@ async function pdbSendOrder(){
  pdbOrderBusy=true;const btt=$('pdbSend');btt.disabled=true;
  try{
   const date=$('pdbDate').value.split('-').reverse().join('.');const extra=[...pdbChosen].filter(x=>x!=='Без пожеланий');
-  const details='Услуги: '+(extra.join(', ')||'Без пожеланий')+'; Комментарий: '+($('pdbWishes').value.trim()||'Нет');
+  const cabin=$('pdbCabinTemp')?.value;
+  const details='Услуги: '+(extra.join(', ')||'Без пожеланий')+'; Температура в салоне: '+(cabin?cabin+' °C':'не указана')+'; Комментарий: '+($('pdbWishes').value.trim()||'Нет');
   const payload={origin:a,destination:b,...pdStopPayload(),trip_date:date,trip_time:$('pdbTime').value,roundtrip:pdIsRoundtrip(),passengers:Number($('pdbPassengers').value),luggage:$('pdbLuggage').value,details,extras:extra,payment_method:pdbPay,...pdbPointPayload()};
   const request_key=await pdbRequestKey(payload);
   feedback.textContent=pdL("Отправляем заявку…");await api('/api/register',{name,phone});

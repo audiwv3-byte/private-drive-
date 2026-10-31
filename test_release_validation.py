@@ -70,6 +70,20 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     with patch.object(server.pd_stops,'directions',return_value=(feature,[25.28,54.68],[23.90,54.89])):
         estimate=check(call('/api/route',request),200)
     assert estimate['price']=='143.00',estimate
+    # Verify optional-service prices through the signed route API, not just the pure helper.
+    from decimal import Decimal
+    base = Decimal(str(estimate['base_price']))
+    service_cases = [
+        (['Встреча с табличкой'], base + Decimal('20.00')),
+        (['Трезвый водитель'], base * 2),
+        (['Перевозка животного', 'Встреча с табличкой', 'Трезвый водитель'],
+         base * Decimal('2.10') + Decimal('20.00')),
+    ]
+    for extras, expected in service_cases:
+        with patch.object(server.pd_stops, 'directions', return_value=(feature,[25.28,54.68],[23.90,54.89])):
+            actual = check(call('/api/route', request | {'extras': extras}), 200)
+        assert Decimal(actual['price']) == expected.quantize(Decimal('0.01')), (extras, actual)
+    print('PASS signed route API: meeting fee, sober double tariff, combined pet surcharge')
     for changes in [{'origin':{}},{'roundtrip':'false'},{'origin_coordinates':[float('nan'),54]},{'origin_coordinates':[999,54]},{'extras':{}},{'stop_address':[]}]:
         check(call('/api/route',request|changes),400)
     future=(core.now()+__import__('datetime').timedelta(days=2)).strftime('%d.%m.%Y')

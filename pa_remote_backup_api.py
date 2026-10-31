@@ -31,7 +31,7 @@ FILES = (
 def main():
     # A copied API-token string may include line wraps or an HTTP "Token " prefix.
     # Normalize formatting only; never print or persist the credential.
-    token = re.sub(r"^Token\\s+", "", os.environ.get("PA_API_TOKEN", "").strip(), flags=re.I)
+    token = re.sub(r"^Token\s+", "", os.environ.get("PA_API_TOKEN", "").strip(), flags=re.I)
     token = "".join(token.split())
     console = os.environ.get("PA_CONSOLE_ID", "").strip()
     if not token:
@@ -40,7 +40,14 @@ def main():
         raise RuntimeError("PA_CONSOLE_ID must be a numeric Bash console ID")
     prefix = f"https://{PA_HOST}/api/v0/user/{PA_USER}"
     session = requests.Session()
+    # Validate credentials with the documented lightweight endpoint first.
+    # Never print the token, request header, or server response body.
     session.headers.update({"Authorization": "Token " + token})
+    probe = session.get(prefix + "/cpu/", timeout=35)
+    if probe.status_code == 401:
+        raise RuntimeError("PythonAnywhere authorization rejected (401). Verify account, token, and API host.")
+    if probe.status_code != 200:
+        raise RuntimeError(f"PythonAnywhere API probe failed: HTTP {probe.status_code}")
     def api(method, endpoint, **kwargs):
         response = session.request(method, prefix + endpoint, timeout=35, **kwargs)
         if not response.ok:
@@ -82,7 +89,7 @@ def main():
         + "then printf 'OK\\n' > " + status_path
         + "; else printf 'FAILED\\n' > " + status_path + "; fi"
     )
-    api("POST", "/consoles/" + console + "/send_input/", data={"input": command + "\\n"})
+    api("POST", "/consoles/" + console + "/send_input/", data={"input": command + "\n"})
     print("Backup command submitted; waiting for private status file...")
     status = ""
     for _ in range(24):
@@ -99,7 +106,7 @@ def main():
             raise RuntimeError("Remote backup failed. Review private PythonAnywhere log: " + log_path)
         raise RuntimeError("No verified completion status from remote console; source files unchanged")
     log = api("GET", "/files/path" + log_path).text
-    pattern = re.compile(r"BACKUP_VERIFIED\\s+(/home/wilsonpark/private_drive_backups/snapshot_[A-Za-z0-9_]+)")
+    pattern = re.compile(r"BACKUP_VERIFIED\s+(/home/wilsonpark/private_drive_backups/snapshot_[A-Za-z0-9_]+)")
     match = pattern.search(log)
     if not match:
         raise RuntimeError("Remote script reported OK but no snapshot path was found")

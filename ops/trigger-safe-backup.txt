@@ -6,3 +6,4 @@ Check revised API authentication and protected backup; requested 2026-10-31.
 Verify official PythonAnywhere US and EU API authentication; requested 2026-10-31.
 Authorized retry after user opened PythonAnywhere Bash console on 2026-10-31 (Vilnius 22:24); backup only, no production deployment.
 Retry after validating and filtering stale PythonAnywhere Bash consoles, 2026-10-31; backup-only.
+Explicit verified Bash selection retry 2026-10-31; no deployment.

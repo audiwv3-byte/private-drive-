@@ -1,5 +1,9 @@
 name: PRIVATE DRIVE - production backup (manual only)
 on:
+  push:
+    branches: [main]
+    paths:
+      - ops/trigger-safe-backup.txt
   workflow_dispatch:
     inputs:
       bash_console_id:
@@ -23,5 +27,5 @@ jobs:
       - name: Verify production files and create consistent source/SQLite backup
         env:
           PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
-          PA_CONSOLE_ID: ${{ inputs.bash_console_id }}
+          PA_CONSOLE_ID: ${{ inputs.bash_console_id || '48900994' }}
         run: python pa_remote_backup_api.py

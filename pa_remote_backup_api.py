@@ -29,7 +29,10 @@ FILES = (
 
 
 def main():
-    token = os.environ.get("PA_API_TOKEN", "").strip()
+    # A copied API-token string may include line wraps or an HTTP "Token " prefix.
+    # Normalize formatting only; never print or persist the credential.
+    token = re.sub(r"^Token\\s+", "", os.environ.get("PA_API_TOKEN", "").strip(), flags=re.I)
+    token = "".join(token.split())
     console = os.environ.get("PA_CONSOLE_ID", "").strip()
     if not token:
         raise RuntimeError("GitHub secret PA_API_TOKEN has not been configured")

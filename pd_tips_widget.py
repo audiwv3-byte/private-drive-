@@ -1,14 +1,19 @@
 """Public page widgets and shared contact icons."""
 from pathlib import Path
+from hashlib import sha256
 import os
 from urllib.parse import urlsplit
 from flask import request, Response
 PAGES={'/','/privacy','/legal','/driver-privacy','/payment-terms'}
+
+def asset_version(name):
+    # Content-addressed URL makes Telegram's embedded WebView fetch each new release.
+    return sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()[:16]
 def register(app):
     @app.get('/assets/pd-tips-widget.js')
     def pd_tips_widget_script():
         response=Response(Path(__file__).with_suffix('.js').read_text(),mimetype='application/javascript')
-        response.headers['Cache-Control']='public, max-age=300'
+        response.headers['Cache-Control']='no-store, max-age=0'
         return response
     @app.get('/assets/pd-contact-icons.css')
     def pd_contact_icons_style():
@@ -42,13 +47,13 @@ def register(app):
             return response
         html=response.get_data(as_text=True)
         if 'pd-contact-icons.css' not in html:
-            css='<link rel="stylesheet" href="/assets/pd-contact-icons.css?v=20261028">'
+            css='<link rel="stylesheet" href="/assets/pd-contact-icons.css?v='+asset_version('pd_contact_icons.css')+'">'
             html=html.replace('</head>',css+'</head>') if '</head>' in html else css+html
-        if 'src="/assets/pd-tips-widget.js?v=20261031-tips-methods-v4"' not in html:
+        if 'src="/assets/pd-tips-widget.js?' not in html:
             scripts=''
             if 'telegram-web-app.js' not in html:
                 scripts+='<script src="https://telegram.org/js/telegram-web-app.js"></script>'
-            scripts+='<script src="/assets/pd-tips-widget.js?v=20261031-tips-methods-v4"></script>'
+            scripts+='<script src="/assets/pd-tips-widget.js?v='+asset_version('pd_tips_widget.js')+'"></script>'
             html=html.replace('</body>',scripts+'</body>') if '</body>' in html else html+scripts
         response.set_data(html)
         return response

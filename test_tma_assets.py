@@ -2,6 +2,7 @@
 import unittest
 from flask import Flask
 from pd_tips_widget import register, asset_version
+from pd_release_probe import register as register_release, fingerprint
 
 
 class TelegramMiniAppAssetTests(unittest.TestCase):
@@ -9,6 +10,7 @@ class TelegramMiniAppAssetTests(unittest.TestCase):
         app = Flask(__name__)
         app.add_url_rule('/', endpoint='home', view_func=lambda: '<html><head></head><body><main>PRIVATE DRIVE</main></body></html>')
         register(app)
+        register_release(app)
         self.client = app.test_client()
 
     def test_versioned_assets_not_cached(self):
@@ -23,6 +25,14 @@ class TelegramMiniAppAssetTests(unittest.TestCase):
             resource = self.client.get(path)
             self.assertEqual(resource.status_code, 200)
             self.assertIn('no-store', resource.headers.get('Cache-Control',''))
+
+    def test_public_release_fingerprint_is_current_and_uncached(self):
+        response = self.client.get('/api/release')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json.get('release'), fingerprint())
+        self.assertEqual(len(response.json.get('release','')), 16)
+        self.assertIn('no-store', response.headers.get('Cache-Control',''))
+        self.assertNotIn('token', str(response.json).lower())
 
     def test_telegram_sdk_initialized_once_in_booking_template(self):
         from pathlib import Path

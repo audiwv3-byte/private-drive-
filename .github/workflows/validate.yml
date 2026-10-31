@@ -15,5 +15,5 @@ jobs:
       - run: pip install -r requirements-runtime.lock.txt
       - run: python test_release_validation.py
       - run: python test_tips_entry.py
-      - run: python -m unittest -v test_extra_services
+      - run: python -m unittest -v test_extra_services test_safe_backup
       - run: node test_role_visibility.cjs

@@ -45,7 +45,16 @@ def main():
     session.headers.update({"Authorization": "Token " + token})
     probe = session.get(prefix + "/cpu/", timeout=35)
     if probe.status_code == 401:
-        raise RuntimeError("PythonAnywhere authorization rejected (401). Verify account, token, and API host.")
+        # PythonAnywhere hosts US and EU accounts on separate official API servers.
+        # Probe the EU host read-only; neither endpoint receives application data.
+        eu_probe = session.get("https://eu.pythonanywhere.com/api/v0/user/" + PA_USER + "/cpu/", timeout=35)
+        if eu_probe.status_code == 200:
+            raise RuntimeError("Token is valid on PythonAnywhere EU, but the live site is configured for the US host; no backup was attempted")
+        raise RuntimeError(
+            "PythonAnywhere auth rejected on both official hosts: US HTTP 401, EU HTTP "
+            + str(eu_probe.status_code)
+            + ". Check GitHub secret PA_API_TOKEN against the live account."
+        )
     if probe.status_code != 200:
         raise RuntimeError(f"PythonAnywhere API probe failed: HTTP {probe.status_code}")
     def api(method, endpoint, **kwargs):

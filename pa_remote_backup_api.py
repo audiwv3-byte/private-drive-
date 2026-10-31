@@ -65,7 +65,19 @@ def main():
         data = response.content
         if len(data) < 100:
             raise RuntimeError("Unexpected empty production source: " + relative)
-        print(relative, "bytes", len(data), "sha256", hashlib.sha256(data).hexdigest()[:16])
+        live_sha = hashlib.sha256(data).hexdigest()
+        print(relative, "bytes", len(data), "sha256", live_sha[:16])
+        # Compare production source with this exact GitHub checkout without
+        # printing production contents or disclosing customer information.
+        github_copy = Path(__file__).resolve().parent / relative
+        if github_copy.is_file():
+            github_sha = hashlib.sha256(github_copy.read_bytes()).hexdigest()
+            print("SOURCE_COMPARE", relative,
+                  "MATCH" if github_sha == live_sha else "DIFFERENT",
+                  "github_bytes", github_copy.stat().st_size,
+                  "production_bytes", len(data))
+        else:
+            print("SOURCE_COMPARE", relative, "MISSING_IN_GITHUB")
     # Select an existing Bash console dynamically; never create or guess one.
     consoles = api("GET", "/consoles/").json()
     if not isinstance(consoles, list):

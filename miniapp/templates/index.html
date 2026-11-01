@@ -75,6 +75,44 @@ body.pd-passenger-view #pdRoleBar,body.pd-passenger-view #adminNav,
 body.pd-passenger-view #pdPilotBack,body.pd-passenger-view .pd-driver-entry,
 body.pd-passenger-view #step10,body.pd-passenger-view #step13,
 body.pd-passenger-view #pdPilotWork{display:none!important}
+</style>
+<style id="pd-vilnius-heritage-v1">
+/* PRIVATE DRIVE Vilnius heritage: CSS-only upgrade; no business logic or data changes. */
+:root{--pd-vh-gold:#e8c47c;--pd-vh-dark:#101014;--pd-vh-deep:#08090b}
+body{background:radial-gradient(ellipse 100% 32% at 50% 0%,#272013 0%,transparent 74%),#08090b}
+.pd-branded-header{border-bottom:1px solid #8a69384d;margin-bottom:16px;position:relative}
+.pd-branded-header:after{content:"";position:absolute;bottom:-1px;left:15%;right:15%;height:1px;background:linear-gradient(90deg,transparent,#f4d89c77,transparent)}
+.pd-branded-header .pd-brand-wordmark strong{letter-spacing:2px}
+#step0{position:relative;isolation:isolate;overflow:hidden;min-height:390px;padding:40px 23px;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;background:linear-gradient(0deg,#0d0d0efc 2%,#0b0b0ecc 42%,#12101470 90%),url("https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Vilnius_Old_Town_Skyline_at_dusk%2C_Lithuania_-_Diliff.jpg/1280px-Vilnius_Old_Town_Skyline_at_dusk%2C_Lithuania_-_Diliff.jpg") center 42%/cover no-repeat;border:1px solid #a88a5a76}
+#step0>h1,#step0>p,#step0>button,#step0>.actions{position:relative;z-index:1}
+#step0 h1{font-family:Georgia,serif;color:#ffe4ab;font-size:31px;max-width:360px}
+#step0>p{color:#f2dfc6;max-width:400px}
+#step0>button{border-radius:14px;background:linear-gradient(145deg,#fff1c5,#c58c3b);color:#16100a;border:1px solid #ffebbc}
+#step11 .pd-vh-hero{position:relative;isolation:isolate;overflow:hidden;min-height:276px;margin:0 0 16px;border:1px solid #967444;border-radius:23px;background:#151619;box-shadow:0 13px 37px #0007,inset 0 0 0 1px #ffdb8520}
+#step11 .pd-vh-photo{position:absolute;inset:0;background:linear-gradient(90deg,#08090bf2 0%,#08090bcc 38%,#08090b30 100%),linear-gradient(0deg,#090a0cf5 0%,transparent 58%),url("https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Vilnius_Old_Town_Skyline_at_dusk%2C_Lithuania_-_Diliff.jpg/1280px-Vilnius_Old_Town_Skyline_at_dusk%2C_Lithuania_-_Diliff.jpg") center 40%/cover no-repeat;transform:scale(1.035);animation:pd-vh-reveal 12s ease-in-out infinite alternate;z-index:-1}
+#step11 .pd-vh-hero:after{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ffe5a7,transparent);pointer-events:none}
+#step11 .pd-vh-content{position:relative;z-index:1;max-width:410px;padding:25px 22px 36px}
+#step11 .pd-vh-eyebrow{display:block;font-size:10px;font-weight:750;letter-spacing:3px;color:#eed29c;margin-bottom:15px}
+#step11 .pd-vh-title{font:normal clamp(26px,6.4vw,39px)/1.08 Georgia,'Times New Roman',serif;color:#fff3d3;text-shadow:0 3px 13px #000;max-width:310px}
+#step11 .pd-vh-subtitle{display:block;color:#dfd3bd;font-size:13px;line-height:1.5;max-width:310px;margin-top:9px;text-shadow:0 1px 8px #000}
+#step11 .pd-vh-featured-route{display:inline-flex;align-items:center;gap:10px;min-height:43px;padding:8px 12px;margin-top:20px;border-radius:12px;border:1px solid #ffd79098;background:linear-gradient(95deg,#b27b34c9,#191719dc);box-shadow:0 0 20px #c88a2e33;color:#fff3cf;font-size:12px;font-weight:700;line-height:1.3;text-align:left;transition:transform .15s ease,box-shadow .2s ease}
+#step11 .pd-vh-featured-route:hover,#step11 .pd-vh-featured-route:focus-visible{transform:translateY(-1px);box-shadow:0 0 26px #d79c4866;outline:2px solid #ffdf9b}
+#step11 .pd-vh-route-icon{width:20px;height:20px;flex:none;stroke:#ffe1a2;fill:none;stroke-width:1.8}
+#step11 .pd-vh-route-meta{font-size:10px;color:#f5dca4;font-weight:400;letter-spacing:.4px}
+#step11 .pd-vh-credit{position:absolute;bottom:8px;right:11px;color:#e4d6b9!important;text-decoration:underline;text-underline-offset:2px;font-size:9px;background:#0708099e;padding:2px 6px;border-radius:4px;z-index:2}
+#step11 .pd-vh-decoration{position:absolute;right:15px;top:14px;width:7px;height:7px;border-radius:50%;background:#f3ca77;box-shadow:0 0 17px 3px #e3b766;animation:pd-vh-pulse 3s ease-in-out infinite}
+#step11 .pd-route-card{border-color:#927346;background:linear-gradient(135deg,#1a1917,#0d0e10);box-shadow:0 13px 32px #0006}
+#step11 .pd-route-title{color:#f5d495}
+#step11 .pd-address-field>input{box-shadow:inset 0 1px 0 #ffffff10;transition:border-color .2s,box-shadow .2s}
+#step11 .pd-address-field>input:focus{border-color:#f2c973;box-shadow:0 0 0 3px #e7ba6832}
+#step11 #pdbPopular button{border-radius:12px;transition:background .18s,border-color .18s}
+#step11 #pdbPopular button:hover{border-color:#f6d28a;background:#3a2c17}
+#step11 .pdb-primary,#step11 .pd-booking-dock .pdb-primary{border-color:#ffdea1;background:linear-gradient(120deg,#fff0be 0%,#efc372 46%,#c58f3f 100%)!important;color:#1d160b!important;box-shadow:0 4px 20px #e6aa4152}
+#step11 .pdb-card{border-radius:21px}
+@keyframes pd-vh-reveal{from{transform:scale(1.035)}to{transform:scale(1.095)}}
+@keyframes pd-vh-pulse{50%{opacity:.4;box-shadow:0 0 4px 1px #e3b766}}
+@media(max-width:480px){#step11 .pd-vh-hero{min-height:258px;border-radius:19px}#step11 .pd-vh-content{padding:24px 17px 31px}#step11 .pd-vh-photo{background-position:57% center}#step11 .pd-vh-title{max-width:225px}#step11 .pd-vh-subtitle{max-width:245px}#step11 .pd-vh-featured-route{max-width:100%}#step0{min-height:330px;padding:26px 18px}}
+@media(prefers-reduced-motion:reduce){#step11 .pd-vh-photo,#step11 .pd-vh-decoration{animation:none}#step11 .pd-vh-featured-route{transition:none}}
 </style></head><body class="pd-onboarding-active"><main class="shell"><header class="brand pd-branded-header"><div class="pd-brand-lockup"><img class="pd-monogram pd-official-logo" src="/assets/private-drive-official-logo.jpeg" alt="Фирменный логотип PD — privatdrive" width="76" height="76" fetchpriority="high"><div class="pd-brand-wordmark"><strong>privatdrive</strong><span>EURO BALTIC TRANSFER</span></div></div><small>Premium Transfers</small><button type="button" class="secondary" id="pdTipsAlways" onclick="pdOpenTipInfo()" style="flex:none;padding:10px 12px;font-size:13px">💛 Чаевые</button></header><section id="pdOnboarding" class="panel pd-onboarding-panel" aria-live="polite">
 <div id="pdObLoading">Загрузка…</div>
 <div id="pdObLanguage" class="hidden"><h1>Выберите язык</h1><p class="muted">Choose language · Pasirinkite kalbą</p><div class="pd-ob-language-options"><button type="button" lang="en" onclick="pdChooseInitialLanguage('en')">EN</button><button type="button" lang="lt" onclick="pdChooseInitialLanguage('lt')">LT</button><button type="button" lang="ru" onclick="pdChooseInitialLanguage('ru')">RU</button></div></div>
@@ -104,6 +142,21 @@ body.pd-passenger-view #pdPilotWork{display:none!important}
 <details class="pd-driver-admin" ontoggle="if(this.open)pdLoadDriverApplications()"><summary>Заявки водителей</summary><div id="pdDriverApplicationsList"></div></details><div class="actions"><button class="secondary" onclick="pdReload()">↻ Обновить данные</button></div></section>
 
 <section class="hidden" id="step11"><div class="pdb-wrap">
+<section class="pd-vh-hero" aria-label="Панорама Вильнюса и популярный маршрут PRIVATE DRIVE">
+  <div class="pd-vh-photo" role="img" aria-label="Старый город Вильнюса вечером"></div>
+  <span class="pd-vh-decoration" aria-hidden="true"></span>
+  <div class="pd-vh-content">
+    <span class="pd-vh-eyebrow" data-pd-vh="eyebrow">PRIVATE DRIVE · ЛИТВА И ЕВРОПА</span>
+    <div class="pd-vh-title" data-pd-vh="title">Ваша поездка начинается здесь</div>
+    <span class="pd-vh-subtitle" data-pd-vh="subtitle">Путешествуйте с комфортом. Выберите направление и укажите время отправления.</span>
+    <button type="button" class="pd-vh-featured-route" id="pdVhFeaturedRoute" aria-label="Выбрать маршрут Вильнюс — Клайпеда">
+      <svg class="pd-vh-route-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="5" r="2.5"/><path d="M7.5 19h5a6.5 6.5 0 0 0 0-13h4"/></svg>
+      <span><span data-pd-vh="route">Вильнюс → Клайпеда</span><span class="pd-vh-route-meta" style="display:block" data-pd-vh="routeMeta">Выбрать популярный маршрут</span></span>
+      <span aria-hidden="true">›</span>
+    </button>
+  </div>
+  <a class="pd-vh-credit" href="https://commons.wikimedia.org/wiki/File:Vilnius_Old_Town_Skyline_at_dusk,_Lithuania_-_Diliff.jpg" target="_blank" rel="noopener noreferrer">© David Iliff · CC BY-SA 3.0</a>
+</section>
 
 <div class="pdb-card pd-route-card" style="margin-bottom:16px"><h1 class="pd-route-title">Куда едем?</h1><label id="pdbTripModeLabel" for="pdbTripMode">Тип поездки</label><select id="pdbTripMode"><option value="oneway">В одну сторону</option><option value="roundtrip">Туда и обратно</option></select><div class="pd-address-field"><label for="pdbOrigin">Откуда</label><input id="pdbOrigin" placeholder="Город, улица или адрес подачи"><div id="pdbOriginSuggestions" class="pdb-suggestions hidden" role="listbox"></div><div id="pdbOriginSuggestStatus" class="pdb-note" role="status"></div></div><div id="pdbStopField" class="pd-address-field hidden"><label id="pdbStopLabel" for="pdbStop">Адрес остановки</label><input id="pdbStop" maxlength="200" placeholder="Город, улица и номер дома"><button id="pdbRemoveStop" type="button" class="secondary" onclick="pdToggleStop(false)">Убрать остановку</button></div><div class="pd-address-field pd-destination"><label for="pdbDest">Куда</label><input id="pdbDest" placeholder="Город, улица или адрес назначения"><div id="pdbDestSuggestions" class="pdb-suggestions hidden" role="listbox"></div><div id="pdbDestSuggestStatus" class="pdb-note" role="status"></div></div><div class="actions pd-route-tools"><button type="button" class="secondary" id="pdbAddStop" onclick="pdToggleStop(true)">+ Добавить остановку</button></div><div class="actions pd-route-tools"><button type="button" id="pdbLocate" onclick="pdbLocate(true)">📍 Показать меня на карте</button><button type="button" class="secondary hidden" id="pdbUsePoint" onclick="pdbUsePoint()">Ехать отсюда</button></div><div id="pdbMap" class="pdb-map"></div><p id="pdbMapChoice" role="status">Разрешите геолокацию или выберите точку нажатием на карту.</p><button type="button" class="secondary pd-route-calculate" onclick="pdbCalculate()">Рассчитать маршрут →</button><p class="pdb-status" id="pdbRouteStatus">Цена уточняется пилотом, если расчёт недоступен.</p><p class="pdb-note">Геолокация запрашивается с вашего разрешения. При подтверждении точки её координаты передаются OpenRouteService для определения адреса.</p></div><div class="pdb-layout"><div class="pdb-card"><div class="pdb-step">01 / 03 · ДЕТАЛИ ПОЕЗДКИ</div><h2>Детали вашей поездки</h2>
 <label id="pdbPopularLabel">Быстрый выбор маршрута</label><style id="pdTemperatureLayoutFix">
@@ -1104,4 +1157,29 @@ setInterval(pdCheckTripCompletion,15000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)pdCheckTripCompletion()});
 setTimeout(pdCheckTripCompletion,1200);
 </script>
-<script src="/assets/pd-trip-runtime-v4.js"></script><script src="/assets/pd-pilot-cabinet-v4.js?v=20261028-roles"></script><script src="/assets/pd-admin-console-v4.js"></script></body></html>
+
+<script id="pd-vilnius-heritage-v1-behavior">
+/* Visual enhancement only. Delegates route selection to the existing quick-route handler. */
+(function(){
+ 'use strict';
+ const phrases={
+  ru:{eyebrow:'PRIVATE DRIVE · ЛИТВА И ЕВРОПА',title:'Ваша поездка начинается здесь',subtitle:'Путешествуйте с комфортом. Выберите направление и укажите время отправления.',route:'Вильнюс → Клайпеда',routeMeta:'Выбрать популярный маршрут',aria:'Выбрать маршрут Вильнюс — Клайпеда'},
+  en:{eyebrow:'PRIVATE DRIVE · LITHUANIA & EUROPE',title:'Your journey begins here',subtitle:'Travel in comfort. Choose your route and departure time.',route:'Vilnius → Klaipėda',routeMeta:'Choose a popular route',aria:'Select Vilnius to Klaipėda route'},
+  lt:{eyebrow:'PRIVATE DRIVE · LIETUVA IR EUROPA',title:'Jūsų kelionė prasideda čia',subtitle:'Keliaukite patogiai. Pasirinkite maršrutą ir išvykimo laiką.',route:'Vilnius → Klaipėda',routeMeta:'Pasirinkti populiarų maršrutą',aria:'Pasirinkti maršrutą Vilnius – Klaipėda'}
+ };
+ function setup(){
+  const root=document.getElementById('step11');
+  const btn=document.getElementById('pdVhFeaturedRoute');
+  if(!root||!btn)return;
+  const lang=['ru','en','lt'].includes(window.PD_LANG)?window.PD_LANG:'ru';
+  const p=phrases[lang];
+  root.querySelectorAll('[data-pd-vh]').forEach(el=>{const k=el.getAttribute('data-pd-vh');if(p[k])el.textContent=p[k]});
+  btn.setAttribute('aria-label',p.aria);
+  btn.addEventListener('click',()=>{
+   const option=root.querySelector('#pdbPopular button[data-dest="Klaipeda, Lithuania"]');
+   if(option){option.click();root.querySelector('#pdbOrigin')?.focus();}
+  });
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+})();
+</script><script src="/assets/pd-trip-runtime-v4.js"></script><script src="/assets/pd-pilot-cabinet-v4.js?v=20261028-roles"></script><script src="/assets/pd-admin-console-v4.js"></script></body></html>

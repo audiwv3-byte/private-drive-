@@ -1,0 +1,6 @@
+{
+  "name": "private-drive-registration-regression",
+  "private": true,
+  "scripts": { "test": "node test-registration.cjs" },
+  "devDependencies": { "jsdom": "26.1.0" }
+}

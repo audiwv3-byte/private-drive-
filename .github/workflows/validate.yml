@@ -16,3 +16,8 @@ jobs:
       - run: python test_release_validation.py
       - run: python test_tips_entry.py
       - run: node test_role_visibility.cjs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --prefix ops/live-registration --ignore-scripts
+      - run: npm test --prefix ops/live-registration

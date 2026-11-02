@@ -1,0 +1,57 @@
+--- pd_registration.js (live before)
++++ pd_registration.js (fixed)
+@@ -21,6 +21,23 @@
+ const emailLabel=document.createElement('label');emailLabel.htmlFor='pdObPassengerEmail';emailLabel.textContent=t('Электронная почта · необязательно','Email · optional','El. paštas · neprivaloma');
+ const email=document.createElement('input');email.id=emailLabel.htmlFor;email.type='email';email.autocomplete='email';email.maxLength=254;email.placeholder=t('Электронная почта','Email','El. paštas');
+ phone.after(emailLabel,email);
++// Match server validation before registration writes the passenger record.
++function validateName(input){
++ const value=input.value.trim().replace(/\s+/g,' ');
++ input.setCustomValidity(value.length>=2&&value.length<=80?'':t('Укажите имя: от 2 до 80 символов','Enter a name: 2 to 80 characters','Įveskite vardą: nuo 2 iki 80 simbolių'));
++}
++function validatePhone(input){
++ const value=input.value.trim(),digits=value.replace(/\D/g,'');
++ input.setCustomValidity(/^\+?[0-9\s().-]+$/.test(value)&&digits.length>=7&&digits.length<=15?'':t('Укажите корректный номер телефона','Enter a valid phone number','Įveskite teisingą telefono numerį'));
++}
++function validateEmail(){
++ const value=email.value.trim();
++ email.setCustomValidity(!value||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)?'':t('Проверьте электронную почту','Check the email address','Patikrinkite el. pašto adresą'));
++}
++for(const [id,validate] of [['pdObPassengerName',validateName],['pdObPassengerPhone',validatePhone],['pdObDriverName',validateName],['pdObDriverPhone',validatePhone]]){
++ const input=document.getElementById(id);if(input)input.addEventListener('input',()=>validate(input));
++}
++email.addEventListener('input',validateEmail);
+ const consent=document.createElement('label');consent.className='pd-registration-consent';
+ const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.required=true;checkbox.id='pdRegistrationConsent';
+ const consentText=document.createElement('span');consentText.append(t('Принимаю ','I accept the ','Sutinku su '));
+@@ -37,13 +54,26 @@
+ const complete=pdCompletePassengerRegistration;
+ pdCompletePassengerRegistration=async function(){
+  const value=email.value.trim();
+- if(value){const me=await api('/api/me'),profile=me.profile||{};await api('/api/profile/details',{email:value,home_city:profile.home_city||'',preferences:profile.preferences||''})}
++ // Signing in must not overwrite an existing profile with registration-form text.
++ if(value&&!window.pdOnboardingUser?.registered){
++  const me=await api('/api/me'),profile=me.profile||{};
++  try{await api('/api/profile/details',{email:value,home_city:profile.home_city||'',preferences:profile.preferences||''})}
++  catch(e){throw new Error(t('Регистрация сохранена, но email не удалось сохранить. Повторите попытку: ','Registration saved, but the email could not be saved. Please retry: ','Registracija išsaugota, bet el. pašto išsaugoti nepavyko. Bandykite dar kartą: ')+e.message)}
++ }
+  return complete();
+ };
+-const register=pdRegisterPassenger;pdRegisterPassenger=async function(){if(!form.reportValidity())return;return register()};
++const register=pdRegisterPassenger;pdRegisterPassenger=async function(){validateName(name);validatePhone(phone);validateEmail();if(!form.reportValidity())return;return register()};
+ const registerTelegram=pdRegisterPassengerTelegram;pdRegisterPassengerTelegram=async function(){
+- if(!window.pdOnboardingUser?.registered&&!checkbox.checked){checkbox.reportValidity();return}
+- if(!email.reportValidity())return;return registerTelegram();
++ // Outside Telegram the original handler shows the launch link. It must run
++ // before signup consent checks: the visitor may already have an account.
++ if(typeof initData==='undefined'||!initData||window.pdOnboardingUser?.registered)return registerTelegram();
++ if(!checkbox.checked){checkbox.reportValidity();return}
++ validateEmail();if(!email.reportValidity())return;return registerTelegram();
++};
++const registerDriver=pdRegisterDriver;pdRegisterDriver=async function(){
++ const driverName=document.getElementById('pdObDriverName'),driverPhone=document.getElementById('pdObDriverPhone');
++ if(driverName)validateName(driverName);if(driverPhone)validatePhone(driverPhone);
++ return registerDriver();
+ };
+ // Apply to an already rendered welcome/language screen without disrupting signed-in roles.
+ if(!form.classList.contains('hidden')||['pdObRole','pdObLanguage'].some(id=>!document.getElementById(id)?.classList.contains('hidden')))pdShowOnboarding('passenger');

@@ -68,14 +68,70 @@ body.pdb-active .shell{max-width:860px}
 .nav{gap:6px}.nav button{min-width:0;font-size:12px;padding:10px 12px}#step14{max-width:720px;margin:0 auto}#step14>h1{font-size:30px}#step14 .pd-profile-page-card{margin:18px 0;background:#171819;border:1px solid #5a4d34;padding:18px}#step14 .pd-profile-page-card h3{display:none}#pdDriverFilter{margin-bottom:18px}#step14 .pd-contact-email{padding:14px 0;overflow-wrap:anywhere}@media(max-width:420px){.nav{gap:4px;padding:9px 6px}.nav button{font-size:11px;padding:10px 9px}#step14 .pd-profile-page-card{padding:13px}}
 .pd-document-fields{border:1px solid #75613b;border-radius:12px;margin:22px 0;padding:16px;min-width:0}.pd-document-fields legend{padding:0 8px;color:#e8c47c}.pd-document-fields p{font-size:13px}.pd-document-card{border-top:1px solid #494131;padding:14px 0}.pd-document-card input[type=file]{max-width:100%;font-size:13px}.pd-document-card img{max-width:100%;max-height:220px;object-fit:contain;margin-top:12px}.pd-document-dialog{background:#18191a;color:#f4f0e8;border:1px solid #b99a5b;border-radius:12px;width:95vw;max-width:1100px;max-height:95vh;padding:12px}.pd-document-dialog::backdrop{background:#000c}.pd-document-dialog img{display:block;max-width:100%;height:auto;margin:12px auto}.pd-document-dialog button{position:sticky;top:0}
 .pd-info-dialog{box-sizing:border-box;background:#151617;color:#f4f0e8;border:1px solid #a98b50;border-radius:18px;padding:20px;width:calc(100vw - 28px);max-width:560px;max-height:90vh}.pd-info-dialog::backdrop{background:#000b}.pd-info-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.pd-info-header h2{font-size:21px;margin:0}.pd-info-header button{padding:10px 14px;flex-shrink:0}.pd-contact-choices{display:grid;gap:14px}.pd-contact-choices a{padding:18px;border:1px solid #77613b;border-radius:12px;text-decoration:none;display:grid;gap:7px;overflow-wrap:anywhere}.pd-contact-choices span{font-size:14px}.pd-policy-dialog{max-width:900px;height:90vh;overflow:hidden;display:flex;flex-direction:column}.pd-policy-dialog:not([open]){display:none}.pd-policy-dialog iframe{width:100%;flex:1;min-height:0;border:0;background:#111;border-radius:10px}.pd-contact-trigger{border:0;background:transparent;padding:0;color:inherit;font:inherit;text-decoration:underline;cursor:pointer}
-.pd-pilot-test-notice{padding:14px;border:1px solid #a88a50;border-radius:12px;background:#282319;color:#f0d79f}#pdFrozenPilotDocuments{margin:18px 0;padding:12px;border:1px solid #5c5441;border-radius:12px}#pdFrozenPilotDocuments summary{cursor:pointer;color:#d5c49e}#pdFrozenPilotDocuments fieldset{border:0;padding:0;min-width:0}#pdFrozenPilotDocuments input:disabled{opacity:.4;cursor:not-allowed}.pd-branded-header{flex-wrap:wrap}</style><style id="pd-role-visibility">
+.pd-pilot-test-notice{padding:14px;border:1px solid #a88a50;border-radius:12px;background:#282319;color:#f0d79f}#pdFrozenPilotDocuments{margin:18px 0;padding:12px;border:1px solid #5c5441;border-radius:12px}#pdFrozenPilotDocuments summary{cursor:pointer;color:#d5c49e}#pdFrozenPilotDocuments fieldset{border:0;padding:0;min-width:0}#pdFrozenPilotDocuments input:disabled{opacity:.4;cursor:not-allowed}.pd-branded-header{flex-wrap:wrap}
+/* PRIVATE DRIVE compact picture header, November 2026.
+   Preserve the approved photo while cropping/masking its baked-in lower lettering.
+   Keep the official PD logo/title and move existing legal links into the header. */
+.brand.pd-branded-header{
+  position:relative;isolation:isolate;display:flex;flex-direction:column;
+  justify-content:space-between;align-items:stretch;gap:10px;flex-wrap:nowrap;
+  min-height:270px;margin:0 0 13px;padding:15px 14px 13px;
+  border:1px solid #6d593b;border-radius:19px;overflow:hidden;
+  background:
+    linear-gradient(180deg,rgba(7,7,7,.78) 0%,rgba(7,7,7,.40) 25%,rgba(7,7,7,.15) 43%,rgba(7,7,7,.94) 72%,#090a0b 84%),
+    url('/assets/private-drive-approved-design.jpeg') center 32%/cover no-repeat,
+    #111;
+  box-shadow:0 12px 28px #0006;
+}
+.pd-branded-header .pd-brand-lockup{position:relative;z-index:1;padding-right:67px;max-width:100%;align-self:flex-start}
+.pd-branded-header .pd-brand-wordmark strong{color:#f1d79b;text-shadow:0 2px 6px #000}
+.pd-branded-header .pd-brand-wordmark span{color:#ead5af;text-shadow:0 1px 5px #000}
+.pd-branded-header>small{display:none}
+.pd-branded-header #pdTipsAlways{
+  position:relative;z-index:1;align-self:center;min-height:45px;
+  margin:3px 0 auto;padding:10px 22px!important;font-size:14px!important;
+  background:rgba(18,17,15,.87);border-color:#d7ae66;border-radius:15px;
+  box-shadow:0 3px 12px #0008;
+}
+.pd-branded-header .pd-language-switch{
+  position:absolute;z-index:2;top:16px;right:12px;
+  display:flex;align-items:center;margin:0;
+}
+.pd-branded-header .pd-language-switch select{
+  width:auto;min-width:62px;min-height:39px;padding:6px 8px;
+  background:rgba(13,13,13,.88);color:#f4e0b8;border-color:#927447;
+}
+.pd-branded-header .pd-privacy-bar{
+  position:relative;z-index:1;margin:auto 0 0;padding:11px 2px 0;
+  border-top:1px solid rgba(229,190,118,.38);
+  color:#e1c893;text-align:center;font-size:12px;line-height:1.8;
+}
+.pd-branded-header .pd-privacy-bar a{
+  color:#f3d7a0;display:inline-block;margin:0 3px;
+  text-decoration:underline;text-underline-offset:3px;
+}
+@media(max-width:480px){
+  .brand.pd-branded-header{min-height:250px;padding:13px 10px 11px;border-radius:16px}
+  .pd-branded-header .pd-brand-lockup{padding-right:59px;gap:6px}
+  .pd-branded-header .pd-official-logo{width:58px;height:58px}
+  .pd-branded-header .pd-brand-wordmark strong{font-size:15px;letter-spacing:1.3px}
+  .pd-branded-header .pd-brand-wordmark span{font-size:8px;letter-spacing:1px}
+  .pd-branded-header .pd-language-switch{top:13px;right:9px}
+  .pd-branded-header .pd-privacy-bar{font-size:11px;line-height:1.7;padding-top:8px}
+}
+@media(max-width:350px){
+  .pd-branded-header .pd-official-logo{width:51px;height:51px}
+  .pd-branded-header .pd-brand-wordmark strong{font-size:13px;letter-spacing:1px}
+  .pd-branded-header .pd-brand-wordmark span{font-size:7px;letter-spacing:.6px}
+}
+</style><style id="pd-role-visibility">
 body:not(.pd-role-admin) #pdRoleBar,body:not(.pd-role-admin) #adminNav,
 body:not(.pd-role-pilot) #pdPilotBack,
 body.pd-passenger-view #pdRoleBar,body.pd-passenger-view #adminNav,
 body.pd-passenger-view #pdPilotBack,body.pd-passenger-view .pd-driver-entry,
 body.pd-passenger-view #step10,body.pd-passenger-view #step13,
 body.pd-passenger-view #pdPilotWork{display:none!important}
-</style></head><body class="pd-onboarding-active"><main class="shell"><header class="brand pd-branded-header"><div class="pd-brand-lockup"><img class="pd-monogram pd-official-logo" src="/assets/private-drive-official-logo.jpeg" alt="Фирменный логотип PD — privatdrive" width="76" height="76" fetchpriority="high"><div class="pd-brand-wordmark"><strong>privatdrive</strong><span>EURO BALTIC TRANSFER</span></div></div><small>Premium Transfers</small><button type="button" class="secondary" id="pdTipsAlways" onclick="pdOpenTipInfo()" style="flex:none;padding:10px 12px;font-size:13px">💛 Чаевые</button></header><section id="pdOnboarding" class="panel pd-onboarding-panel" aria-live="polite">
+</style></head><body class="pd-onboarding-active"><main class="shell"><header class="brand pd-branded-header"><div class="pd-brand-lockup"><img class="pd-monogram pd-official-logo" src="/assets/private-drive-official-logo.jpeg" alt="Фирменный логотип PD — privatdrive" width="76" height="76" fetchpriority="high"><div class="pd-brand-wordmark"><strong>privatdrive</strong><span>EURO BALTIC TRANSFER</span></div></div><small>Premium Transfers</small><button type="button" class="secondary" id="pdTipsAlways" onclick="pdOpenTipInfo()" style="flex:none;padding:10px 12px;font-size:13px">💛 Чаевые</button><div class="pd-language-switch"><label for="pdLangSelect" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">Язык</label><select id="pdLangSelect" onchange="pdSwitchLanguage(this.value)"><option value="en" lang="en">EN</option><option value="lt" lang="lt">LT</option><option value="ru" lang="ru">RU</option></select></div><div class="pd-privacy-bar"><a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="/legal" target="_blank" rel="noopener noreferrer">Условия поездки и оплаты</a> · <a href="mailto:eurobaltictransfer@gmail.com" data-pd-contact="true">Связаться с нами</a></div></header><section id="pdOnboarding" class="panel pd-onboarding-panel" aria-live="polite">
 <div id="pdObLoading">Загрузка…</div>
 <div id="pdObLanguage" class="hidden"><h1>Выберите язык</h1><p class="muted">Choose language · Pasirinkite kalbą</p><div class="pd-ob-language-options"><button type="button" lang="en" onclick="pdChooseInitialLanguage('en')">EN</button><button type="button" lang="lt" onclick="pdChooseInitialLanguage('lt')">LT</button><button type="button" lang="ru" onclick="pdChooseInitialLanguage('ru')">RU</button></div></div>
 <div id="pdObRole" class="hidden"><h1>Добро пожаловать</h1><p>Как вы хотите зарегистрироваться?</p><div class="pd-ob-role-options"><button type="button" onclick="pdShowOnboarding('passenger')">Пассажир</button><button type="button" onclick="pdShowOnboarding('driver')">Пилоты</button></div><button type="button" class="secondary" onclick="pdShowOnboarding('language')">Язык</button></div>
@@ -84,7 +140,7 @@ body.pd-passenger-view #pdPilotWork{display:none!important}
 <div id="pdObReceived" class="hidden"><h1>Заявка водителя получена</h1><p>Дождитесь связи с администратором. Данные вашей заявки доступны только вам и уполномоченным администраторам.</p><div id="pdObOwnDriver"></div><div class="actions"><button type="button" class="secondary" onclick="pdShowOnboarding('driver')">Изменить данные</button><button type="button" onclick="pdUsePassengerMode()">Продолжить как пассажир</button></div></div>
 <button type="button" class="secondary pay-choice" onclick="pdOpenSupport()">Связаться с нами</button><p id="pdObStatus" role="status"></p><p class="pdb-note"><a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a> · <a href="https://t.me/PrivatDraiv" target="_blank" rel="noopener noreferrer" data-pd-telegram-contact="true">@PrivatDraiv</a></p>
 </section>
-<div class="pd-language-switch" style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:0 4px 14px"><label for="pdLangSelect" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">Язык</label><select id="pdLangSelect" style="width:auto;min-width:64px;padding:6px 9px" onchange="pdSwitchLanguage(this.value)"><option value="en" lang="en">EN</option><option value="lt" lang="lt">LT</option><option value="ru" lang="ru">RU</option></select></div><button type="button" id="pdPilotBack" class="secondary pay-choice hidden" onclick="pdEnterPilot()">Мои поездки</button><div class="pd-privacy-bar" style="margin:0 4px 16px;font-size:13px;line-height:1.6"><a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="/legal" target="_blank" rel="noopener noreferrer">Условия поездки и оплаты</a> · <a href="mailto:eurobaltictransfer@gmail.com" data-pd-contact="true">Связаться с нами</a></div><header class="pdb-head pd-shared-hero" id="pdSharedHero"><div class="pd-hero pd-approved-hero"><img src="/assets/private-drive-approved-design.jpeg" alt="privatdrive · Euro Baltic Transfer — комфортные поездки по Литве и Европе, Toyota RAV4" loading="eager"><span class="pd-hero-language-caption" aria-hidden="true"><span>Комфортные поездки</span><br><span>по Литве и Европе</span></span></div></header><div class="pd-role-bar hidden" id="pdRoleBar" role="group" aria-label="Режим администратора"><span class="pd-role-label">Режим работы · доступ администратора сохранён</span><button type="button" data-mode="admin" onclick="pdSetRole('admin')">Администратор</button><button type="button" data-mode="driver" onclick="pdSetRole('driver')">Водитель</button><button type="button" data-mode="client" onclick="pdSetRole('client')">Клиент</button></div><div id="message"></div><div class="progress"><div id="bar" style="width:10%"></div></div>
+<button type="button" id="pdPilotBack" class="secondary pay-choice hidden" onclick="pdEnterPilot()">Мои поездки</button><div class="pd-role-bar hidden" id="pdRoleBar" role="group" aria-label="Режим администратора"><span class="pd-role-label">Режим работы · доступ администратора сохранён</span><button type="button" data-mode="admin" onclick="pdSetRole('admin')">Администратор</button><button type="button" data-mode="driver" onclick="pdSetRole('driver')">Водитель</button><button type="button" data-mode="client" onclick="pdSetRole('client')">Клиент</button></div><div id="message"></div><div class="progress"><div id="bar" style="width:10%"></div></div>
 <section class="panel" id="step0"><h1>Добро пожаловать</h1><p>Индивидуальные поездки по Литве и Европе. Забронируйте автомобиль в несколько шагов.</p><button onclick="go(11)">🚘 Заказать поездку</button><div class="actions"><button class="secondary" onclick="go(8)">Мои заказы</button></div></section>
 <section class="panel hidden" id="step1"><h2>1. Направление</h2><p>Выберите тип поездки</p><div class="actions"><button class="chip selected" id="oneway" onclick="setRound(false)">В одну сторону</button><button class="chip" id="twoway" onclick="setRound(true)">Туда и обратно</button></div><div class="actions"><button onclick="go(2)">Продолжить →</button></div></section>
 <section class="panel hidden" id="step2"><h2>2. Маршрут на карте</h2><label>📍 Откуда</label><input id="origin" placeholder="Например: Vilnius, Lithuania"><label>🏁 Куда</label><input id="destination" placeholder="Например: Kaunas, Lithuania"><div class="actions"><button class="secondary" onclick="locate()">📍 Моё местоположение</button><button class="secondary" onclick="calcRoute()">🗺️ Рассчитать маршрут</button></div><div id="map"></div><p id="routeResult">Маршрут появится после расчёта. Карта носит справочный характер.</p><div class="actions"><button class="secondary" onclick="go(1)">Назад</button><button onclick="go(3)">Далее →</button></div></section>

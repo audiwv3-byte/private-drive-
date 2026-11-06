@@ -1,0 +1,81 @@
+name: Dating Lithuania read-only remote inspection
+on:
+  push:
+    branches:
+      - audit/dating-only-20261106
+    paths:
+      - .github/workflows/dating-readonly-audit-20261106.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Check PythonAnywhere Dating Lithuania without modifications
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys, hashlib, json, urllib.request, urllib.error
+          token = re.sub(r'^Token\\s+', '', os.getenv('PA_API_TOKEN','').strip(), flags=re.I)
+          token = ''.join(token.split())
+          if not token:
+              print('AUTH_UNAVAILABLE: no configured PA_API_TOKEN', flush=True)
+              sys.exit(2)
+          user = 'wilsonpark'
+          prefix = None
+          for domain in ('www.pythonanywhere.com','eu.pythonanywhere.com'):
+              base = f'https://{domain}/api/v0/user/{user}'
+              req=urllib.request.Request(base + '/cpu/',headers={'Authorization':'Token '+token})
+              try:
+                  with urllib.request.urlopen(req,timeout=25) as resp:
+                      if resp.status == 200:
+                          prefix=base
+                          print('AUTH_OK host='+domain,flush=True)
+                          break
+              except urllib.error.HTTPError as e:
+                  print('AUTH_PROBE host='+domain+' http='+str(e.code),flush=True)
+              except Exception as e:
+                  print('AUTH_PROBE_TRANSPORT_ERROR host='+domain+' kind='+type(e).__name__,flush=True)
+          if not prefix:
+              print('STOP: cannot inspect production without credentials',flush=True)
+              sys.exit(3)
+          def get(endpoint,read_limit=None):
+              req=urllib.request.Request(prefix+endpoint,headers={'Authorization':'Token '+token})
+              try:
+                  with urllib.request.urlopen(req,timeout=35) as response:
+                      return (response.status, response.read() if read_limit is None else response.read(read_limit))
+              except urllib.error.HTTPError as e:
+                  return (e.code,b'')
+          root='/home/wilsonpark/dating_lithuania_bot/'
+          code,src=get('/files/path'+root+'bot.py')
+          print('BOT_SOURCE_HTTP',code,flush=True)
+          if code==200:
+              t=src.decode('utf8','replace')
+              print('BOT_SOURCE_BYTES',len(src),'LINES',len(t.splitlines()),'SHA256',hashlib.sha256(src).hexdigest(),flush=True)
+              for term in ('dl2_matches','anon_chat','matches','chat_enabled','Dating Lithuania','filelock','fcntl'):
+                  print('BOT_MARKER_'+term,str(term.lower() in t.lower()),flush=True)
+          for file in ('dating.sqlite3','settings.json'):
+              req=urllib.request.Request(prefix+'/files/path'+root+file,headers={'Authorization':'Token '+token},method='HEAD')
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as f:
+                      print('FILE_HEAD',file,'http',f.status,'size',f.headers.get('Content-Length','unknown'),flush=True)
+              except urllib.error.HTTPError as e:
+                  print('FILE_HEAD',file,'http',e.code,flush=True)
+              except Exception as e:
+                  print('FILE_HEAD',file,'error_type',type(e).__name__,flush=True)
+          code,data=get('/consoles/')
+          print('CONSOLES_HTTP',code,flush=True)
+          if code==200:
+              try:
+                  consoles=json.loads(data)
+                  if not isinstance(consoles,list): raise ValueError('unexpected type')
+                  for item in consoles:
+                      if isinstance(item,dict):
+                          executable=str(item.get('executable','')).rsplit('/',1)[-1]
+                          if executable=='bash' and re.fullmatch(r'\\d+',str(item.get('id',''))):
+                              print('BASH_CONSOLE_ID',item['id'],flush=True)
+              except Exception:
+                  print('CONSOLES_INVALID_FORMAT',flush=True)
+          PY

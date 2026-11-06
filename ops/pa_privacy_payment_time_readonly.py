@@ -38,4 +38,11 @@ for path in paths:
    print("TIME_WRITE",re.sub(r"\s+"," ",t[max(0,m.start()-75):m.end()+100])[:240])
   for q in ["async function pdbSendOrder","function pdbSummary"]:
    i=t.find(q);print("TIME_CHAIN",q,"exists",i>=0,"trip_time",("trip_time" in t[i:i+2600]) if i>=0 else False)
+  for marker in ["/api/orders","/api/admin/orders","/api/driver/work","pdOnboardingUser","pdPassengerView","pdCurrentTrip"]:
+   matches=list(re.finditer(re.escape(marker),t))
+   print("HTML_USAGE",marker,"count",len(matches))
+   for m in matches[:6]:
+    print("HTML_USAGE_CONTEXT",marker,re.sub(r"\s+"," ",t[max(0,m.start()-160):m.end()+240])[:420])
+  for marker in ["localStorage","sessionStorage","lastOrder","currentOrder"]:
+   print("CLIENT_STATE_MARKER",marker,"count",t.count(marker))
 print("NO_WRITE_AUDIT_COMPLETE")

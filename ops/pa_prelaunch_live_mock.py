@@ -76,6 +76,9 @@ with tempfile.TemporaryDirectory(prefix="pd-live-mock-test-") as work:
     )
     if role_run.returncode:
         print("LIVE_ROLES_FAILED exit", role_run.returncode)
+        for line in role_run.stderr.splitlines()[:12]:
+            if not line.lstrip().startswith(("at ", "Node.js ")):
+                print("ROLE_DIAGNOSTIC", line[:180])
         loc = re.search(r"test_role_visibility[.]cjs:(\\d+):(\\d+)", role_run.stderr)
         if loc:
             print("LIVE_ROLES_TEST_LOCATION", loc.group(1), loc.group(2))

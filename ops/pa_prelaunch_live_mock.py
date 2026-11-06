@@ -48,6 +48,10 @@ with tempfile.TemporaryDirectory(prefix="pd-live-mock-test-") as work:
         if i >= 0:
             nearby = runtime[max(0, i - 190):i + 180].replace("\\n", " ")
             print("TRIP_UI_CONTEXT", caption, nearby[:370], flush=True)
+    for marker in ("async function beginDeparture(", "function beginDeparture(", "async function refresh()", "function refresh()", "r.role==='pilot'"):
+        start = runtime.find(marker)
+        if start >= 0:
+            print("TRIP_STAGE_SOURCE", marker, repr(runtime[start:start + 850]), flush=True)
     test = source_root / "test_miniapp_interactions.cjs"
     if not test.is_file():
         sys.exit("TEST_BLOCKED: missing approved mock test")

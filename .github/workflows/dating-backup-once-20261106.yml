@@ -1,0 +1,110 @@
+name: Dating Lithuania server-local verified backup
+on:
+  push:
+    branches:
+      - audit/dating-only-20261106
+    paths:
+      - .github/workflows/dating-backup-once-20261106.yml
+permissions:
+  contents: read
+jobs:
+  safe_backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verified remote backup, never copy private database to GitHub
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, secrets, sys, time
+          from pathlib import Path
+          import requests
+          token=re.sub(r'^Token\\s+','',os.environ.get('PA_API_TOKEN','').strip(),flags=re.I)
+          token=''.join(token.split())
+          if not token: raise SystemExit('No PA_API_TOKEN configured')
+          prefix='https://www.pythonanywhere.com/api/v0/user/wilsonpark'
+          sess=requests.Session()
+          sess.headers.update({'Authorization':'Token '+token})
+          p=sess.get(prefix+'/cpu/',timeout=25)
+          if p.status_code != 200: raise SystemExit('PA auth failure HTTP '+str(p.status_code))
+          live=sess.get(prefix+'/files/path/home/wilsonpark/dating_lithuania_bot/bot.py',timeout=35)
+          expected='de35369744f830ba8ab9215a7f3a800d34a5e6f992b2cd23dcf3a87df1e1caca'
+          if live.status_code!=200 or hashlib.sha256(live.content).hexdigest()!=expected:
+              raise SystemExit('Live source mismatch: ABORT')
+          local=Path('ops/dating_remote_backup_20261106.py')
+          script=local.read_bytes()
+          compile(script,local.name,'exec')
+          remote='/home/wilsonpark/dating_safe_ops_20261106/backup.py'
+          endpoint=prefix+'/files/path'+remote
+          existing=sess.get(endpoint,timeout=35)
+          if existing.status_code==404:
+              up=sess.post(endpoint,files={'content':('backup.py',script,'text/x-python')},timeout=35)
+              if up.status_code not in (200,201):
+                  raise SystemExit('Could not stage isolated backup tool: HTTP '+str(up.status_code))
+          elif existing.status_code==200:
+              if existing.content!=script: raise SystemExit('Remote file exists with conflicting content: ABORT')
+          else:raise SystemExit('Stage probe failed: HTTP '+str(existing.status_code))
+          remote_check=sess.get(endpoint,timeout=35)
+          if remote_check.status_code!=200 or hashlib.sha256(remote_check.content).digest()!=hashlib.sha256(script).digest():
+              raise SystemExit('Remote backup runner checksum mismatch')
+          print('BACKUP_TOOL_STAGED_OUTSIDE_LIVE_APP',flush=True)
+          nonce=secrets.token_hex(6)
+          status_url=prefix+'/files/path/home/wilsonpark/dating_safe_ops_20261106/status_'+nonce+'.json'
+          task_id=None
+          task_created=False
+          try:
+              payload={'command':'python3 -u '+remote+' '+nonce,
+                       'description':'Dating Lithuania isolated verified backup 2026-11-06',
+                       'enabled':True}
+              task=sess.post(prefix+'/always_on/',json=payload,timeout=35)
+              if task.status_code not in (200,201):
+                  print('TEMPORARY_TASK_UNAVAILABLE_HTTP',task.status_code,flush=True)
+                  raise SystemExit('Cannot execute a backup without available task capacity')
+              task_created=True
+              try:
+                  task_id=task.json().get('id')
+              except Exception: pass
+              if task_id is None:
+                  tasks=sess.get(prefix+'/always_on/',timeout=35).json()
+                  hits=[x.get('id') for x in tasks if nonce in str(x.get('command',''))]
+                  if len(hits)==1:task_id=hits[0]
+              if task_id is None:
+                  raise RuntimeError('Backup task created but ID unavailable; inspect account')
+              print('BACKUP_STARTED_PRIVATE_HOST',flush=True)
+              status=None
+              for _ in range(36):
+                  time.sleep(5)
+                  res=sess.get(status_url,timeout=30)
+                  if res.status_code==404:continue
+                  if res.status_code!=200:raise RuntimeError('Status read HTTP '+str(res.status_code))
+                  status=res.json()
+                  break
+              if status is None:raise RuntimeError('Remote job did not provide a verified completion status')
+              if status.get('result')!='PASS' or status.get('db_integrity')!='PASS':
+                  print('BACKUP_REMOTE_STATUS',status.get('result'),'error',status.get('reason','unknown'),flush=True)
+                  raise RuntimeError('SQLite online backup did not pass verification')
+              snapshot=status['backup']
+              manifest=sess.get(prefix+'/files/path'+snapshot+'/MANIFEST.json',timeout=35)
+              if manifest.status_code!=200:
+                  raise RuntimeError('Backup manifest not readable')
+              if hashlib.sha256(manifest.content).hexdigest()!=status['manifest_sha256']:
+                  raise RuntimeError('Manifest checksum mismatch')
+              details=manifest.json()
+              if not details.get('verified') or not {'bot.py','settings.json','dating.sqlite3'}.issubset(details.get('files_sha256',{})):
+                  raise RuntimeError('Backup manifest incomplete')
+              print('BACKUP_VERIFIED',snapshot,flush=True)
+              print('DATABASE_INTEGRITY','PASS',flush=True)
+              print('PROFILES_COUNT',status.get('profiles'),flush=True)
+              print('EXISTING_TABLES',','.join(status.get('tables',[])),flush=True)
+              print('LIVE_FILES_UNCHANGED',status.get('source_unchanged'),flush=True)
+          finally:
+              if task_created and task_id is not None:
+                  stop=sess.delete(prefix+'/always_on/'+str(task_id)+'/',timeout=40)
+                  print('TEMPORARY_TASK_REMOVED',stop.status_code in (200,202,204,404),flush=True)
+                  if stop.status_code not in (200,202,204,404):
+                      raise RuntimeError('Temporary backup task could not be removed')
+              elif task_created:
+                  print('CRITICAL_TEMPORARY_TASK_CREATED_WITH_UNKNOWN_ID',flush=True)
+          PY

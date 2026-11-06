@@ -1,0 +1,27 @@
+name: PRIVATE DRIVE - surgical production deployment
+on:
+  push:
+    branches: [fix/miniapp-ui-gps-pricing-20261106]
+    paths:
+      - .github/workflows/production-surgical-deploy.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-surgical-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m py_compile ops/pa_surgical_deploy.py
+      - run: pip install requests
+      - name: Apply three exact-anchored production changes or roll back
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: python ops/pa_surgical_deploy.py

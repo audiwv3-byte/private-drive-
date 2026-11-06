@@ -64,6 +64,11 @@ async function click(label){const b=button(label);assert.ok(b,'Missing button '+
  const before=cleared.length;document.hidden=true;document.listeners.visibilitychange();
  assert.equal(cleared.length,before+1,'GPS watch did not stop on background');
  document.hidden=false;
- console.log('PASS GPS privacy: background stops tracking');
+ await window.pdOpenLiveTripV4(42);
+ await click('Передавать мою геопозицию');
+ const beforeClose=cleared.length;
+ dialog.close();
+ assert.equal(cleared.length,beforeClose+1,'GPS watch did not stop on dialog close');
+ console.log('PASS GPS privacy: background and dialog close stop tracking');
  assert.deepEqual(messages,[]);
 })().catch(e=>{console.error(e);process.exitCode=1});

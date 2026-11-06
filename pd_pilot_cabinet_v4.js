@@ -23,7 +23,7 @@ pdEnterPilot=function(){
  document.getElementById('pdPilotWork').classList.remove('hidden');document.getElementById('mainNav').classList.add('hidden');document.getElementById('pdPilotBack').classList.add('hidden');
  document.getElementById('pdPilotWorkTitle').textContent=tr('Кабинет пилота','Pilot cabinet','Piloto paskyra');
  document.getElementById('pdPilotWorkRefresh').textContent=tr('Обновить','Refresh','Atnaujinti');
- const passenger=document.getElementById('pdPilotPassenger');passenger.textContent=tr('Перейти в пассажирский кабинет','Open passenger cabinet','Atidaryti keleivio paskyrą');passenger.classList.toggle('hidden',!user.registered);
+ const passenger=document.getElementById('pdPilotPassenger');passenger.textContent=tr('Перейти в пассажирский кабинет','Open passenger cabinet','Atidaryti keleivio paskyrą');passenger.classList.add('hidden');
  buttons();pdPilotWork();window.scrollTo(0,0);
 };
 const oldPassenger=pdPilotPassenger;pdPilotPassenger=function(){document.body.classList.remove('pd-pilot-cabinet');oldPassenger()};

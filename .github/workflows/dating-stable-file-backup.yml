@@ -1,0 +1,21 @@
+name: Dating Lithuania verified stable backup fallback
+on:
+  push:
+    branches:
+      - audit/dating-only-20261106
+    paths:
+      - .github/workflows/dating-stable-file-backup.yml
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source and stable SQLite snapshot, copy only back to same PythonAnywhere account
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: |
+          python -m pip install -q requests
+          python ops/dating_safe_api_backup_stable.py

@@ -1,0 +1,69 @@
+name: Dating Lithuania real snapshot migration rehearsal
+on:
+  push:
+    branches: [audit/dating-only-20261106]
+    paths: [.github/workflows/dating-real-db-trial.yml]
+permissions:
+  contents: read
+jobs:
+  dry_run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Migrate a detached copy of confirmed PythonAnywhere snapshot only
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, sqlite3, tempfile, urllib.request, sys
+          from pathlib import Path
+          BASE='https://www.pythonanywhere.com/api/v0/user/wilsonpark'
+          SNAP='/home/wilsonpark/dating_lithuania_safe_backups/api_stable_20261106T072947Z_3af13701/'
+          t=re.sub(r'^Token\\s+','',os.environ['PA_API_TOKEN'].strip(),flags=re.I);t=''.join(t.split())
+          def get(name):
+              req=urllib.request.Request(BASE+'/files/path'+SNAP+name,headers={'Authorization':'Token '+t})
+              with urllib.request.urlopen(req,timeout=35) as r:return r.read()
+          metadata=json.loads(get('MANIFEST.json'))
+          data=get('dating.sqlite3')
+          if hashlib.sha256(data).hexdigest()!=metadata['file_hashes']['dating.sqlite3']:
+              raise RuntimeError('Remote backup checksum mismatch')
+          DDL=[
+          "CREATE TABLE IF NOT EXISTS dl2_cards (token TEXT PRIMARY KEY, target_id INTEGER NOT NULL UNIQUE)",
+          "CREATE TABLE IF NOT EXISTS dl2_interests (sender_id INTEGER NOT NULL, receiver_id INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(sender_id,receiver_id), CHECK(sender_id<>receiver_id))",
+          "CREATE TABLE IF NOT EXISTS dl2_invite_attempts (sender_id INTEGER NOT NULL, receiver_id INTEGER NOT NULL, created_at INTEGER NOT NULL)",
+          "CREATE INDEX IF NOT EXISTS idx_dl2_invites_sender_age ON dl2_invite_attempts(sender_id,created_at)",
+          "CREATE TABLE IF NOT EXISTS dl2_matches (id INTEGER PRIMARY KEY AUTOINCREMENT, lo INTEGER NOT NULL, hi INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'active', created_at INTEGER NOT NULL, UNIQUE(lo,hi), CHECK(lo<hi), CHECK(state IN ('active','closed')))",
+          "CREATE TABLE IF NOT EXISTS dl2_sessions (user_id INTEGER PRIMARY KEY, match_id INTEGER NOT NULL)",
+          "CREATE TABLE IF NOT EXISTS dl2_shares (match_id INTEGER NOT NULL, user_id INTEGER NOT NULL, username TEXT NOT NULL, PRIMARY KEY(match_id,user_id))",
+          "CREATE TABLE IF NOT EXISTS dl2_blocks (user_id INTEGER NOT NULL, blocked_id INTEGER NOT NULL, PRIMARY KEY(user_id,blocked_id), CHECK(user_id<>blocked_id))",
+          "CREATE TABLE IF NOT EXISTS dl2_relay (id INTEGER PRIMARY KEY AUTOINCREMENT, sender_id INTEGER NOT NULL, source_message_id INTEGER NOT NULL, receiver_id INTEGER NOT NULL, match_id INTEGER NOT NULL, state TEXT NOT NULL, created_at INTEGER NOT NULL, UNIQUE(sender_id,source_message_id), CHECK(state IN ('reserved','sent','unknown')))",
+          "CREATE INDEX IF NOT EXISTS idx_dl2_interests_receiver ON dl2_interests(receiver_id)",
+          "CREATE INDEX IF NOT EXISTS idx_dl2_sessions_match ON dl2_sessions(match_id)",
+          "CREATE INDEX IF NOT EXISTS idx_dl2_relay_age ON dl2_relay(created_at)",
+          "CREATE TABLE IF NOT EXISTS dl2_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, reporter_id INTEGER NOT NULL, reported_id INTEGER NOT NULL, match_id INTEGER NOT NULL, created_at INTEGER NOT NULL, UNIQUE(reporter_id,match_id))"]
+          def digest_rows(db):
+              h=hashlib.sha256();n=0
+              for row in db.execute('SELECT * FROM profiles ORDER BY user_id'):
+                  h.update(json.dumps(list(row),ensure_ascii=False,default=str).encode()+b'\\n');n+=1
+              return n,h.hexdigest()
+          with tempfile.TemporaryDirectory() as folder:
+              db_path=Path(folder)/'trial.sqlite3';db_path.write_bytes(data)
+              db=sqlite3.connect(db_path)
+              try:
+                  assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+                  before=digest_rows(db)
+                  assert {'user_id','status','age'}<=set(x[1] for x in db.execute('PRAGMA table_info(profiles)'))
+                  for _ in range(2):
+                      db.execute('BEGIN IMMEDIATE')
+                      try:
+                          for stmt in DDL:db.execute(stmt)
+                          db.commit()
+                      except BaseException:db.rollback();raise
+                  assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+                  assert digest_rows(db)==before
+                  tables=[x[0] for x in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'dl2_%'")]
+                  assert len(tables)==9
+                  assert all(db.execute('SELECT count(*) FROM '+name).fetchone()[0]==0 for name in tables)
+                  print('REAL_SNAPSHOT_MIGRATION_PASS profiles',before[0],'chat_tables',len(tables),'unchanged',True,flush=True)
+              finally:db.close()
+          PY

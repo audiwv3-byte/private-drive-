@@ -89,7 +89,9 @@ jobs:
                       for item in records:
                           if not isinstance(item,dict): continue
                           cmd=str(item.get('command',''))
-                          print(label+'_DATING_BOT_TASK',str('dating_lithuania_bot' in cmd),str(item.get('enabled',item.get('status','unknown'))),flush=True)
+                          detail=str(item.get('description',''))
+                          flags={k:(k in (cmd+' '+detail).lower()) for k in ('dating','private','bot.py','telegram','news','euro','python','litva')}
+                          print(label+'_TASK',json.dumps({'id':item.get('id'),'flags':flags,'enabled':item.get('enabled')},ensure_ascii=True),flush=True)
                   except Exception: print(label+'_INVALID_RESPONSE',flush=True)
           code, data=get('/files/tree/?path=/home/wilsonpark/dating_lithuania_bot/')
           print('BOT_DIRECTORY_HTTP',code,flush=True)

@@ -1,0 +1,27 @@
+name: PRIVATE DRIVE - guarded privacy cache deploy
+on:
+  push:
+    branches: [fix/order-api-cache-isolation-20261106]
+    paths:
+      - .github/workflows/privacy-cache-deploy.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-privacy-prod
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install requests
+      - run: python -m py_compile ops/pa_privacy_cache_guard_deploy.py
+      - name: Apply exact production cache guard or roll back
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: python ops/pa_privacy_cache_guard_deploy.py

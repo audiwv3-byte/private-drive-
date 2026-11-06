@@ -91,7 +91,7 @@ jobs:
                           cmd=str(item.get('command',''))
                           detail=str(item.get('description',''))
                           flags={k:(k in (cmd+' '+detail).lower()) for k in ('dating','private','bot.py','telegram','news','euro','python','litva')}
-                          print(label+'_TASK',json.dumps({'id':item.get('id'),'command_flags':{k:k in cmd.lower() for k in flags},'description_flags':{k:k in detail.lower() for k in flags},'script_names':[x.rsplit('/',1)[-1] for x in re.findall(r'[A-Za-z0-9_./-]+\\.py',cmd)][:6],'enabled':item.get('enabled')},ensure_ascii=True),flush=True)
+                          print(label+'_TASK',json.dumps({'id':item.get('id'),'command_flags':{k:k in cmd.lower() for k in flags},'description_flags':{k:k in detail.lower() for k in flags},'script_names':[x.rsplit('/',1)[-1] for x in re.findall(r'[A-Za-z0-9_./-]+\\.(?:py|sh|js)',cmd)][:6],'working_directory_dating':('dating' in str(item.get('working_directory','')).lower()),'uses_python_m':('-m ' in cmd),'enabled':item.get('enabled')},ensure_ascii=True),flush=True)
                   except Exception: print(label+'_INVALID_RESPONSE',flush=True)
           code, data=get('/files/tree/?path=/home/wilsonpark/dating_lithuania_bot/')
           print('BOT_DIRECTORY_HTTP',code,flush=True)

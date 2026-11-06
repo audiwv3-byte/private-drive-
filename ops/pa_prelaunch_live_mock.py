@@ -42,6 +42,12 @@ with tempfile.TemporaryDirectory(prefix="pd-live-mock-test-") as work:
         target.write_bytes(r.content)
         print("LIVE_TEST_SOURCE", name, "bytes", len(r.content),
               "sha256_12", hashlib.sha256(r.content).hexdigest()[:12], flush=True)
+    runtime = (root / "pd_trip_runtime_v4.js").read_text(encoding="utf-8")
+    for caption in ("В пути к пассажиру", "Прибыл", "Начать поездку", "Передавать мою геопозицию"):
+        i = runtime.find(caption)
+        if i >= 0:
+            nearby = runtime[max(0, i - 190):i + 180].replace("\\n", " ")
+            print("TRIP_UI_CONTEXT", caption, nearby[:370], flush=True)
     test = source_root / "test_miniapp_interactions.cjs"
     if not test.is_file():
         sys.exit("TEST_BLOCKED: missing approved mock test")

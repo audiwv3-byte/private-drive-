@@ -23,7 +23,7 @@ async function position(id){
  {enableHighAccuracy:true,maximumAge:5000,timeout:15000});
  await refresh();
 }
-function cleanDialog(){if(map)map.remove();map=null;marker=null;dialog=null;body=null;active=null}
+function cleanDialog(){stopPosition();closing(false);if(map)map.remove();map=null;marker=null;dialog=null;body=null;active=null}
 window.pdOpenLiveTripV4=async function(id){
  if(dialog){dialog.close();cleanDialog()}
  dialog=pdSimpleDialog(label('Текущая поездка','Current trip','Dabartinė kelionė'));dialog.id='pdTripRuntimeV4';

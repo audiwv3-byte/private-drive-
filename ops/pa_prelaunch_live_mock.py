@@ -52,6 +52,10 @@ with tempfile.TemporaryDirectory(prefix="pd-live-mock-test-") as work:
         start = runtime.find(marker)
         if start >= 0:
             print("TRIP_STAGE_SOURCE", marker, repr(runtime[start:start + 850]), flush=True)
+    for marker in ("async function firstPosition(", "function firstPosition(", "r.status==='Подтверждена'", "r.departed_at?", "r.departed_at&&", "beginDeparture(id)"):
+        start = runtime.find(marker)
+        if start >= 0:
+            print("TRIP_EXTRA_CONTEXT", marker, repr(runtime[start:start + 1150]), flush=True)
     test = source_root / "test_miniapp_interactions.cjs"
     if not test.is_file():
         sys.exit("TEST_BLOCKED: missing approved mock test")

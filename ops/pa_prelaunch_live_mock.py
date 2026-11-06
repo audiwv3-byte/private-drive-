@@ -42,32 +42,14 @@ with tempfile.TemporaryDirectory(prefix="pd-live-mock-test-") as work:
         target.write_bytes(r.content)
         print("LIVE_TEST_SOURCE", name, "bytes", len(r.content),
               "sha256_12", hashlib.sha256(r.content).hexdigest()[:12], flush=True)
-    runtime = (root / "pd_trip_runtime_v4.js").read_text(encoding="utf-8")
-    for caption in ("В пути к пассажиру", "Прибыл", "Начать поездку", "Передавать мою геопозицию"):
-        i = runtime.find(caption)
-        if i >= 0:
-            nearby = runtime[max(0, i - 190):i + 180].replace("\\n", " ")
-            print("TRIP_UI_CONTEXT", caption, nearby[:370], flush=True)
-    for marker in ("async function beginDeparture(", "function beginDeparture(", "async function refresh()", "function refresh()", "r.role==='pilot'"):
-        start = runtime.find(marker)
-        if start >= 0:
-            print("TRIP_STAGE_SOURCE", marker, repr(runtime[start:start + 850]), flush=True)
-    for marker in ("async function firstPosition(", "function firstPosition(", "r.status==='Подтверждена'", "r.departed_at?", "r.departed_at&&", "beginDeparture(id)"):
-        start = runtime.find(marker)
-        if start >= 0:
-            print("TRIP_EXTRA_CONTEXT", marker, repr(runtime[start:start + 1150]), flush=True)
-    test = source_root / "test_miniapp_interactions.cjs"
+    test = source_root / "test_live_prod_interactions.cjs"
     if not test.is_file():
         sys.exit("TEST_BLOCKED: missing approved mock test")
-    mock_test = test.read_text(encoding="utf-8")
-    marker = "assert.ok(button('Прибыл'));assert.ok(button('Передавать мою геопозицию'));"
-    if marker in mock_test:
-        mock_test = mock_test.replace(marker, "console.log('PASS INITIAL_BUTTON_LABELS '+JSON.stringify(buttons().map(n=>n.textContent)));"+marker)
-    (root / "test_miniapp_interactions.cjs").write_text(mock_test, encoding="utf-8")
+    (root / "test_live_prod_interactions.cjs").write_bytes(test.read_bytes())
     # No token, project secrets or production path is exposed to Node.
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": work}
     p = subprocess.run(
-        ["node", "--unhandled-rejections=strict", "test_miniapp_interactions.cjs"],
+        ["node", "--unhandled-rejections=strict", "test_live_prod_interactions.cjs"],
         cwd=root, env=env, text=True, capture_output=True, timeout=50,
     )
     # These scripts contain only fixed PASS strings and assertion names;

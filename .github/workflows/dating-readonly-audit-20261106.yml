@@ -78,4 +78,26 @@ jobs:
                               print('BASH_CONSOLE_ID',item['id'],flush=True)
               except Exception:
                   print('CONSOLES_INVALID_FORMAT',flush=True)
+          for endpoint,label in (('/always_on/','ALWAYS_ON'),('/schedule/','SCHEDULED_TASKS')):
+              code,data=get(endpoint)
+              print(label+'_HTTP',code,flush=True)
+              if code==200:
+                  try:
+                      records=json.loads(data)
+                      if not isinstance(records,list): raise ValueError()
+                      print(label+'_COUNT',len(records),flush=True)
+                      for item in records:
+                          if not isinstance(item,dict): continue
+                          cmd=str(item.get('command',''))
+                          print(label+'_DATING_BOT_TASK',str('dating_lithuania_bot' in cmd),str(item.get('enabled',item.get('status','unknown'))),flush=True)
+                  except Exception: print(label+'_INVALID_RESPONSE',flush=True)
+          code, data=get('/files/tree/?path=/home/wilsonpark/dating_lithuania_bot/')
+          print('BOT_DIRECTORY_HTTP',code,flush=True)
+          if code==200:
+              try:
+                  tree=json.loads(data)
+                  text=json.dumps(tree)
+                  for needle in ('bot.py','settings.json','dating.sqlite3','dating_private_chat.py','backups','dating_upgrade_test.sqlite3','dating_v11_sandbox','dating_v111_sandbox'):
+                      print('TREE_HAS',needle,str(needle in text),flush=True)
+              except Exception: print('DIRECTORY_RESPONSE_INVALID',flush=True)
           PY

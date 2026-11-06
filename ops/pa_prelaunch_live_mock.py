@@ -69,7 +69,9 @@ with tempfile.TemporaryDirectory(prefix="pd-live-mock-test-") as work:
         sys.exit(1)
     print("LIVE_MOCK_SUCCESS: source executed with synthetic DOM, trip and GPS API")
     roles = source_root / "test_role_visibility.cjs"
-    (root / "test_role_visibility.cjs").write_bytes(roles.read_bytes())
+    role_source = roles.read_text(encoding="utf-8")
+    role_source = role_source.replace("document: {body}", "document: {body, querySelectorAll:()=>[]}")
+    (root / "test_role_visibility.cjs").write_text(role_source, encoding="utf-8")
     role_run = subprocess.run(
         ["node", "--unhandled-rejections=strict", "test_role_visibility.cjs"],
         cwd=root, env=env, text=True, capture_output=True, timeout=30,

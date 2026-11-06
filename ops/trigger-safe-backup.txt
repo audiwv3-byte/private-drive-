@@ -9,3 +9,4 @@ Retry after validating and filtering stale PythonAnywhere Bash consoles, 2026-10
 Explicit verified Bash selection retry 2026-10-31; no deployment.
 Read-only production-vs-GitHub source fingerprint audit 2026-10-31; verified backup repeated, no deployment.
 2026-11-06: user-requested pre-deployment backup and live source fingerprints for Mini App PR #8; backup-only, no application writes or restart.
+2026-11-06: fresh verified snapshot required before isolated order API privacy-cache guard patch; no deployment or live order mutation.

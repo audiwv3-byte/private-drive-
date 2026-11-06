@@ -68,3 +68,20 @@ with tempfile.TemporaryDirectory(prefix="pd-live-mock-test-") as work:
             print("FAILED_TEST_LOCATION", location.group(1), location.group(2))
         sys.exit(1)
     print("LIVE_MOCK_SUCCESS: source executed with synthetic DOM, trip and GPS API")
+    roles = source_root / "test_role_visibility.cjs"
+    (root / "test_role_visibility.cjs").write_bytes(roles.read_bytes())
+    role_run = subprocess.run(
+        ["node", "--unhandled-rejections=strict", "test_role_visibility.cjs"],
+        cwd=root, env=env, text=True, capture_output=True, timeout=30,
+    )
+    if role_run.returncode:
+        print("LIVE_ROLES_FAILED exit", role_run.returncode)
+        loc = re.search(r"test_role_visibility[.]cjs:(\\d+):(\\d+)", role_run.stderr)
+        if loc:
+            print("LIVE_ROLES_TEST_LOCATION", loc.group(1), loc.group(2))
+        sys.exit(2)
+    for line in role_run.stdout.splitlines():
+        if line.startswith("PASS:"):
+            print("LIVE_ROLES", line)
+    print("LIVE_ROLE_VISIBILITY_SUCCESS")
+

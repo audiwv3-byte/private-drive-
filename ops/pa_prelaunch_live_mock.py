@@ -63,5 +63,8 @@ with tempfile.TemporaryDirectory(prefix="pd-live-mock-test-") as work:
             if line.lstrip().startswith(("AssertionError", "Error:", "TypeError:",
                                         "ReferenceError:", "SyntaxError:")):
                 print("DIAGNOSTIC", line[:250])
+        location = re.search(r"test_miniapp_interactions[.]cjs:(\d+):(\d+)", p.stderr)
+        if location:
+            print("FAILED_TEST_LOCATION", location.group(1), location.group(2))
         sys.exit(1)
     print("LIVE_MOCK_SUCCESS: source executed with synthetic DOM, trip and GPS API")

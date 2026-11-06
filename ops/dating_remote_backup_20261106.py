@@ -54,5 +54,5 @@ def main():
     except Exception as exc:status={'result':'FAIL','error_type':type(exc).__name__,'reason':str(exc)[:120]}
     out=OPS/('status_'+nonce+'.json')
     out.write_text(json.dumps(status),encoding='utf-8');out.chmod(0o600)
-    time.sleep(150)
+    time.sleep(86400)
 if __name__=='__main__':main()

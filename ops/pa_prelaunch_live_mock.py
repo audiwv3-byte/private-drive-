@@ -45,7 +45,11 @@ with tempfile.TemporaryDirectory(prefix="pd-live-mock-test-") as work:
     test = source_root / "test_miniapp_interactions.cjs"
     if not test.is_file():
         sys.exit("TEST_BLOCKED: missing approved mock test")
-    (root / "test_miniapp_interactions.cjs").write_bytes(test.read_bytes())
+    mock_test = test.read_text(encoding="utf-8")
+    marker = "assert.ok(button('Прибыл'));assert.ok(button('Передавать мою геопозицию'));"
+    if marker in mock_test:
+        mock_test = mock_test.replace(marker, "console.log('PASS INITIAL_BUTTON_LABELS '+JSON.stringify(buttons().map(n=>n.textContent)));"+marker)
+    (root / "test_miniapp_interactions.cjs").write_text(mock_test, encoding="utf-8")
     # No token, project secrets or production path is exposed to Node.
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": work}
     p = subprocess.run(

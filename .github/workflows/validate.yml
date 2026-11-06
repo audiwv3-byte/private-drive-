@@ -17,3 +17,4 @@ jobs:
       - run: python test_tips_entry.py
       - run: node test_role_visibility.cjs
       - run: node test_miniapp_interactions.cjs
+      - run: python -m unittest -v test_ui_contracts

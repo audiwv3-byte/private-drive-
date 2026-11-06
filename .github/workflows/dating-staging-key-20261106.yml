@@ -1,0 +1,28 @@
+name: Dating Lithuania protected staging transfer key
+on:
+  push:
+    branches:
+      - audit/dating-only-20261106
+    paths:
+      - .github/workflows/dating-staging-key-20261106.yml
+permissions:
+  contents: read
+jobs:
+  public_key:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Derive public encryption key without exposing server credentials
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: |
+          python -m pip -q install cryptography
+          python - <<'PY'
+          import os,re,hashlib
+          from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+          from cryptography.hazmat.primitives import serialization
+          t=re.sub(r'^Token\\s+','',os.environ['PA_API_TOKEN'].strip(),flags=re.I)
+          t=''.join(t.split())
+          secret=X25519PrivateKey.from_private_bytes(hashlib.sha256(t.encode()+b':dating-lithuania-v12-20261106-keywrap').digest())
+          print('DAT_V12_PUBLIC_KEY',secret.public_key().public_bytes(encoding=serialization.Encoding.Raw,format=serialization.PublicFormat.Raw).hex())
+          PY

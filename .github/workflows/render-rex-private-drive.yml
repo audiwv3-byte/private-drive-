@@ -14,18 +14,20 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Install FFmpeg and FFprobe
+      - name: Provide standalone FFmpeg without apt
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg
+          python -m pip install --quiet --user imageio-ffmpeg
+          mkdir -p "$HOME/.local/bin"
+          ln -sf "$(python -c 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())')" "$HOME/.local/bin/ffmpeg"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Get approved Rex Broadcaster audio and existing master visuals
         shell: bash
         run: |
           set -euo pipefail
           curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 'https://resource2.heygen.ai/video/da55ab47231e4fe3993e3d7c5a47963c/original.mp4' -o video.mp4
           curl -fsSL --retry 3 --connect-timeout 15 --max-time 120 'https://resource2.heygen.ai/text_to_speech/94f4b62ce18a4a77b5498aa84f1e4225/f80e430f06b34b70b275c9c746436e37/id%3D7a85503f-293a-42a5-a8be-35c4c1dbeffc.mp3' -o rex.mp3
-          ffprobe -v error -show_entries stream=codec_name,codec_type -of compact=p=0 rex.mp3 | grep -E '^codec_name=mp3|codec_type=audio'
-          ffprobe -v error -show_entries stream=codec_name,codec_type -of compact=p=0 video.mp4 | grep -q video
+          ffmpeg -hide_banner -v error -i rex.mp3 -t 0.1 -f null -
+          ffmpeg -hide_banner -v error -i video.mp4 -t 0.1 -f null -
       - name: Master new MP4, no voice substitution, and validate output
         shell: bash
         run: |
@@ -35,8 +37,8 @@ jobs:
             -af "loudnorm=I=-16:TP=-1.5:LRA=11" \
             -t 7.75 -movflags +faststart 'PRIVATE_DRIVE_Rex_Broadcaster_approved.mp4'
           test -s PRIVATE_DRIVE_Rex_Broadcaster_approved.mp4
-          ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 PRIVATE_DRIVE_Rex_Broadcaster_approved.mp4 | grep -q audio
-          ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,codec_type -of json PRIVATE_DRIVE_Rex_Broadcaster_approved.mp4
+          ffmpeg -hide_banner -i PRIVATE_DRIVE_Rex_Broadcaster_approved.mp4 -t 0.1 -f null - 2>&1 | tee probe.log
+          grep -q 'Audio: aac' probe.log
           ffmpeg -hide_banner -i PRIVATE_DRIVE_Rex_Broadcaster_approved.mp4 -map 0:a -af volumedetect -f null - 2>&1 | grep 'mean_volume'
           sha256sum PRIVATE_DRIVE_Rex_Broadcaster_approved.mp4
       - name: Save finished MP4

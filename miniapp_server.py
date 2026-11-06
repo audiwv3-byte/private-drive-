@@ -71,9 +71,14 @@ def protect_private_information():
 
 @app.after_request
 def private_response_cache(response):
-    if request.path.lower().startswith(('/static/', '/api/pilot', '/api/admin/', '/api/payment')):
+    # Every authenticated API response must bypass shared and WebView caches.
+    # Include all order, trip, driver, payment and profile endpoints.
+    path = request.path.lower()
+    if path.startswith('/api/') or path.startswith('/static/'):
         response.headers['Cache-Control'] = 'private, no-store, max-age=0'
-        response.headers['Vary'] = 'X-Telegram-Init-Data'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        response.vary.add('X-Telegram-Init-Data')
     return response
 
 

@@ -79,7 +79,10 @@ changed=False
 try:
     changed=True
     put(PROJECT+PATH,updated.encode("utf-8"))
-    api("POST","/webapps/wilsonpark.pythonanywhere.com/reload/")
+    try:
+        api("POST","/webapps/wilsonpark.pythonanywhere.com/reload/")
+    except requests.exceptions.ReadTimeout:
+        print("RELOAD_API_READ_TIMEOUT public verification required",flush=True)
     ok=False
     for attempt in range(8):
         r=requests.get(SITE,params={"privacy_footer_fix":run,"attempt":attempt},headers={"Cache-Control":"no-cache"},timeout=30)
@@ -100,6 +103,10 @@ try:
 except BaseException:
     if changed:
         put(PROJECT+PATH,original)
-        api("POST","/webapps/wilsonpark.pythonanywhere.com/reload/")
+        try:
+            api("POST","/webapps/wilsonpark.pythonanywhere.com/reload/")
+        except requests.exceptions.ReadTimeout:
+            print("ROLLBACK_RELOAD_API_READ_TIMEOUT",flush=True)
+        assert get(PROJECT+PATH)==original,"Rollback source mismatch"
         print("PRIVACY_FOOTER_ROLLBACK_VERIFIED",flush=True)
     raise

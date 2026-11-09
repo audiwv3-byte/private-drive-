@@ -48,3 +48,24 @@ for url in [site + "/",site + "/assets/pd-registration.js",site + "/assets/priva
     except requests.RequestException:
         print("PUBLIC_URL",url.replace(site,""),"NOT_RESPONDING")
 print("READ_ONLY_AUDIT_DONE no_hosting_writes=true")
+
+# Check only the error TYPE and module, never emit request details or full tracebacks.
+r=s.get(base+"/files/path/var/log/wilsonpark.pythonanywhere.com.error.log",timeout=30)
+print("ERROR_LOG_READ_STATUS",r.status_code)
+if r.status_code==200:
+    frame=[]
+    for line in r.text.splitlines()[-500:]:
+        m=re.search(r'File "([^"]+)", line ([0-9]+)',line)
+        if m:frame.append((m.group(1).split("/")[-1],m.group(2)))
+        er=re.search(r'([A-Za-z.]*?(?:SyntaxError|TemplateSyntaxError|AttributeError|NameError|TypeError|ImportError|RuntimeError|UndefinedError))\\b',line)
+        if er:
+            print("ERROR_EXCEPTION",er.group(1),"RECENT_FRAMES",frame[-3:])
+            frame.clear()
+import subprocess
+check=subprocess.run([sys.executable,"ops/onboarding-restore-20261109/deploy_ui.py"],
+    env={**os.environ,"PD_UI_DEPLOY":"0"},text=True,capture_output=True)
+print("DRY_RUN_SOURCE_CHECK_EXIT",check.returncode)
+for line in check.stdout.splitlines():
+    if line.startswith(("LIVE_SOURCE_FINGERPRINTS","OFFLINE_SYNTAX","PATCH_PREFLIGHT","DRY_RUN")):print(line)
+if check.returncode:
+    for line in check.stderr.splitlines()[-6:]: print("DRY_RUN_ERROR_TYPE",line[:160])

@@ -121,13 +121,17 @@ assert.equal(hidden,1,'Existing registered user stays signed in');
 ctx.pdOnboardingStart({pilot_access:true});assert.equal(pilot,1,'Pilots unaffected');
 ctx.pdOnboardingStart({admin:true});assert.equal(hidden,2,'Admins unaffected');
 const c=raw.welcome;
-const w=Object.assign({pdSwitchLanguage:v=>switches.push(v),document:{getElementById:()=>({open:false})}},ctx);
+ctx.selected='ru';
+ctx.pdSwitchLanguage=v=>switches.push(v);
+ctx.document={getElementById:()=>({open:false})};
 vm.runInContext("window.pdWelcomeContinue=function(manual){"+c+"\n };",ctx);
-ctx.pdWelcomeContinue(true);
+ctx.window.pdWelcomeContinue(true);
 assert.equal(shown.at(-1),'role','Continue must show role before registration');
 assert.equal(state.pdWelcomeManualPending,'yes');
-ctx.window.PD_LANG='ru';
-ctx.pdWelcomeContinue(false);assert.equal(state.pdWelcomeManualPending,undefined);
+ctx.window.pdWelcomeContinue(false);assert.equal(state.pdWelcomeManualPending,undefined);
+ctx.selected='lt';ctx.window.pdWelcomeContinue(false);
+assert.equal(switches.at(-1),'lt','Changing language must reload chosen language');
+assert.ok(Number(state.pdWelcomeRoleAfterLanguageAt)>0,'Role resume marker must be saved');
 console.log('PASS guest language first, persisted old role ignored, chosen language -> role, staff preservation, manual link');
 """
     v=Path(td)/"probe.cjs";v.write_text(vmtest,encoding="utf-8")

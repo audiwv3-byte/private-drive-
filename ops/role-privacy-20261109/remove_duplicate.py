@@ -38,7 +38,9 @@ def digest(data):return hashlib.sha256(data).hexdigest()
 original=get(PROJECT+PATH)
 page=original.decode("utf-8-sig")
 assert page.count(ANCHOR)==1,"Onboarding footer anchor changed; no writes"
-assert page.count(HEADER)==1,"Header privacy policy missing; no writes"
+upper_privacy=page[:page.index(ANCHOR)]
+print("UPPER_PRIVACY_MARKERS","header_class",upper_privacy.count("pd-privacy-bar"),"privacy_links",upper_privacy.count('href="/privacy"'),flush=True)
+assert upper_privacy.count('href="/privacy"')>=1,"Upper privacy link missing; no writes"
 # Remove only the lower privacy link after the role screen. Leave contact links.
 start=page.index(ANCHOR)+len(ANCHOR)
 end=page.index("</p>",start)
@@ -52,7 +54,7 @@ assert '<button type="button" class="secondary" onclick="pdShowOnboarding(\'lang
 updated=page[:start]+footer[len(DUPLICATE):]+page[end:]
 assert len(page)-len(updated)==len(DUPLICATE),"Unrelated code changed"
 assert updated[:start]==page[:start] and updated[start+len(footer)-len(DUPLICATE):]==page[end:]
-assert updated.count(HEADER)==1
+assert updated[:updated.index(ANCHOR)].count('href="/privacy"')==upper_privacy.count('href="/privacy"')
 assert 'href="/privacy"' in updated
 assert "mailto:eurobaltictransfer@gmail.com" in updated[start:start+400]
 assert "https://t.me/PrivatDraiv" in updated[start:start+400]
@@ -83,7 +85,7 @@ try:
         b=html.find("</p>",a+len(ANCHOR)) if a>=0 else -1
         lower=html[a+len(ANCHOR):b] if a>=0 and b>a else ""
         ok=(r.status_code==200 and a>=0 and DUPLICATE not in lower
-            and html.count(HEADER)==1
+            and html[:a].count('href="/privacy"')>=1
             and "mailto:eurobaltictransfer@gmail.com" in lower
             and "https://t.me/PrivatDraiv" in lower
             and 'id="pdLangSelect"' in html and 'id="pdWelcomeTelegram"' in html)

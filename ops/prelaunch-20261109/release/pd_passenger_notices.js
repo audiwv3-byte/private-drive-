@@ -39,4 +39,3 @@ async function poll(){
 setInterval(poll,8000);setTimeout(poll,1800);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});
 })();
 
-

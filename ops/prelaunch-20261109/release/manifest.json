@@ -10,5 +10,17 @@
     "public_path": "/assets/pd-passenger-notices-v5.js",
     "before_sha256": "8e3adc750133e0a912ddcb2f4febc11b8b628386c45ace60ebed476df7f08d10",
     "after_sha256": "8bc5e1071efdfd1bd155e0f3ba28d3b1eb5c37b3ed3c7b390479d7f90e30b79e"
+  },
+  {
+    "file": "pd_trip_runtime_v4.js",
+    "public_path": "/assets/pd-trip-runtime-v4.js",
+    "before_sha256": "a0569eac3c8b601dbd1aab684ae4d7d22b46cce6823d8a03221c3c5936f05785",
+    "after_sha256": "38e6c6c9c05a6251cc1ad34bd6bcfc7dca958d00929bc719c62b92438eeeef04"
+  },
+  {
+    "file": "pd_admin_console_v4.js",
+    "public_path": "/assets/pd-admin-console-v4.js",
+    "before_sha256": "332f5f1523c9da5971718257c2da57200aa103b8ff16889445f1a4753fd25665",
+    "after_sha256": "9ae18b8ae975825d956a42f2c4d4c0a9957a07630b9250cb2122ad7351988ebf"
   }
 ]

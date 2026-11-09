@@ -83,4 +83,3 @@ const registerDriver=pdRegisterDriver;pdRegisterDriver=async function(){
 // Apply to an already rendered welcome/language screen without disrupting signed-in roles.
 if(!form.classList.contains('hidden')||['pdObRole','pdObLanguage'].some(id=>!document.getElementById(id)?.classList.contains('hidden')))pdShowOnboarding('passenger');
 })();
-

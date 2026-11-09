@@ -1,5 +1,5 @@
 name: PRIVATE DRIVE - restore language-first UI (source backup)
-# Second guarded attempt: print safe public status/hash diagnostics before automatic rollback.
+# Third guarded attempt: Jinja and Node compile checks passed offline; source rollback remains automatic.
 on:
   push:
     branches: [fix/restore-first-language-telegram-onboarding-20261109]
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: pip install requests
+      - run: pip install requests Jinja2
       - name: Compile isolated script (no hosting changes)
         run: python -m py_compile ops/onboarding-restore-20261109/deploy_ui.py
       - name: Verify current source fingerprints and exact patches (dry-run)

@@ -1,0 +1,33 @@
+name: PRIVATE DRIVE - passenger one checkbox one Telegram button
+on:
+  push:
+    branches: [fix/telegram-one-action-intake-20261109]
+    paths:
+      - .github/workflows/deploy-passenger-one-tap-20261109.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-single-tap-registration
+  cancel-in-progress: false
+jobs:
+  guarded-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install requests Jinja2
+      - run: python -m py_compile ops/telegram-intake-20261109/deploy_one_tap.py
+      - name: Confirm exact live source and inspect single consent UI without writes
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_SINGLE_TAP_DEPLOY: "0"
+        run: python ops/telegram-intake-20261109/deploy_one_tap.py
+      - name: Backup, install and verify Telegram-first registration UI
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_SINGLE_TAP_DEPLOY: "1"
+        run: python ops/telegram-intake-20261109/deploy_one_tap.py

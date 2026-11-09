@@ -188,7 +188,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check.write_text(r"""
 const vm=require('node:vm'),assert=require('node:assert/strict');
 let expanded=[],invalidated=0;const close={remove(){this.removed=true}};
-function make(){return {classList:{toggle:(c,on)=>expanded.push([c,on])},append:()=>{},dataset:{}}}
+function make(){return {classList:{toggle:(c,on)=>expanded.push([c,on])},append:()=>{},remove:()=>{},dataset:{}}}
 const dialog=make(),canvas=make();
 const ctx={window:{PD_LANG:'ru'},document:{createElement:()=>Object.assign(make(),{setAttribute(){}}),head:{append(){}}},
   label:(ru)=>ru,dialog,map:{getContainer:()=>canvas,invalidateSize:()=>invalidated++},

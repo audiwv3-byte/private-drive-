@@ -21,6 +21,7 @@ pdEnterPilot=function(){
  pdApplyRoleAccess(user,'driver');pdHideOnboarding();document.body.classList.add('admin-home','pd-pilot-cabinet');
  document.querySelectorAll('section[id^="step"]').forEach(x=>x.classList.add('hidden'));
  document.getElementById('pdPilotWork').classList.remove('hidden');document.getElementById('mainNav').classList.add('hidden');document.getElementById('pdPilotBack').classList.add('hidden');
+ const dispatchBack=document.getElementById('pdPilotAdmin');if(dispatchBack){dispatchBack.hidden=!admin;dispatchBack.classList.toggle('hidden',!admin)}
  document.getElementById('pdPilotWorkTitle').textContent=tr('Кабинет пилота','Pilot cabinet','Piloto paskyra');
  document.getElementById('pdPilotWorkRefresh').textContent=tr('Обновить','Refresh','Atnaujinti');
  const passenger=document.getElementById('pdPilotPassenger');passenger.textContent=tr('Перейти в пассажирский кабинет','Open passenger cabinet','Atidaryti keleivio paskyrą');passenger.classList.toggle('hidden',!user.registered);

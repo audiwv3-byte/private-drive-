@@ -7,8 +7,6 @@ s=requests.Session();s.headers["Authorization"]="Token "+token
 url="https://www.pythonanywhere.com/api/v0/user/wilsonpark/files/path/home/wilsonpark/euro_baltic_transfer/PRIVATE_DRIVE_MiniApp_2026_10_18/miniapp/templates/index.html"
 r=s.get(url,timeout=50);r.raise_for_status();b=r.content;html=b.decode("utf-8-sig")
 print("LIVE_SHA256",hashlib.sha256(b).hexdigest(),"BYTES",len(b))
-for key in ("function pdSetRole(","pdSetRole('client')",'data-mode="client"','id="mainNav"',"Как клиент","Как пассажир","Диспетчерская","body.admin-home","pd-role-admin","pd-role-visibility","class=\"nav\"","mainNav").replace("(", "\\(").replace(")", "\\)"):
- pass
 patterns=["function pdSetRole(","pdSetRole('client')",'data-mode="client"','id="mainNav"',"Как клиент","Как пассажир","Диспетчерская","body.admin-home","pd-role-admin","pd-role-visibility",'class="nav"',"mainNav"]
 for key in patterns:
  pos=[m.start() for m in re.finditer(re.escape(key),html)]

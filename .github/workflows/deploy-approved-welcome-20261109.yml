@@ -1,0 +1,32 @@
+name: PRIVATE DRIVE - deploy approved welcome screen
+on:
+  push:
+    branches: [feature/approved-welcome-visual-20261109]
+    paths:
+      - .github/workflows/deploy-approved-welcome-20261109.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-approved-welcome-20261109
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install requests Jinja2
+      - run: python -m py_compile ops/welcome-20261109/deploy.py
+      - name: Preflight current live source, Jinja and JavaScript with no writes
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_WELCOME_DEPLOY: "0"
+        run: python ops/welcome-20261109/deploy.py
+      - name: Deploy only welcome template after verified source backup
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_WELCOME_DEPLOY: "1"
+        run: python ops/welcome-20261109/deploy.py

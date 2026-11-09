@@ -32,7 +32,7 @@ pdAssignPilot=async function(id){
  if((fresh.pilots||[]).length)return originalAssignPilot(id);
  const d=pdSimpleDialog(text('Нет одобренных пилотов','No approved pilots','Nėra patvirtintų pilotų'));
  d.append(el('p',text('Карточка пилота появится после назначения одобренного водителя. Откройте заявки и проверьте этап регистрации, документы и решение диспетчера.','A pilot card appears after an approved driver is assigned. Open applications and check the registration stage, documents and dispatcher decision.','Piloto kortelė rodoma priskyrus patvirtintą vairuotoją. Atidarykite paraiškas ir patikrinkite registracijos etapą, dokumentus bei dispečerio sprendimą.')));
- d.append(btn(text('Открыть заявки пилотов','Open pilot applications','Atidaryti pilotų paraiškas'),async()=>{d.close();await applicationsDialog()}));
+ d.append(btn(text('Открыть заявки пилотов','Open pilot applications','Atidaryti pilotų paraiškas'),async()=>{d.close();await openPilotApplications()}));
 };
 function internalFinance(){showLegacy();$id('pdTabFinance')?.click()}
 function showLegacy(){if(root)root.hidden=true;$id('step10')?.classList.remove('pda-console-active');$id('pdAdminConsoleReturnV4')?.removeAttribute('hidden')}

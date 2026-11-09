@@ -121,7 +121,9 @@ with tempfile.TemporaryDirectory(prefix='pd-private-audit-') as directory:
                 c=sqlite3.connect(backup.as_uri()+'?mode=ro',uri=True);c.row_factory=sqlite3.Row
                 if 'pd_driver_applications' in tables(c):
                     counts={enum(r['status'],pilot_states):r['n'] for r in c.execute('SELECT status,COUNT(*) AS n FROM pd_driver_applications GROUP BY status')}
-                    people=[dict(identity=pseudonym(r['telegram_id']),status=enum(r['status'],pilot_states),stage=r['stage']) for r in c.execute('SELECT telegram_id,status,stage FROM pd_driver_applications')]
+                    backup_columns={r[1] for r in c.execute('PRAGMA table_info(pd_driver_applications)')}
+                    stage='stage' if 'stage' in backup_columns else 'NULL AS stage'
+                    people=[dict(identity=pseudonym(r['telegram_id']),status=enum(r['status'],pilot_states),stage=r['stage']) for r in c.execute('SELECT telegram_id,status,'+stage+' FROM pd_driver_applications')]
                     findings['backup_pilot_counts'].append(dict(snapshot=remote.split('/')[-2],counts=counts,pilots=people))
                 c.close()
 key=os.urandom(32);nonce=os.urandom(12)

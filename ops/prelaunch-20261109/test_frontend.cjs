@@ -72,11 +72,13 @@ async function startRide(){
  console.log('PASS trip start UI: paid proceeds; unpaid/review/cash receipt states explained before GPS; no unpaid start request');
 }
 async function assignment(){
- const dom=new JSDOM('<body><div id="pdDriverApplicationsList"></div></body>',{url:'https://private-drive.test',runScripts:'outside-only'}),w=dom.window;let original=0;
+ const dom=new JSDOM('<body><div id="pdDriverApplicationsList"></div></body>',{url:'https://private-drive.test',runScripts:'outside-only'}),w=dom.window;let original=0,applications=0;
  w.PD_LANG='ru';w.pdL=s=>s;w.pdAssignPilot=async()=>{original++};w.go=()=>{};w.admin=true;w.setTimeout=()=>{};w.setInterval=()=>{};w.message=()=>{};
  w.api=async()=>({pilots:[]});w.pdSimpleDialog=title=>{const d=w.document.createElement('dialog');d.append(title);w.document.body.append(d);return d};
+ w.HTMLDialogElement.prototype.close=function(){this.dispatchEvent(new w.Event('close'));this.remove()};w.pdLoadDriverApplications=async()=>{applications++};
  w.eval(source('pd_admin_console_v4.js','pd-admin-console-v4.js'));await w.pdAssignPilot(24);
  assert.match(w.document.body.textContent,/Нет одобренных пилотов/);assert.match(w.document.body.textContent,/Открыть заявки/);assert.equal(original,0);
+ await w.document.querySelector('dialog button').onclick();assert(w.document.getElementById('pdPilotApplicationsDialogV4'));assert.equal(applications,1);
  w.api=async()=>({pilots:[{telegram_id:202}]});await w.pdAssignPilot(24);assert.equal(original,1);w.close();
  console.log('PASS pilot assignment UI: empty approved list explains card absence and links to applications; eligible pilots use existing assignment flow');
 }

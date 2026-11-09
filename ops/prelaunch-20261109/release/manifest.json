@@ -1,0 +1,14 @@
+[
+  {
+    "file": "pd_registration.js",
+    "public_path": "/assets/pd-registration.js",
+    "before_sha256": "e34583bd267c041d7e3511cd1366200a7e2fcaa0a7f411f7069cb8ea60b71bdd",
+    "after_sha256": "1700c935f147ba6bb7c3ac117259edb16e01c7f4c55dfd0d22ee20832907896d"
+  },
+  {
+    "file": "pd_passenger_notices.js",
+    "public_path": "/assets/pd-passenger-notices-v5.js",
+    "before_sha256": "8e3adc750133e0a912ddcb2f4febc11b8b628386c45ace60ebed476df7f08d10",
+    "after_sha256": "8bc5e1071efdfd1bd155e0f3ba28d3b1eb5c37b3ed3c7b390479d7f90e30b79e"
+  }
+]

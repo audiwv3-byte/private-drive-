@@ -1,0 +1,86 @@
+/* Live form enhancement: retains the deployed Telegram auth and role handlers. */
+(()=>{
+'use strict';
+const form=document.getElementById('pdObPassenger'),header=document.querySelector('.pd-branded-header');
+if(!form||!header||window.pdRegistrationV1)return;window.pdRegistrationV1=true;
+const t=(ru,en,lt)=>window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru;
+const logo=header.querySelector('.pd-official-logo');if(logo)logo.src='/assets/private-drive-logo-transparent-v1.png';
+const brand=header.querySelector('.pd-brand-wordmark');
+if(brand){brand.querySelector('strong').textContent='PRIVATE DRIVE';brand.querySelector('span').textContent='VILNIUS • LIETUVA • EUROPA'}
+const language=document.createElement('select');language.id='pdRegistrationLanguage';language.setAttribute('aria-label',t('Язык','Language','Kalba'));
+for(const value of ['ru','en','lt']){const o=document.createElement('option');o.value=value;o.textContent=value.toUpperCase();language.append(o)}
+language.value=window.PD_LANG||'ru';language.onchange=()=>{try{localStorage.setItem('pdOnboardingLanguage',language.value)}catch(_){}pdSwitchLanguage(language.value)};header.append(language);
+// The original shared hero remains the live-home anchor; its picture is now the page background.
+const privacy=document.querySelector('.pd-privacy-bar');
+const shared=document.getElementById('pdSharedHero'),pilotBack=document.getElementById('pdPilotBack');
+if(shared&&privacy)shared.append(privacy);
+if(shared&&pilotBack)shared.after(pilotBack);
+form.querySelector('h1').textContent=t('Регистрация','Registration','Registracija');
+const name=document.getElementById('pdObPassengerName'),phone=document.getElementById('pdObPassengerPhone');
+name.placeholder=t('Имя','Name','Vardas');phone.placeholder='+370…';
+const emailLabel=document.createElement('label');emailLabel.htmlFor='pdObPassengerEmail';emailLabel.textContent=t('Электронная почта · необязательно','Email · optional','El. paštas · neprivaloma');
+const email=document.createElement('input');email.id=emailLabel.htmlFor;email.type='email';email.autocomplete='email';email.maxLength=254;email.placeholder=t('Электронная почта','Email','El. paštas');
+phone.after(emailLabel,email);
+const consent=document.createElement('label');consent.className='pd-registration-consent';
+const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.required=true;checkbox.id='pdRegistrationConsent';
+const consentText=document.createElement('span');consentText.append(t('Принимаю ','I accept the ','Sutinku su '));
+function link(path,text){const a=document.createElement('a');a.href=path+'?lang='+(window.PD_LANG||'ru');a.target='_blank';a.rel='noopener noreferrer';a.textContent=text;return a}
+consentText.append(link('/legal',t('условия','terms','sąlygomis')),t(' и ',' and ',' ir '),link('/privacy',t('политику конфиденциальности','privacy policy','privatumo politika')));consent.append(checkbox,consentText);
+const actions=form.querySelector('.actions');actions.before(consent);
+// Keep the original paragraphs available to screen readers without duplicating the card footer.
+for(const p of form.querySelectorAll(':scope > p'))p.classList.add('hidden');
+const back=actions.querySelector('button[type="button"]');if(back){back.textContent=t('Для пилотов · регистрация водителя','For pilots · driver registration','Pilotams · vairuotojo registracija');back.classList.add('pd-registration-role');back.onclick=()=>pdShowOnboarding('driver')}
+const telegram=form.querySelector('[onclick="pdRegisterPassengerTelegram()"]');if(telegram){telegram.classList.add('pd-registration-login');telegram.textContent=t('Продолжить через Telegram · передать номер','Continue with Telegram · share phone','Tęsti per Telegram · perduoti numerį')}
+const footer=document.createElement('div');footer.className='pd-registration-footer';footer.append(link('/legal',t('Условия поездки и оплаты','Trip and payment terms','Kelionės ir mokėjimo sąlygos')),link('/privacy',t('Политика конфиденциальности','Privacy policy','Privatumo politika')));const contact=document.createElement('a');contact.href='mailto:eurobaltictransfer@gmail.com';contact.textContent=t('Связаться с нами','Contact us','Susisiekite');const support=document.createElement('a');support.href='https://t.me/PrivatDraiv';support.textContent='Telegram';support.target='_blank';support.rel='noopener noreferrer';footer.append(contact,support);form.append(footer);
+// Existing users/driver/admin routing is still decided by the original handler.
+const show=pdShowOnboarding;pdShowOnboarding=function(stage){const u=window.pdOnboardingUser;const guest=!u?.registered&&!u?.admin&&!u?.pilot_access;return show(guest&&(stage==='role'||stage==='language')?'passenger':stage)};
+function validateName(input){
+ input.setCustomValidity(input.value.trim().length<2?t('Укажите имя: 2–80 символов','Enter a name: 2–80 characters','Įveskite vardą: 2–80 simbolių'):'');
+}
+function validatePhone(input){
+ const value=input.value.trim(),digits=value.replace(/\D/g,'');
+ input.setCustomValidity(!/^\+?[0-9\s().-]+$/.test(value)||digits.length<7||digits.length>15?t('Проверьте номер телефона','Check your phone number','Patikrinkite telefono numerį'):'');
+}
+function validateEmail(){
+ const value=email.value.trim();
+ email.setCustomValidity(value&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)?t('Проверьте электронную почту','Check your email address','Patikrinkite el. pašto adresą'):'');
+}
+for(const [input,validate] of [[name,validateName],[phone,validatePhone],[email,validateEmail],
+ [document.getElementById('pdObDriverName'),validateName],[document.getElementById('pdObDriverPhone'),validatePhone]]){
+ if(input)input.addEventListener('input',()=>validate(input));
+}
+const complete=pdCompletePassengerRegistration;
+pdCompletePassengerRegistration=async function(){
+ // Signing in must never write fields from the new-registration form.
+ if(!window.pdOnboardingUser?.registered){
+  const value=email.value.trim();
+  if(value){
+   try{const me=await api('/api/me'),profile=me.profile||{};await api('/api/profile/details',{email:value,home_city:profile.home_city||'',preferences:profile.preferences||''})}
+   catch(_){throw Error(t('Регистрация сохранена. Не удалось сохранить email — повторите или оставьте поле пустым.','Registration saved. Email could not be saved — retry or leave it blank.','Registracija išsaugota. El. pašto išsaugoti nepavyko — bandykite dar kartą arba palikite tuščią.'))}
+  }
+ }
+ return complete();
+};
+const register=pdRegisterPassenger;pdRegisterPassenger=async function(){
+ validateName(name);validatePhone(phone);validateEmail();if(!form.reportValidity())return;return register();
+};
+const registerTelegram=pdRegisterPassengerTelegram;pdRegisterPassengerTelegram=async function(){
+ if(typeof initData==='undefined'||!initData){
+  const status=document.getElementById('pdObStatus');
+  status.replaceChildren(document.createTextNode(t('Откройте бота и нажмите кнопку приложения. ','Open the bot and tap the app button. ','Atidarykite botą ir paspauskite programėlės mygtuką. ')));
+  const launch=document.createElement('a');launch.href='https://t.me/EuroBalticTransferBot';launch.target='_blank';launch.rel='noopener noreferrer';launch.textContent=t('Открыть Telegram','Open Telegram','Atidaryti Telegram');status.append(launch);return;
+ }
+ if(window.pdOnboardingUser?.registered)return complete();
+ if(!checkbox.checked){checkbox.reportValidity();return}
+ validateEmail();if(!email.reportValidity())return;
+ // The original handler still enforces the separate phone-sharing consent.
+ return registerTelegram();
+};
+const registerDriver=pdRegisterDriver;pdRegisterDriver=async function(){
+ const driverName=document.getElementById('pdObDriverName'),driverPhone=document.getElementById('pdObDriverPhone');
+ if(driverName)validateName(driverName);if(driverPhone)validatePhone(driverPhone);return registerDriver();
+};
+// Apply to an already rendered welcome/language screen without disrupting signed-in roles.
+if(!form.classList.contains('hidden')||['pdObRole','pdObLanguage'].some(id=>!document.getElementById(id)?.classList.contains('hidden')))pdShowOnboarding('passenger');
+})();
+

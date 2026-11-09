@@ -1,0 +1,26 @@
+name: PRIVATE DRIVE - current runtime and order 24 read-only check
+on:
+  push:
+    branches: [fix/prelaunch-registration-notices-20261109]
+    paths:
+      - ops/prelaunch-20261109/remote_readonly_check.py
+      - ops/prelaunch-20261109/test_runtime_contracts.py
+      - .github/workflows/prelaunch-20261109.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install requests Flask==3.0.3 cryptography
+      - name: Test current runtime with fake data, read only order 24 and pilot status counts
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: python ops/prelaunch-20261109/remote_readonly_check.py
+

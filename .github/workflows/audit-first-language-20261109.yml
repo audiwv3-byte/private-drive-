@@ -1,0 +1,22 @@
+name: PRIVATE DRIVE - audit language-before-role routing
+on:
+  push:
+    branches: [fix/first-language-before-role-20261109]
+    paths:
+      - ops/first-language-role-20261109/audit.py
+      - .github/workflows/audit-first-language-20261109.yml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install requests
+      - name: Inspect first-launch flow without changes
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: python ops/first-language-role-20261109/audit.py

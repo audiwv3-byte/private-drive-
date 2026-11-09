@@ -11,13 +11,13 @@ for path in paths:
  h=r.content.decode("utf-8-sig")
  print("SOURCE",path,"sha256",hashlib.sha256(r.content).hexdigest(),"bytes",len(r.content))
  if path.endswith(".html"):
-  for needle in ('function pdPilotWork()', "await api('/api/driver/work/'+o.id+'/status'",'<script src="/assets/pd-trip-runtime-v4.js"','<script src="/assets/pd-pilot-cabinet-v4.js"','function pdSimpleDialog','L.map','leaflet.css','leaflet.js'):
+  for needle in ('function pdPilotWork()', "await api('/api/driver/work/'+o.id+'/status'",'pd-trip-runtime-v4.js','pd-pilot-cabinet-v4.js','function pdSimpleDialog','L.map','leaflet.css','leaflet.js'):
    i=h.find(needle);print("MARKER",path,repr(needle),"count",h.count(needle),"pos",i)
    if i>=0:print("CONTEXT",path,repr(needle),repr(h[max(0,i-170):i+700]))
  if path=="pd_trip_runtime_v4.js":
-  print("RUNTIME_JS",repr(h[:7800]))
+  print("RUNTIME_JS",repr(h[7100:19000]))
  if path=="pd_pilot_cabinet_v4.js":
-  print("PILOT_JS",repr(h[:4000]))
+  print("PILOT_JS",repr(h[3900:14000]))
  if path=="pd_trip_runtime_v4.py":
   for needle in ("def view(", "def identity(", "@app.get('/api/trip/<int:oid>')"):
    i=h.find(needle);print("CONTEXT",path,repr(needle),repr(h[max(0,i-150):i+3100]) if i>=0 else "not found")

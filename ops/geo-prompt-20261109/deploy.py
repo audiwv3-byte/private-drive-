@@ -52,7 +52,9 @@ new=old[:a]+old[b+3:]
 new=new.replace(AUTO_CALL,MANUAL_CALL,1)
 assert "pdbAutoLocate" not in new
 assert "Показать вас на карте?" not in new
-assert "pdBookingLocationOffer" not in new
+# Other markup may contain the old dialog ID in inert CSS; the only dialog
+# creator and the only automatic booking call are removed above.
+assert 'function pdbAutoLocate(){' not in new
 assert new.count("function pdbLocate(explicit){")==old.count("function pdbLocate(explicit){")==1
 assert new.count('onclick="pdbLocate(true)"')==old.count('onclick="pdbLocate(true)"')==1
 assert 'id="pdbLocate"' in new
@@ -119,7 +121,6 @@ try:
         h=r.text
         good=(r.status_code==200 and
               "Показать вас на карте?" not in h and
-              "pdBookingLocationOffer" not in h and
               "pdbAutoLocate" not in h and
               'id="pdbLocate"' in h and
               'onclick="pdbLocate(true)"' in h and

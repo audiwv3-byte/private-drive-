@@ -1,0 +1,21 @@
+name: PRIVATE DRIVE - audit profile duplicate legal links
+on:
+  push:
+    branches: [fix/profile-duplicate-legal-links-20261109]
+    paths:
+      - .github/workflows/audit-profile-links-20261109.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install requests
+      - name: Inspect exact production profile and header markup, read-only
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: python ops/profile-links-20261109/audit.py

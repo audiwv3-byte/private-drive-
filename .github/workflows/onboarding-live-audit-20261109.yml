@@ -4,6 +4,7 @@ on:
     branches: [fix/restore-first-language-telegram-onboarding-20261109]
     paths:
       - ops/onboarding-restore-20261109/audit_live.py
+      - ops/onboarding-restore-20261109/deploy_ui.py
       - .github/workflows/onboarding-live-audit-20261109.yml
   workflow_dispatch:
 permissions:

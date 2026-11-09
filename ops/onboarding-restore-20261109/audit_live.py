@@ -69,3 +69,16 @@ for line in check.stdout.splitlines():
     if line.startswith(("LIVE_SOURCE_FINGERPRINTS","OFFLINE_SYNTAX","PATCH_PREFLIGHT","DRY_RUN")):print(line)
 if check.returncode:
     for line in check.stderr.splitlines()[-6:]: print("DRY_RUN_ERROR_TYPE",line[:160])
+
+# Geo prompt root-cause audit: print only bounded public-source context, not private data.
+source=read("miniapp/templates/index.html")
+if source:
+    html=source.decode("utf-8-sig",errors="replace")
+    print("GEO_AUDIT_TEMPLATE_BYTES",len(html))
+    for needle in ("Показать вас на карте","Определим ваше местоположение","Адрес можно указать вручную","Запрашивается только с вашего разрешения","geolocation.getCurrentPosition","getCurrentPosition(","watchPosition(","pdOnboardingStage","pdObLanguage","pdShowGeo","geoConsent"):
+        matches=list(re.finditer(re.escape(needle),html,re.I))
+        print("GEO_MATCH",repr(needle),"count",len(matches))
+        for m in matches[:4]:
+            left=max(0,m.start()-450);right=min(len(html),m.end()+720)
+            print("GEO_CONTEXT",repr(needle),"index",m.start(),repr(html[left:right]))
+    print("GEO_SCRIPT_URLS",re.findall(r'<script[^>]+src="([^"]+)"',html)[-25:])

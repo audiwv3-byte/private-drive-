@@ -1,4 +1,5 @@
 name: PRIVATE DRIVE - inspect language buttons (read only)
+# corrected Python inspect-module name shadowing in prior runner
 on:
   push:
     branches: [fix/welcome-language-buttons-20261109]

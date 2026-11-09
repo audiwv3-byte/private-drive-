@@ -1,0 +1,33 @@
+name: PRIVATE DRIVE - restore language then role then registration
+on:
+  push:
+    branches: [fix/first-language-before-role-20261109]
+    paths:
+      - .github/workflows/first-language-role-20261109.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-first-language-role-fix
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install requests Jinja2
+      - name: Compile release helper
+        run: python -m py_compile ops/first-language-role-20261109/deploy.py
+      - name: Validate live source, Jinja, JavaScript and role routing with no writes
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_FIRST_LANGUAGE_DEPLOY: "0"
+        run: python ops/first-language-role-20261109/deploy.py
+      - name: Backup and restore first-language sequence on PythonAnywhere
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_FIRST_LANGUAGE_DEPLOY: "1"
+        run: python ops/first-language-role-20261109/deploy.py

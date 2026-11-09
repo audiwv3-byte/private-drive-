@@ -1,0 +1,4 @@
+User explicitly authorised deletion of all test profiles, orders and payment history,
+preserving the dispatcher, settings and private verified backups, and immediate
+installation of the prepared UI and role corrections on 2026-11-09.
+Apply only through the guarded script; never publish private data or credentials.

@@ -1,0 +1,29 @@
+name: PRIVATE DRIVE - apply authorised reset and UI fixes
+on:
+  push:
+    branches: [fix/prelaunch-registration-notices-20261109]
+    paths: [ops/prelaunch-20261109/reset-trigger.txt]
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-production-maintenance
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install requests cryptography
+      - name: Download public-only page fixture
+        run: python -c "import pathlib,requests; r=requests.get('https://wilsonpark.pythonanywhere.com/',timeout=30); r.raise_for_status(); pathlib.Path('ops/prelaunch-20261109/live-index.html').write_bytes(r.content)"
+      - name: Verify reset transaction, backups, dispatcher preservation and session revocation locally
+        run: python ops/prelaunch-20261109/test_reset.py
+      - name: Apply user-authorised test reset and verified UI patches
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_RESET_AUTHORISATION: DELETE_TEST_DATA_KEEP_DISPATCHER_20261109
+        run: python ops/prelaunch-20261109/apply_release_and_reset.py

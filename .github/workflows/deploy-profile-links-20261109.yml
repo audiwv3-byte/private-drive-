@@ -1,0 +1,32 @@
+name: PRIVATE DRIVE - remove duplicate policy and terms from passenger profile
+on:
+  push:
+    branches: [fix/profile-duplicate-legal-links-20261109]
+    paths:
+      - .github/workflows/deploy-profile-links-20261109.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-profile-legal-dedup
+  cancel-in-progress: false
+jobs:
+  update-profile-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install requests Jinja2
+      - run: python -m py_compile ops/profile-links-20261109/deploy.py
+      - name: Dry-run exact profile-only link removal
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_PROFILE_LEGAL_DEPLOY: "0"
+        run: python ops/profile-links-20261109/deploy.py
+      - name: Backup, deploy and verify links on public site
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_PROFILE_LEGAL_DEPLOY: "1"
+        run: python ops/profile-links-20261109/deploy.py

@@ -1,4 +1,5 @@
 name: PRIVATE DRIVE - restore language-first UI (source backup)
+# Second guarded attempt: print safe public status/hash diagnostics before automatic rollback.
 on:
   push:
     branches: [fix/restore-first-language-telegram-onboarding-20261109]

@@ -4,6 +4,7 @@ on:
     branches: [fix/remove-duplicate-onboarding-privacy-20261109]
     paths:
       - .github/workflows/remove-duplicate-privacy-20261109.yml
+      - ops/role-privacy-20261109/remove_duplicate.py
   workflow_dispatch:
 permissions:
   contents: read

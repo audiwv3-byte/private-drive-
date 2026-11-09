@@ -1,0 +1,33 @@
+name: PRIVATE DRIVE - remove automatic booking map dialog
+on:
+  push:
+    branches: [fix/no-auto-location-prompt-20261109]
+    paths:
+      - .github/workflows/deploy-no-auto-location-20261109.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-no-auto-booking-location
+  cancel-in-progress: false
+jobs:
+  safe-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install requests Jinja2
+      - run: python -m py_compile ops/geo-prompt-20261109/deploy.py
+      - name: Verify exact production source and run isolated map UI tests
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_DISABLE_GEO_PROMPT_DEPLOY: "0"
+        run: python ops/geo-prompt-20261109/deploy.py
+      - name: Backup, disable automatic dialog and verify production HTML
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_DISABLE_GEO_PROMPT_DEPLOY: "1"
+        run: python ops/geo-prompt-20261109/deploy.py

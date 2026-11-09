@@ -3,7 +3,8 @@ Only three UI source files; no databases, orders, payments, settings or sessions
 Preflight exact observed fingerprints, private byte-for-byte backup, verified
 readback, webapp reload, public smoke test, automatic source rollback on failure.
 """
-import hashlib, json, os, re, sys, time
+import ast, hashlib, json, os, re, sys, time
+from jinja2 import Environment
 from pathlib import Path
 import requests
 USER="wilsonpark"
@@ -119,6 +120,9 @@ updated={
  "pd_registration.js":js.encode("utf-8"),
  "pd_tips_widget.py":widget.encode("utf-8"),
 }
+ast.parse(widget,filename="pd_tips_widget.py")
+Environment().parse(page)
+print("OFFLINE_SYNTAX_VALIDATION_PASS python_module=true jinja_template=true")
 assert "guest&&(stage==='role'||stage==='language')?'passenger':stage" not in js
 assert all(flag in page for flag in ("🇬🇧","🇱🇹","🇷🇺"))
 assert all(data!=original[name] for name,data in updated.items())

@@ -75,7 +75,7 @@ body.pd-onboarding-active #pdObLanguage:not(.hidden){text-align:center;max-width
 .pd-registration-manual{border:1px solid #594b31;border-radius:12px;padding:10px 14px;margin:12px 0;clear:both}
 .pd-registration-manual summary{color:#f4cb80;cursor:pointer}
 .pd-registration-login{display:block!important;width:100%;min-height:57px;font-size:17px;margin:16px 0}
-@media(max-width:400px){#pdObLanguage .pd-ob-language-options{gap:6px}#pdObLanguage .pd-ob-language-options button{font-size:12px}#pdObLanguage .pd-ob-flag{font-size:33px}}
+@media(max-width:400px){ #pdObLanguage .pd-ob-language-options{gap:6px}#pdObLanguage .pd-ob-language-options button{font-size:12px}#pdObLanguage .pd-ob-flag{font-size:33px}}
 </style>'''
 page=sub_once(page,"</head>",css+"</head>","append-only restoration CSS")
 old_override="const show=pdShowOnboarding;pdShowOnboarding=function(stage){const u=window.pdOnboardingUser;const guest=!u?.registered&&!u?.admin&&!u?.pilot_access;return show(guest&&(stage==='role'||stage==='language')?'passenger':stage)};"

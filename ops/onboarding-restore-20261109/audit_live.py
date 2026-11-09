@@ -44,7 +44,7 @@ for f in ["miniapp/templates/index.html", "pd_registration.js", "pd_tips_widget.
 for url in [site + "/",site + "/assets/pd-registration.js",site + "/assets/private-drive-official-logo.jpeg"]:
     try:
         r=requests.get(url,timeout=25)
-        print("PUBLIC_URL",url.replace(site,""),"HTTP",r.status_code,"bytes",len(r.content),"visible_code_matches",("pdShowOnboarding('passenger')" in r.text) if url.endswith(".js") and r.status_code==200 else "n/a")
+        print("PUBLIC_URL",url.replace(site,""),"HTTP",r.status_code,"bytes",len(r.content),"sha256",hashlib.sha256(r.content).hexdigest()[:20],"has_flags",all(x in r.text for x in ('🇬🇧','🇱🇹','🇷🇺')) if r.status_code==200 else False,"visible_code_matches",("pdShowOnboarding('passenger')" in r.text) if url.endswith(".js") and r.status_code==200 else "n/a")
     except requests.RequestException:
         print("PUBLIC_URL",url.replace(site,""),"NOT_RESPONDING")
 print("READ_ONLY_AUDIT_DONE no_hosting_writes=true")

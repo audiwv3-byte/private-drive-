@@ -65,7 +65,8 @@ style='''<style id="pd-welcome-languages-fixed-20261109">
 </style>'''
 if html.count("</head>")!=1:raise RuntimeError("Unexpected template head")
 html=html.replace("</head>",style+"</head>",1)
-assert html[start:html.index("</div>",start)+6]==before_buttons,"Language button handlers were modified"
+after_start=html.index('<div class="pd-ob-language-options pd-welcome-choices"')
+assert html[after_start:html.index("</div>",after_start)+6]==before_buttons,"Language button handlers were modified"
 assert html.count(NEW)==1 and html.count(CSS_ID)==1
 Environment().parse(html)
 decorator_pos=html.index("function decorate(){document.querySelectorAll('button')")

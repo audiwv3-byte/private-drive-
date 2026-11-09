@@ -43,3 +43,20 @@ for path in paths:
    if key in ("admin","pdObPhone","pdOnboardingStart"):chunk=s[max(0,i-120):i+550]
    print("SNIP",path,key,repr(chunk))
 print("READ_ONLY_AUDIT_DONE")
+
+
+# Narrow localizable UI + phone consent + order dispatcher snippets (source only).
+res=session.get(base+"/files/path"+root+"miniapp/templates/index.html",timeout=40);res.raise_for_status()
+s=res.content.decode("utf-8-sig")
+for first,stop in [('<form id="pdObPassenger"','<form id="pdObDriver"'),('function pdRequirePhoneConsent','\n}'),('async function pdbRegisterTelegram()','\n}'),('function pdOnboardingStart(user)','\n}'),("const pdRegistrationManual",'</script>')]:
+ i=s.find(first)
+ if i<0:continue
+ j=s.find(stop,i+len(first))
+ print("FOCUSED_UI",repr(first),repr(s[i:min(j+len(stop),i+5300)]))
+for word in ('pdObPhoneConsent','pdObLegal','consent','pdRegistration','pdOnboardingContacts','dispatcher'):
+ pos=[m.start() for m in list(re.finditer(word,s,re.I))[:8]]
+ print("CLIENT_SCAN",word,len(pos),pos)
+# Protected admin view scripts in live HTML: inspect call and elements only.
+for word in ("'/api/admin/orders'","/api/admin/orders","id=\"admin", "function adminRefresh", "function pdAdmin", "pd-order-customer"):
+ idx=s.find(word)
+ if idx>=0:print("ADMIN_UI_SCAN",word,repr(s[max(0,idx-250):idx+1550]))

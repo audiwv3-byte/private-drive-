@@ -1,0 +1,19 @@
+name: PRIVATE DRIVE - inspect public privacy footer read-only
+on:
+  push:
+    branches: [fix/remove-duplicate-onboarding-privacy-20261109]
+    paths:
+      - ops/role-privacy-20261109/inspect_public.py
+      - .github/workflows/inspect-role-privacy-20261109.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install requests
+      - run: python ops/role-privacy-20261109/inspect_public.py

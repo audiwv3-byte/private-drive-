@@ -147,7 +147,10 @@ try:
   for attempt in range(7):
     r=public.get(SITE+"/?pd_restore_verification="+run,timeout=25,headers={"Cache-Control":"no-cache"})
     f=public.get(SITE+"/assets/pd-registration.js?v=20261109-language-restore-v1",timeout=25,headers={"Cache-Control":"no-cache"})
-    if r.status_code==200 and f.status_code==200 and all(flag in r.text for flag in ("🇬🇧","🇱🇹","🇷🇺")) and digest(f.content)==digest(updated["pd_registration.js"]):
+    visible=all(flag in r.text for flag in ("🇬🇧","🇱🇹","🇷🇺"))
+    script_ok=digest(f.content)==digest(updated["pd_registration.js"])
+    print("PUBLIC_SMOKE_CHECK",attempt,"page_http",r.status_code,"page_bytes",len(r.content),"page_flags",visible,"script_http",f.status_code,"script_bytes",len(f.content),"script_hash",digest(f.content)[:20],"expected_script_hash",digest(updated["pd_registration.js"])[:20],flush=True)
+    if r.status_code==200 and f.status_code==200 and visible and script_ok:
       okay=True;break
     time.sleep(4)
   if not okay:raise RuntimeError("Public page/script verification failed")

@@ -1,0 +1,35 @@
+name: PRIVATE DRIVE - fix pilot map and double tap fullscreen
+on:
+  push:
+    branches: [fix/pilot-trip-map-fullscreen-20261109]
+    paths:
+      - .github/workflows/deploy-pilot-trip-map-20261109.yml
+      - ops/pilot-trip-map-20261109/deploy.py
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-driver-map
+  cancel-in-progress: false
+jobs:
+  map-ui-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install requests Jinja2
+      - name: Validate release helper Python syntax
+        run: python -m py_compile ops/pilot-trip-map-20261109/deploy.py
+      - name: Dry run exact live source, Jinja, JS and fullscreen state tests
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_DRIVER_MAP_DEPLOY: "0"
+        run: python ops/pilot-trip-map-20261109/deploy.py
+      - name: Back up all three assets then install pilot map safely
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_DRIVER_MAP_DEPLOY: "1"
+        run: python ops/pilot-trip-map-20261109/deploy.py

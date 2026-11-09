@@ -4,6 +4,7 @@ on:
     branches: [fix/profile-all-redundant-links-20261109]
     paths:
       - .github/workflows/deploy-profile-contacts-20261109.yml
+      - ops/profile-all-links-20261109/deploy.py
   workflow_dispatch:
 permissions:
   contents: read

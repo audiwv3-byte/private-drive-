@@ -3,7 +3,7 @@ Only three UI source files; no databases, orders, payments, settings or sessions
 Preflight exact observed fingerprints, private byte-for-byte backup, verified
 readback, webapp reload, public smoke test, automatic source rollback on failure.
 """
-import ast, hashlib, json, os, re, sys, time
+import ast, hashlib, json, os, re, sys, time, tempfile, subprocess
 from jinja2 import Environment
 from pathlib import Path
 import requests
@@ -122,7 +122,12 @@ updated={
 }
 ast.parse(widget,filename="pd_tips_widget.py")
 Environment().parse(page)
-print("OFFLINE_SYNTAX_VALIDATION_PASS python_module=true jinja_template=true")
+with tempfile.NamedTemporaryFile(mode="w",suffix=".js",encoding="utf-8") as tmp:
+  tmp.write(js)
+  tmp.flush()
+  parsed=subprocess.run(["node","--check",tmp.name],capture_output=True,text=True)
+  if parsed.returncode!=0:raise RuntimeError("Registration JavaScript syntax check failed: "+parsed.stderr[-500:])
+print("OFFLINE_SYNTAX_VALIDATION_PASS python_module=true jinja_template=true registration_js=true")
 assert "guest&&(stage==='role'||stage==='language')?'passenger':stage" not in js
 assert all(flag in page for flag in ("🇬🇧","🇱🇹","🇷🇺"))
 assert all(data!=original[name] for name,data in updated.items())

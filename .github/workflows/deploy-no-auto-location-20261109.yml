@@ -4,6 +4,7 @@ on:
     branches: [fix/no-auto-location-prompt-20261109]
     paths:
       - .github/workflows/deploy-no-auto-location-20261109.yml
+      - ops/geo-prompt-20261109/deploy.py
   workflow_dispatch:
 permissions:
   contents: read

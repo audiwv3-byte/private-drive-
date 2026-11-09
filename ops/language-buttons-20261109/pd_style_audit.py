@@ -25,3 +25,10 @@ for needle in (":before",":after","content:'→'","content:\"→\"","content:'�
   for m in matches[:6]:
     p=m.start()
     print("ARROW_CONTEXT",repr(html[max(0,p-240):p+250]))
+
+for needle in (".pd-action-icon", "pd-action-icon", "querySelectorAll('button", 'querySelectorAll("button', "button.insertBefore", "prepend(icon)", "pdButtonEnter", "data-pd-icon", "pdDecorate"):
+  matches=list(re.finditer(re.escape(needle),html))
+  print("BUTTON_ICON_MATCH",repr(needle),"count",len(matches))
+  for m in matches[-5:]:
+    p=m.start()
+    print("BUTTON_ICON_CONTEXT",repr(html[max(0,p-340):p+500]))

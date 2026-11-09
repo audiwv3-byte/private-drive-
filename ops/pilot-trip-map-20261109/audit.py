@@ -14,6 +14,9 @@ for path in paths:
   for needle in ('function pdPilotWork()', "await api('/api/driver/work/'+o.id+'/status'",'function pdDriverLoad()', 'async function pdDriverLoad()', 'pdSetRole(\'driver\')', 'id="step13"', 'pd-trip-runtime-v4.js','pd-pilot-cabinet-v4.js','function pdSimpleDialog','L.map','leaflet.css','leaflet.js'):
    i=h.find(needle);print("MARKER",path,repr(needle),"count",h.count(needle),"pos",i)
    if i>=0:print("CONTEXT",path,repr(needle),repr(h[max(0,i-170):i+700]))
+ if path.endswith(".html"):
+  i=h.find("async function pdDriverLoad()")
+  if i>=0:print("DRIVER_LOAD_CODE",repr(h[i:i+4100]))
  if path=="pd_trip_runtime_v4.js":
   print("RUNTIME_JS",repr(h[7100:19000]))
  if path=="pd_pilot_cabinet_v4.js":

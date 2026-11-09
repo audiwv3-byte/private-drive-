@@ -90,12 +90,14 @@ try:
         a=html.find(STATUS)
         b=html.find("</section>",a) if a>=0 else -1
         lower=html[a:b] if a>=0 and b>a else ""
-        ok=(r.status_code==200 and a>=0 and b>a and DUPLICATE not in lower
-            and html[:a].count('href="/privacy"')>=1
-            and "mailto:eurobaltictransfer@gmail.com" in html
+        upper_kept=bool(re.search(r'href="/privacy(?:\\?lang=(?:ru|en|lt))?"',html[:a])) if a>=0 else False
+        lower_duplicate=bool(re.search(r'<p class="pdb-note">\\s*<a href="/privacy(?:\\?lang=(?:ru|en|lt))?"[^>]*>Политика конфиденциальности</a>\\s*</p>',lower))
+        ok=(r.status_code==200 and a>=0 and b>a and not lower_duplicate
+            and upper_kept and "mailto:eurobaltictransfer@gmail.com" in html
             and "https://t.me/PrivatDraiv" in html
             and 'id="pdLangSelect"' in html and 'id="pdWelcomeTelegram"' in html)
-        print("PRIVACY_FOOTER_PUBLIC_CHECK",attempt,"HTTP",r.status_code,"verified",ok,flush=True)
+        print("PRIVACY_FOOTER_PUBLIC_CHECK",attempt,"HTTP",r.status_code,
+              "upper_kept",upper_kept,"lower_duplicate",lower_duplicate,"verified",ok,flush=True)
         if ok:break
         time.sleep(4)
     if not ok:raise RuntimeError("Public privacy footer verification failed")

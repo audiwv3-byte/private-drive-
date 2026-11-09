@@ -10,8 +10,9 @@ API="https://www.pythonanywhere.com/api/v0/user/wilsonpark"
 PROJECT="/home/wilsonpark/euro_baltic_transfer/PRIVATE_DRIVE_MiniApp_2026_10_18/"
 PATH="miniapp/templates/index.html"
 SITE="https://wilsonpark.pythonanywhere.com/"
-ANCHOR='<p id="pdObStatus" role="status"></p><p class="pdb-note">'
-DUPLICATE='<a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · '
+STATUS='<p id="pdObStatus" role="status"></p>'
+ANCHOR=STATUS+'<p class="pdb-note">'
+DUPLICATE='<a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a>'
 HEADER='<div class="pd-privacy-bar"><a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a>'
 token="".join(re.sub(r"^Token\s+","",os.environ.get("PA_API_TOKEN","").strip(),flags=re.I).split())
 assert token,"PythonAnywhere token unavailable"
@@ -46,19 +47,20 @@ start=page.index(ANCHOR)+len(ANCHOR)
 end=page.index("</p>",start)
 footer=page[start:end]
 print("LIVE_ONBOARD_FOOTER",repr(footer[:650]),flush=True)
-assert footer.startswith(DUPLICATE),"Unexpected onboarding footer structure; no writes"
-assert "mailto:eurobaltictransfer@gmail.com" in footer
-assert "https://t.me/PrivatDraiv" in footer
+assert footer==DUPLICATE,"Unexpected standalone footer structure; no writes"
+assert "mailto:eurobaltictransfer@gmail.com" in page and "https://t.me/PrivatDraiv" in page
 assert '<button type="button" class="secondary" onclick="pdShowOnboarding(\'language\')">Язык</button>' not in page[
     page.index('<div id="pdObRole"'):page.index('<form id="pdObPassenger"')
 ],"Previous duplicate language button removal not found; no writes"
-updated=page[:start]+footer[len(DUPLICATE):]+page[end:]
-assert len(page)-len(updated)==len(DUPLICATE),"Unrelated code changed"
-assert updated[:start]==page[:start] and updated[start+len(footer)-len(DUPLICATE):]==page[end:]
-assert updated[:updated.index(ANCHOR)].count('href="/privacy"')==upper_privacy.count('href="/privacy"')
+target=ANCHOR+DUPLICATE+"</p>"
+assert page.count(target)==1,"Lower policy paragraph changed; no writes"
+updated=page.replace(target,STATUS,1)
+assert len(page)-len(updated)==len(target)-len(STATUS),"Unrelated code changed"
+assert updated.count(STATUS)==page.count(STATUS)
+assert updated[:updated.index(STATUS)].count('href="/privacy"')==upper_privacy.count('href="/privacy"')
 assert 'href="/privacy"' in updated
-assert "mailto:eurobaltictransfer@gmail.com" in updated[start:start+400]
-assert "https://t.me/PrivatDraiv" in updated[start:start+400]
+assert "mailto:eurobaltictransfer@gmail.com" in updated
+assert "https://t.me/PrivatDraiv" in updated
 assert 'id="pdWelcomeTelegram"' in updated and 'id="pdLangSelect"' in updated
 Environment().parse(updated)
 print("PRIVACY_FOOTER_PREFLIGHT_PASS source_sha256="+digest(original)[:20]+" bottom_link_removed=true header_policy_kept=true contacts_kept=true role_and_language_unchanged=true",flush=True)
@@ -82,13 +84,13 @@ try:
     for attempt in range(8):
         r=requests.get(SITE,params={"privacy_footer_fix":run,"attempt":attempt},headers={"Cache-Control":"no-cache"},timeout=30)
         html=r.text
-        a=html.find(ANCHOR)
-        b=html.find("</p>",a+len(ANCHOR)) if a>=0 else -1
-        lower=html[a+len(ANCHOR):b] if a>=0 and b>a else ""
-        ok=(r.status_code==200 and a>=0 and DUPLICATE not in lower
+        a=html.find(STATUS)
+        b=html.find("</section>",a) if a>=0 else -1
+        lower=html[a:b] if a>=0 and b>a else ""
+        ok=(r.status_code==200 and a>=0 and b>a and DUPLICATE not in lower
             and html[:a].count('href="/privacy"')>=1
-            and "mailto:eurobaltictransfer@gmail.com" in lower
-            and "https://t.me/PrivatDraiv" in lower
+            and "mailto:eurobaltictransfer@gmail.com" in html
+            and "https://t.me/PrivatDraiv" in html
             and 'id="pdLangSelect"' in html and 'id="pdWelcomeTelegram"' in html)
         print("PRIVACY_FOOTER_PUBLIC_CHECK",attempt,"HTTP",r.status_code,"verified",ok,flush=True)
         if ok:break

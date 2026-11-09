@@ -1,0 +1,33 @@
+name: PRIVATE DRIVE - remove duplicate privacy below role
+on:
+  push:
+    branches: [fix/remove-duplicate-onboarding-privacy-20261109]
+    paths:
+      - .github/workflows/remove-duplicate-privacy-20261109.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-duplicate-privacy-20261109
+  cancel-in-progress: false
+jobs:
+  update-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install requests Jinja2
+      - run: python -m py_compile ops/role-privacy-20261109/remove_duplicate.py
+      - name: Validate exact privacy link removal without writes
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_PRIVACY_FOOTER_DEPLOY: "0"
+        run: python ops/role-privacy-20261109/remove_duplicate.py
+      - name: Backup and remove lower privacy duplicate, then verify public site
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_PRIVACY_FOOTER_DEPLOY: "1"
+        run: python ops/role-privacy-20261109/remove_duplicate.py

@@ -45,6 +45,7 @@ assert upper_privacy.count('href="/privacy"')>=1,"Upper privacy link missing; no
 start=page.index(ANCHOR)+len(ANCHOR)
 end=page.index("</p>",start)
 footer=page[start:end]
+print("LIVE_ONBOARD_FOOTER",repr(footer[:650]),flush=True)
 assert footer.startswith(DUPLICATE),"Unexpected onboarding footer structure; no writes"
 assert "mailto:eurobaltictransfer@gmail.com" in footer
 assert "https://t.me/PrivatDraiv" in footer

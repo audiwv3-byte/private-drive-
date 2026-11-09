@@ -90,8 +90,8 @@ try:
         a=html.find(STATUS)
         b=html.find("</section>",a) if a>=0 else -1
         lower=html[a:b] if a>=0 and b>a else ""
-        upper_kept=bool(re.search(r'href="/privacy(?:\\?lang=(?:ru|en|lt))?"',html[:a])) if a>=0 else False
-        lower_duplicate=bool(re.search(r'<p class="pdb-note">\\s*<a href="/privacy(?:\\?lang=(?:ru|en|lt))?"[^>]*>Политика конфиденциальности</a>\\s*</p>',lower))
+        upper_kept=bool(re.search(r'href="/privacy(?:\?lang=(?:ru|en|lt))?"',html[:a])) if a>=0 else False
+        lower_duplicate=bool(re.search(r'<p class="pdb-note">\s*<a href="/privacy(?:\?lang=(?:ru|en|lt))?"[^>]*>Политика конфиденциальности</a>\s*</p>',lower))
         ok=(r.status_code==200 and a>=0 and b>a and not lower_duplicate
             and upper_kept and "mailto:eurobaltictransfer@gmail.com" in html
             and "https://t.me/PrivatDraiv" in html

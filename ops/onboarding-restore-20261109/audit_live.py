@@ -82,3 +82,13 @@ if source:
             left=max(0,m.start()-450);right=min(len(html),m.end()+720)
             print("GEO_CONTEXT",repr(needle),"index",m.start(),repr(html[left:right]))
     print("GEO_SCRIPT_URLS",re.findall(r'<script[^>]+src="([^"]+)"',html)[-25:])
+
+# Narrowly inspect the lifecycle and callers of the geolocation offer.
+if source:
+    center=html.find("Показать вас на карте?")
+    if center>=0:
+        print("GEO_LIFECYCLE_SOURCE",repr(html[max(0,center-1300):center+2700]))
+    for key in ("pdbGeoAutoAttempted","pdBookingLocationOffer"):
+        positions=[m.start() for m in re.finditer(re.escape(key),html)]
+        print("GEO_TRIGGER",key,"count",len(positions))
+        for pos in positions[:12]:print("GEO_TRIGGER_CONTEXT",pos,repr(html[max(0,pos-260):pos+340]))

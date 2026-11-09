@@ -1,0 +1,21 @@
+name: PRIVATE DRIVE - audit Telegram single-tap and admin profile (read only)
+on:
+  push:
+    branches: [fix/telegram-one-action-intake-20261109]
+    paths:
+      - .github/workflows/audit-telegram-intake-20261109.yml
+permissions:
+  contents: read
+jobs:
+  read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install requests
+      - name: Inspect only live source code, no databases and no writes
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: python ops/telegram-intake-20261109/read_only_audit.py

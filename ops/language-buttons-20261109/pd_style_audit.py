@@ -18,3 +18,10 @@ for needle in (".pd-welcome-choices{", ".pd-welcome-choices button{", ".pd-welco
   pos=html.find(needle)
   if pos>=0:print("MATCH_CONTEXT",repr(html[max(0,pos-250):pos+650]))
 print("AUDIT_READ_ONLY_OK")
+
+for needle in (":before",":after","content:'→'","content:\"→\"","content:'➜'","content:'➔'","pd-welcome-choices button>","pd-ob-language-options button:","pd-welcome-choices button:"):
+  matches=list(re.finditer(re.escape(needle),html))
+  print("ARROW_CSS_MATCH",repr(needle),"count",len(matches))
+  for m in matches[:6]:
+    p=m.start()
+    print("ARROW_CONTEXT",repr(html[max(0,p-240):p+250]))

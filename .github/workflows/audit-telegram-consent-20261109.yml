@@ -1,0 +1,22 @@
+name: PRIVATE DRIVE - audit consent and one-tap form
+on:
+  push:
+    branches: [fix/telegram-one-action-intake-20261109]
+    paths:
+      - .github/workflows/audit-telegram-consent-20261109.yml
+      - ops/telegram-intake-20261109/audit_consent.py
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install requests
+      - name: Read current registration source, zero writes
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: python ops/telegram-intake-20261109/audit_consent.py

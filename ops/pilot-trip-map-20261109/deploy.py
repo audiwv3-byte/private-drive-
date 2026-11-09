@@ -162,8 +162,6 @@ pilot=pilot.replace(pilot_old,pilot_new,1)
 
 # In the admin-as-driver pane, the status API is unchanged; only navigate to
 # the already-existing live-trip map after it reports success.
-old_handler='async function pdDriverStatus(id,status){try{await api(\\'/api/admin/status\\',{id,status});message(pdL("Статус обновлён"));await pdDriverLoad()}catch(e){message(pdL(e.message),true)}}'
-# Python does not need escaping of the single quotes when using double quotes.
 old_handler="async function pdDriverStatus(id,status){try{await api('/api/admin/status',{id,status});message(pdL(\"Статус обновлён\"));await pdDriverLoad()}catch(e){message(pdL(e.message),true)}}"
 new_handler="async function pdDriverStatus(id,status){try{await api('/api/admin/status',{id,status});message(pdL(\"Статус обновлён\"));await pdDriverLoad();if(status==='В пути'&&typeof window.pdOpenLiveTripV4==='function')await window.pdOpenLiveTripV4(id)}catch(e){message(pdL(e.message),true)}}"
 if html.count(old_handler)!=1:raise RuntimeError("Admin-as-driver status handler changed")

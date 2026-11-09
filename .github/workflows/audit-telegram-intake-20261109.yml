@@ -4,6 +4,7 @@ on:
     branches: [fix/telegram-one-action-intake-20261109]
     paths:
       - .github/workflows/audit-telegram-intake-20261109.yml
+      - ops/telegram-intake-20261109/read_only_audit.py
 permissions:
   contents: read
 jobs:

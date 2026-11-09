@@ -42,6 +42,7 @@ if __name__=='__main__':
    r=session.get(HOST+'/files/path'+path,timeout=35)
    if r.status_code==200:
     body=r.content.decode('utf-8-sig',errors='replace')
+    if path.endswith('bots_supervisor.py'):result.setdefault('private_supervisor_sources',{})[path]=body
     info['source_markers'].append(dict(path=path,project_in_source=PROJECT.rstrip('/') in body,bot_module_in_source='Euro_Baltic_Transfer' in body,has_polling='polling' in body,referenced_project_paths=re.findall(r'/home/wilsonpark/[A-Za-z_0-9./-]+',body)[:6]))
   result['tasks'].append(info)
  with tempfile.TemporaryDirectory() as directory:

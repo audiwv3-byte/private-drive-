@@ -1,0 +1,33 @@
+name: PRIVATE DRIVE - remove repeated legal and contact links from passenger profile
+on:
+  push:
+    branches: [fix/profile-all-redundant-links-20261109]
+    paths:
+      - .github/workflows/deploy-profile-contacts-20261109.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-profile-contacts-dedup
+  cancel-in-progress: false
+jobs:
+  profile-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install requests Jinja2
+      - run: python -m py_compile ops/profile-all-links-20261109/deploy.py
+      - name: Dry run exact profile contact dedup and Jinja JS validation
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_PROFILE_LINKS_DEPLOY: "0"
+        run: python ops/profile-all-links-20261109/deploy.py
+      - name: Backup, update and verify production profile only
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+          PD_PROFILE_LINKS_DEPLOY: "1"
+        run: python ops/profile-all-links-20261109/deploy.py

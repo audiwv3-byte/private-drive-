@@ -61,16 +61,17 @@ if head.count(TOP_LINKS)!=1 or body.count(FULL_NOTICE)!=1:
     raise RuntimeError("Duplicate profile text differs; no writes")
 if source.count(TOP_LINKS)!=1:
     raise RuntimeError("Unexpected repeated top support note")
-if source.count(FULL_NOTICE)!=1:
-    raise RuntimeError("Unexpected repeated privacy notice")
+if source.count(FULL_NOTICE)!=2:
+    raise RuntimeError("Unexpected duplicate notice structure")
 if 'class="pd-privacy-bar"' not in source or 'class="pd-contact-footer' not in source:
     raise RuntimeError("Global header or footer missing; no writes")
 if not all(x in source[:card] for x in ('href="/privacy"','href="/legal"')):
     raise RuntimeError("Top legal links absent; no writes")
-updated=source.replace(TOP_LINKS,"",1).replace(FULL_NOTICE,SHORT_NOTICE,1)
+updated=source[:card]+body.replace(FULL_NOTICE,SHORT_NOTICE,1)+source[stop:]
+updated=updated.replace(TOP_LINKS,"",1)
 assert len(source)-len(updated)==len(TOP_LINKS)+len(FULL_NOTICE)-len(SHORT_NOTICE)
 assert updated.count(TOP_LINKS)==0
-assert updated.count(FULL_NOTICE)==0
+assert updated.count(FULL_NOTICE)==1
 assert updated.count(SHORT_NOTICE)==1
 assert '<section class="panel hidden" id="step14"><h1>Мой профиль</h1><p>Ваши контакты' in updated
 new_card=updated[updated.index(PROFILE_START):updated.index(PROFILE_END,updated.index(PROFILE_START))]

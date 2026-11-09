@@ -33,7 +33,17 @@ if __name__=='__main__':
  meta=api('GET','/webapps/wilsonpark.pythonanywhere.com/').json()
  result['webapp']={k:v for k,v in meta.items() if k in ('enabled','is_enabled','state','status','source_directory','python_version','virtualenv_path','wsgi_configuration_file')}
  tasks=api('GET','/always_on/').json()
- result['tasks']=[dict(keys=sorted(t.keys()),id=t.get('id'),project_match=PROJECT.rstrip('/') in str(t.get('command','')),bot_match='Euro_Baltic_Transfer.py' in str(t.get('command','')),enabled=t.get('enabled'),state=t.get('state'),status=t.get('status')) for t in tasks]
+ result['tasks']=[]
+ for t in tasks:
+  paths=re.findall(r'/home/wilsonpark/[A-Za-z_0-9./-]+\.(?:py|sh)',str(t.get('command','')))
+  info=dict(keys=sorted(t.keys()),id=t.get('id'),project_match=PROJECT.rstrip('/') in str(t.get('command','')),bot_match='Euro_Baltic_Transfer.py' in str(t.get('command','')),enabled=t.get('enabled'),state=t.get('state'),status=t.get('status'),paths=paths,description_private_drive=bool(re.search(r'private.?drive|privat.?drive|euro.?baltic',str(t.get('description','')),re.I)))
+  info['source_markers']=[]
+  for path in paths:
+   r=session.get(HOST+'/files/path'+path,timeout=35)
+   if r.status_code==200:
+    body=r.content.decode('utf-8-sig',errors='replace')
+    info['source_markers'].append(dict(path=path,project_in_source=PROJECT.rstrip('/') in body,bot_module_in_source='Euro_Baltic_Transfer' in body,has_polling='polling' in body,referenced_project_paths=re.findall(r'/home/wilsonpark/[A-Za-z_0-9./-]+',body)[:6]))
+  result['tasks'].append(info)
  with tempfile.TemporaryDirectory() as directory:
   for name in ('users.db','orders.db'):
    p=Path(directory)/name;p.write_bytes(get(name));c=sqlite3.connect(p);c.row_factory=sqlite3.Row

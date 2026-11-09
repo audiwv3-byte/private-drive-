@@ -22,6 +22,7 @@ vm.runInContext(html.slice(html.indexOf('function pdRoleVisibility('), html.inde
 const passenger = {registered: true, admin: false, pilot_access: false};
 const pilot = {registered: true, admin: false, pilot_access: true};
 const owner = {registered: true, admin: true, pilot_access: false};
+const soleOperator = {registered: true, admin: true, pilot_access: true};
 const applicant = {registered: false, admin: false, driver_application: {status: 'pending'}};
 function check(user, view, expected) {
   const role = context.pdApplyRoleAccess(user, view);
@@ -35,9 +36,14 @@ check(null, '', {passengerView: false, adminControls: false, pilotControls: fals
 check(passenger, '', {passengerView: true, adminControls: false, pilotControls: false});
 check(owner, 'admin', {passengerView: false, adminControls: true, pilotControls: false});
 check(owner, 'client', {passengerView: true, adminControls: false, pilotControls: false});
+check(soleOperator, 'admin', {passengerView: false, adminControls: true, pilotControls: true});
+check(soleOperator, 'client', {passengerView: true, adminControls: false, pilotControls: false});
 check(pilot, 'driver', {passengerView: false, adminControls: false, pilotControls: true});
 check(pilot, 'client', {passengerView: true, adminControls: false, pilotControls: false});
 assert.equal(elements.get('pdPilotBack').hidden, true);
+assert.ok(html.includes('Пилот-диспетчер'));
+assert.ok(html.includes('id="pdPilotAdmin"'));
+assert.ok(!html.includes('data-mode="driver"'), 'Separate driver role button must not confuse the sole operator');
 check(applicant, '', {passengerView: false, adminControls: false, pilotControls: true});
 // Changing to an ordinary passenger cannot retain another role's controls.
 check(passenger, '', {passengerView: true, adminControls: false, pilotControls: false});

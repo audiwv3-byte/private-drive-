@@ -23,7 +23,12 @@ assert token, "PA_API_TOKEN unavailable"
 s=requests.Session()
 s.headers["Authorization"]="Token "+token
 assert s.get(API+"/cpu/",timeout=35).status_code==200,"Hosting API credentials unavailable"
+last_file_call=0.0
 def call(method,path,**args):
+  global last_file_call
+  if path.startswith('/files/path'):
+    time.sleep(max(0.0,1.65-(time.monotonic()-last_file_call)))
+    last_file_call=time.monotonic()
   for retry in range(4):
     r=s.request(method,API+path,timeout=40,**args)
     if r.status_code==429 and retry<3:
@@ -118,6 +123,9 @@ assert "guest&&(stage==='role'||stage==='language')?'passenger':stage" not in js
 assert all(flag in page for flag in ("🇬🇧","🇱🇹","🇷🇺"))
 assert all(data!=original[name] for name,data in updated.items())
 print("PATCH_PREFLIGHT_PASS flags=3 telegram_first=true manual_fallback=true no_data_migrations=true")
+if os.environ.get("PD_UI_DEPLOY")!="1":
+  print("DRY_RUN_PASS no_remote_writes=true")
+  raise SystemExit(0)
 run=os.environ.get("GITHUB_RUN_ID","")
 assert run.isdigit(),"Missing CI run ID"
 backup="/home/wilsonpark/private_drive_backups/onboarding_restore_20261109_"+run+"/"

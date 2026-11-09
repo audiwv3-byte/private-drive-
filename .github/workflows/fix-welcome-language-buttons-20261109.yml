@@ -4,6 +4,7 @@ on:
     branches: [fix/welcome-language-buttons-20261109]
     paths:
       - .github/workflows/fix-welcome-language-buttons-20261109.yml
+      - ops/language-buttons-20261109/fix_buttons.py
   workflow_dispatch:
 permissions:
   contents: read

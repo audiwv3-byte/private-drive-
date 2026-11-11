@@ -54,7 +54,7 @@ def register_request_guard(app):
         if request.path == '/api/stripe/webhook':
             return
         # Document uploads retain their existing file validation and limits.
-        if request.path == '/api/driver/application' and request.mimetype == 'multipart/form-data':
+        if (request.path in ('/api/driver/application', '/api/profile/avatar-v6') or re.fullmatch(r'/api/photo-review/upload/[a-z_]+',request.path)) and request.mimetype == 'multipart/form-data':
             return
         if not request.is_json:
             return jsonify(error='Отправьте данные в формате JSON'), 415

@@ -119,5 +119,29 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     run(server,core,client,call,signed,check)
     from pd_invoice_tests import run as invoice_checks
     invoice_checks(server,core,call,check)
+    # Photo replacement is isolated from production and external providers.
+    import io
+    from PIL import Image
+    with core.db(core.USERS_DB) as c:
+        c.execute("INSERT INTO pd_driver_applications(telegram_id,name,phone,city,vehicle,vehicle_year,plate,seats,status,created_at,updated_at) VALUES(101,'Test Pilot','+37060000000','Vilnius','Toyota',2020,'TEST',4,'approved','test','test')")
+    def replace_photo(actor,side='car_front',payload=None):
+        out=io.BytesIO()
+        Image.new('RGB',(1200,800),'blue').save(out,format='JPEG')
+        return client.post('/api/driver/documents/101/'+side,
+            headers={'X-Telegram-Init-Data':signed(actor)},
+            data={side:(io.BytesIO(payload if payload is not None else out.getvalue()),'photo.jpg')})
+    check(replace_photo(102),401)
+    check(replace_photo(101,payload=b'not an image'),400)
+    check(replace_photo(101),200)
+    with core.db(core.USERS_DB) as c:
+        assert c.execute('SELECT status FROM pd_driver_applications WHERE telegram_id=101').fetchone()['status']=='pending'
+        c.execute("UPDATE pd_driver_applications SET status='approved' WHERE telegram_id=101")
+    check(replace_photo(101,'car_rear'),400) # A duplicate car angle is rejected.
+    check(replace_photo(999,'license_front'),200)
+    with core.db(core.USERS_DB) as c:
+        assert c.execute('SELECT status FROM pd_driver_applications WHERE telegram_id=101').fetchone()['status']=='approved'
+    assert call('/api/driver/documents/101/car_front',uid=102).status_code==401
+    assert 'no-store' in call('/api/driver/documents/101/car_front').headers['Cache-Control']
+    print('PASS photo replacement: owner/admin access, invalid files, duplicate angles, review status and private reads')
     gc.collect()
 print('ALL RELEASE CHECKS PASSED; production data and payment providers were not used')

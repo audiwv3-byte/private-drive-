@@ -45,6 +45,7 @@ pdPilotWork=async function(){
     if(tab==='vehicle'&&!key.startsWith('car_'))continue;
     if((application.document_sides||[]).includes(key))box.append(b(title,()=>pdPreviewDocument(key,window.pdOnboardingUser.id)));
     else line(box,title,tr('Не загружено','Not uploaded','Neįkelta'));
+    pdAppendPhotoReplacement(box,key,window.pdOnboardingUser.id,pdPilotWork);
    }
    line(box,tr('Изменение данных','Update details','Duomenų keitimas'),tr('Повторная отправка заявки возвращает её на проверку администратора.','Resubmitting returns the application to admin review.','Pakartotinai pateikta paraiška vėl tikrinama administratoriaus.'));
    box.append(b(tr('Обновить данные и фотографии','Update details and photos','Atnaujinti duomenis ir nuotraukas'),pdStartDriverRegistration));return;

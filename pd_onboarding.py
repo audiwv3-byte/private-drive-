@@ -53,6 +53,30 @@ def register(app,core,auth):
     def document_sides(uid):
         with core.db(core.USERS_DB) as c:
             return [r['side'] for r in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(uid,))]
+    @app.post('/api/driver/documents/<int:applicant>/<side>')
+    def pd_replace_driver_document(applicant,side):
+        uid,_=auth()
+        if uid!=applicant and not core.is_admin(uid):raise PermissionError('Нет доступа')
+        if side not in ACTIVE_SIDES:raise ValueError('Недопустимый тип фотографии')
+        if set(request.files)!={side}:raise ValueError('Выберите одну фотографию')
+        photos=read_photos()
+        if side not in photos:raise ValueError('Выберите фотографию')
+        with core.db(core.USERS_DB) as c:
+            c.execute('BEGIN IMMEDIATE')
+            if not c.execute('SELECT 1 FROM pd_driver_applications WHERE telegram_id=?',(applicant,)).fetchone():
+                return jsonify(error='Заявка не найдена'),404
+            image=photos[side]
+            if side.startswith('car_'):
+                others=c.execute("SELECT image FROM pd_driver_documents WHERE telegram_id=? AND side IN ('car_front','car_rear','car_interior') AND side<>?",(applicant,side))
+                if any(hashlib.sha256(bytes(r['image'])).digest()==hashlib.sha256(image).digest() for r in others):
+                    raise ValueError('Добавьте три разных фото автомобиля: спереди, сзади и салон')
+            now=core.now().isoformat()
+            c.execute('INSERT INTO pd_driver_documents(telegram_id,side,image,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_id,side) DO UPDATE SET image=excluded.image,updated_at=excluded.updated_at',(applicant,side,image,now))
+            # A pilot's changed documents must be reviewed again. Admin corrections
+            # preserve the existing decision and never grant access to orders.
+            if not core.is_admin(uid):
+                c.execute("UPDATE pd_driver_applications SET status='pending',updated_at=? WHERE telegram_id=?",(now,applicant))
+        return jsonify(ok=True)
     @app.get('/api/driver/documents/<int:applicant>/<side>')
     def pd_driver_document(applicant,side):
         uid,_=auth()

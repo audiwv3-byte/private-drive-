@@ -19,6 +19,7 @@ class ReadonlyOrdersTests(unittest.TestCase):
             db.execute('BEGIN')
             db.execute("CREATE TABLE orders (id INTEGER, origin TEXT, destination TEXT, trip_date TEXT, trip_time TEXT, status TEXT, price REAL, telegram_id INTEGER, payment_method TEXT)")
             db.execute("INSERT INTO orders VALUES (1,'Vilnius','Kaunas','01.12.2026','10:00','Новая',130,12345,'cash')")
+            db.commit()
         self.app = Flask(__name__)
         pd_n8n_readonly.register(self.app, SimpleNamespace(ORDERS_DB=path))
         self.client = self.app.test_client()

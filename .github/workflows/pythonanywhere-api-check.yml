@@ -1,0 +1,55 @@
+name: PRIVATE DRIVE - PythonAnywhere API check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ops/trigger-pythonanywhere-api-check.txt
+
+permissions:
+  contents: read
+
+jobs:
+  api-check:
+    name: Check PythonAnywhere API (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check API token and GET CPU endpoint
+        shell: bash
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          import urllib.request
+          import urllib.error
+
+          token = os.environ.get("PYTHONANYWHERE_API_TOKEN", "")
+          if not token:
+              print("ERROR: PYTHONANYWHERE_API_TOKEN secret missing or empty")
+              sys.exit(1)
+          req = urllib.request.Request(
+              "https://www.pythonanywhere.com/api/v0/user/wilsonpark/cpu/",
+              headers={
+                  "Authorization": "Token " + token,
+                  "Accept": "application/json",
+                  "User-Agent": "PRIVATE-DRIVE-readonly-healthcheck/1.0",
+              },
+              method="GET",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  if response.status != 200:
+                      print("ERROR: unexpected HTTP status:", response.status)
+                      sys.exit(1)
+                  print("PYTHONANYWHERE API CHECK PASSED (HTTP 200, GET only)")
+          except urllib.error.HTTPError as exc:
+              print("PYTHONANYWHERE API CHECK FAILED: HTTP", exc.code)
+              sys.exit(1)
+          except Exception as exc:
+              print("PYTHONANYWHERE API CHECK FAILED:", type(exc).__name__)
+              sys.exit(1)
+          PY

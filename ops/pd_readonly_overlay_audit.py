@@ -100,7 +100,32 @@ def overlay_language(text):
             print("LIVE_HEADER_OPTIONS_FLAGS", all(flag in header.group(1) for flag,_,_ in FLAGS.values()), flush=True)
         else:
             print("LIVE_HEADER_OPTIONS_FLAGS no_header_selector", flush=True)
-        return "ALREADY_PRESENT_CUSTOM_LIVE", text
+        if not header:
+            return "REVIEW_NEEDED_MISSING_HEADER", None
+        updated_header = header.group()
+        for code, (flag, _, short) in FLAGS.items():
+            pattern = re.compile(
+                r'(<option\b[^>]*\bvalue="' + code + r'"[^>]*>)([^<]*)(</option>)'
+            )
+            matches = list(pattern.finditer(updated_header))
+            if len(matches) != 1:
+                return "REVIEW_NEEDED_HEADER_OPTION_" + code.upper(), None
+            current = matches[0].group(2).strip()
+            if current == f"{flag} {short}":
+                continue
+            if current != short:
+                return "REVIEW_NEEDED_CUSTOM_HEADER_" + code.upper(), None
+            updated_header = pattern.sub(
+                lambda m: m.group(1) + flag + " " + short + m.group(3),
+                updated_header, count=1,
+            )
+        if updated_header == header.group():
+            return "ALREADY_PRESENT_CUSTOM_LIVE", text
+        candidate = text[:header.start()] + updated_header + text[header.end():]
+        assert candidate.count('<div id="pdObLanguage"') == 1
+        assert candidate.count('<div id="pdObRole"') == 1
+        # All bytes except the three option labels remain untouched.
+        return "HEADER_FLAGS_OVERLAY_READY", candidate
 
     for code, (flag, name, abbr) in FLAGS.items():
         expr = re.compile(
@@ -212,7 +237,7 @@ def main():
             print("LANGUAGE_STRUCTURE panel_missing_or_reordered", flush=True)
     for key in ("pr22", "pr23"):
         print(f"PATCH_CHECK {key} {status.get(key, 'NOT_CHECKED')}", flush=True)
-    if any(s not in ("OVERLAY_READY", "ALREADY_PRESENT", "ALREADY_PROTECTED_WIDER_SCOPE", "ALREADY_PRESENT_CUSTOM_LIVE") for s in status.values()):
+    if any(s not in ("OVERLAY_READY", "ALREADY_PRESENT", "ALREADY_PROTECTED_WIDER_SCOPE", "ALREADY_PRESENT_CUSTOM_LIVE", "HEADER_FLAGS_OVERLAY_READY") for s in status.values()):
         print("DEPLOY_GATE BLOCKED: manual integration review required", flush=True)
     else:
         print("DEPLOY_GATE SOURCE_PATCHES_APPLICABLE: deploy still NOT authorized", flush=True)

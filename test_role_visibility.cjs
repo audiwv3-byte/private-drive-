@@ -42,5 +42,13 @@ check(applicant, '', {passengerView: false, adminControls: false, pilotControls:
 // Changing to an ordinary passenger cannot retain another role's controls.
 check(passenger, '', {passengerView: true, adminControls: false, pilotControls: false});
 assert.ok(!html.includes('onclick="pdStartDriverRegistration()">Регистрация водителя</button>'));
+const languagePanel=html.match(/<div id="pdObLanguage"[\s\S]*?<\/div><\/div>/)?.[0]||'';
+for (const [lang,flag,name] of [['en','🇬🇧','English'],['lt','🇱🇹','Lietuvių'],['ru','🇷🇺','Русский']]) {
+  assert.ok(languagePanel.includes(`pdChooseInitialLanguage('${lang}')`),lang);
+  assert.ok(languagePanel.includes(flag),flag);
+  assert.ok(languagePanel.includes(name),name);
+}
+assert.ok(!/<div id="pdObRole"[^>]*>[\s\S]*?onclick="pdShowOnboarding\('language'\)"/.test(html.slice(html.indexOf('<div id="pdObRole"'), html.indexOf('<form id="pdObPassenger"'))));
+assert.ok(html.includes('.pd-onboarding-active .pd-language-switch{display:flex!important}'));
 assert.ok(html.includes('body:not(.pd-role-admin) #pdRoleBar'));
 console.log('PASS: passenger, administrator, pilot and applicant roles; passenger mode hides work controls; stale role controls cleared; inline scripts compile');

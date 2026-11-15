@@ -48,6 +48,12 @@ def overlay_cache(text):
         return "REVIEW_NEEDED_HANDLER", None
     match = found[0]
     handler = match.group()
+    if ("response.headers['Cache-Control']" in handler
+            and "no-store" in handler
+            and "path.startswith('/api/')" in handler
+            and ("response.vary.add('X-Telegram-Init-Data')" in handler
+                 or "response.headers['Vary']" in handler)):
+        return "ALREADY_PROTECTED_WIDER_SCOPE", text
     if "response.headers['Cache-Control']" not in handler or "response.headers['Vary']" not in handler:
         return "REVIEW_NEEDED_HEADERS", None
     if "path in ('/api/me', '/api/orders')" in handler:
@@ -82,6 +88,20 @@ def overlay_language(text):
     role = text[b:c]
     if "pd-ob-language-options" not in lang:
         return "REVIEW_NEEDED_LANGUAGE_LAYOUT", None
+    if all(("pdWelcomeSelect('" + code + "')" in lang
+            and flag in lang and name in lang)
+           for code, (flag, name, _) in FLAGS.items()):
+        role_language_button = 'onclick="pdShowOnboarding(\'language\')"'
+        print("LIVE_LANGUAGE_FLAGS present_in_welcome_screen", flush=True)
+        print("LIVE_ROLE_LANGUAGE_DUPLICATE", role_language_button in role, flush=True)
+        print("LIVE_FLAG_CSS", "pd-ob-flag" in text, flush=True)
+        header = re.search(r'(?s)<select id="pdLangSelect"[^>]*>(.*?)</select>', text)
+        if header:
+            print("LIVE_HEADER_OPTIONS_FLAGS", all(flag in header.group(1) for flag,_,_ in FLAGS.values()), flush=True)
+        else:
+            print("LIVE_HEADER_OPTIONS_FLAGS no_header_selector", flush=True)
+        return "ALREADY_PRESENT_CUSTOM_LIVE", text
+
     for code, (flag, name, abbr) in FLAGS.items():
         expr = re.compile(
             r"(<button\b[^>]*\bonclick=\"pdChooseInitialLanguage\('" + code +
@@ -192,7 +212,7 @@ def main():
             print("LANGUAGE_STRUCTURE panel_missing_or_reordered", flush=True)
     for key in ("pr22", "pr23"):
         print(f"PATCH_CHECK {key} {status.get(key, 'NOT_CHECKED')}", flush=True)
-    if any(s not in ("OVERLAY_READY", "ALREADY_PRESENT") for s in status.values()):
+    if any(s not in ("OVERLAY_READY", "ALREADY_PRESENT", "ALREADY_PROTECTED_WIDER_SCOPE", "ALREADY_PRESENT_CUSTOM_LIVE") for s in status.values()):
         print("DEPLOY_GATE BLOCKED: manual integration review required", flush=True)
     else:
         print("DEPLOY_GATE SOURCE_PATCHES_APPLICABLE: deploy still NOT authorized", flush=True)

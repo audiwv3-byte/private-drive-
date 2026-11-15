@@ -4,6 +4,7 @@ on:
     branches: [ops/read-only-pa-overlay-audit-20261116]
     paths:
       - .github/workflows/pd-readonly-overlay-audit.yml
+      - ops/pd_readonly_overlay_audit.py
 permissions:
   contents: read
 jobs:

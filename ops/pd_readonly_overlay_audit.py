@@ -235,6 +235,40 @@ def main():
             print("LANGUAGE_BUTTON_COUNT", len(buttons), flush=True)
         else:
             print("LANGUAGE_STRUCTURE panel_missing_or_reordered", flush=True)
+    # Read-only static flag rendering and onboarding-flow diagnostics.
+    live_html = get_source("miniapp/templates/index.html", token).decode("utf-8")
+    for key in ("pd-ob-flag", "pd-ob-language-options", "pd-welcome-choices", "pdOnboardingStage"):
+        css_rules = re.findall(
+            r"[^{}\n]{0,180}" + re.escape(key) + r"[^{}\n]{0,180}\{[^{}]{0,650}\}",
+            live_html,
+        )
+        print("STYLE_RULE", key, len(css_rules), repr(css_rules[:5]), flush=True)
+    for marker in ("function pdWelcomeSelect(", "function pdWelcomeContinue(",
+                   "function pdShowOnboarding(", "function pdBootstrap(",
+                   "function pdChooseInitialLanguage("):
+        pos = live_html.find(marker)
+        print("JS_FLOW", marker, "FOUND" if pos >= 0 else "NOT_IN_HTML",
+              repr(live_html[pos:pos+1150]) if pos >= 0 else "", flush=True)
+    lang_pos = live_html.find('<div id="pdObLanguage"')
+    role_pos = live_html.find('<div id="pdObRole"')
+    if lang_pos >= 0 and role_pos > lang_pos:
+        section = live_html[lang_pos:role_pos]
+        print("LIVE_LANG_OPTIONS", {code: ("pdWelcomeSelect('" + code + "')" in section,
+              flag in section) for code,(flag,_,_) in FLAGS.items()}, flush=True)
+    # Public landing GET only, no Telegram initData or cookies sent.
+    with urllib.request.urlopen(
+        urllib.request.Request("https://wilsonpark.pythonanywhere.com/?lang=ru",
+                               headers={"Cache-Control": "no-cache"}, method="GET"),
+        timeout=45,
+    ) as public_response:
+        response_text = public_response.read(1_000_000).decode("utf-8", errors="replace")
+        print("PUBLIC_HTTP", public_response.status,
+              "cache_control", public_response.headers.get("Cache-Control", "absent"),
+              "etag", bool(public_response.headers.get("ETag")),
+              "last_modified", bool(public_response.headers.get("Last-Modified")),
+              "flag_markup", all(flag in response_text for flag,_,_ in FLAGS.values()),
+              "body_sha256", hashlib.sha256(response_text.encode("utf-8")).hexdigest()[:16],
+              flush=True)
     for key in ("pr22", "pr23"):
         print(f"PATCH_CHECK {key} {status.get(key, 'NOT_CHECKED')}", flush=True)
     if any(s not in ("OVERLAY_READY", "ALREADY_PRESENT", "ALREADY_PROTECTED_WIDER_SCOPE", "ALREADY_PRESENT_CUSTOM_LIVE", "HEADER_FLAGS_OVERLAY_READY") for s in status.values()):

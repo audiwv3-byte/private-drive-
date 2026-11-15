@@ -1,0 +1,23 @@
+name: PRIVATE DRIVE - read-only production overlay audit
+on:
+  push:
+    branches: [ops/read-only-pa-overlay-audit-20261116]
+    paths:
+      - .github/workflows/pd-readonly-overlay-audit.yml
+permissions:
+  contents: read
+jobs:
+  read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify inspection script syntax
+        run: python -m py_compile ops/pd_readonly_overlay_audit.py
+      - name: GET-only current PythonAnywhere comparison and overlay checks
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: python ops/pd_readonly_overlay_audit.py

@@ -1,0 +1,36 @@
+name: PRIVATE DRIVE - protected diagnostic and backup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-drive-production-backup
+  cancel-in-progress: false
+
+jobs:
+  verify-and-backup:
+    name: Verify production and create isolated backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out reviewed backup tools
+        uses: actions/checkout@v4
+
+      - name: Configure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate backup scripts without executing
+        run: python -m py_compile pd_safe_backup.py pa_remote_backup_api.py
+
+      - name: Install API client
+        run: python -m pip install requests
+
+      - name: Check production and create a verified server-side snapshot
+        env:
+          PA_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: python pa_remote_backup_api.py

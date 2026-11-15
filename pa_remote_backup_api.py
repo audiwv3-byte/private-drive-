@@ -108,12 +108,11 @@ def main():
     if not verified_consoles:
         raise RuntimeError("No accessible Bash console found")
     requested = os.environ.get("PA_CONSOLE_ID", "").strip()
-    if requested in verified_consoles:
-        console = requested
-    else:
-        # The user opened a fresh Bash console for this backup. Use the
-        # highest verified numeric console ID, not an unverified stale default.
-        console = max(verified_consoles, key=int)
+    if not requested or not re.fullmatch(r"[0-9]{1,12}", requested):
+        raise RuntimeError("Explicit PA_CONSOLE_ID required: refusing automatic console selection")
+    if requested not in verified_consoles:
+        raise RuntimeError("Requested Bash console not accessible: " + requested)
+    console = requested
     print("Selected verified Bash console:", console,
           "out of", len(verified_consoles), "accessible consoles")
     print("Bash console exists, uploading verified backup runner outside web root...")
@@ -142,7 +141,12 @@ def main():
         + "then printf 'OK\\n' > " + status_path
         + "; else printf 'FAILED\\n' > " + status_path + "; fi"
     )
-    api("POST", "/consoles/" + console + "/send_input/", data={"input": command + "\n"})
+    response = session.post(prefix + "/consoles/" + console + "/send_input/",
+                            data={"input": command + "\n"}, timeout=35)
+    if response.status_code == 412:
+        raise RuntimeError("Selected Bash console is not ready (HTTP 412); open that exact console and wait for a shell prompt")
+    if not response.ok:
+        raise RuntimeError("Console input failed: HTTP " + str(response.status_code))
     print("Backup command submitted; waiting for private status file...")
     status = ""
     for _ in range(24):

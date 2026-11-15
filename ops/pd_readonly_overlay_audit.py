@@ -170,6 +170,26 @@ def main():
             status["pr23"], candidate = overlay_language(source)
             if candidate is not None:
                 assert candidate.count('id="pdObLanguage"') == 1
+    # Targeted diagnostic only: limited static handler and language-button markup.
+    # Never print full source, user data, request headers or credentials.
+    if status.get("pr22", "").startswith("REVIEW_"):
+        text = get_source("miniapp_server.py", token).decode("utf-8")
+        m = re.search(r"(?ms)^@app\.after_request\s*\ndef private_response_cache\(response\):\n.*?(?=^@app\.|\Z)", text)
+        if m:
+            h = m.group()
+            print("CACHE_STRUCTURE", repr(h[:820]), flush=True)
+        else:
+            print("CACHE_STRUCTURE missing_handler", flush=True)
+    if status.get("pr23", "").startswith("REVIEW_"):
+        text = get_source("miniapp/templates/index.html", token).decode("utf-8")
+        start, end = text.find('<div id="pdObLanguage"'), text.find('<div id="pdObRole"')
+        if 0 <= start < end:
+            section = text[start:end]
+            buttons = re.findall(r"<button\b[\s\S]*?</button>", section)
+            print("LANGUAGE_STRUCTURE", repr(section[:1250]), flush=True)
+            print("LANGUAGE_BUTTON_COUNT", len(buttons), flush=True)
+        else:
+            print("LANGUAGE_STRUCTURE panel_missing_or_reordered", flush=True)
     for key in ("pr22", "pr23"):
         print(f"PATCH_CHECK {key} {status.get(key, 'NOT_CHECKED')}", flush=True)
     if any(s not in ("OVERLAY_READY", "ALREADY_PRESENT") for s in status.values()):

@@ -49,5 +49,19 @@ class ReadonlyOrdersTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/integrations/n8n/orders?status=invalid",headers=h).status_code,400)
         self.assertEqual(self.client.get("/api/integrations/n8n/orders?status=Отменена",headers=h).json["count"],0)
 
+    def test_hashed_token_file(self):
+        import hashlib
+        from unittest.mock import patch
+        source = Path(self.temp.name) / "pd_n8n_readonly.py"
+        verifier = source.with_name(".pd_n8n_readonly.sha256")
+        verifier.write_text(hashlib.sha256(self.secret.encode()).hexdigest(), encoding="ascii")
+        h = {"Authorization": "Bearer " + self.secret}
+        with patch.object(pd_n8n_readonly, "__file__", str(source)):
+            with patch.dict(os.environ, {"PD_N8N_READONLY_TOKEN": ""}):
+                response = self.client.get("/api/integrations/n8n/orders?limit=1", headers=h)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json["count"], 1)
+                self.assertEqual(self.client.get("/api/integrations/n8n/orders", headers={"Authorization":"Bearer invalid"}).status_code, 401)
+
 if __name__=="__main__":
     unittest.main()

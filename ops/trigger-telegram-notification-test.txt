@@ -1,1 +1,1 @@
-PRIVATE DRIVE Telegram notification connection test number 2. Validate configured Telegram secrets without touching PythonAnywhere, orders, payments, or n8n.
+PRIVATE DRIVE Telegram connection diagnostic test #3: report only names of missing GitHub Secrets; no production changes.

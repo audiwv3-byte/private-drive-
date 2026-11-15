@@ -46,7 +46,10 @@ jobs:
           token = os.environ.get("PD_TELEGRAM_BOT_TOKEN", "").strip()
           chat_id = os.environ.get("PD_TELEGRAM_CHAT_ID", "").strip()
           if not token or not chat_id:
-              print("TELEGRAM_NOT_CONFIGURED: check both PD_TELEGRAM_BOT_TOKEN and PD_TELEGRAM_CHAT_ID in repository Actions secrets")
+              if not token:
+                  print("MISSING_SECRET: PD_TELEGRAM_BOT_TOKEN")
+              if not chat_id:
+                  print("MISSING_SECRET: PD_TELEGRAM_CHAT_ID")
               sys.exit(1)
 
           if os.environ.get("EVENT_NAME") in ("workflow_dispatch", "push"):

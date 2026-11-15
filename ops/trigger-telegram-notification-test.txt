@@ -1,1 +1,1 @@
-PRIVATE DRIVE Telegram connection diagnostic test #4: manual-safe GitHub Actions notification trigger after PD_TELEGRAM_CHAT_ID setup. No production changes.
+PRIVATE DRIVE Telegram connection diagnostic test #5: verify Telegram notification after setting PD_TELEGRAM_CHAT_ID. Notification only; no server or order changes.

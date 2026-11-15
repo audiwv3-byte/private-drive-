@@ -9,6 +9,10 @@ on:
     branches:
       - main
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ops/trigger-telegram-notification-test.txt
 
 permissions: {}
 
@@ -16,7 +20,7 @@ jobs:
   notify:
     name: Report backup status to Telegram (no server changes)
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_dispatch' || github.event_name == 'push' ||
       (github.event.workflow_run.head_repository.full_name == 'audiwv3-byte/private-drive-' &&
        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
@@ -45,7 +49,7 @@ jobs:
               print("TELEGRAM_NOT_CONFIGURED: set both PD_TELEGRAM_BOT_TOKEN and PD_TELEGRAM_CHAT_ID in GitHub Actions secrets")
               sys.exit(0)
 
-          if os.environ.get("EVENT_NAME") == "workflow_dispatch":
+          if os.environ.get("EVENT_NAME") in ("workflow_dispatch", "push"):
               status = "TEST (notification setup)"
               run_line = "GitHub Actions manual notification test"
           else:

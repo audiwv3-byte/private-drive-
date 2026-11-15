@@ -1,1 +1,1 @@
-PRIVATE DRIVE Telegram connection diagnostic test #3: report only names of missing GitHub Secrets; no production changes.
+PRIVATE DRIVE Telegram connection diagnostic test #4: manual-safe GitHub Actions notification trigger after PD_TELEGRAM_CHAT_ID setup. No production changes.

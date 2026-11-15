@@ -1,6 +1,7 @@
 """Tests for the isolated n8n read-only API (no production database needed)."""
 import os
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,7 +15,8 @@ class ReadonlyOrdersTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         path = Path(self.temp.name) / "orders.sqlite"
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db:
+            db.execute('BEGIN')
             db.execute("CREATE TABLE orders (id INTEGER, origin TEXT, destination TEXT, trip_date TEXT, trip_time TEXT, status TEXT, price REAL, telegram_id INTEGER, payment_method TEXT)")
             db.execute("INSERT INTO orders VALUES (1,'Vilnius','Kaunas','01.12.2026','10:00','Новая',130,12345,'cash')")
         self.app = Flask(__name__)

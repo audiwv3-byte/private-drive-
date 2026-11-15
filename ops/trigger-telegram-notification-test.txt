@@ -1,1 +1,1 @@
-One-time private drive Telegram notification connection test. No PythonAnywhere or n8n operations.
+PRIVATE DRIVE Telegram notification connection test number 2. Validate configured Telegram secrets without touching PythonAnywhere, orders, payments, or n8n.

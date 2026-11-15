@@ -52,6 +52,13 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     for data in ['', 'hash=bad',signed(user='null'),signed(user='[]'),signed(user='{}'),signed(user='{"id":true}'),signed(auth_date='invalid'),signed(auth_date=str(int(time.time())-90000)),signed()+'&user=duplicate']:
         check(call('/api/me',init=data),401)
     print('PASS authentication: missing, forged, malformed, expired, duplicate data')
+    # Private API responses must never be shared or stored by intermediary caches.
+    for path in ('/api/me', '/api/orders'):
+        for init in (signed(), ''):
+            response=call(path,init=init)
+            assert response.headers.get('Cache-Control')=='private, no-store, max-age=0',(path,response.headers)
+            assert response.headers.get('Vary')=='X-Telegram-Init-Data',(path,response.headers)
+    print('PASS private no-store cache policy for authenticated and rejected API requests')
     check(call('/api/register',{'name':'Test Passenger','phone':'+37060000000'}),200)
     check(call('/api/register',{'name':['Test'],'phone':'+37060000000'}),400)
     for body in [[],['item'],'text',None]:

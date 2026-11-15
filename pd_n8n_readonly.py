@@ -1,5 +1,6 @@
 """Read-only, narrowly scoped n8n orders view. Disabled unless configured."""
 import hmac
+import hashlib
 import os
 import sqlite3
 from contextlib import closing
@@ -9,12 +10,28 @@ from flask import jsonify, request
 def register(app, core):
     @app.get("/api/integrations/n8n/orders")
     def n8n_orders_readonly():
-        expected = os.environ.get("PD_N8N_READONLY_TOKEN", "")
         supplied = request.headers.get("Authorization", "")
-        # Fail closed if a unique, long-lived secret is not configured.
-        if len(expected) < 32 or not supplied.startswith("Bearer "):
+        if not supplied.startswith("Bearer "):
             return jsonify(error="Unauthorized"), 401
-        if not hmac.compare_digest(supplied[7:].encode(), expected.encode()):
+
+        # Prefer a SHA-256 verifier, so the bearer token need not be stored on
+        # the web server. Store only this verifier in a private application file.
+        verifier_path = Path(__file__).with_name(".pd_n8n_readonly.sha256")
+        try:
+            verifier = verifier_path.read_text(encoding="ascii").strip()
+        except OSError:
+            verifier = ""
+        if len(verifier) == 64 and all(c in "0123456789abcdef" for c in verifier):
+            digest = hashlib.sha256(supplied[7:].encode("utf-8")).hexdigest()
+            authorized = hmac.compare_digest(digest, verifier)
+        else:
+            # Backward-compatible path for local unit tests; never enable by
+            # default on the production server.
+            expected = os.environ.get("PD_N8N_READONLY_TOKEN", "")
+            authorized = len(expected) >= 32 and hmac.compare_digest(
+                supplied[7:].encode(), expected.encode()
+            )
+        if not authorized:
             return jsonify(error="Unauthorized"), 401
 
         try:

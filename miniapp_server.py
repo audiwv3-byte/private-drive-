@@ -71,7 +71,8 @@ def protect_private_information():
 
 @app.after_request
 def private_response_cache(response):
-    if request.path.lower().startswith(('/static/', '/api/pilot', '/api/admin/', '/api/payment')):
+    path = request.path.lower()
+    if path in ('/api/me', '/api/orders') or path.startswith(('/static/', '/api/pilot', '/api/admin/', '/api/payment')):
         response.headers['Cache-Control'] = 'private, no-store, max-age=0'
         response.headers['Vary'] = 'X-Telegram-Init-Data'
     return response

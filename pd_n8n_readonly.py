@@ -2,6 +2,7 @@
 import hmac
 import os
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from flask import jsonify, request
 
@@ -32,7 +33,7 @@ def register(app, core):
         path = Path(core.ORDERS_DB).resolve()
         uri = path.as_uri() + "?mode=ro"
         try:
-            with sqlite3.connect(uri, uri=True, timeout=5) as db:
+            with closing(sqlite3.connect(uri, uri=True, timeout=5)) as db:
                 db.row_factory = sqlite3.Row
                 sql = ("SELECT id, origin, destination, trip_date, trip_time, "
                        "status, price FROM orders")

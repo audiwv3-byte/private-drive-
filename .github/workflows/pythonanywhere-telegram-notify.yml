@@ -46,8 +46,8 @@ jobs:
           token = os.environ.get("PD_TELEGRAM_BOT_TOKEN", "").strip()
           chat_id = os.environ.get("PD_TELEGRAM_CHAT_ID", "").strip()
           if not token or not chat_id:
-              print("TELEGRAM_NOT_CONFIGURED: set both PD_TELEGRAM_BOT_TOKEN and PD_TELEGRAM_CHAT_ID in GitHub Actions secrets")
-              sys.exit(0)
+              print("TELEGRAM_NOT_CONFIGURED: check both PD_TELEGRAM_BOT_TOKEN and PD_TELEGRAM_CHAT_ID in repository Actions secrets")
+              sys.exit(1)
 
           if os.environ.get("EVENT_NAME") in ("workflow_dispatch", "push"):
               status = "TEST (notification setup)"

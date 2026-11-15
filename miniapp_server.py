@@ -920,3 +920,7 @@ pd_crypto_manual.register(app, core, auth, cents_for_order)
 
 import pd_tips_widget
 pd_tips_widget.register(app)
+
+# Scoped, read-only n8n integration; requires PD_N8N_READONLY_TOKEN.
+import pd_n8n_readonly
+pd_n8n_readonly.register(app, core)

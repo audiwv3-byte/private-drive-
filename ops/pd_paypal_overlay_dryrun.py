@@ -51,7 +51,7 @@ def main():
     print("HTML_CASH_HANDLER_COUNT",html.count("async function cashNotice()"),flush=True)
     if html.count(base_ui)!=1:
         at=html.find("cryptoNotice(")
-        print("UI_CONTEXT",repr(html[max(0,at-115):at+160]) if at>=0 else "NOT_FOUND",flush=True)
+        print("UI_CONTEXT",repr(html[max(0,at-850):at+550]) if at>=0 else "NOT_FOUND",flush=True)
     html=one(html,base_ui,base_ui+ui_fragment)
     js=between(reviewed_html,"// PayPal is available only for a confirmed","async function cashNotice()")
     html=one(html,"async function cashNotice()",js+"async function cashNotice()")

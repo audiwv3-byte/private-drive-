@@ -2,6 +2,15 @@ PATCH_ANCHOR ADMIN_STATUS_GUARD COUNT 1
 PATCH_ANCHOR TRIP_AUTH_CONFIG COUNT 1
 AST_GUARDS_OK
 TEMPORARY_SERVER_COMPONENTS 5 COPIED_AND_COMPILED
+FINISH_LOGIC_LINE 331 seconds=max(1,clock()-t['stop_started_at']);cents=math.ceil(seconds/60)*WAIT_CENTS_PER_MINUTE
+FINISH_LOGIC_LINE 332 c.execute('UPDATE pd_trip_runtime_v4 SET stop_seconds=COALESCE(stop_seconds,0)+?,stop_cents=COALESCE(stop_cents,0)+?,stop_started_at=NULL WHERE order_id=?',(sec
+FINISH_LOGIC_LINE 333 event(c,oid,uid,'stop_ended_on_finish:'+str(seconds)+'s:'+str(cents)+'c')
+FINISH_LOGIC_LINE 334 t=runtime(c,oid)
+FINISH_LOGIC_LINE 335 final = t['base_cents'] + t['wait_cents'] + extras + (t['stop_cents'] or 0)
+FINISH_LOGIC_LINE 336 c.execute('UPDATE pd_trip_runtime_v4 SET ended_at=?,final_cents=?,lat=NULL,lon=NULL,accuracy=NULL,location_at=NULL,meter_lat=NULL,meter_lon=NULL,meter_at=NULL WHERE
+FINISH_LOGIC_LINE 337 c.execute("UPDATE orders SET status='Выполнена',updated_at=? WHERE id=?", (core.now().isoformat(), oid))
+FINISH_LOGIC_LINE 338 event(c, oid, uid, 'completed')
+FINISH_LOGIC_LINE 339 extra_total = t['wait_cents'] + extras + (t['stop_cents'] or 0)
 PASS EXACT_LIVE_ADMIN_STATUS_FUNCTION_FOUND
 PASS OLD_PILOT_ROUTE_REBOUND_TO_SINGLE_TRANSITION
 PASS OLD_PILOT_CANNOT_START_WITHOUT_ARRIVAL

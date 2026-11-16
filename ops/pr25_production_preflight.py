@@ -32,6 +32,20 @@ def main():
     }
     for key,val in gates.items():print("GATE",key,"PASS" if val else "BLOCK",flush=True)
     if not all(gates.values()):raise RuntimeError("RELEASE_GATE_FAILED")
+    # Verify pre-existing backup destination via GET only; deployment must not
+    # assume PythonAnywhere accepts uploads to a non-existent parent directory.
+    import urllib.error
+    backup_dir="https://www.pythonanywhere.com/api/v0/user/wilsonpark/files/path/home/wilsonpark/private_drive_backups/"
+    try:
+        request=urllib.request.Request(backup_dir,headers={"Authorization":"Token "+token},method="GET")
+        with urllib.request.urlopen(request,timeout=25) as response:
+            backup_parent_ready=(response.status==200)
+        print("GATE BACKUP_DIRECTORY_READABLE", "PASS" if backup_parent_ready else "BLOCK",flush=True)
+    except urllib.error.HTTPError as exc:
+        backup_parent_ready=False
+        print("GATE BACKUP_DIRECTORY_READABLE BLOCK HTTP",exc.code,flush=True)
+    if not backup_parent_ready:
+        raise RuntimeError("BACKUP_DIRECTORY_NOT_VERIFIED_NO_DEPLOY")
     print("PREFLIGHT_READONLY_PASSED_NO_PRODUCTION_CHANGES",flush=True)
 if __name__=="__main__":
     try:main()

@@ -1,0 +1,39 @@
+name: PRIVATE DRIVE - stage2 guarded rollback synthetic
+on:
+  push:
+    branches: [fix/driver-approval-photo-rights-admin-filters-20261116]
+    paths:
+      - ops/stage2_onefile_guarded_release.py
+      - ops/test_stage2_onefile_rollback.py
+      - .github/workflows/stage2-onefile-rollback-tests.yml
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check syntax and fault-injection rollback without token
+        run: |
+          mkdir -p reports
+          if python -m py_compile ops/stage2_ui_live_compatible_dryrun.py ops/stage2_onefile_guarded_release.py ops/test_stage2_onefile_rollback.py && python ops/test_stage2_onefile_rollback.py > reports/stage2_rollback_test.txt 2>&1; then
+            echo STAGE2_ROLLBACK_CI_PASS >> reports/stage2_rollback_test.txt
+          else
+            echo STAGE2_ROLLBACK_CI_BLOCK >> reports/stage2_rollback_test.txt
+          fi
+      - name: Save sanitized report
+        if: always()
+        run: |
+          if [ -f reports/stage2_rollback_test.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/stage2_rollback_test.txt
+            git commit -m "test: stage2 one-file rollback outcomes" || true
+            git push origin HEAD:fix/driver-approval-photo-rights-admin-filters-20261116
+          fi
+      - name: Enforce rollback test
+        run: grep -Fqx STAGE2_ROLLBACK_CI_PASS reports/stage2_rollback_test.txt

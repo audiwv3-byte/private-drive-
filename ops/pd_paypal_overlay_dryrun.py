@@ -65,14 +65,22 @@ def main():
         raise ValueError("PAYPAL_HANDLER_COUNT")
     # Each inline script must remain parseable after the live-source overlay.
     script_tags=re.findall(r"<script\b([^>]*)>([\s\S]*?)</script>",html,flags=re.I)
+    prior_scripts=re.findall(r"<script\b([^>]*)>([\s\S]*?)</script>",get(API+LIVE+"miniapp/templates/index.html",token),flags=re.I)
+    if len(script_tags)!=len(prior_scripts):raise ValueError("SCRIPT_TAGS_CHANGED")
     checked=0
-    for attrs,body in script_tags:
+    for index,((attrs,body),(old_attrs,old_body)) in enumerate(zip(script_tags,prior_scripts)):
         if re.search(r"\bsrc\s*=",attrs,re.I) or not body.strip():continue
+        if re.search(r"\btype\s*=\s*['\"](?:application/json|application/ld\+json)",attrs,re.I):continue
         with tempfile.TemporaryDirectory(prefix="pd-paypal-js-") as temp:
             pathname=pathlib.Path(temp)/"inline.js"
             pathname.write_text(body,encoding="utf-8")
             result=subprocess.run(["node","--check",str(pathname)],capture_output=True,text=True)
-            if result.returncode!=0:raise ValueError("HTML_INLINE_JS_SYNTAX_INVALID")
+            pathname.write_text(old_body,encoding="utf-8")
+            before=subprocess.run(["node","--check",str(pathname)],capture_output=True,text=True)
+            if result.returncode!=0:
+                print("INLINE_SCRIPT_STATUS",index,"baseline",before.returncode,"overlay",result.returncode,"js_chars",len(body),flush=True)
+                print("INLINE_SCRIPT_OVERLAY_ERROR",result.stderr.splitlines()[0][:150] if result.stderr else "NODE_CHECK_FAILED",flush=True)
+                raise ValueError("HTML_INLINE_JS_SYNTAX_INVALID")
         checked+=1
     print("HTML_INLINE_JAVASCRIPT_CHECKED",checked,flush=True)
     print("PASSENGER_UI_PATCH_OK",flush=True)

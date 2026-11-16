@@ -1,0 +1,7 @@
+ENDPOINT always_on/ HTTP 200
+ITEMS always_on/ 1
+ENDPOINT scheduled_tasks/ HTTP 404
+ITEMS scheduled_tasks/ 0
+ENDPOINT consoles/ HTTP 200
+ITEMS consoles/ 16
+BOT_RUNTIME_AUDIT_READ_ONLY_FINISHED

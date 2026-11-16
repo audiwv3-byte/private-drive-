@@ -1,0 +1,19 @@
+[2026-11-16 02:43:51,212] ERROR in app: Exception on /api/driver/work/42/status [POST]
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/opt/hostedtoolcache/Python/3.13.18/x64/lib/python3.13/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/home/runner/work/private-drive-/private-drive-/pd_trip_runtime_v4.py", line 609, in guarded_legacy_status
+    raise ValueError('Недопустимый статус')
+ValueError: Недопустимый статус
+Traceback (most recent call last):
+  File "/home/runner/work/private-drive-/private-drive-/test_pilot_status_guard.py", line 28, in <module>
+    raise AssertionError('Invalid state was not rejected')
+AssertionError: Invalid state was not rejected
+STATUS_GUARD_UNIT_FAILED

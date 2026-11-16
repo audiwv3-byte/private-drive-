@@ -21,12 +21,20 @@ def verify(value,label):
     if not value:raise AssertionError(label)
     print("PASS",label,flush=True)
 
-def isolated_handler(code,func_name,env):
+def isolated_handler(code,func_name,env,stop_after_payment=False):
     tree=ast.parse(code)
     nodes=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name==func_name]
     if len(nodes)!=1:raise RuntimeError("FUNCTION_COUNT_"+func_name)
     node=nodes[0]
     node.decorator_list=[]
+    if stop_after_payment:
+        # Execute real authorization, request parsing and payment guard.
+        # Stop before any route pricing, DB writes or provider interactions.
+        boundary=next((i for i,x in enumerate(node.body)
+            if isinstance(x,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="passenger_value" for t in x.targets)),None)
+        if boundary is None:raise RuntimeError("PAYMENT_GUARD_BOUNDARY_NOT_FOUND")
+        inject=ast.parse("capture_valid_method(method)\nraise StopBeforeSaving()").body
+        node.body=node.body[:boundary]+inject
     module=ast.fix_missing_locations(ast.Module(body=[node],type_ignores=[]))
     exec(compile(module,"<isolated-production-handler>","exec"),env)
     return env[func_name]
@@ -87,7 +95,10 @@ def main():
             "pd_fixed_prices":types.SimpleNamespace(base=lambda d:None),
             "pd_pet_price":lambda value,d:value,
             "os":os,"datetime":datetime}
-        create=isolated_handler(server,"create_order",env)
+        captured=[]
+        env["capture_valid_method"]=captured.append
+        env["StopBeforeSaving"]=StopBeforeSaving
+        create=isolated_handler(server,"create_order",env,stop_after_payment=True)
         cash=isolated_handler(server,"select_cash",env)
         @app.post("/api/order")
         def new_booking():
@@ -111,7 +122,7 @@ def main():
         verify(not core.saved,"INVALID_BOOKINGS_NEVER_REACH_SAVE")
         r=post("/api/order",base)
         verify(r.status_code==204,"DEFAULT_BANK_TRANSFER_ACCEPTED_NO_PERSISTENCE")
-        verify(core.saved[-1][1]["payment_method"]=="Банковский перевод","DEFAULT_BANK_TRANSFER_METHOD")
+        verify(captured[-1]=="Банковский перевод","DEFAULT_BANK_TRANSFER_METHOD")
         r=post("/api/order",dict(base,payment_method="Банковский перевод"))
         verify(r.status_code==204,"EXPLICIT_BANK_TRANSFER_ACCEPTED_NO_PERSISTENCE")
         historical=state(core,701)

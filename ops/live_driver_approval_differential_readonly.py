@@ -20,6 +20,18 @@ def main():
    for n in range(95,min(174,len(lines)+1)):
     v=lines[n-1]
     if not re.search(r"secret|token|password|API_KEY",v,re.I):print("DETAIL",label,n,v[:230],flush=True)
+ if label=="DRIVER":
+   for n in list(range(1,24))+list(range(85,100)):
+    v=lines[n-1]
+    if not re.search(r"secret|token|password|API_KEY",v,re.I):print("KEYLINE",label,n,v[:230],flush=True)
+ if label=="UI":
+   for n in range(480,min(493,len(lines)+1)):
+    v=lines[n-1]
+    if not re.search(r"secret|token|password|API_KEY",v,re.I):print("KEYLINE",label,n,v[:500],flush=True)
+ if label=="DISPATCH":
+   for n in range(54,min(91,len(lines)+1)):
+    v=lines[n-1]
+    if not re.search(r"secret|token|password|API_KEY",v,re.I):print("KEYLINE",label,n,v[:350],flush=True)
  for pat in targets[label]:
    matches=[(i+1,v[:210]) for i,v in enumerate(lines) if re.search(pat,v,re.I)]
    print("PATTERN",label,pat,"COUNT",len(matches),flush=True)

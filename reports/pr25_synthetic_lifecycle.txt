@@ -1,5 +1,6 @@
-Traceback (most recent call last):
-  File "/home/runner/work/private-drive-/private-drive-/ops/pr25_synthetic_status_integration.py", line 20, in <module>
-    from ops.pr25_live_overlay_dryrun import get_live, add_admin_guard, secure_trip_runtime, secure_server_tail, verify_ast
-ModuleNotFoundError: No module named 'ops'
+PATCH_ANCHOR ADMIN_STATUS_GUARD COUNT 1
+PATCH_ANCHOR TRIP_AUTH_CONFIG COUNT 1
+AST_GUARDS_OK
+TEMPORARY_SERVER_COMPONENTS 4 COPIED_AND_COMPILED
+ISOLATED_TEST_FAILED OperationalError table pd_driver_applications has 9 columns but 10 values were supplied
 PR25_SYNTHETIC_LIFECYCLE_FAILED

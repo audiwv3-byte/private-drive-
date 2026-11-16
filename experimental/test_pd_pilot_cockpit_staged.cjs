@@ -96,6 +96,21 @@ async function test(){
  assert.equal(root.children.length,2);
  assert.equal(root.children[0],passport);assert.equal(root.children[1],admin);
  console.log('PASS DISPOSE_CLEANS_MAP_TIMERS_AND_PRESERVES_PASSENGER_ADMIN');
+ workOrders=[];
+ const passive=impl.make({api,leaflet,document:dummyDocument,window:mockWindow,geolocation:geo,lang:'ru'});
+ assert.equal(passive.mount(root,true),true);
+ await new Promise(res=>setImmediate(res));
+ assert.equal(passive.state().selectedOrder,null);
+ const beforeTraffic=requests.filter(r=>r.path.endsWith('/location')).length;
+ passive.startGps();
+ gpsCallbacks[0]({coords:{latitude:54.69,longitude:25.28,accuracy:10}});
+ await new Promise(res=>setImmediate(res));
+ assert.equal(passive.state().gpsEnabled,true);
+ assert.equal(passive.state().hasMap,true);
+ assert.equal(requests.filter(r=>r.path.endsWith('/location')).length,beforeTraffic,
+   'GPS must not send trip location when no trip is assigned');
+ passive.dispose();
+ console.log('PASS GPS_FOLLOWS_LOCAL_POSITION_WITHOUT_ACTIVE_TRIP_NO_SERVER_WRITE');
  console.log('PILOT_COCKPIT_ISOLATED_TESTS_PASSED');
 }
 test().catch(e=>{console.error(e);process.exit(1)});

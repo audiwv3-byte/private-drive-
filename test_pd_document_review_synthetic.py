@@ -21,14 +21,14 @@ class DocumentReviewSyntheticTests(unittest.TestCase):
         self.db.row_factory = sqlite3.Row
         self.db.executescript("""
             CREATE TABLE pd_driver_applications (
-                telegram_id INTEGER PRIMARY KEY, status TEXT NOT NULL, stage TEXT
+                telegram_id INTEGER PRIMARY KEY, status TEXT NOT NULL, stage INTEGER NOT NULL
             );
             CREATE TABLE pd_driver_documents (
                 telegram_id INTEGER NOT NULL, side TEXT NOT NULL,
                 image BLOB NOT NULL, updated_at TEXT NOT NULL,
                 PRIMARY KEY (telegram_id, side)
             );
-            INSERT INTO pd_driver_applications VALUES (1001, 'pending', 'stage1');
+            INSERT INTO pd_driver_applications VALUES (1001, 'pending', 1);
         """)
         review.ensure_tables(self.db)
 

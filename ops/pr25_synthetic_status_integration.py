@@ -37,8 +37,13 @@ def prepare(temp,token):
            "pd_admin_console_v4.py","pd_pilot_notifications.py")
     original={name:get_live(name,token) for name in files}
     patched={}
-    patched["miniapp_server.py"]=secure_server_tail(add_admin_guard(original["miniapp_server.py"]))
-    patched["pd_trip_runtime_v4.py"]=secure_trip_runtime(original["pd_trip_runtime_v4.py"])
+    # Since PR25 deployment, the live sources already include the guards.
+    # Reuse exact production bytes, rather than attempting to patch twice.
+    server_is_patched="pd_trip_runtime_v4.secure_legacy_status_route(app)" in original["miniapp_server.py"]
+    runtime_is_patched="def secure_legacy_status_route(app):" in original["pd_trip_runtime_v4.py"]
+    ensure(server_is_patched and runtime_is_patched,"PR25_INSTALLED_GUARDS_IN_LIVE_SOURCE")
+    patched["miniapp_server.py"]=original["miniapp_server.py"]
+    patched["pd_trip_runtime_v4.py"]=original["pd_trip_runtime_v4.py"]
     patched["pd_pilot_dispatch.py"]=original["pd_pilot_dispatch.py"]
     patched["pd_admin_console_v4.py"]=original["pd_admin_console_v4.py"]
     patched["pd_pilot_notifications.py"]=original["pd_pilot_notifications.py"]

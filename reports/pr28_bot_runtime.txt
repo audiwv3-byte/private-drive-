@@ -1,6 +1,7 @@
 ENDPOINT always_on/ HTTP 200
 ITEMS always_on/ 1
 FIELDS always_on/ can_delete,can_disable,can_edit,can_enable,can_restart,command,description,enabled,id,logfile,state,url,user
+ALWAYS_ON_CLASS other_or_unidentified STATE Running CAN_RESTART True COMMAND_PATTERN python PROJECT_HINTS bot,private,dating
 ENDPOINT scheduled_tasks/ HTTP 404
 ITEMS scheduled_tasks/ 0
 ENDPOINT consoles/ HTTP 200

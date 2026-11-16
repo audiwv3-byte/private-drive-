@@ -7,8 +7,13 @@ import pd_issue30_stage_adapter as adapter
 from test_pd_document_review_synthetic import DocumentReviewSyntheticTests, APP, ADMIN
 
 
-class AdapterIntegrationTests(DocumentReviewSyntheticTests):
-    # unittest also executes inherited baseline tests, intentionally.
+class AdapterIntegrationTests(unittest.TestCase):
+    # Reuse fixture helpers without inheriting/repeating the baseline tests.
+    setUp = DocumentReviewSyntheticTests.setUp
+    tearDown = DocumentReviewSyntheticTests.tearDown
+    upload = DocumentReviewSyntheticTests.upload
+    approve = DocumentReviewSyntheticTests.approve
+    events = DocumentReviewSyntheticTests.events
     def test_stage1_missing_document_fails_closed(self):
         with self.assertRaises(review.ReviewError):
             adapter.guard_first_stage(self.db, APP)

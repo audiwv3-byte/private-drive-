@@ -127,7 +127,10 @@ class ReviewTests(unittest.TestCase):
 
     def test_unknown_side_and_nonexisting_applicant_rejected(self):
         with self.assertRaises(review.ReviewError):
-            self.decide("not_a_side")
+            review.decide(
+                self.conn, applicant=101, side="not_a_side", action="approved",
+                reviewer_id=9001, expected_sha256="a"*64,
+            )
         with self.assertRaisesRegex(review.ReviewError, "не найдена"):
             review.decide(
                 self.conn, applicant=999, side="portrait",

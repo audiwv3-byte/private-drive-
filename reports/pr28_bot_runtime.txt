@@ -1,7 +1,9 @@
 ENDPOINT always_on/ HTTP 200
 ITEMS always_on/ 1
+FIELDS always_on/ can_delete,can_disable,can_edit,can_enable,can_restart,command,description,enabled,id,logfile,state,url,user
 ENDPOINT scheduled_tasks/ HTTP 404
 ITEMS scheduled_tasks/ 0
 ENDPOINT consoles/ HTTP 200
 ITEMS consoles/ 16
+FIELDS consoles/ arguments,console_frame_url,console_url,executable,id,name,user,working_directory
 BOT_RUNTIME_AUDIT_READ_ONLY_FINISHED

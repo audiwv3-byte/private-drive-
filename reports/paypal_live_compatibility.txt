@@ -1,0 +1,19 @@
+MODE READ_ONLY_GET_NO_SECRETS_NO_PAYMENTS
+FILE miniapp_server.py PRESENT 49349 141885de5c1da1b9
+FILE miniapp/templates/index.html PRESENT 261208 caa84e1698f11d04
+FILE pd_paypal_checkout.py PRESENT 5380 4b84a71211b58b95
+SERVER_SYNTAX OK
+PAYPAL_SYNTAX OK
+PAYPAL_MODULE_MATCHES_REVIEWED_PR True
+COMPAT paypal_not_yet_integrated OK
+COMPAT server_import_anchor OK
+COMPAT server_stripe_anchor OK
+COMPAT server_payment_route OK
+COMPAT payment_json_anchor OK
+COMPAT html_payment_ui OK
+COMPAT html_cryptonotice OK
+COMPAT html_new_booking OK
+COMPAT no_existing_paypal OK
+COMPAT staging_mode_does_not_activate OK
+DEPLOYMENT_BLOCKED_DEFAULT
+STAGING_OVERLAY_PRECONDITIONS_OK

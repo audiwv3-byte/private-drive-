@@ -15,6 +15,7 @@ import sqlite3
 import sys
 import tempfile
 import types
+import traceback
 
 from flask import Flask, jsonify, request
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]))
@@ -212,4 +213,6 @@ if __name__=="__main__":
     try:main()
     except Exception as exc:
         print("ISOLATED_TEST_FAILED",type(exc).__name__,str(exc)[:150],flush=True)
+        for frame in traceback.extract_tb(exc.__traceback__)[-4:]:
+            print("FAILURE_FRAME",pathlib.Path(frame.filename).name,frame.lineno,frame.name,flush=True)
         raise SystemExit(1)

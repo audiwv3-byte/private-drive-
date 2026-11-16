@@ -1,0 +1,13 @@
+PASS PILOT_STATE_ACTIONS_AND_COORDS
+PASS UNAPPROVED_PILOT_NO_MAP_OR_TRIPS
+AssertionError [ERR_ASSERTION]: null == 32
+    at test (/home/runner/work/private-drive-/private-drive-/experimental/test_pd_pilot_cockpit_staged.cjs:62:9)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: null,
+  expected: 32,
+  operator: '==',
+  diff: 'simple'
+}
+PILOT_COCKPIT_STAGING_BLOCK

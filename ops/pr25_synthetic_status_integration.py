@@ -83,7 +83,7 @@ CREATE TABLE pd_driver_applications(telegram_id INTEGER PRIMARY KEY,status TEXT,
 CREATE TABLE pd_driver_documents(telegram_id INTEGER,side TEXT);
 INSERT INTO users VALUES(101,'Passenger','+37060000000');
 INSERT INTO pd_driver_applications VALUES(201,'approved','Pilot','+37060000001','Vilnius','Test Car','2020','TEST001',4);
-INSERT INTO pd_driver_applications VALUES(202,'pending','Unapproved','','','','','','',4);
+INSERT INTO pd_driver_applications(telegram_id,status,name,phone,city,vehicle,vehicle_year,plate,seats) VALUES(202,'pending','Unapproved','','','','','',4);
 """)
     with db(orders) as c:
         c.executescript("""

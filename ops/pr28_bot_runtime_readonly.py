@@ -22,6 +22,16 @@ def main():
             print("FIELDS",endpoint,",".join(sorted(k for k in rows[0].keys() if not any(z in k.lower() for z in ("secret","token","password","key")))),flush=True)
         for row in rows:
             if not isinstance(row,dict):continue
+            if endpoint=="always_on/":
+                task_command=str(row.get("command") or "")
+                task_desc=str(row.get("description") or "")
+                print("ALWAYS_ON_CLASS", "private_drive" if re.search(r"Euro_Baltic_Transfer|PRIVATE_DRIVE_MiniApp|euro_baltic_transfer",task_command+" "+task_desc,re.I) else "other_or_unidentified",
+                    "STATE",str(row.get("state","unknown"))[:32],
+                    "CAN_RESTART",bool(row.get("can_restart")),
+                    "COMMAND_PATTERN",
+                    "python" if re.search(r"python",task_command,re.I) else "shell" if re.search(r"bash|\.sh",task_command,re.I) else "other",
+                    "PROJECT_HINTS", ",".join(z for z in ("bot","telegram","private","euro","dating","n8n") if z in (task_command+" "+task_desc).lower()) or "none",
+                    flush=True)
             value=" ".join(str(row.get(k,"")) for k in ("command","description","executable","arguments","name","command_line","task","console_name"))
             if re.search(r"Euro_Baltic_Transfer|dating_lithuania|private_drive|miniapp_server|telegram",value,re.I):
                 # Only disclose matched classification; redact source command and env.

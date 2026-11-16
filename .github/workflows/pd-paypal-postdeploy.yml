@@ -1,0 +1,31 @@
+name: PRIVATE DRIVE - verify dormant PayPal deployment and privacy
+on:
+  push:
+    branches: [ops/paypal-readonly-live-audit-20261116]
+    paths:
+      - .github/workflows/pd-paypal-postdeploy.yml
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify deployed code, public pages and anonymous access (GET only)
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: python ops/pd_paypal_postdeploy_verify.py > reports/postdeploy_status.txt
+      - name: Persist sanitized status report on audit branch
+        if: always()
+        run: |
+          if [ -f reports/postdeploy_status.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/postdeploy_status.txt
+            git commit -m "audit: persist production PayPal rollout verification" || true
+            git push origin HEAD:ops/paypal-readonly-live-audit-20261116
+          fi

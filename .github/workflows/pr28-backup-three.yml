@@ -1,0 +1,39 @@
+name: PRIVATE DRIVE - PR28 verified source-only backup
+on:
+  push:
+    branches: [audit/selected-launch-updates-20261116]
+    paths:
+      - ops/pr28_backup_three_live_sources.py
+      - .github/workflows/pr28-backup-three.yml
+permissions:
+  contents: write
+concurrency:
+  group: private-drive-pr28-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile
+        run: python -m py_compile ops/pr28_backup_three_live_sources.py
+      - name: Create three private backups and verify SHA256 using GET readback
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: |
+          mkdir -p reports
+          python ops/pr28_backup_three_live_sources.py > reports/pr28_three_backup_readback.txt
+      - name: Record path/hash metadata only
+        if: always()
+        run: |
+          if [ -f reports/pr28_three_backup_readback.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pr28_three_backup_readback.txt
+            git commit -m "ops: record verified PR28 source backup paths and sha256" || true
+            git push origin HEAD:audit/selected-launch-updates-20261116
+          fi

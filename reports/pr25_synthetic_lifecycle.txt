@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/runner/work/private-drive-/private-drive-/ops/pr25_synthetic_status_integration.py", line 20, in <module>
+    from ops.pr25_live_overlay_dryrun import get_live, add_admin_guard, secure_trip_runtime, secure_server_tail, verify_ast
+ModuleNotFoundError: No module named 'ops'
+PR25_SYNTHETIC_LIFECYCLE_FAILED

@@ -385,6 +385,8 @@ def admin_status():
     d = request.get_json(force=True)
     oid = int(d.get('id', 0))
     target = str(d.get('status', ''))
+    if target in ('В пути', 'Выполнена'):
+        raise ValueError('Переходы поездки выполняются только через диспетчерскую с причиной действия и проверками V4')
     transitions = {
         'Новая': {'Подтверждена', 'Отменена'},
         'Подтверждена': {'В пути', 'Отменена'},
@@ -921,3 +923,7 @@ pd_crypto_manual.register(app, core, auth, cents_for_order)
 
 import pd_tips_widget
 pd_tips_widget.register(app)
+
+# Install after ALL routes are registered; the legacy pilot endpoint must never
+# bypass the V4 state machine (arrival, paid fare, timings and completion).
+pd_trip_runtime_v4.secure_legacy_status_route(app)

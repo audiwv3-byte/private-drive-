@@ -1,0 +1,4 @@
+PASS legacy pilot endpoint delegates to unified V4 transition
+PASS unrecognized pilot state changes rejected
+PASS route initialization fails closed if endpoint missing
+STATUS_GUARD_UNIT_PASSED

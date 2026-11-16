@@ -6,7 +6,7 @@ const $id=id=>document.getElementById(id);
 const euros=c=>(Number(c||0)/100).toFixed(2)+' €';
 const clock=s=>s===null||s===undefined?'—':Math.floor(s/3600)+':'+String(Math.floor(s%3600/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
 const when=t=>t?new Date(t*1000).toLocaleString(window.PD_LANG||'ru',{timeZone:'Europe/Vilnius'}):'—';
-let root=null,list=null,panel=null,filter='all',query='',day='',cursor=null,selected=null,record=null,currentTab='overview',dirty=false,busy=false,lastLoaded=0,searchTimer=null;
+let root=null,list=null,panel=null,filter='all',query='',day='',cursor=null,selected=null,record=null,currentTab='overview',dirty=false,busy=false,pendingRender=null,lastLoaded=0,searchTimer=null;
 const statusNames={all:text('Все','All','Visi'),unpaid:text('Не оплачены','Unpaid','Neapmokėti'),unassigned:text('Без пилота','Unassigned','Nepriskirti'),waiting:text('Ожидание','Waiting','Laukimas')};
 const titles={overview:text('Обзор','Overview','Apžvalga'),route:text('Маршрут','Route','Maršrutas'),time:text('Время','Timing','Laikas'),pilot:text('Пилот','Pilot','Pilotas'),money:text('Оплата','Payment','Mokėjimas'),history:text('История','History','Istorija')};
 function el(tag,content,className){const n=document.createElement(tag);if(content!==undefined)n.textContent=content;if(className)n.className=className;return n}
@@ -17,7 +17,9 @@ function contact(parent,label,value,href){if(!value)return;const row=el('p');row
 function internalFinance(){showLegacy();$id('pdTabFinance')?.click()}
 function showLegacy(){if(root)root.hidden=true;$id('step10')?.classList.remove('pda-console-active');$id('pdAdminConsoleReturnV4')?.removeAttribute('hidden')}
 async function renderList(append=false){
- if(busy||!root||root.hidden)return;busy=true;
+ if(!root||root.hidden)return;
+ if(busy){pendingRender=append&&pendingRender!==false?true:false;return;}
+ busy=true;
  try{
   const params=new URLSearchParams({q:query,status:filter,limit:'25'});if(day)params.set('date',day);if(append&&cursor)params.set('before',cursor);
   const d=await api('/api/admin/console/orders?'+params);cursor=d.next_before;
@@ -38,9 +40,9 @@ async function renderList(append=false){
   $id('pdAdminMoreV4').hidden=!cursor;
   $id('pdAdminStatsV4').replaceChildren();
   const stats=[['Новая',text('Новые','New','Nauji')],['Подтверждена',text('Подтверждены','Confirmed','Patvirtinti')],['В пути',text('В пути','Driving','Kelyje')],['unpaid',text('Не оплачены','Unpaid','Neapmokėti')]];
-  for(const[key,label]of stats){const b=btn('',()=>{filter=key;$id('pdAdminStatusV4').value=key;return renderList()});b.className='pda-stat';b.append(el('strong',String(key==='unpaid'?d.unpaid:d.counts[key]||0)),el('span',label));$id('pdAdminStatsV4').append(b)}
+  for(const[key,label]of stats){const b=btn('',()=>{filter=key;cursor=null;query='';day='';$id('pdAdminStatusV4').value=key;$id('pdAdminSearchV4').value='';$id('pdAdminDayV4').value='';return renderList()});b.className='pda-stat';b.append(el('strong',String(key==='unpaid'?d.unpaid:d.counts[key]||0)),el('span',label));$id('pdAdminStatsV4').append(b)}
   lastLoaded=Date.now();$id('pdAdminUpdatedV4').textContent=text('Обновлено: ','Updated: ','Atnaujinta: ')+new Date(lastLoaded).toLocaleTimeString();
- }finally{busy=false}
+ }finally{busy=false;if(pendingRender!==null){const queued=pendingRender;pendingRender=null;queueMicrotask(()=>renderList(queued).catch(e=>message(e.message,true)))}}
 }
 function formField(form,label,key,value,type='text'){
  const wrap=el('label',label),input=type==='textarea'?el('textarea'):el('input');input.name=key;input.value=value??'';
@@ -111,9 +113,9 @@ function mount(){
  const heading=el('div',undefined,'pda-heading');heading.append(el('h1',text('Управление заказами','Order management','Užsakymų valdymas')));
  const actions=el('div',undefined,'pda-actions');actions.append(btn(text('Обновить список','Refresh list','Atnaujinti sąrašą'),()=>renderList()),btn(text('Финансы и настройки','Finance and settings','Finansai ir nustatymai'),internalFinance));heading.append(actions);root.append(heading);
  const stats=el('div',undefined,'pda-stats');stats.id='pdAdminStatsV4';root.append(stats);
- const filters=el('div',undefined,'pda-filters');const search=el('input');search.type='search';search.placeholder=text('№ заказа, клиент, телефон, маршрут, пилот…','Order #, customer, phone, route, pilot…','Užsakymo Nr., klientas, telefonas, maršrutas, pilotas…');search.setAttribute('aria-label',search.placeholder);search.oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{query=search.value;cursor=null;renderList()},300)};
+ const filters=el('div',undefined,'pda-filters');const search=el('input');search.id='pdAdminSearchV4';search.type='search';search.placeholder=text('№ заказа, клиент, телефон, маршрут, пилот…','Order #, customer, phone, route, pilot…','Užsakymo Nr., klientas, telefonas, maršrutas, pilotas…');search.setAttribute('aria-label',search.placeholder);search.oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{query=search.value;cursor=null;renderList()},300)};
  const select=el('select');select.id='pdAdminStatusV4';for(const key of ['all',...Object.keys(statusNames).filter(k=>k!=='all'),'Новая','Подтверждена','В пути','Выполнена','Отменена']){const o=el('option',statusNames[key]||pdL(key));o.value=key;select.append(o)}select.setAttribute('aria-label',text('Фильтр заказов','Order filter','Užsakymų filtras'));select.onchange=()=>{filter=select.value;cursor=null;renderList()};
- const date=el('input');date.type='date';date.setAttribute('aria-label',text('Дата подачи','Pickup date','Paėmimo data'));date.onchange=()=>{day=date.value;cursor=null;renderList()};filters.append(search,select,date);root.append(filters);
+ const date=el('input');date.id='pdAdminDayV4';date.type='date';date.setAttribute('aria-label',text('Дата подачи','Pickup date','Paėmimo data'));date.onchange=()=>{day=date.value;cursor=null;renderList()};filters.append(search,select,date);root.append(filters);
  const status=el('p','', 'pda-status');status.id='pdAdminUpdatedV4';root.append(status);
  const layout=el('div',undefined,'pda-layout'),left=el('div');list=el('div',undefined,'pda-orders');left.append(list);const more=btn(text('Ещё заказы','More orders','Daugiau užsakymų'),()=>renderList(true));more.id='pdAdminMoreV4';more.hidden=true;left.append(more);panel=el('section',undefined,'pda-panel');panel.append(el('h2',text('Выберите заказ','Select an order','Pasirinkite užsakymą')),el('p',text('Здесь появятся все параметры, действия и история.','Order details, actions and history appear here.','Čia bus rodomi visi duomenys, veiksmai ir istorija.')));layout.append(left,panel);root.append(layout);
  $id('step10').prepend(root);const back=btn(text('Открыть панель управления заказами','Open order console','Atidaryti užsakymų valdymą'),show);back.id='pdAdminConsoleReturnV4';back.hidden=true;$id('step10').prepend(back);

@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/home/runner/work/private-drive-/private-drive-/experimental/test_pd_web_wsgi_bridge_staged.py", line 36, in <module>
+    require(legacy.wsgi_app is saved_wsgi,"ORIGINAL_LEGACY_WSGI_UNCHANGED")
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/private-drive-/private-drive-/experimental/test_pd_web_wsgi_bridge_staged.py", line 15, in require
+    if not value:raise AssertionError(name)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ORIGINAL_LEGACY_WSGI_UNCHANGED
+WEB_WSGI_INTEGRATION_BLOCK

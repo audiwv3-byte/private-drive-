@@ -8,7 +8,7 @@ def main():
  token=re.sub(r"^Token\s+","",os.environ["PYTHONANYWHERE_API_TOKEN"].strip(),flags=re.I)
  targets={
   "DRIVER":[r"def pd_driver_apply",r"def pd_driver_decide",r"def pd_dispatcher_replace",r"photo.*(replace|review)",r"missing_document_sides",r"status='pending'",r"status=excluded.status",r"UPDATE SET image",r"stored.intersection",r"ACTIVE_SIDES",r"core.is_admin",r"document_sides"],
-  "DISPATCH":[r"let root=",r"async function renderList",r"pendingRender",r"if\\(busy",r"const stats=",r"for\\(const\\[key,label\\]of stats",r"const search=el",r"const date=el"],
+  "DISPATCH":[r"let root=",r"async function renderList",r"pendingRender",r"if\(busy",r"const stats=",r"for\\(const\\[key,label\\]of stats",r"const search=el",r"const date=el"],
   "UI":[r"function pdDocumentRefresh",r"async function pdChooseDocument",r"async function pdLoadDriverApplications",r"missing_document_sides",r"b.disabled=a.status===target",r"pdPilotCockpit",r"pd-pilot-cockpit-adapter-stage-js"]
  }
  for label,path in FILES.items():
@@ -16,7 +16,11 @@ def main():
   with urllib.request.urlopen(req,timeout=40) as r:text=r.read(700000).decode("utf8")
   lines=text.splitlines()
   print("FILE",label,"LINECOUNT",len(lines),flush=True)
-  for pat in targets[label]:
+  if label=="DRIVER":
+   for n in range(95,min(174,len(lines)+1)):
+    v=lines[n-1]
+    if not re.search(r"secret|token|password|API_KEY",v,re.I):print("DETAIL",label,n,v[:230],flush=True)
+ for pat in targets[label]:
    matches=[(i+1,v[:210]) for i,v in enumerate(lines) if re.search(pat,v,re.I)]
    print("PATTERN",label,pat,"COUNT",len(matches),flush=True)
    for number,v in matches[:4]:

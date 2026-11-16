@@ -124,6 +124,7 @@ class LivePatchIntegration(unittest.TestCase):
         sys.modules["pd_languages"] = lang
         try:
             module = types.ModuleType("pd_onboarding_synthetic_live_patch")
+            module.__file__ = __file__  # synthetic local path; no deployed file access
             exec(compile(self.patched_source, "<verified-live-in-memory>", "exec"),
                  module.__dict__)
             self.onboarding = module

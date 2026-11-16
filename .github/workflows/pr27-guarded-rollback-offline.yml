@@ -1,0 +1,40 @@
+name: PRIVATE DRIVE - pilot guarded deploy rollback offline
+on:
+  push:
+    branches: [feature/pilot-cockpit-isolated-20261116]
+    paths:
+      - ops/pr27_guarded_install_NOT_EXECUTED.py
+      - ops/test_pr27_guarded_install_offline.py
+      - .github/workflows/pr27-guarded-rollback-offline.yml
+permissions:
+  contents: write
+jobs:
+  rollback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Byte-verified recovery under partial upload and failed HTTP health
+        run: |
+          mkdir -p reports
+          python -m py_compile ops/pr27_guarded_install_NOT_EXECUTED.py
+          if python ops/test_pr27_guarded_install_offline.py > reports/pr27_rollback_offline.txt 2>&1; then
+            echo PR27_OFFLINE_ROLLBACK_PASS >> reports/pr27_rollback_offline.txt
+          else
+            echo PR27_OFFLINE_ROLLBACK_BLOCK >> reports/pr27_rollback_offline.txt
+          fi
+      - name: Save sanitized report
+        if: always()
+        run: |
+          if [ -f reports/pr27_rollback_offline.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pr27_rollback_offline.txt
+            git commit -m "test(pilot): rollback fault injection results" || true
+            git push origin HEAD:feature/pilot-cockpit-isolated-20261116
+          fi
+      - name: Require green
+        run: grep -Fqx PR27_OFFLINE_ROLLBACK_PASS reports/pr27_rollback_offline.txt

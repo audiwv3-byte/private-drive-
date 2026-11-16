@@ -33,13 +33,14 @@ def expected_response(client, url, payload, who, code, label):
 def prepare(temp,token):
     # Current live code for ALL components involved in the pilot/dispatcher state.
     files=("miniapp_server.py","pd_trip_runtime_v4.py","pd_pilot_dispatch.py",
-           "pd_admin_console_v4.py")
+           "pd_admin_console_v4.py","pd_pilot_notifications.py")
     original={name:get_live(name,token) for name in files}
     patched={}
     patched["miniapp_server.py"]=secure_server_tail(add_admin_guard(original["miniapp_server.py"]))
     patched["pd_trip_runtime_v4.py"]=secure_trip_runtime(original["pd_trip_runtime_v4.py"])
     patched["pd_pilot_dispatch.py"]=original["pd_pilot_dispatch.py"]
     patched["pd_admin_console_v4.py"]=original["pd_admin_console_v4.py"]
+    patched["pd_pilot_notifications.py"]=original["pd_pilot_notifications.py"]
     verify_ast(patched["miniapp_server.py"],patched["pd_trip_runtime_v4.py"])
     for filename,content in patched.items():
         ast.parse(content)
@@ -124,6 +125,7 @@ def main():
         def forbidden(exc):return jsonify(error=str(exc)),403
         @app.get("/api/me")
         def me():return jsonify(id=auth()[0])
+        sys.path.insert(0,str(temp))
         runtime=module("isolated_live_pd_trip_runtime_v4",temp/"pd_trip_runtime_v4.py")
         console=module("isolated_live_pd_admin_console_v4",temp/"pd_admin_console_v4.py")
         dispatch=module("isolated_live_pd_pilot_dispatch",temp/"pd_pilot_dispatch.py")

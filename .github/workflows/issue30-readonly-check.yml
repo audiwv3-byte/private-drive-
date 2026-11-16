@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/issue30-readonly-check.yml
       - pd_issue30_readonly_audit.py
+      - pd_issue30_live_ast_probe.py
       - pd_document_review.py
       - test_pd_document_review_synthetic.py
   workflow_dispatch:
@@ -46,3 +47,4 @@ jobs:
             exit 0
           fi
           python pd_issue30_readonly_audit.py
+          python pd_issue30_live_ast_probe.py

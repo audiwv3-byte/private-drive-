@@ -115,8 +115,14 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     assert check(call(f'/api/admin/bank-transfers/{oid}/received',receipt,uid=999),200)['replayed']
     assert core.order_find(oid)['payment_status']=='Оплачено'
     print('PASS bank payment: owner access, claim distinct from receipt, exact amount, admin-only confirmation, duplicate safety and stale Telegram buttons')
+    # Old dispatcher status API must not bypass arrival, start and finish V4 safeguards.
     for target in ['В пути','Выполнена']:
-        check(call('/api/admin/status',{'id':oid,'status':target},uid=999),200)
+        check(call('/api/admin/status',{'id':oid,'status':target},uid=999),400)
+    assert core.order_find(oid)['status']=='Подтверждена'
+    # This is an isolated, temporary SQLite fixture only: establish a completed
+    # order for the independent review UI test, without invoking production APIs.
+    with core.db(core.ORDERS_DB) as db:
+        db.execute("UPDATE orders SET status='Выполнена' WHERE id=?",(oid,))
     check(call(f'/api/orders/{oid}/review',{'stars':5,'comment':'Test'}),200)
     orders=check(call('/api/orders'),200)['orders']
     assert orders[0]['review_stars']==5 and orders[0]['status']=='Выполнена'

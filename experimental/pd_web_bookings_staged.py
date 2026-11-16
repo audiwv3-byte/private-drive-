@@ -84,6 +84,6 @@ def add_staged_web_bookings(app,database,*,origin):
                 FROM web_bookings_test WHERE id=? AND owner_web_id=?""",
                 (booking_id,row["web_id"])).fetchone()
         if not booking:return failure("Not found",404)
-        return jsonify(dict(booking),checkout_enabled=False,
-                       message="Payment integration not enabled in staging")
+        return jsonify({**dict(booking),"checkout_enabled":False,
+                       "message":"Payment integration not enabled in staging"})
     return app

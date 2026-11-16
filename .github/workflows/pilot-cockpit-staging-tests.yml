@@ -1,0 +1,40 @@
+name: PRIVATE DRIVE - isolated pilot cockpit regression
+on:
+  push:
+    branches: [feature/pilot-cockpit-isolated-20261116]
+    paths:
+      - experimental/pd_pilot_cockpit_staged.js
+      - experimental/test_pd_pilot_cockpit_staged.cjs
+      - .github/workflows/pilot-cockpit-staging-tests.yml
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compile and exercise fully synthetic cockpit
+        run: |
+          mkdir -p reports
+          node --check experimental/pd_pilot_cockpit_staged.js
+          if node experimental/test_pd_pilot_cockpit_staged.cjs > reports/pilot_cockpit_staging.txt 2>&1; then
+            echo 'PILOT_COCKPIT_STAGING_PASS' >> reports/pilot_cockpit_staging.txt
+          else
+            echo 'PILOT_COCKPIT_STAGING_BLOCK' >> reports/pilot_cockpit_staging.txt
+          fi
+      - name: Save outcomes
+        if: always()
+        run: |
+          if [ -f reports/pilot_cockpit_staging.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pilot_cockpit_staging.txt
+            git commit -m "test: cockpit offline results" || true
+            git push origin HEAD:feature/pilot-cockpit-isolated-20261116
+          fi
+      - name: Verify results
+        run: grep -Fqx 'PILOT_COCKPIT_STAGING_PASS' reports/pilot_cockpit_staging.txt

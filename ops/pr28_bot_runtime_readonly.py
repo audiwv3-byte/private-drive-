@@ -18,9 +18,11 @@ def main():
         rows=data if isinstance(data,list) else data.get("results",[]) if isinstance(data,dict) else []
         if not isinstance(rows,list):rows=[]
         print("ITEMS",endpoint,len(rows),flush=True)
+        if rows and isinstance(rows[0],dict):
+            print("FIELDS",endpoint,",".join(sorted(k for k in rows[0].keys() if not any(z in k.lower() for z in ("secret","token","password","key")))),flush=True)
         for row in rows:
             if not isinstance(row,dict):continue
-            value=" ".join(str(row.get(k,"")) for k in ("command","description","executable","arguments","name"))
+            value=" ".join(str(row.get(k,"")) for k in ("command","description","executable","arguments","name","command_line","task","console_name"))
             if re.search(r"Euro_Baltic_Transfer|dating_lithuania|private_drive|miniapp_server|telegram",value,re.I):
                 # Only disclose matched classification; redact source command and env.
                 kind="private_drive_bot" if "Euro_Baltic_Transfer" in value else "project_related"

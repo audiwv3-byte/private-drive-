@@ -1,0 +1,41 @@
+name: PRIVATE DRIVE - PR25 rollback failure injection offline
+on:
+  push:
+    branches: [ops/pr25-live-overlay-dryrun-20261116]
+    paths:
+      - ops/test_pr25_rollback_injection.py
+      - ops/pr25_guarded_deploy_NOT_EXECUTED.py
+      - .github/workflows/pr25-rollback-injection.yml
+permissions:
+  contents: write
+jobs:
+  rollback-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile rollback code and tests (no production connections)
+        run: python -m py_compile ops/pr25_guarded_deploy_NOT_EXECUTED.py ops/test_pr25_rollback_injection.py
+      - name: Inject simulated upload and reload faults on temporary filesystem
+        run: |
+          mkdir -p reports
+          if python ops/test_pr25_rollback_injection.py > reports/pr25_rollback_fault_test.txt 2>&1; then
+            echo PR25_ROLLBACK_FAULT_INJECTION_PASSED >> reports/pr25_rollback_fault_test.txt
+          else
+            echo PR25_ROLLBACK_FAULT_INJECTION_FAILED >> reports/pr25_rollback_fault_test.txt
+          fi
+      - name: Save test result to isolated audit branch
+        if: always()
+        run: |
+          if [ -f reports/pr25_rollback_fault_test.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pr25_rollback_fault_test.txt
+            git commit -m "test(pr25): record offline rollback failure injection" || true
+            git push origin HEAD:ops/pr25-live-overlay-dryrun-20261116
+          fi
+      - name: Require both failures and safe manual intervention detection
+        run: grep -Fqx "PR25_ROLLBACK_FAULT_INJECTION_PASSED" reports/pr25_rollback_fault_test.txt

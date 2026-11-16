@@ -142,7 +142,7 @@ def main():
         # Cached old bot keyboard must not be permitted after options removal.
         tree=ast.parse(bot)
         targets=[n for n in ast.walk(tree) if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="options" for t in n.targets) and isinstance(n.value,ast.Dict)]
-        allowed=[n.value for n in targets if any(isinstance(k,ast.Constant) and k.value=="💳 Безналичная" for k in n.keys)]
+        allowed=[n.value for n in targets if any(isinstance(k,ast.Constant) and k.value=="💳 Безналичная" for k in n.value.keys)]
         verify(len(allowed)==1,"BOT_PAYMENT_WHITELIST_FOUND")
         menu=ast.literal_eval(allowed[0])
         verify("💶 Наличные" not in menu and "💳 Безналичная" in menu,"OLD_TELEGRAM_CASH_BUTTON_REJECTED")

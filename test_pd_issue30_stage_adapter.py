@@ -4,16 +4,19 @@ import unittest
 
 import pd_document_review as review
 import pd_issue30_stage_adapter as adapter
-from test_pd_document_review_synthetic import DocumentReviewSyntheticTests, APP, ADMIN
+import test_pd_document_review_synthetic as fixtures
+
+APP = fixtures.APP
+ADMIN = fixtures.ADMIN
 
 
 class AdapterIntegrationTests(unittest.TestCase):
     # Reuse fixture helpers without inheriting/repeating the baseline tests.
-    setUp = DocumentReviewSyntheticTests.setUp
-    tearDown = DocumentReviewSyntheticTests.tearDown
-    upload = DocumentReviewSyntheticTests.upload
-    approve = DocumentReviewSyntheticTests.approve
-    events = DocumentReviewSyntheticTests.events
+    setUp = fixtures.DocumentReviewSyntheticTests.setUp
+    tearDown = fixtures.DocumentReviewSyntheticTests.tearDown
+    upload = fixtures.DocumentReviewSyntheticTests.upload
+    approve = fixtures.DocumentReviewSyntheticTests.approve
+    events = fixtures.DocumentReviewSyntheticTests.events
     def test_stage1_missing_document_fails_closed(self):
         with self.assertRaises(review.ReviewError):
             adapter.guard_first_stage(self.db, APP)

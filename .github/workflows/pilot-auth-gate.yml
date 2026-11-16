@@ -1,0 +1,38 @@
+name: PRIVATE DRIVE - isolated pilot authorization gate
+on:
+  push:
+    branches: [ops/pilot-auth-regression-20261116]
+    paths:
+      - .github/workflows/pilot-auth-gate.yml
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements-runtime.lock.txt
+      - name: Run Telegram signature authorization, role and private order tests
+        run: |
+          mkdir -p reports
+          if python test_release_validation.py > /tmp/pd_pilot_auth_validation.log 2>&1; then
+            grep '^PASS\|^ALL RELEASE CHECKS' /tmp/pd_pilot_auth_validation.log > reports/pilot_auth_gate.txt || true
+            echo 'PILOT_AUTH_GATE_PASSED' >> reports/pilot_auth_gate.txt
+          else
+            echo 'PILOT_AUTH_GATE_FAILED' > reports/pilot_auth_gate.txt
+            exit 1
+          fi
+      - name: Persist sanitized result for review
+        if: always()
+        run: |
+          if [ -f reports/pilot_auth_gate.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pilot_auth_gate.txt
+            git commit -m "test: record isolated passenger and role authorization result" || true
+            git push origin HEAD:ops/pilot-auth-regression-20261116
+          fi

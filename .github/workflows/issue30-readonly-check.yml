@@ -9,6 +9,7 @@ on:
       - pd_issue30_readonly_audit.py
       - pd_issue30_live_ast_probe.py
       - pd_issue30_live_transition_probe.py
+      - pd_issue30_live_schema_probe.py
       - pd_document_review.py
       - test_pd_document_review_synthetic.py
       - pd_issue30_stage_adapter.py
@@ -52,3 +53,4 @@ jobs:
           python pd_issue30_readonly_audit.py
           python pd_issue30_live_ast_probe.py
           python pd_issue30_live_transition_probe.py
+          python pd_issue30_live_schema_probe.py

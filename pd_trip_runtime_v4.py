@@ -342,6 +342,7 @@ def register(app, core, auth, provider=None, clock=None):
             app.view_functions[rule.endpoint] = timed_work
 
     app.config['PD_TRIP_TRANSITION_V4'] = transition
+    app.config['PD_TRIP_AUTH_V4'] = auth
     register_payments(app, core, auth, provider, clock, row, attach, pilot, notify)
 
 
@@ -583,3 +584,36 @@ def register_payments(app, core, auth, provider, clock, order_row, attach, pilot
             if endpoint == 'status' and d.get('status') in ('В пути', 'Выполнена') and p['state'] == 'paid':
                 return
             raise ValueError('Для нового карточного сценария используйте принятие заявки и сверку оплаты V4')
+
+
+def secure_legacy_status_route(app):
+    """Bind the legacy pilot endpoint to the V4 state machine after route registration.
+
+    Fail closed on missing/duplicate routes. Does not alter any booking during
+    registration and requires the usual authenticated pilot on actual calls.
+    """
+    transition = app.config.get('PD_TRIP_TRANSITION_V4')
+    if not callable(transition):
+        raise RuntimeError('Trip status transition engine is not registered')
+    rules = [rule for rule in app.url_map.iter_rules()
+             if rule.rule == '/api/driver/work/<int:oid>/status' and 'POST' in rule.methods]
+    if len(rules) != 1:
+        raise RuntimeError('Expected exactly one legacy pilot status route')
+    endpoint = rules[0].endpoint
+
+    def guarded_legacy_status(oid):
+        payload = request.get_json(silent=True) or {}
+        target = payload.get('status') if isinstance(payload, dict) else None
+        action = {'В пути': 'start', 'Выполнена': 'finish'}.get(target)
+        if not action:
+            raise ValueError('Недопустимый статус')
+        # The shared transition validates assigned/approved pilot, payment,
+        # arrival, start, extras and finish inside its own transaction.
+        auth = app.config.get('PD_TRIP_AUTH_V4')
+        if not callable(auth):
+            raise RuntimeError('Trip authorization is not configured')
+        uid, _ = auth()
+        return jsonify(transition(oid, action, uid))
+
+    app.view_functions[endpoint] = guarded_legacy_status
+    app.config['PD_TRIP_LEGACY_STATUS_SECURED'] = True

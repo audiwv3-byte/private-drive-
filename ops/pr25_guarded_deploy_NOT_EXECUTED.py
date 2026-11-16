@@ -117,10 +117,14 @@ def main():
     old,new=plan(token)
     # Backups must be fully uploaded and readback-verified before touching
     # production. Names are unique per release attempt.
+    # Flat unique filenames inside an existing verified backup directory.
+    # PythonAnywhere's file-upload API does not guarantee parent creation.
     backup="/home/wilsonpark/private_drive_backups/pr25_"+datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
+    def backup_path(kind,name):
+        return backup+"__"+kind+"__"+name
     for name in TARGETS:
-        upload(backup+"/original/"+name,old[name],token)
-        upload(backup+"/candidate/"+name,new[name],token)
+        upload(backup_path("original",name),old[name],token)
+        upload(backup_path("candidate",name),new[name],token)
     print("BACKUPS_AND_CANDIDATES_VERIFIED",backup,flush=True)
     # Re-read to prevent overwriting another operator's changes during backup.
     for name in TARGETS:
@@ -160,7 +164,7 @@ def main():
                         continue
                     print("PARTIAL_UPLOAD_IDENTIFIED",name,flush=True)
                 # The stored original must still be intact before restoring.
-                backup_bytes=read(backup+"/original/"+name,token)
+                backup_bytes=read(backup_path("original",name),token)
                 if sha(backup_bytes)!=sha(old[name]):
                     errors.append("ROLLBACK_BACKUP_HASH_MISMATCH_"+name)
                     continue

@@ -17,6 +17,9 @@ class AdapterIntegrationTests(unittest.TestCase):
     upload = fixtures.DocumentReviewSyntheticTests.upload
     approve = fixtures.DocumentReviewSyntheticTests.approve
     events = fixtures.DocumentReviewSyntheticTests.events
+
+    def submit_stage2(self):
+        self.db.execute('UPDATE pd_driver_applications SET stage=2 WHERE telegram_id=?', (APP,))
     def test_stage1_missing_document_fails_closed(self):
         with self.assertRaises(review.ReviewError):
             adapter.guard_first_stage(self.db, APP)
@@ -35,6 +38,7 @@ class AdapterIntegrationTests(unittest.TestCase):
     def test_final_requires_verified_stage2_submission(self):
         for side in review.FIRST + review.SECOND:
             self.approve(side)
+        self.submit_stage2()
         for evidence in (None, False, 1, "true"):
             with self.subTest(evidence=evidence):
                 with self.assertRaises(adapter.IntegrationNotReady):
@@ -44,6 +48,7 @@ class AdapterIntegrationTests(unittest.TestCase):
     def test_final_rejected_document_blocks(self):
         for side in review.FIRST + review.SECOND:
             self.approve(side)
+        self.submit_stage2()
         side = review.SECOND[0]
         self.db.execute("UPDATE pd_document_reviews SET status='rejected' "
                         "WHERE telegram_id=? AND side=?", (APP, side))
@@ -53,7 +58,14 @@ class AdapterIntegrationTests(unittest.TestCase):
     def test_final_stale_photo_blocks(self):
         for side in review.FIRST + review.SECOND:
             self.approve(side)
+        self.submit_stage2()
         self.upload(review.SECOND[0], b"different synthetic bytes")
+        with self.assertRaises(review.ReviewError):
+            adapter.guard_final_stage(self.db, APP, True)
+
+    def test_final_stage1_pending_rejected(self):
+        for side in review.FIRST + review.SECOND:
+            self.approve(side)
         with self.assertRaises(review.ReviewError):
             adapter.guard_final_stage(self.db, APP, True)
 

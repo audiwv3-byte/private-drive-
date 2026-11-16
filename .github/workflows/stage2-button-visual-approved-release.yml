@@ -1,0 +1,54 @@
+name: PRIVATE DRIVE - stage2 disabled approval visual approved onefile release
+on:
+  push:
+    branches: [fix/driver-approval-photo-rights-admin-filters-20261116]
+    paths:
+      - .github/workflows/stage2-button-visual-approved-release.yml
+permissions:
+  contents: write
+concurrency:
+  group: pd-stage2-disabled-button-production-html
+  cancel-in-progress: false
+jobs:
+  install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Repeat production HTML pinned dryrun and backend protection GET only
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: |
+          python ops/stage2_button_visual_live_dryrun.py
+      - name: Repeat synthetic rollback protection
+        run: |
+          python ops/test_stage2_button_visual_rollback.py
+      - name: Upload one approved HTML file with verified backup and rollback
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+          PD_APPROVED_STAGE2_VISUAL: 'YES'
+        run: |
+          mkdir -p reports
+          if python ops/stage2_button_visual_guarded_release.py --execute > reports/stage2_button_visual_production_release.txt 2>&1; then
+            echo STAGE2_VISUAL_PRODUCTION_RELEASE_SUCCESS >> reports/stage2_button_visual_production_release.txt
+          else
+            echo STAGE2_VISUAL_PRODUCTION_RELEASE_FAILED >> reports/stage2_button_visual_production_release.txt
+          fi
+      - name: Save exact result backup locations SHA without secret
+        if: always()
+        run: |
+          if [ -f reports/stage2_button_visual_production_release.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/stage2_button_visual_production_release.txt
+            git commit -m "release(stage2): store visual button rollout status" || true
+            git push origin HEAD:fix/driver-approval-photo-rights-admin-filters-20261116
+          fi
+      - name: Require verified successful deployment
+        run: grep -Fqx STAGE2_VISUAL_PRODUCTION_RELEASE_SUCCESS reports/stage2_button_visual_production_release.txt

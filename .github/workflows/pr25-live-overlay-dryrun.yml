@@ -1,0 +1,42 @@
+name: PRIVATE DRIVE - PR25 live overlay read-only dry run
+on:
+  push:
+    branches: [ops/pr25-live-overlay-dryrun-20261116]
+    paths:
+      - .github/workflows/pr25-live-overlay-dryrun.yml
+      - ops/pr25_live_overlay_dryrun.py
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated test dependencies
+        run: pip install -r requirements-runtime.lock.txt
+      - name: Simulate tiny patch against current production code (GET only)
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: |
+          mkdir -p reports
+          if python ops/pr25_live_overlay_dryrun.py > reports/pr25_live_overlay_result.txt 2>&1; then
+            echo PR25_LIVE_OVERLAY_DRYRUN_PASSED >> reports/pr25_live_overlay_result.txt
+          else
+            echo PR25_LIVE_OVERLAY_DRYRUN_FAILED >> reports/pr25_live_overlay_result.txt
+          fi
+      - name: Save only sanitized statuses, never production source
+        if: always()
+        run: |
+          if [ -f reports/pr25_live_overlay_result.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pr25_live_overlay_result.txt
+            git commit -m "test: record non-mutating live PR25 overlay verification" || true
+            git push origin HEAD:ops/pr25-live-overlay-dryrun-20261116
+          fi
+      - name: Gate deployment until all checks pass
+        run: grep -q '^PR25_LIVE_OVERLAY_DRYRUN_PASSED$' reports/pr25_live_overlay_result.txt

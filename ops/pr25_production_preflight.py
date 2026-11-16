@@ -3,7 +3,7 @@
 Prints only source hashes, anchor counts, route-order checks, and mode.
 Does not inspect .env, credentials, orders, payments, customer records.
 """
-import ast, hashlib, os, re, urllib.request
+import ast, hashlib, os, re, urllib.request, urllib.error
 ROOT="/home/wilsonpark/euro_baltic_transfer/PRIVATE_DRIVE_MiniApp_2026_10_18/"
 API="https://www.pythonanywhere.com/api/v0/user/wilsonpark/files/path"
 FILES=("miniapp_server.py","pd_trip_runtime_v4.py")
@@ -34,7 +34,6 @@ def main():
     if not all(gates.values()):raise RuntimeError("RELEASE_GATE_FAILED")
     # Verify pre-existing backup destination via GET only; deployment must not
     # assume PythonAnywhere accepts uploads to a non-existent parent directory.
-    import urllib.error
     backup_dir="https://www.pythonanywhere.com/api/v0/user/wilsonpark/files/path/home/wilsonpark/private_drive_backups/"
     try:
         request=urllib.request.Request(backup_dir,headers={"Authorization":"Token "+token},method="GET")

@@ -17,6 +17,7 @@ import tempfile
 import types
 
 from flask import Flask, jsonify, request
+sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]))
 from ops.pr25_live_overlay_dryrun import get_live, add_admin_guard, secure_trip_runtime, secure_server_tail, verify_ast
 
 def ensure(cond, label):

@@ -1,0 +1,25 @@
+name: PRIVATE DRIVE issue30 - document review offline tests
+on:
+  push:
+    branches: [feature/issue-30-document-review-offline-20261117]
+    paths:
+      - pd_document_review.py
+      - ops/test_pd_document_review_offline.py
+      - .github/workflows/issue30-document-review-tests.yml
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated Flask test dependency
+        run: python -m pip install Flask==3.1.2
+      - name: Compile module and run synthetic SQLite and Flask tests only
+        run: |
+          python -m py_compile pd_document_review.py ops/test_pd_document_review_offline.py
+          python ops/test_pd_document_review_offline.py

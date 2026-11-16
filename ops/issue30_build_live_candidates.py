@@ -57,6 +57,11 @@ def patch_onboarding(src):
             for side,image in photos.items():
                 c.execute('INSERT INTO pd_driver_documents""","PILOT_DOCUMENT_REPLACEMENT_RIGHTS")
  src=unique(src,
+  "            if target=='approved' and r['status']!='approved':",
+  """            if target=='approved' and r['status']!='approved':
+                if r['status']=='stage2':
+                    raise ValueError('Дождитесь заполнения второго этапа водителем')""","STAGE2_EARLY_REFUSAL")
+ src=unique(src,
   "                if r['stage']==1:target='stage2'",
   """                pd_document_review.require_approved_documents(c,applicant,int(r['stage']))
                 if r['stage']==1:target='stage2'""","APPROVAL_GATE")

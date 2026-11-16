@@ -338,7 +338,51 @@ function showEstimate(){$('estimate').innerHTML=routeInfo?.available?pdTpl`<stro
 function showSummary(){$('summary').innerHTML=`<div class="item">🚘 ${roundtrip?pdL("Туда и обратно"):pdL("В одну сторону")}</div><div class="item">📍 ${escapeHtml(v('origin'))} → ${escapeHtml(v('destination'))}</div><div class="item">📅 ${escapeHtml(v('date'))} ${escapeHtml(v('time'))}</div><div class="item">📝 ${escapeHtml(v('wishes')||pdL("Нет пожеланий"))}</div><div class="item">💶 ${routeInfo?.price?escapeHtml(routeInfo.price)+' €':pdL("По согласованию")}</div>`;}
 async function submitOrder(){if(!initData)return message(pdL("Откройте приложение через кнопку Telegram-бота"),true);let b=$('submitButton');b.disabled=true;try{let name=v('name'),phone=v('phone');await api('/api/register',{name,phone});let date=v('date').split('-').reverse().join('.');let r=await api('/api/order',{origin:v('origin'),destination:v('destination'),trip_date:date,trip_time:v('time'),roundtrip,details:v('wishes'),payment_method:v('payMethod')});lastOrder=r.order_id;$('done').textContent=pdTpl`Заявка №${r.order_id} принята. Цена: ${r.price?r.price+' €':pdL("по согласованию")}. Ожидайте подтверждения пилотом.`;go(7)}catch(e){message(pdL(e.message),true)}finally{b.disabled=false}}
 async function loadOrders(){try{let r=await api('/api/orders');$('orders').innerHTML=r.orders.length?r.orders.map(o=>pdTpl`<div class="item"><b>№${o.id}</b> · ${escapeHtml(pdL(o.status))}<br>${escapeHtml(o.origin)} → ${escapeHtml(o.destination)}<br>${escapeHtml(o.trip_date)} ${escapeHtml(o.trip_time)} · ${escapeHtml(o.price||pdL("Цена уточняется"))} €<br><small>${escapeHtml(pdL(o.payment_status))}</small><br><button class="secondary" onclick="openPay(${o.id})">Оплата / детали</button></div>`).join(''):pdL("Заказов пока нет")}catch(e){message(pdL(e.message),true)}}
-async function openPay(id){try{let p=await api('/api/payment/'+id);$('paymentBox').classList.remove('hidden');let x=$('paymentContent');if(p.status!=='Подтверждена'){x.textContent=pdL("Ожидайте подтверждения пилотом");return}if(!p.price){x.textContent=pdL("Цена ещё не согласована");return}x.innerHTML=pdTpl`<p>Заказ №${id} · ${escapeHtml(p.price)} €</p><button class="pay-choice" onclick="cashNotice()">💶 Наличными</button><button class="pay-choice" onclick="cryptoNotice(${id})">₿ Криптовалютой</button><div id="paymentDetail"></div>`;window.currentPayment=p}catch(e){message(pdL(e.message),true)}}
+async function openPay(id){try{let p=await api('/api/payment/'+id);$('paymentBox').classList.remove('hidden');let x=$('paymentContent');if(p.status!=='Подтверждена'){x.textContent=pdL("Ожидайте подтверждения пилотом");return}if(!p.price){x.textContent=pdL("Цена ещё не согласована");return}x.innerHTML=pdTpl`<p>Заказ №${id} · ${escapeHtml(p.price)} €</p><button class="pay-choice" onclick="cashNotice()">💶 Наличными</button><button class="pay-choice" onclick="cryptoNotice(${id})">₿ Криптовалютой</button>${p.paypal_available?'<button class="pay-choice" onclick="paypalNotice()">💙 PayPal</button>':''}<div id="paymentDetail"></div>`;window.currentPayment=p}catch(e){message(pdL(e.message),true)}}
+// PayPal is available only for a confirmed, priced order when server settings
+// explicitly enable it. The server creates the PayPal order and verifies capture.
+async function pdPaypalSdk(clientId){
+ if(window.paypal?.Buttons)return window.paypal;
+ if(window.pdPaypalSdkLoading)return window.pdPaypalSdkLoading;
+ window.pdPaypalSdkLoading=new Promise((resolve,reject)=>{
+   const script=document.createElement('script');
+   script.src='https://www.paypal.com/sdk/js?client-id='+encodeURIComponent(clientId)+'&currency=EUR&intent=capture';
+   script.async=true;
+   script.onload=()=>window.paypal?.Buttons?resolve(window.paypal):reject(Error('PayPal SDK unavailable'));
+   script.onerror=()=>reject(Error('PayPal SDK failed to load'));
+   document.head.appendChild(script);
+ });
+ try{return await window.pdPaypalSdkLoading}
+ catch(e){window.pdPaypalSdkLoading=null;throw e}
+}
+async function paypalNotice(){
+ const p=window.currentPayment,box=$('paymentDetail');
+ if(!p||!box)return;
+ box.replaceChildren();box.textContent='Подключаем защищённую оплату PayPal…';
+ try{
+  const cfg=await api('/api/payment/'+p.id+'/paypal/config');
+  if(!cfg.enabled||!cfg.client_id)throw Error('PayPal пока недоступен');
+  const paypal=await pdPaypalSdk(cfg.client_id);
+  box.replaceChildren();
+  const host=document.createElement('div');host.id='pdPaypalButtons';box.appendChild(host);
+  const notice=document.createElement('p');notice.textContent='Вы перейдёте к подтверждению оплаты PayPal. Сумма подтверждается диспетчером.';box.appendChild(notice);
+  await paypal.Buttons({
+    createOrder:async()=>{
+     const r=await api('/api/payment/'+p.id+'/paypal/create',{});
+     if(!r.id)throw Error('Не удалось создать платёж PayPal');
+     return r.id;
+    },
+    onApprove:async(data)=>{
+     const r=await api('/api/payment/'+p.id+'/paypal/capture',{paypal_order_id:data.orderID});
+     if(!r.ok)throw Error('Не удалось подтвердить оплату');
+     box.textContent='✅ PayPal: оплата подтверждена.';
+     await loadOrders();
+    },
+    onCancel:()=>{notice.textContent='PayPal: оплата отменена, деньги не подтверждены.'},
+    onError:()=>{notice.textContent='Не удалось завершить оплату PayPal. Проверь статус заказа перед повтором.'}
+  }).render(host);
+ }catch(e){box.textContent='PayPal: '+pdL(e.message)}
+}
 async function cashNotice(){let p=window.currentPayment,box=$('paymentDetail');if(!p)return;box.textContent=pdL("Подтверждаем выбор наличных…");try{await api('/api/payment/'+p.id+'/cash',{});box.textContent=pdL("💶 Оплата наличными пилоту при поездке. Пилот подтвердит получение денег.")}catch(e){box.textContent=pdL(e.message);message(pdL(e.message),true)}}
 async function cardNotice(){let p=window.currentPayment;let box=$('paymentDetail');box.textContent=pdL("Создаём защищённую тестовую оплату…");try{let r=await api('/api/payment/'+p.id+'/checkout',{});if(!r.url?.startsWith('https://checkout.stripe.com/'))throw Error(pdL("Некорректная ссылка Stripe"));box.innerHTML='<a target="_blank" rel="noopener" href="'+escapeHtml(r.url)+pdL("\">💳 Перейти к тестовой оплате Stripe</a><p>Это тестовый платёж. Деньги не списываются.</p>")}catch(e){box.textContent=pdL(e.message);message(pdL(e.message),true)}}
 function cryptoNotice(){let p=window.currentPayment;if(!p)return;let buttons=['USDC','BTC','ETH'].map(c=>`<button class="chip" onclick="showWallet('${c}')">${c}</button>`).join(' ');$('paymentDetail').innerHTML=pdTpl`<p>Выберите валюту: ${buttons}</p><div id="wallet"></div>`}

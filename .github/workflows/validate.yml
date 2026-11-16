@@ -15,5 +15,6 @@ jobs:
       - run: pip install -r requirements-runtime.lock.txt
       - run: python test_release_validation.py
       - run: python test_tips_entry.py
+      - run: python test_paypal_checkout.py
       - run: node test_role_visibility.cjs
       - run: node test_miniapp_interactions.cjs

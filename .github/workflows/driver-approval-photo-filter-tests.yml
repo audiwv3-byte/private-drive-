@@ -1,0 +1,46 @@
+name: PRIVATE DRIVE - driver approval and dispatcher filter regression
+on:
+  push:
+    branches: [fix/driver-approval-photo-rights-admin-filters-20261116]
+    paths:
+      - pd_onboarding.py
+      - pd_admin_console_v4.js
+      - miniapp/templates/index.html
+      - ops/test_driver_approval_photo_rights_offline.py
+      - .github/workflows/driver-approval-photo-filter-tests.yml
+permissions:
+  contents: write
+jobs:
+  synthetic-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install only free test dependencies
+        run: pip install 'Flask>=3,<4' 'Pillow>=10,<12'
+      - name: Compile backend and JS; test real Flask handlers on synthetic data only
+        run: |
+          mkdir -p reports
+          if python -m py_compile pd_onboarding.py && node --check pd_admin_console_v4.js && python ops/test_driver_approval_photo_rights_offline.py > reports/driver_approval_photo_tests.txt 2>&1; then
+            echo 'DRIVER_APPROVAL_PHOTO_TESTS_PASS' >> reports/driver_approval_photo_tests.txt
+          else
+            echo 'DRIVER_APPROVAL_PHOTO_TESTS_BLOCK' >> reports/driver_approval_photo_tests.txt
+          fi
+      - name: Save sanitized results
+        if: always()
+        run: |
+          if [ -f reports/driver_approval_photo_tests.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/driver_approval_photo_tests.txt
+            git commit -m "test: record synthetic driver approval and immutable photo outcomes" || true
+            git push origin HEAD:fix/driver-approval-photo-rights-admin-filters-20261116
+          fi
+      - name: Tests must pass
+        run: grep -Fqx DRIVER_APPROVAL_PHOTO_TESTS_PASS reports/driver_approval_photo_tests.txt

@@ -194,7 +194,7 @@ def main():
             with core.db(core.ORDERS_DB) as c:
                 c.execute("INSERT OR IGNORE INTO pd_trip_runtime_v4(order_id) VALUES(501)")
                 c.execute("INSERT OR IGNORE INTO pd_trip_runtime_v4(order_id) VALUES(502)")
-                c.execute("UPDATE pd_trip_runtime_v4 SET departed_at=?,departed_pilot_id=?,arrived_at=? WHERE order_id IN (501,502)",
+                c.execute("UPDATE pd_trip_runtime_v4 SET departed_at=?,departed_pilot_id=?,arrived_at=?,base_cents=CASE WHEN order_id=501 THEN 5000 ELSE 3000 END WHERE order_id IN (501,502)",
                     (time_now[0]-100,201,time_now[0]-80))
             r=legacy(502,"В пути")
             ensure(r.status_code==400,"OLD_PILOT_UNPAID_START_BLOCKED")

@@ -1,0 +1,24 @@
+name: PRIVATE DRIVE - PR25 mobile desktop read-only live browser
+on:
+  push:
+    branches: [ops/pr25-live-overlay-dryrun-20261116]
+    paths:
+      - ops/pr25_live_readonly_browser_smoke.py
+      - .github/workflows/pr25-live-browser-readonly.yml
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Playwright and headless Chromium
+        run: |
+          pip install playwright==1.58.0
+          python -m playwright install --with-deps chromium
+      - name: Browser test with all mutating requests blocked
+        run: python ops/pr25_live_readonly_browser_smoke.py

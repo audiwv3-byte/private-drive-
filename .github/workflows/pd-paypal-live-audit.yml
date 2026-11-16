@@ -47,4 +47,3 @@ jobs:
         run: |
           grep -q 'SAFE_STAGING_OVERLAY_READY' reports/paypal_overlay_dryrun.txt
           grep -q 'PUBLIC_READONLY_SMOKE_PASSED' reports/launch_smoke.txt
-          fi

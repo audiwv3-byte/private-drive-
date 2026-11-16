@@ -4,6 +4,7 @@ from flask import Flask, jsonify
 from pd_trip_runtime_v4 import secure_legacy_status_route
 
 app=Flask(__name__)
+app.config['TESTING']=True
 calls=[]
 @app.post('/api/driver/work/<int:oid>/status')
 def legacy_status(oid):

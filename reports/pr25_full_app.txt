@@ -1,0 +1,16 @@
+PASS authentication: missing, forged, malformed, expired, duplicate data
+PASS private no-store cache policy for authenticated and rejected API requests
+PASS registration and private access
+PASS registered passengers cannot access administrator or pilot APIs
+PASS route, pet pricing, map validation, passengers, luggage, stop and duplicate prevention
+PASS bank payment: owner access, claim distinct from receipt, exact amount, admin-only confirmation, duplicate safety and stale Telegram buttons
+PASS complete booking lifecycle through completed trip and passenger review
+PASS Checkout interruption: durable ledger, identical retry parameters and payment-method lock
+PASS prepayment gates: mode, account role, terms, save-card consent, provider idempotency, signature, exact amount and duplicate webhooks
+PASS cancellation boundaries: 300 seconds full refund, 301 seconds 20%, driver cancellation full refund; pending is distinct from succeeded and late events cannot reverse success
+PASS payment/cancellation race, full late-arriving-payment refund, timeout retry with same provider key, and bank transfers requiring manual reconciliation
+PASS extra charges: consent, trip completed, saved method ownership, duplicate safety, cumulative limit and immutable original fare; readiness is admin-only
+PASS invoices: explicit tax confirmation, totals, immutable PDF and number, Unicode, owner/admin access and passenger archive
+ALL RELEASE CHECKS PASSED; production data and payment providers were not used
+PR25_FULL_APP_RELEASE_PASSED
+PR25_UI_AND_TIPS_REGRESSION_PASSED

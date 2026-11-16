@@ -1,14 +1,8 @@
-Traceback (most recent call last):
-  File "/home/runner/work/private-drive-/private-drive-/ops/test_pr25_rollback_injection.py", line 135, in <module>
-    run_case("second_file_failure")
-    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/private-drive-/private-drive-/ops/test_pr25_rollback_injection.py", line 124, in run_case
-    remote.assert_backup()
-    ~~~~~~~~~~~~~~~~~~~~^^
-  File "/home/runner/work/private-drive-/private-drive-/ops/test_pr25_rollback_injection.py", line 94, in assert_backup
-    assert any(path.endswith("/original/"+name) and data==ORIGINAL[name]
-           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-               for path,data in self.backups.items()),"Original not preserved: "+name
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: Original not preserved: miniapp_server.py
-PR25_ROLLBACK_FAULT_INJECTION_FAILED
+PASS SECOND_FILE_FAILURE ORIGINAL_BYTES_RESTORED BACKUPS_VERIFIED RELOADS 1 STATUS ROLLBACK_VERIFIED
+PASS HEALTH_CHECK_FAILURE ORIGINAL_BYTES_RESTORED BACKUPS_VERIFIED RELOADS 2 STATUS ROLLBACK_VERIFIED
+PASS PARTIAL_SECOND_UPLOAD ORIGINAL_BYTES_RESTORED BACKUPS_VERIFIED RELOADS 1 STATUS ROLLBACK_VERIFIED
+PASS UNKNOWN_BYTES_FAIL_CLOSED_MANUAL_RECOVERY_REQUIRED
+PASS EXECUTE_WITHOUT_APPROVAL_BLOCKED
+ALL_PR25_ROLLBACK_INJECTION_GATES_PASSED
+NO_PYTHONANYWHERE_WRITES_OR_EXTERNAL_PAYMENT_REQUESTS
+PR25_ROLLBACK_FAULT_INJECTION_PASSED

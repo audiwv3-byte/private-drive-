@@ -38,6 +38,7 @@ def candidate(s,html,bot):
     html=one(html,'<option value="Наличными">💶 Наличными водителю</option>',"","LEGACY_FORM_CASH")
     html=one(html,'<button type="button" class="active" data-method="Наличными">💶 Наличными</button>',"","PASSENGER_FORM_CASH")
     html=one(html,"pdbPay='Наличными'","pdbPay='Банковский перевод'","PASSENGER_DEFAULT")
+    html=one(html,'<button type="button" data-method="Банковский перевод">','<button type="button" class="active" data-method="Банковский перевод">',"PASSENGER_BANK_ACTIVE")
     # Ensure bank choice exists and isn't hidden by the patch.
     if html.count('data-method="Банковский перевод"')<1:raise RuntimeError("BANK_OPTION_NOT_FOUND")
     # Keep user interface selected chip in sync with new default.

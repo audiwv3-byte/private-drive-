@@ -43,6 +43,24 @@ def main():
     selected("SERVER_ADMIN_AND_PLUGIN_ORDER",server,r"import pd_trip_runtime_v4|pd_trip_runtime_v4\.register|import pd_pilot_dispatch|pd_pilot_dispatch\.register|import pd_admin_console_v4|pd_admin_console_v4\.register|def admin_status\(|target == 'В пути'|VALID_STATUSES|allowed",1,3,20)
     selected("DISPATCH_LEGACY_STATUS",disp,r"def status\(|@app\.post\('/api/driver/work|allowed=|UPDATE orders SET status=|payment_status",1,4,10)
     selected("ADMIN_CONSOLE_GUARD",admin,r"def pd_admin_console_action|PD_TRIP_TRANSITION_V4|/api/admin/console/orders/<int:oid>/action|def pd_admin_console_assignment_guard",2,5,6)
+    for title, data, a, b in [
+        ("LIVE_UI_GPS_START",js,21,43),
+        ("LIVE_UI_STAGE_BUTTONS",js,152,173),
+        ("LIVE_SERVER_ADMIN_STATUS",server,408,449),
+        ("LIVE_TRIP_TRANSITION",trip,264,335),
+        ("LIVE_TRIP_LEGACY_REPLACEMENT",trip,400,437),
+    ]:
+        print("DETAIL_BLOCK",title,flush=True)
+        for idx in range(a-1,min(b,len(data))):
+            line=data[idx]
+            if any(word in line.lower() for word in ("token","secret","api_key","password","authorization")):
+                print("DETAIL_LINE",idx+1,"[REDACTED]",flush=True)
+            else:
+                print("DETAIL_LINE",idx+1,line[:260],flush=True)
+    engine_reg=live["miniapp_server.py"].find("pd_trip_runtime_v4.register(app")
+    legacy_reg=live["miniapp_server.py"].find("pd_pilot_dispatch.register(app")
+    print("REGISTRATION_ORDER", "LEGACY_REGISTERED_AFTER_TRIP_ENGINE" if 0<=engine_reg<legacy_reg else "REVIEW_REQUIRED",flush=True)
+    print("LEGACY_ROUTE_VIEWS_OVERRIDDEN", "NO_EVIDENCE_OF_POST_REGISTER_OVERRIDE" if engine_reg<legacy_reg else "REVIEW_REQUIRED",flush=True)
     print("READ_ONLY_NO_ORDER_OR_PAYMENT_DATA_ACCESSED",flush=True)
 if __name__=="__main__":
     try:main()

@@ -38,3 +38,5 @@ except RuntimeError:
 else:
     raise AssertionError('Missing route did not fail closed')
 print('PASS route initialization fails closed if endpoint missing')
+
+# Postdeployment isolated regression rerun 2026-11-16

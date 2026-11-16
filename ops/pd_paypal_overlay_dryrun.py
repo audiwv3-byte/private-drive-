@@ -64,10 +64,10 @@ def main():
     if html.count("async function paypalNotice()") !=1:
         raise ValueError("PAYPAL_HANDLER_COUNT")
     # Each inline script must remain parseable after the live-source overlay.
-    script_tags=re.findall(r"<script\\b([^>]*)>([\\s\\S]*?)</script>",html,flags=re.I)
+    script_tags=re.findall(r"<script\b([^>]*)>([\s\S]*?)</script>",html,flags=re.I)
     checked=0
     for attrs,body in script_tags:
-        if re.search(r"\\bsrc\\s*=",attrs,re.I) or not body.strip():continue
+        if re.search(r"\bsrc\s*=",attrs,re.I) or not body.strip():continue
         with tempfile.TemporaryDirectory(prefix="pd-paypal-js-") as temp:
             pathname=pathlib.Path(temp)/"inline.js"
             pathname.write_text(body,encoding="utf-8")

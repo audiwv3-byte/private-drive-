@@ -1,0 +1,34 @@
+FILE DRIVER LINECOUNT 176
+PATTERN DRIVER def pd_driver_apply COUNT 1
+SOURCE DRIVER 88     def pd_driver_apply():
+PATTERN DRIVER def pd_driver_decide COUNT 1
+SOURCE DRIVER 149     def pd_driver_decide(applicant):
+PATTERN DRIVER def pd_dispatcher_replace COUNT 0
+PATTERN DRIVER photo.*(replace|review) COUNT 0
+PATTERN DRIVER missing_document_sides COUNT 0
+PATTERN DRIVER status='pending' COUNT 1
+SOURCE DRIVER 133               status='pending',stage=excluded.stage,updated_at=excluded.updated_at''',
+PATTERN DRIVER status=excluded.status COUNT 0
+PATTERN DRIVER UPDATE SET image COUNT 1
+SOURCE DRIVER 127                 c.execute('INSERT INTO pd_driver_documents(telegram_id,side,image,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_id,side) DO UPDATE SET image=excluded.image,updated_at=excluded.updated_at',(ui
+PATTERN DRIVER stored.intersection COUNT 0
+PATTERN DRIVER ACTIVE_SIDES COUNT 5
+SOURCE DRIVER 11 ACTIVE_SIDES=("license_front","license_back","car_front","car_rear","car_interior")
+SOURCE DRIVER 32 def read_photos(allowed=ACTIVE_SIDES):
+SOURCE DRIVER 112         photos=read_photos(ACTIVE_SIDES if stage==1 else SIDES)
+SOURCE DRIVER 121             required=ACTIVE_SIDES if stage==1 else ACTIVE_SIDES+REQUIRED_SECOND
+PATTERN DRIVER core.is_admin COUNT 3
+SOURCE DRIVER 68         if uid!=applicant and not core.is_admin(uid):raise PermissionError('Нет доступа')
+SOURCE DRIVER 143         if not core.is_admin(uid):raise PermissionError('Нет доступа')
+SOURCE DRIVER 151         if not core.is_admin(uid):raise PermissionError('Нет доступа')
+PATTERN DRIVER document_sides COUNT 3
+SOURCE DRIVER 62     def document_sides(uid):
+SOURCE DRIVER 80         return dict(submitted=True,document_sides=document_sides(uid),**dict(row)) if row else None
+SOURCE DRIVER 146         return jsonify(applications=[dict(**dict(r),document_sides=document_sides(r["telegram_id"])) for r in rows])
+FILE DISPATCH LINECOUNT 198
+PATTERN DISPATCH let root= COUNT 1
+SOURCE DISPATCH 9 let root=null,list=null,panel=null,filter='all',query='',day='',cursor=null,selected=null,record=null,currentTab='overview',dirty=false,busy=false,lastLoaded=0,searchTimer=null,workspaceSection='orders',detailR
+PATTERN DISPATCH async function renderList COUNT 1
+SOURCE DISPATCH 56 async function renderList(append=false){
+PATTERN DISPATCH pendingRender COUNT 0
+AUDIT_FAILURE PatternError

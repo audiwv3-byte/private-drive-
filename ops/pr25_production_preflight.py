@@ -38,3 +38,5 @@ if __name__=="__main__":
     except Exception as e:
         print("PREFLIGHT_BLOCKED",type(e).__name__,str(e)[:90],flush=True)
         raise SystemExit(1)
+
+# Read-only preflight rerun trigger 2026-11-16

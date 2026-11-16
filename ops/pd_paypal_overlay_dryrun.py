@@ -52,7 +52,10 @@ def main():
     if html.count(base_ui)!=1:
         at=html.find("cryptoNotice(")
         print("UI_CONTEXT",repr(html[max(0,at-850):at+550]) if at>=0 else "NOT_FOUND",flush=True)
-    html=one(html,base_ui,base_ui+ui_fragment)
+    # Production uses a dynamically generated array of payment actions.
+    dynamic_anchor="()=>cryptoNotice(id)]]){"
+    dynamic_replacement="()=>cryptoNotice(id)],...(p.paypal_available?[[pdReleaseText('💙 PayPal','💙 PayPal','💙 PayPal'),()=>paypalNotice()]]:[])]){"
+    html=one(html,dynamic_anchor,dynamic_replacement)
     js=between(reviewed_html,"// PayPal is available only for a confirmed","async function cashNotice()")
     html=one(html,"async function cashNotice()",js+"async function cashNotice()")
     if html.count("async function paypalNotice()") !=1:

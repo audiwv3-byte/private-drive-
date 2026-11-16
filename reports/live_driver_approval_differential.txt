@@ -1,34 +1,99 @@
 FILE DRIVER LINECOUNT 176
-PATTERN DRIVER def pd_driver_apply COUNT 1
-SOURCE DRIVER 88     def pd_driver_apply():
-PATTERN DRIVER def pd_driver_decide COUNT 1
-SOURCE DRIVER 149     def pd_driver_decide(applicant):
-PATTERN DRIVER def pd_dispatcher_replace COUNT 0
-PATTERN DRIVER photo.*(replace|review) COUNT 0
-PATTERN DRIVER missing_document_sides COUNT 0
-PATTERN DRIVER status='pending' COUNT 1
-SOURCE DRIVER 133               status='pending',stage=excluded.stage,updated_at=excluded.updated_at''',
-PATTERN DRIVER status=excluded.status COUNT 0
-PATTERN DRIVER UPDATE SET image COUNT 1
-SOURCE DRIVER 127                 c.execute('INSERT INTO pd_driver_documents(telegram_id,side,image,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_id,side) DO UPDATE SET image=excluded.image,updated_at=excluded.updated_at',(ui
-PATTERN DRIVER stored.intersection COUNT 0
-PATTERN DRIVER ACTIVE_SIDES COUNT 5
-SOURCE DRIVER 11 ACTIVE_SIDES=("license_front","license_back","car_front","car_rear","car_interior")
-SOURCE DRIVER 32 def read_photos(allowed=ACTIVE_SIDES):
-SOURCE DRIVER 112         photos=read_photos(ACTIVE_SIDES if stage==1 else SIDES)
-SOURCE DRIVER 121             required=ACTIVE_SIDES if stage==1 else ACTIVE_SIDES+REQUIRED_SECOND
-PATTERN DRIVER core.is_admin COUNT 3
-SOURCE DRIVER 68         if uid!=applicant and not core.is_admin(uid):raise PermissionError('Нет доступа')
-SOURCE DRIVER 143         if not core.is_admin(uid):raise PermissionError('Нет доступа')
-SOURCE DRIVER 151         if not core.is_admin(uid):raise PermissionError('Нет доступа')
-PATTERN DRIVER document_sides COUNT 3
-SOURCE DRIVER 62     def document_sides(uid):
-SOURCE DRIVER 80         return dict(submitted=True,document_sides=document_sides(uid),**dict(row)) if row else None
-SOURCE DRIVER 146         return jsonify(applications=[dict(**dict(r),document_sides=document_sides(r["telegram_id"])) for r in rows])
+DETAIL DRIVER 95         if existing and existing['stage']==1 and existing['status']=='pending':
+DETAIL DRIVER 96             raise ValueError('Дождитесь подтверждения первого этапа администратором')
+DETAIL DRIVER 97         if stage==1:
+DETAIL DRIVER 98             d={**d,'city':'','vehicle':'','vehicle_year':1980,'plate':'','seats':4}
+DETAIL DRIVER 99         out={}
+DETAIL DRIVER 100         for key,limit in [('name',80),('phone',40),('city',120),('vehicle',120),('plate',16)]:
+DETAIL DRIVER 101             value=d.get(key)
+DETAIL DRIVER 102             if not isinstance(value,str):raise ValueError('Заполните все поля регистрации водителя')
+DETAIL DRIVER 103             out[key]=' '.join(value.split())
+DETAIL DRIVER 104             if not (stage==1 and key in ('city','vehicle','plate')) and not 2<=len(out[key])<=limit:raise ValueError('Заполните все поля регистрации водителя')
+DETAIL DRIVER 105         phone=core.clean_phone(out['phone'])
+DETAIL DRIVER 106         if not phone:raise ValueError('Неверный номер телефона')
+DETAIL DRIVER 107         year=d.get('vehicle_year');seats=d.get('seats')
+DETAIL DRIVER 108         if type(year) is not int or not 1980<=year<=core.now().year+1:raise ValueError('Проверьте год выпуска автомобиля')
+DETAIL DRIVER 109         if type(seats) is not int or not 1<=seats<=8:raise ValueError('Укажите от 1 до 8 пассажирских мест')
+DETAIL DRIVER 110         plate=out['plate'].upper()
+DETAIL DRIVER 111         if stage==2 and not all(ch.isalnum() or ch in ' -' for ch in plate):raise ValueError('Проверьте номер автомобиля')
+DETAIL DRIVER 112         photos=read_photos(ACTIVE_SIDES if stage==1 else SIDES)
+DETAIL DRIVER 113         core.initialize()
+DETAIL DRIVER 114         now=core.now().isoformat()
+DETAIL DRIVER 115         with core.db(core.USERS_DB) as c:
+DETAIL DRIVER 116             c.execute('BEGIN IMMEDIATE')
+DETAIL DRIVER 117             current=c.execute('SELECT status,stage FROM pd_driver_applications WHERE telegram_id=?',(uid,)).fetchone()
+DETAIL DRIVER 118             if (dict(current) if current else None)!=({k:existing[k] for k in ('status','stage')} if existing else None):
+DETAIL DRIVER 119                 raise ValueError('Статус заявки изменился. Обновите страницу и повторите отправку')
+DETAIL DRIVER 120             stored={r['side'] for r in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(uid,))}
+DETAIL DRIVER 121             required=ACTIVE_SIDES if stage==1 else ACTIVE_SIDES+REQUIRED_SECOND
+DETAIL DRIVER 122             if set(required)-stored-set(photos):raise ValueError('Добавьте все обязательные фотографии документов')
+DETAIL DRIVER 123             car_rows={x['side']:bytes(x['image']) for x in c.execute("SELECT side,image FROM pd_driver_documents WHERE telegram_id=? AND side IN ('car_front','car_rear','car_interior')",(uid,))}
+DETAIL DRIVER 124             car_rows.update({k:v for k,v in photos.items() if k.startswith('car_')})
+DETAIL DRIVER 125             if len({hashlib.sha256(v).digest() for v in car_rows.values()})!=3:raise ValueError('Добавьте три разных фото автомобиля: спереди, сзади и салон')
+DETAIL DRIVER 126             for side,image in photos.items():
+DETAIL DRIVER 127                 c.execute('INSERT INTO pd_driver_documents(telegram_id,side,image,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_id,side) DO UPDATE SET image=excluded.image,updated_at=excluded.updated_at',(uid,side,image,now))
+DETAIL DRIVER 128             c.execute('''INSERT INTO pd_driver_applications
+DETAIL DRIVER 129               (telegram_id,name,phone,city,vehicle,vehicle_year,plate,seats,status,created_at,updated_at,stage)
+DETAIL DRIVER 130               VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?) ON CONFLICT(telegram_id) DO UPDATE SET
+DETAIL DRIVER 131               name=excluded.name,phone=excluded.phone,city=excluded.city,vehicle=excluded.vehicle,
+DETAIL DRIVER 132               vehicle_year=excluded.vehicle_year,plate=excluded.plate,seats=excluded.seats,
+DETAIL DRIVER 133               status='pending',stage=excluded.stage,updated_at=excluded.updated_at''',
+DETAIL DRIVER 134               (uid,out['name'],phone,out['city'],out['vehicle'],year,plate,seats,now,now,stage))
+DETAIL DRIVER 135         if current is None or current['status'] != 'pending':
+DETAIL DRIVER 136             label = '🚘 Новая регистрация водителя' if current is None else '🚘 Анкета водителя обновлена'
+DETAIL DRIVER 137             core.notify_admins(f"{label}: {out['name']}, {phone}, Telegram {uid}\nЭтап {stage}. Заявка ожидает проверки в кабинете диспетчера.")
+DETAIL DRIVER 138         return jsonify(ok=True,submitted=True)
+DETAIL DRIVER 139 
+DETAIL DRIVER 140     @app.get('/api/admin/driver-applications')
+DETAIL DRIVER 141     def pd_driver_applications():
+DETAIL DRIVER 142         uid,_=auth()
+DETAIL DRIVER 143         if not core.is_admin(uid):raise PermissionError('Нет доступа')
+DETAIL DRIVER 144         with core.db(core.USERS_DB) as c:
+DETAIL DRIVER 145             rows=c.execute('SELECT * FROM pd_driver_applications ORDER BY updated_at DESC LIMIT 200').fetchall()
+DETAIL DRIVER 146         return jsonify(applications=[dict(**dict(r),document_sides=document_sides(r["telegram_id"])) for r in rows])
+DETAIL DRIVER 147 
+DETAIL DRIVER 148     @app.post('/api/admin/driver-applications/<int:applicant>/decision')
+DETAIL DRIVER 149     def pd_driver_decide(applicant):
+DETAIL DRIVER 150         uid,_=auth()
+DETAIL DRIVER 151         if not core.is_admin(uid):raise PermissionError('Нет доступа')
+DETAIL DRIVER 152         d=request.get_json(silent=True);target=d.get('status') if isinstance(d,dict) else None
+DETAIL DRIVER 153         if target not in ('pending','approved','rejected'):raise ValueError('Некорректный статус заявки')
+DETAIL DRIVER 154         with core.db(core.USERS_DB) as c:
+DETAIL DRIVER 155             c.execute('BEGIN IMMEDIATE')
+DETAIL DRIVER 156             r=c.execute('SELECT status,stage FROM pd_driver_applications WHERE telegram_id=?',(applicant,)).fetchone()
+DETAIL DRIVER 157             if not r:return jsonify(error='Заявка не найдена'),404
+DETAIL DRIVER 158             if target=='approved' and r['status']!='approved':
+DETAIL DRIVER 159                 stored={x['side'] for x in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(applicant,))}
+DETAIL DRIVER 160                 required=ACTIVE_SIDES if r['stage']==1 else ACTIVE_SIDES+REQUIRED_SECOND
+DETAIL DRIVER 161                 if set(required)-stored:
+DETAIL DRIVER 162                     raise ValueError('Для одобрения нужны все обязательные фотографии текущего этапа')
+DETAIL DRIVER 163                 if r['stage']==1:target='stage2'
+DETAIL DRIVER 164             if r['status']=='stage2' and target=='approved':
+DETAIL DRIVER 165                 raise ValueError('Дождитесь заполнения второго этапа водителем')
+DETAIL DRIVER 166             if r['status']!=target:
+DETAIL DRIVER 167                 now=core.now().isoformat()
+DETAIL DRIVER 168                 c.execute('UPDATE pd_driver_applications SET status=?,updated_at=? WHERE telegram_id=?',(target,now,applicant))
+DETAIL DRIVER 169                 c.execute('INSERT INTO pd_driver_application_decisions(telegram_id,admin_id,old_status,new_status,decided_at) VALUES(?,?,?,?,?)',(applicant,uid,r['status'],target,now))
+DETAIL DRIVER 170         # Reviewing an application never grants dispatcher access or exposes customer orders.
+DETAIL DRIVER 171         return jsonify(ok=True)
+DETAIL DRIVER 172 
+DETAIL DRIVER 173     @app.get('/driver-privacy')
 FILE DISPATCH LINECOUNT 198
-PATTERN DISPATCH let root= COUNT 1
-SOURCE DISPATCH 9 let root=null,list=null,panel=null,filter='all',query='',day='',cursor=null,selected=null,record=null,currentTab='overview',dirty=false,busy=false,lastLoaded=0,searchTimer=null,workspaceSection='orders',detailR
-PATTERN DISPATCH async function renderList COUNT 1
-SOURCE DISPATCH 56 async function renderList(append=false){
-PATTERN DISPATCH pendingRender COUNT 0
-AUDIT_FAILURE PatternError
+FILE UI LINECOUNT 1820
+PATTERN UI function pdDocumentRefresh COUNT 1
+SOURCE UI 336 function pdDocumentRefresh(){pdDriverStageRefresh();const saved=window.pdOnboardingUser?.driver_application?.document_sides||[];for(const side of pdDocumentSides){const input=$('pdPhoto_'+side);input.required=s
+PATTERN UI async function pdChooseDocument COUNT 1
+SOURCE UI 337 async function pdChooseDocument(side,input){
+PATTERN UI async function pdLoadDriverApplications COUNT 1
+SOURCE UI 482 async function pdLoadDriverApplications(){
+PATTERN UI missing_document_sides COUNT 0
+PATTERN UI b.disabled=a.status===target COUNT 1
+SOURCE UI 486    const actions=document.createElement('div');actions.className='actions';for(const[target,label]of [['approved','Одобрить'],['rejected','Отклонить'],['pending','На проверку']]){const b=document.createElement(
+PATTERN UI pdPilotCockpit COUNT 12
+SOURCE UI 155 body.pd-pilot-cockpit-on #pdPilotCockpit {
+SOURCE UI 168 body.pd-pilot-cockpit-on #pdPilotCockpitMap {
+SOURCE UI 175 body.pd-pilot-cockpit-on #pdPilotCockpit .pd-cockpit-top {
+SOURCE UI 190 body.pd-pilot-cockpit-on #pdPilotCockpit .pd-cockpit-bottom {
+PATTERN UI pd-pilot-cockpit-adapter-stage-js COUNT 1
+SOURCE UI 1755 <script id="pd-pilot-cockpit-adapter-stage-js">
+NO_PRIVATE_DATA_NO_DB_NO_WRITES

@@ -4,6 +4,10 @@ on:
     branches: [fix/pilot-dispatch-status-guard-20261116]
     paths:
       - .github/workflows/pilot-status-guard-tests.yml
+      - test_pilot_status_guard.py
+      - test_release_validation.py
+      - miniapp_server.py
+      - pd_trip_runtime_v4.py
 permissions:
   contents: write
 jobs:

@@ -10,19 +10,19 @@ const messages={
   arrived:'Прибыл',start:'В путь',finish:'Завершить',toward:'К пассажиру',
   stop:'Остановка',unavailable:'Нет доступа к геолокации',connection:'Нет связи с сервером',
   permission:'Нет допуска пилота',loading:'Загрузка',trip:'Заказ',route:'Маршрут',
-  gpsHelp:'GPS передаётся только пока приложение открыто и доступ разрешён.'},
+  follow:'Следить за мной',gpsHelp:'GPS передаётся только пока приложение открыто и доступ разрешён.'},
  en:{title:'Pilot cockpit',gpsOn:'GPS active',gpsOff:'Enable GPS',gpsStop:'Disable GPS',
   idle:'Waiting for assigned trips',load:'Loading assigned trips…',
   arrived:'Arrived',start:'Start trip',finish:'Finish',toward:'Navigate to pickup',
   stop:'Stop',unavailable:'Location permission unavailable',connection:'Connection lost',
   permission:'Pilot access required',loading:'Loading',trip:'Order',route:'Route',
-  gpsHelp:'Location is shared only while the app is open and permission is granted.'},
+  follow:'Follow me',gpsHelp:'Location is shared only while the app is open and permission is granted.'},
  lt:{title:'Piloto kabina',gpsOn:'GPS įjungtas',gpsOff:'Įjungti GPS',gpsStop:'Išjungti GPS',
   idle:'Laukiama priskirtų užsakymų',load:'Įkeliami užsakymai…',
   arrived:'Atvykau',start:'Pradėti kelionę',finish:'Baigti',toward:'Į paėmimo vietą',
   stop:'Sustojimas',unavailable:'Vietos prieiga negalima',connection:'Nėra ryšio',
   permission:'Nėra piloto prieigos',loading:'Įkeliama',trip:'Užsakymas',route:'Maršrutas',
-  gpsHelp:'Vieta perduodama tik atvėrus programėlę ir gavus leidimą.'}
+  follow:'Sekti mane',gpsHelp:'Vieta perduodama tik atvėrus programėlę ir gavus leidimą.'}
 };
 const liveStatuses=['Подтверждена','В пути'];
 function nextAction(order){
@@ -42,7 +42,7 @@ function make(opts){
  const windowRef=opts.window||root;
  let mountNode=null,container=null,map=null,marker=null,watch=null,watchId=0,selected=null;
  let disposed=false,polling=false,latestPosition=null,requestPending=false,lastSent=0,refreshInterval=null;
- let gpsEnabled=false,viewReady=false;
+ let gpsEnabled=false,viewReady=false,followGps=true;
  let elements={};
  function el(tag,klass,text){
    const e=doc.createElement(tag);if(klass)e.className=klass;
@@ -67,20 +67,20 @@ function make(opts){
    if(!coords(lat,lon)||!map)return;
    if(!marker){marker=L.marker([lat,lon]).addTo(map);}
    else marker.setLatLng([lat,lon]);
-   map.panTo([lat,lon],{animate:false});
+   if(followGps)map.panTo([lat,lon],{animate:false});
  }
  function gpsStart(){
-   if(disposed||gpsEnabled||!selected)return;
+   if(disposed||gpsEnabled)return;
    const geo=getGeo();if(!geo?.watchPosition){displayError(lang.unavailable);return;}
    const thisWatch=++watchId;gpsEnabled=true;updateGps();
    try{
-    const id=selected.id;
+    const id=selected?.id||null;
     watch=geo.watchPosition(async position=>{
-      if(disposed||watchId!==thisWatch||doc.hidden||selected?.id!==id)return;
+      if(disposed||watchId!==thisWatch||doc.hidden||(id!==null&&selected?.id!==id))return;
       const latitude=position?.coords?.latitude,longitude=position?.coords?.longitude;
       if(!coords(latitude,longitude))return;
       latestPosition={latitude,longitude};updateMap(latitude,longitude);
-      if(requestPending||Date.now()-lastSent<5000)return;
+      if(id===null||requestPending||Date.now()-lastSent<5000)return;
       requestPending=true;lastSent=Date.now();
       try{await api('/api/trip/'+Number(id)+'/location',{lat:latitude,lon:longitude,accuracy:position.coords.accuracy});}
       catch(e){stopGps();displayError(e?.message||lang.connection);}
@@ -136,7 +136,7 @@ function make(opts){
      // Server MUST independently filter orders for approved pilot.
      const previous=selected?.id;
      selected=pickActive(result.orders);
-     if(previous!==selected?.id)stopGps();
+     if(previous!==selected?.id && previous!==undefined && previous!==null && selected?.id!==previous)stopGps();
      renderOrder();if(elements.status)elements.status.textContent='';
    }catch(e){displayError(e?.message||lang.connection);}
    finally{polling=false;}
@@ -157,7 +157,8 @@ function make(opts){
          controls=el('div','pd-cockpit-gps-controls');
    const gps=el('button','',lang.gpsOff);gps.type='button';gps.onclick=gpsStart;
    const gpsStop=el('button','',lang.gpsStop);gpsStop.type='button';gpsStop.onclick=stopGps;gpsStop.hidden=true;
-   controls.append(gps,gpsStop);
+   const follow=el('button','',lang.gpsOn);follow.type='button';follow.textContent=lang.follow;follow.onclick=()=>{followGps=true;if(latestPosition)updateMap(latestPosition.latitude,latestPosition.longitude);};
+   controls.append(gps,gpsStop,follow);
    const status=el('p','pd-cockpit-status');status.setAttribute('role','status');
    panel.append(order,controls,status);
    container.append(mapNode,head,panel);
@@ -167,6 +168,7 @@ function make(opts){
    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
        {attribution:'© OpenStreetMap contributors'}).addTo(map);
    viewReady=true;
+   if(map.on)map.on('dragstart',()=>{followGps=false;});
    if(map.invalidateSize)map.invalidateSize();
    renderOrder();updateGps();refresh();
    refreshInterval=windowRef.setInterval?.(()=>{if(!doc.hidden)refresh();},10000)||null;
@@ -177,13 +179,13 @@ function make(opts){
    if(refreshInterval!==null)windowRef.clearInterval?.(refreshInterval);
    refreshInterval=null;
    if(map)map.remove();
-   map=null;marker=null;viewReady=false;
+   map=null;marker=null;viewReady=false;followGps=true;latestPosition=null;
    if(container?.parentNode)container.parentNode.removeChild(container);
    container=null;mountNode=null;selected=null;elements={};
  }
  function dispose(){if(disposed)return;unmount();disposed=true;}
  return {mount,unmount,dispose,refresh,startGps:gpsStart,stopGps,
-         state:()=>({gpsEnabled,hasMap:viewReady,selectedOrder:selected?.id||null})};
+         state:()=>({gpsEnabled,hasMap:viewReady,followGps,selectedOrder:selected?.id||null})};
 }
 root.PD_PILOT_COCKPIT_STAGED={make,pickActive,nextAction,coords};
 })(typeof window!=='undefined'?window:globalThis);

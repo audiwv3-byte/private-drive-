@@ -1,9 +1,6 @@
-Traceback (most recent call last):
-  File "/home/runner/work/private-drive-/private-drive-/ops/test_pr27_guarded_install_offline.py", line 55, in <module>
-    run_case("partial")
-    ~~~~~~~~^^^^^^^^^^^
-  File "/home/runner/work/private-drive-/private-drive-/ops/test_pr27_guarded_install_offline.py", line 51, in run_case
-    assert fake.reloads>=1
-           ^^^^^^^^^^^^^^^
-AssertionError
-PR27_OFFLINE_ROLLBACK_BLOCK
+PASS PARTIAL FULL_BYTE_RECOVERY_AND_RELOAD
+PASS POST_HEALTH FULL_BYTE_RECOVERY_AND_RELOAD
+PASS DEPLOY_WITHOUT_APPROVAL_BLOCKED
+PR27_GUARDED_ROLLBACK_TESTS_PASSED
+NO_PRODUCTION_WRITES_OR_PAYMENTS
+PR27_OFFLINE_ROLLBACK_PASS

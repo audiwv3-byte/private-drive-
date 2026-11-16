@@ -103,6 +103,8 @@ INSERT INTO orders(id,telegram_id,status,payment_status,price,origin,destination
 VALUES(501,101,'Подтверждена','Оплачено','50.00','Vilnius','Kaunas','','16.11.2026','10:00','В одну сторону',1,'','TEST','Наличные','2026-11-16','2026-11-16');
 INSERT INTO orders(id,telegram_id,status,payment_status,price,origin,destination,stop_address,trip_date,trip_time,order_type,passengers,luggage,details,payment_method,created_at,updated_at)
 VALUES(502,101,'Подтверждена','Не оплачено','30.00','Vilnius','Trakai','','16.11.2026','11:00','В одну сторону',1,'','TEST','Наличные','2026-11-16','2026-11-16');
+INSERT INTO orders(id,telegram_id,status,payment_status,price,origin,destination,stop_address,trip_date,trip_time,order_type,passengers,luggage,details,payment_method,created_at,updated_at)
+VALUES(503,101,'Подтверждена','Оплачено','75.00','Vilnius','Klaipeda','','16.11.2026','12:00','В одну сторону',1,'','TEST','Наличные','2026-11-16','2026-11-16');
 """)
     return core
 
@@ -153,7 +155,7 @@ def main():
                "OLD_PILOT_ROUTE_REBOUND_TO_SINGLE_TRANSITION")
         with core.db(core.ORDERS_DB) as c:
             c.executemany("INSERT INTO pd_pilot_assignments(order_id,pilot_id,assigned_by,assigned_at) VALUES(?,?,?,?)",
-                          [(501,201,999,"2026-11-16"),(502,201,999,"2026-11-16")])
+                          [(501,201,999,"2026-11-16"),(502,201,999,"2026-11-16"),(503,201,999,"2026-11-16")])
         def state(oid):
             with core.db(core.ORDERS_DB) as c:
                 row=c.execute("SELECT status,payment_status FROM orders WHERE id=?",(oid,)).fetchone()
@@ -194,7 +196,8 @@ def main():
             with core.db(core.ORDERS_DB) as c:
                 c.execute("INSERT OR IGNORE INTO pd_trip_runtime_v4(order_id) VALUES(501)")
                 c.execute("INSERT OR IGNORE INTO pd_trip_runtime_v4(order_id) VALUES(502)")
-                c.execute("UPDATE pd_trip_runtime_v4 SET departed_at=?,departed_pilot_id=?,arrived_at=?,base_cents=CASE WHEN order_id=501 THEN 5000 ELSE 3000 END WHERE order_id IN (501,502)",
+                c.execute("INSERT OR IGNORE INTO pd_trip_runtime_v4(order_id) VALUES(503)")
+                c.execute("UPDATE pd_trip_runtime_v4 SET departed_at=?,departed_pilot_id=?,arrived_at=?,base_cents=CASE WHEN order_id=501 THEN 5000 WHEN order_id=503 THEN 7500 ELSE 3000 END WHERE order_id IN (501,502,503)",
                     (time_now[0]-100,201,time_now[0]-80))
             r=legacy(502,"В пути")
             ensure(r.status_code==400,"OLD_PILOT_UNPAID_START_BLOCKED")
@@ -207,6 +210,33 @@ def main():
             ensure(r.status_code==200,"OLD_PILOT_FINISH_SUCCESS")
             ensure(state(501)[0]["status"]=="Выполнена","FINISH_STATUS_PERSISTED")
             ensure(bool(state(501)[1].get("ended_at")),"FINISH_TIMESTAMP_RECORDED")
+            # Authenticated dispatcher can advance the separate synthetic paid trip
+            # ONLY via the console route and an explicit reason.
+            for who in (101,201,203):
+                r=client.post("/api/admin/console/orders/503/action",
+                    json={"action":"start","reason":"Synthetic test"},
+                    headers={"X-Dummy-UID":str(who)})
+                ensure(r.status_code==403,"NON_ADMIN_CANNOT_OPERATE_DISPATCHER")
+            r=client.post("/api/admin/console/orders/503/action",
+                json={"action":"start","reason":"x"},
+                headers={"X-Dummy-UID":"999"})
+            ensure(r.status_code==400,"ADMIN_REASON_REQUIRED")
+            r=client.post("/api/admin/console/orders/503/action",
+                json={"action":"start","reason":"Synthetic dispatcher start"},
+                headers={"X-Dummy-UID":"999"})
+            ensure(r.status_code==200,"AUTHORIZED_DISPATCHER_START_SUCCESS")
+            ensure(state(503)[0]["status"]=="В пути" and bool(state(503)[1].get("started_at")),
+                   "DISPATCHER_START_TIMESTAMP_STORED")
+            r=client.post("/api/admin/console/orders/503/action",
+                json={"action":"finish","reason":"Synthetic dispatcher finish"},
+                headers={"X-Dummy-UID":"999"})
+            ensure(r.status_code==200,"AUTHORIZED_DISPATCHER_FINISH_SUCCESS")
+            ensure(state(503)[0]["status"]=="Выполнена" and bool(state(503)[1].get("ended_at")),
+                   "DISPATCHER_FINISH_TIMESTAMP_STORED")
+            with core.db(core.ORDERS_DB) as c:
+                audit=[r["event"] for r in c.execute("SELECT event FROM pd_trip_events_v4 WHERE order_id=503")]
+            ensure(any("admin_start" in event for event in audit) and any("admin_finish" in event for event in audit),
+                   "DISPATCHER_ACTION_REASON_AUDIT_RECORDED")
             before=state(501)
             r=legacy(501,"Выполнена")
             ensure(r.status_code in (200,400),"DUPLICATE_FINISH_HANDLED")

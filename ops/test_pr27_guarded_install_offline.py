@@ -1,5 +1,5 @@
 """PR27 guarded deploy fault injection. Only synthetic memory; no API calls."""
-import contextlib,hashlib,importlib.util,io,os,pathlib,sys
+import contextlib,hashlib,importlib.util,io,os,pathlib,sys,urllib.error
 from unittest.mock import patch
 path=pathlib.Path(__file__).resolve().parents[1]/"ops/pr27_guarded_install_NOT_EXECUTED.py"
 spec=importlib.util.spec_from_file_location("pilot_guarded_release",path)
@@ -15,7 +15,7 @@ class Fake:
   self.health_calls=0
   self.reloads=0
  def read(self,path,token):
-  if path not in self.files:raise FileNotFoundError(path)
+  if path not in self.files:raise urllib.error.HTTPError(path,404,'Not found',{},None)
   return self.files[path]
  def upload(self,path,data,token):
   if path==SRC and self.once and self.stage=="partial":

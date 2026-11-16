@@ -91,9 +91,9 @@ class FakeRemote:
 
     def assert_backup(self):
         for name in deploy.TARGETS:
-            assert any(path.endswith("/original/"+name) and data==ORIGINAL[name]
+            assert any(path.endswith("__original__"+name) and data==ORIGINAL[name]
                        for path,data in self.backups.items()),"Original not preserved: "+name
-            assert any(path.endswith("/candidate/"+name) and data==PATCHED[name]
+            assert any(path.endswith("__candidate__"+name) and data==PATCHED[name]
                        for path,data in self.backups.items()),"Candidate not preserved: "+name
         assert len(self.backups)==4
 

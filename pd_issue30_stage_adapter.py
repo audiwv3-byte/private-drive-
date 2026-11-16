@@ -33,19 +33,19 @@ def _application_status(conn, applicant):
     if type(applicant) is not int or applicant < 1:
         raise reviews.ReviewError("Invalid applicant")
     row = conn.execute(
-        "SELECT status FROM pd_driver_applications WHERE telegram_id=?",
+        "SELECT status,stage FROM pd_driver_applications WHERE telegram_id=?",
         (applicant,),
     ).fetchone()
     if row is None:
         raise reviews.ReviewError("Applicant not found")
-    return row[0]
+    return row[0], row[1]
 
 
 def guard_first_stage(conn, applicant):
     """Precondition for stage1 -> stage2. Call only under existing write lock."""
     _assert_review_schema(conn)
-    status = _application_status(conn, applicant)
-    if status not in ("pending",):
+    status, stage = _application_status(conn, applicant)
+    if status != "pending" or stage != 1:
         raise reviews.ReviewError("Stage-1 transition not allowed")
     reviews.require_approved_documents(conn, applicant, 1)
     return True
@@ -61,8 +61,8 @@ def guard_final_stage(conn, applicant, authoritative_stage2_submitted):
     _assert_review_schema(conn)
     if authoritative_stage2_submitted is not True:
         raise IntegrationNotReady("Stage-2 submission has not been verified")
-    status = _application_status(conn, applicant)
-    if status != "pending":
+    status, stage = _application_status(conn, applicant)
+    if status != "pending" or stage != 2:
         raise reviews.ReviewError("Final approval not allowed from current state")
     reviews.require_approved_documents(conn, applicant, 2)
     return True

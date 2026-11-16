@@ -53,11 +53,8 @@ jobs:
             git commit -m "test(pr25): synthetic status and role regression report" || true
             git push origin HEAD:ops/pr25-live-overlay-dryrun-20261116
           fi
-      - name: Require all synthetic route checks to pass
+      - name: Require both full-app and synthetic integration gates
         run: |
-          grep -q '^PR25_SYNTHETIC_LIFECYCLE_PASSED
- reports/pr25_synthetic_lifecycle.txt
-          grep -q '^PR25_FULL_APP_RELEASE_PASSED
- reports/pr25_full_app.txt
-          grep -q '^PR25_UI_AND_TIPS_REGRESSION_PASSED
- reports/pr25_full_app.txt
+          grep -Fqx "PR25_SYNTHETIC_LIFECYCLE_PASSED" reports/pr25_synthetic_lifecycle.txt
+          grep -Fqx "PR25_FULL_APP_RELEASE_PASSED" reports/pr25_full_app.txt
+          grep -Fqx "PR25_UI_AND_TIPS_REGRESSION_PASSED" reports/pr25_full_app.txt

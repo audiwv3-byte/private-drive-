@@ -1,0 +1,39 @@
+name: PRIVATE DRIVE - stage2 disabled visual guarded rollback offline
+on:
+  push:
+    branches: [fix/driver-approval-photo-rights-admin-filters-20261116]
+    paths:
+      - ops/stage2_button_visual_guarded_release.py
+      - ops/test_stage2_button_visual_rollback.py
+      - .github/workflows/stage2-button-visual-rollback.yml
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile and inject rollback failures without production API
+        run: |
+          mkdir -p reports
+          if python -m py_compile ops/stage2_button_visual_guarded_release.py ops/test_stage2_button_visual_rollback.py && python ops/test_stage2_button_visual_rollback.py > reports/stage2_button_visual_rollback.txt 2>&1; then
+            echo STAGE2_VISUAL_ROLLBACK_CI_PASS >> reports/stage2_button_visual_rollback.txt
+          else
+            echo STAGE2_VISUAL_ROLLBACK_CI_FAIL >> reports/stage2_button_visual_rollback.txt
+          fi
+      - name: Save sanitized validation report
+        if: always()
+        run: |
+          if [ -f reports/stage2_button_visual_rollback.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/stage2_button_visual_rollback.txt
+            git commit -m "test: stage2 visual button rollback verification" || true
+            git push origin HEAD:fix/driver-approval-photo-rights-admin-filters-20261116
+          fi
+      - name: Must be green
+        run: grep -Fqx STAGE2_VISUAL_ROLLBACK_CI_PASS reports/stage2_button_visual_rollback.txt

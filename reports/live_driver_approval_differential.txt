@@ -80,6 +80,19 @@ DETAIL DRIVER 172
 DETAIL DRIVER 173     @app.get('/driver-privacy')
 FILE DISPATCH LINECOUNT 198
 FILE UI LINECOUNT 1820
+KEYLINE UI 480 function pdUsePassengerMode(){const u=window.pdOnboardingUser;if(u?.registered){pdObStore('pdDriverPassengerView:'+u.id,'yes');pdHideOnboarding();go(11)}else pdShowOnboarding('passenger')}
+KEYLINE UI 481 function pdStartDriverRegistration(){if(pdRoleVisibility(window.pdOnboardingUser).passengerView)return;pdShowOnboarding('driver')}
+KEYLINE UI 482 async function pdLoadDriverApplications(){
+KEYLINE UI 483  const area=$('pdDriverApplicationsList');if(!area)return;area.textContent=pdL('Загрузка…');
+KEYLINE UI 484  try{const d=await api('/api/admin/driver-applications');area.replaceChildren();if(!d.applications.length){area.textContent=pdL('Заявок водителей пока нет');return}
+KEYLINE UI 485   for(const a of d.applications){const row=document.createElement('article');row.className='pd-driver-application';const title=document.createElement('h3');title.textContent=a.name;row.append(title);const details=document.createElement('p');details.textContent=[a.phone,a.city,a.vehicle,a.vehicle_year,a.plate,String(a.seats)+' '+pdL('Пассажирских мест')].join(' · ');row.append(details);const status=document.createElement('p');status.textContent=(a.stage===1?'Этап 1 · ':'Этап 2 · ')+pdL({stage2:'П
+KEYLINE UI 486    const actions=document.createElement('div');actions.className='actions';for(const[target,label]of [['approved','Одобрить'],['rejected','Отклонить'],['pending','На проверку']]){const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent=pdL(label);b.disabled=a.status===target||(target==='approved'&&(missingPhotos.length>0||a.status==='stage2'));b.onclick=async()=>{actions.querySelectorAll('button').forEach(x=>x.disabled=true);try{await api('/api/admin/driver-
+KEYLINE UI 487  }catch(e){area.textContent=pdL(e.message)}
+KEYLINE UI 488 }
+KEYLINE UI 489 </script><script src="https://telegram.org/js/telegram-web-app.js"></script>
+KEYLINE UI 490 <script>
+KEYLINE UI 491 async function invoiceFetch(url,body){let r=await fetch(url,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:body?JSON.stringify(body):undefined});if(!r.ok){let d=await r.json().catch(()=>({}));throw Error(d.error||pdL("Ошибка выставления счёта"))}return r}
+KEYLINE UI 492 async function issuePdfInvoice(id){try{let buyer=prompt(pdL("Название покупателя / компании (необязательно). Для частного клиента нажмите OK с пустым полем."));if(buyer===null)return;let code='';if(buyer.trim()){let val=prompt(pdL("Код компании, если нужен (необязательно):"),'');if(val===null)return;code=val;}let res=await invoiceFetch('/api/admin/invoices/'+id,{buyer_name:buyer,buyer_code:code});let d=await res.json();let url='/api/admin/invoices/'+id+'/pdf';let pdf=await invoiceFetch(url);let 
 PATTERN UI function pdDocumentRefresh COUNT 1
 SOURCE UI 336 function pdDocumentRefresh(){pdDriverStageRefresh();const saved=window.pdOnboardingUser?.driver_application?.document_sides||[];for(const side of pdDocumentSides){const input=$('pdPhoto_'+side);input.required=s
 PATTERN UI async function pdChooseDocument COUNT 1

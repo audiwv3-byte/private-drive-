@@ -1,0 +1,28 @@
+name: PRIVATE DRIVE - PR25 explicitly approved production deployment
+on:
+  push:
+    branches: [ops/pr25-live-overlay-dryrun-20261116]
+    paths:
+      - .github/workflows/pr25-approved-production-deploy.yml
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-pr25-production-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile guarded deployment code
+        run: python -m py_compile ops/pr25_guarded_deploy_NOT_EXECUTED.py ops/pr25_live_overlay_dryrun.py
+      - name: Apply exactly two PR25 production files with preflight backups and automatic rollback
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+          OPERATOR_APPROVED_PR25: 'YES'
+        run: python ops/pr25_guarded_deploy_NOT_EXECUTED.py --execute

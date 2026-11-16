@@ -5,6 +5,7 @@ on:
     paths:
       - ops/pd_paypal_live_audit.py
       - ops/pd_paypal_overlay_dryrun.py
+      - ops/pd_launch_readonly_smoke.py
       - .github/workflows/pd-paypal-live-audit.yml
 permissions:
   contents: write
@@ -28,13 +29,15 @@ jobs:
         env:
           PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
         run: python ops/pd_paypal_overlay_dryrun.py > reports/paypal_overlay_dryrun.txt
+      - name: Public launch readiness smoke checks (GET only)
+        run: python ops/pd_launch_readonly_smoke.py > reports/launch_smoke.txt
       - name: Save sanitized audit findings to isolated branch
         if: always()
         run: |
           if [ -f reports/paypal_live_compatibility.txt ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add reports/paypal_live_compatibility.txt reports/paypal_overlay_dryrun.txt
+            git add reports/paypal_live_compatibility.txt reports/paypal_overlay_dryrun.txt reports/launch_smoke.txt
             git commit -m "audit(paypal): record safe live compatibility statuses" || true
             git push origin HEAD:ops/paypal-readonly-live-audit-20261116
           fi

@@ -156,6 +156,17 @@ def main():
                 errors.append("RESTORE_FAILED_"+name)
         try:reload(token)
         except Exception:errors.append("ROLLBACK_RELOAD_FAILED")
+        # A successful API response is not proof of rollback: verify bytes
+        # and ensure that the restored application is serving requests.
+        for name in TARGETS:
+            try:
+                if read(ROOT+"/"+name,token)!=old[name]:
+                    errors.append("ROLLBACK_CONTENT_MISMATCH_"+name)
+            except Exception:
+                errors.append("ROLLBACK_READBACK_FAILED_"+name)
+        try:
+            if not healthy():errors.append("ROLLBACK_PUBLIC_HEALTH_FAILED")
+        except Exception:errors.append("ROLLBACK_PUBLIC_HEALTH_ERROR")
         print("ROLLBACK_VERIFIED" if not errors else "ROLLBACK_MANUAL_INTERVENTION_REQUIRED",flush=True)
         for e in errors:print(e,flush=True)
         raise

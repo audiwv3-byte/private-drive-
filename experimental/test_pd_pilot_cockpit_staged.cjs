@@ -88,6 +88,14 @@ async function test(){
  assert.equal(cockpit.state().gpsEnabled,false);
  assert.equal(clearCount>=1,true);
  assert.equal(gpsButtons[0].hidden,false);
+ const oldNetworkCount=requests.filter(r=>r.path==='/api/trip/32/location').length;
+ const oldMoves=moved;
+ gpsCallbacks[0]({coords:{latitude:54.69,longitude:25.28,accuracy:9}});
+ await new Promise(res=>setImmediate(res));
+ assert.equal(requests.filter(r=>r.path==='/api/trip/32/location').length,oldNetworkCount,
+    'stale GPS callback must never send location after stop');
+ assert.equal(moved,oldMoves,'stale GPS callback cannot move map after stop');
+ console.log('PASS STALE_GPS_CALLBACK_IGNORED_AFTER_STOP');
  console.log('PASS GPS_STOP_RESTORES_BUTTON_AND_RELEASES_WATCH');
  cockpit.stopGps();
  cockpit.dispose();

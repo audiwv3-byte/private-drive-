@@ -1,0 +1,79 @@
+/* PRIVATE DRIVE experimental cockpit overlay — scoped to approved pilot only. */
+body.pd-pilot-cockpit-on {
+ overflow:hidden!important;
+}
+body.pd-pilot-cockpit-on #pdPilotCockpit {
+ position:fixed;
+ z-index:2147482000;
+ inset:0;
+ width:100vw;
+ height:100vh;
+ height:100dvh;
+ overflow:hidden;
+ display:block;
+ background:#080808;
+ color:#f6eac3;
+ font:inherit;
+}
+body.pd-pilot-cockpit-on #pdPilotCockpitMap {
+ position:absolute;
+ inset:0;
+ width:100%;
+ height:100%;
+ background:#161616;
+}
+body.pd-pilot-cockpit-on #pdPilotCockpit .pd-cockpit-top {
+ position:absolute;
+ z-index:1000;
+ inset-block-start:calc(env(safe-area-inset-top,0px) + 12px);
+ inset-inline:12px;
+ border-radius:12px;
+ background:rgba(12,12,12,.89);
+ padding:12px 16px;
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:8px;
+ color:#e9c678;
+ pointer-events:auto;
+}
+body.pd-pilot-cockpit-on #pdPilotCockpit .pd-cockpit-bottom {
+ position:absolute;
+ z-index:1000;
+ inset-inline:12px;
+ inset-block-end:calc(env(safe-area-inset-bottom,0px) + 12px);
+ max-height:min(43dvh,420px);
+ overflow:auto;
+ background:rgba(12,12,12,.91);
+ border:1px solid rgba(224,185,104,.58);
+ border-radius:16px;
+ padding:12px;
+ color:#f9f4e4;
+ pointer-events:auto;
+}
+body.pd-pilot-cockpit-on #pdPilotCockpit .pd-cockpit-actions,
+body.pd-pilot-cockpit-on #pdPilotCockpit .pd-cockpit-gps-controls {
+ display:flex;
+ flex-wrap:wrap;
+ gap:8px;
+}
+body.pd-pilot-cockpit-on #pdPilotCockpit button {
+ border:1px solid #d4af37;
+ border-radius:10px;
+ background:#181818;
+ color:#ffe6a2;
+ min-height:42px;
+ padding:8px 14px;
+ cursor:pointer;
+}
+body.pd-pilot-cockpit-on #pdPilotCockpit button[hidden] {display:none!important}
+body.pd-pilot-cockpit-on #pdPilotCockpit .pd-cockpit-route {
+ overflow-wrap:anywhere;
+ margin:8px 0;
+}
+@media (prefers-reduced-motion:reduce){
+ body.pd-pilot-cockpit-on #pdPilotCockpit * {
+  scroll-behavior:auto!important;
+  transition:none!important;
+ }
+}

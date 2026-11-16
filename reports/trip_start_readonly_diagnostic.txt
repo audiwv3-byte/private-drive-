@@ -1,0 +1,227 @@
+SOURCE miniapp_server.py DIFFERENT LIVE_SHA e827dcc675c40195
+SOURCE pd_trip_runtime_v4.js DIFFERENT LIVE_SHA ca94b0c8006ba50f
+SOURCE pd_trip_runtime_v4.py DIFFERENT LIVE_SHA 0bee9f529e34000d
+SOURCE pd_pilot_dispatch.py DIFFERENT LIVE_SHA a209e55428d49626
+SOURCE pd_admin_console_v4.py DIFFERENT LIVE_SHA 2a45f5c85ea47945
+SECTION UI_ACTION_CONTROL matches 8
+LINE 35 window.pdStartRideV7=async function(id,recover=false){const fix=await firstPosition(),coords={lat:fix.coords.latitude,lon:fix.coords.longitude,accuracy:fix.coords.accuracy};await requestTrip(id,'/action',{action:recover?'recover_s
+LINE 36 
+LINE 100 async function action(name){await requestTrip(active,'/action',{action:name});await refresh();if(name==='finish'){stopPosition(true);closing(false);if(typeof pdCheckTripCompletion==='function')pdCheckTripCompletion()}}
+LINE 101 async function refresh(){
+LINE 114 if(r.role==='pilot'&&live){
+LINE 115 if(r.departed_at){
+LINE 157 if(r.role==='pilot'&&r.status==='Подтверждена'){
+LINE 158 if(!r.departed_at)body.append(button(label('В пути к пассажиру','On my way to pickup','Vykstu pas keleivį'),()=>beginDeparture(id)));
+LINE 159 else body.append(button(r.arrived_at?label('В путь','Start trip','Pradėti kelionę'):label('Прибыл','Arrived','Atvykau'),()=>r.arrived_at?window.pdStartRideV7(id):action('arrive')));
+LINE 160 }
+LINE 161 if(r.role==='pilot'&&r.started_at&&!r.ended_at)body.append(button(r.stop_started_at?label('Продолжить поездку','Resume trip','Tęsti kelionę'):label('Остановка','Stop','Sustojimas'),()=>action(r.stop_started_at?'stop_end':'stop_s
+LINE 162 if(r.role==='passenger'&&live&&!r.stop_accepted_at){p(label('Остановка: 0,25 € за каждую начатую минуту с первой минуты.','Stops: €0.25 per started minute from the first minute.','Sustojimas: 0,25 € už kiekvieną pradėtą minutę n
+LINE 169 if(r.role==='pilot'&&r.status==='В пути'&&!r.started_at){p(label('В старой поездке время начала не записано. Нажмите «В путь»: учёт начнётся с текущего момента.','This older trip has no recorded start. Press Start trip to begin
+LINE 170 if(r.role==='pilot'&&r.status==='В пути'&&r.started_at)body.append(button(label('Завершить поездку','Finish trip','Baigti kelionę'),()=>action('finish')));
+LINE 171 if(r.final_cents!==null&&r.final_cents!==undefined){
+SECTION TRIP_REGISTER_AND_ROUTES matches 14
+LINE 72 def register(app, core, auth, provider=None, clock=None):
+LINE 73 """provider must implement checkout/retrieve/capture/cancel/verify_event.
+LINE 74 No real provider is constructed automatically. Cash/bank stay on their own path.
+LINE 178 @app.post('/api/trip/<int:oid>/waiting-consent')
+LINE 179 def pd_v4_wait_consent(oid):
+LINE 180 uid = identity()
+LINE 197 @app.post('/api/trip/<int:oid>/depart')
+LINE 198 def pd_v4_depart(oid):
+LINE 199 uid=identity();d=request.get_json(silent=True) or {}
+LINE 215 @app.post('/api/trip/<int:oid>/stop-consent')
+LINE 216 def pd_v7_stop_consent(oid):
+LINE 217 uid = identity()
+LINE 232 @app.post('/api/trip/<int:oid>/location')
+LINE 233 def pd_v4_location(oid):
+LINE 234 uid = identity()
+LINE 265 def transition(oid, action, uid, admin_reason=None):
+LINE 266 text = None
+LINE 267 with core.db(core.ORDERS_DB) as c:
+LINE 349 @app.post('/api/trip/<int:oid>/action')
+LINE 350 def pd_v4_action(oid):
+LINE 351 return jsonify(transition(oid, (request.get_json(silent=True) or {}).get('action'), identity()))
+LINE 352 
+LINE 353 @app.post('/api/trip/<int:oid>/extras')
+LINE 354 def pd_v4_extra(oid):
+LINE 355 uid = identity()
+LINE 379 @app.post('/api/trip/<int:oid>/extras/<int:eid>')
+LINE 380 def pd_v4_extra_decision(oid, eid):
+LINE 381 uid = identity()
+LINE 468 @app.post('/api/trip/<int:oid>/cancel')
+LINE 469 def pd_v4_cancel(oid):
+LINE 470 configured()
+LINE 517 @app.post('/api/trip/<int:oid>/authorize')
+LINE 518 def pd_v4_authorize(oid):
+LINE 519 configured()
+LINE 553 @app.post('/api/trip/<int:oid>/accept')
+LINE 554 def pd_v4_accept(oid):
+LINE 555 configured()
+LINE 574 @app.post('/api/trip/payments/webhook')
+LINE 575 def pd_v4_payment_webhook():
+LINE 576 configured()
+SECTION TRIP_PILOT_AUTH_AND_START matches 10
+LINE 87 return r
+LINE 88 
+LINE 89 def pilot(c, r, uid):
+LINE 90 # Called inside the same transaction as the mutation.
+LINE 91 if r['pilot_id'] != uid:
+LINE 92 raise PermissionError('Заказ назначен другому пилоту')
+LINE 93 if not c.execute("SELECT 1 FROM trip_users.pd_driver_applications WHERE telegram_id=? AND status='approved'", (uid,)).fetchone():
+LINE 94 raise PermissionError('Доступ пилота отсутствует')
+LINE 95 
+LINE 263 return jsonify(ok=True)
+LINE 264 
+LINE 265 def transition(oid, action, uid, admin_reason=None):
+LINE 266 text = None
+LINE 267 with core.db(core.ORDERS_DB) as c:
+LINE 268 attach(c)
+LINE 269 r = row(c, oid)
+LINE 270 if admin_reason is not None:
+LINE 271 if not core.is_admin(uid) or not 3 <= len(str(admin_reason)) <= 500:
+LINE 280 (action == 'finish' and t['ended_at'] and r['status'] == 'Выполнена')):
+LINE 281 action = 'noop'
+LINE 282 if action == 'arrive':
+LINE 283 if not t['departed_at'] or t['departed_pilot_id']!=r['pilot_id']:raise ValueError('Сначала отметьте выезд к пассажиру с включённой геолокацией')
+LINE 284 if r['status'] != 'Подтверждена' or t['started_at'] or t['ended_at']:
+LINE 285 raise ValueError('Прибытие недоступно для текущего статуса')
+LINE 286 if not t['arrived_at']:
+LINE 287 c.execute('UPDATE pd_trip_runtime_v4 SET arrived_at=?,base_cents=? WHERE order_id=?', (clock(), money(r['price']), oid))
+LINE 288 event(c, oid, uid, 'arrived')
+LINE 299 if not recovering and (r['status'] != 'Подтверждена' or not t['arrived_at'] or t['ended_at']):
+LINE 300 raise ValueError('Сначала отметьте прибытие')
+LINE 301 if r['payment_status'] != 'Оплачено':
+LINE 302 raise ValueError('Дождитесь подтверждённой оплаты')
+LINE 303 wait = (t['wait_cents'] or 0) if recovering else waiting_cents(t['arrived_at'], t['wait_accepted_at'], clock())
+LINE 304 if recovering:
+LINE 305 c.execute('UPDATE pd_trip_runtime_v4 SET base_cents=?,departed_at=?,departed_pilot_id=?,lat=?,lon=?,accuracy=?,location_at=?,location_pilot_id=? WHERE order_id=?',(t['base_cents'] or money(r['price']),clock(),u
+LINE 306 event(c,oid,uid,'legacy_meter_started_now_without_backdating')
+LINE 307 c.execute('UPDATE pd_trip_runtime_v4 SET started_at=?,wait_cents=?,trip_meters=0,meter_lat=NULL,meter_lon=NULL,meter_at=NULL WHERE order_id=?', (clock(), wait, oid))
+LINE 308 c.execute("UPDATE orders SET status='В пути',updated_at=? WHERE id=?", (core.now().isoformat(), oid))
+LINE 309 event(c, oid, uid, 'started')
+LINE 310 text = f'🚘 Заказ №{oid}: учёт времени и расстояния начат с текущего момента.' if recovering else f'🚘 Заказ №{oid}: поездка началась.'
+LINE 311 elif action in ('stop_start','stop_end'):
+LINE 312 if r['status'] != 'В пути' or not t['started_at'] or t['ended_at']:raise ValueError('Сначала нажмите «В путь»')
+LINE 313 if action == 'stop_start':
+LINE 314 if not t['stop_accepted_at']:raise ValueError('Пассажир должен подтвердить тариф остановок в приложении')
+LINE 322 event(c,oid,uid,'stop_ended:'+str(seconds)+'s:'+str(cents)+'c')
+LINE 323 text=f'▶ Заказ №{oid}: поездка продолжена. Остановка: {seconds} сек., {cents/100:.2f} €.'
+LINE 324 elif action == 'finish':
+LINE 325 if r['status'] != 'В пути' or not t['started_at']:
+LINE 326 raise ValueError('Сначала начните поездку')
+LINE 327 if c.execute("SELECT 1 FROM pd_trip_extras_v4 WHERE order_id=? AND state='proposed'", (oid,)).fetchone():
+LINE 328 raise ValueError('Пассажир должен принять или отклонить предложенные доплаты')
+LINE 329 extras = c.execute("SELECT COALESCE(SUM(amount_cents),0) FROM pd_trip_extras_v4 WHERE order_id=? AND state='accepted'", (oid,)).fetchone()[0]
+LINE 330 if t['stop_started_at']:
+LINE 403 # Prevent the legacy pilot status buttons from bypassing arrival/wait/final totals.
+LINE 404 for rule in list(app.url_map.iter_rules()):
+LINE 405 if rule.rule == '/api/driver/work/<int:oid>/status':
+LINE 406 def legacy_status(oid):
+LINE 407 target = (request.get_json(silent=True) or {}).get('status')
+LINE 408 action = {'В пути': 'start', 'Выполнена': 'finish'}.get(target)
+LINE 409 return jsonify(transition(oid, action, identity()))
+LINE 410 app.view_functions[rule.endpoint] = legacy_status
+LINE 411 
+LINE 412 for rule in list(app.url_map.iter_rules()):
+LINE 432 app.view_functions[rule.endpoint] = timed_work
+LINE 433 
+LINE 434 app.config['PD_TRIP_TRANSITION_V4'] = transition
+LINE 435 register_payments(app, core, auth, provider, clock, row, attach, pilot, notify)
+LINE 436 
+LINE 437 
+LINE 438 def register_payments(app, core, auth, provider, clock, order_row, attach, pilot, notify):
+LINE 439 """Authorization is collected before acceptance; capture only on acceptance.
+LINE 440 Signed provider events are authoritative for payment_status='Оплачено'.
+LINE 527 if uid != r['telegram_id']:
+LINE 528 raise PermissionError('Оплату подтверждает пассажир')
+LINE 529 if r['status'] != 'Новая' or r['payment_status'] == 'Оплачено':
+LINE 530 raise ValueError('Заявка уже обработана')
+LINE 531 amount = money(r['price'])
+LINE 532 old = c.execute('SELECT * FROM pd_booking_capture_v4 WHERE order_id=?', (oid,)).fetchone()
+LINE 533 if old and (old['amount_cents'] != amount or old['mode'] != provider.mode):
+LINE 534 raise ValueError('Сумма или режим оплаты изменились')
+LINE 535 if old and old['checkout_url']:
+SECTION SERVER_ADMIN_AND_PLUGIN_ORDER matches 8
+LINE 411 @app.post('/api/admin/status')
+LINE 412 def admin_status():
+LINE 413 uid, _ = auth()
+LINE 414 if not core.is_admin(uid):
+LINE 415 raise PermissionError('Нет доступа')
+LINE 432 current = r['status']
+LINE 433 if target == 'В пути' and r['payment_status'] != 'Оплачено':
+LINE 434 raise ValueError('Дождитесь подтверждённой оплаты перед началом поездки')
+LINE 435 if target not in transitions.get(current, set()):
+LINE 436 raise ValueError('Недопустимое изменение статуса: ' + str(current))
+LINE 1013 # V4 staging-only registration: no provider, no real payments.
+LINE 1014 import pd_trip_runtime_v4
+LINE 1015 pd_trip_runtime_v4.register(app, core, auth, provider=None)
+LINE 1016 import pd_admin_console_v4
+LINE 1017 pd_admin_console_v4.register(app,core,auth)
+LINE 1018 @app.get('/assets/pd-trip-runtime-v4.js')
+LINE 1019 def pd_trip_runtime_v4_asset():
+LINE 1020 return send_file(ROOT / 'pd_trip_runtime_v4.js', mimetype='application/javascript', max_age=0)
+LINE 1064 # Approved pilots may access only orders assigned to their Telegram identity.
+LINE 1065 import pd_pilot_dispatch
+LINE 1066 pd_pilot_dispatch.register(app,core,auth)
+LINE 1067 
+LINE 1068 # Immutable PDF invoices, restricted to each passenger and dispatchers.
+LINE 1069 import pd_invoice_v2
+SECTION DISPATCH_LEGACY_STATUS matches 9
+LINE 24 with core.db(core.ORDERS_DB) as c:
+LINE 25 rows=c.execute('''SELECT o.id,o.telegram_id,o.origin,o.destination,o.stop_address,o.order_type,o.trip_date,o.trip_time,o.status,o.price,o.payment_method,o.payment_status,o.passengers,o.luggage,o.details FROM orders o JOIN pd_pi
+LINE 26 with core.db(core.USERS_DB) as c:
+LINE 27 result=[]
+LINE 28 for r in rows:
+LINE 29 item=dict(r);customer=c.execute('SELECT name,phone FROM users WHERE telegram_id=?',(item.pop('telegram_id'),)).fetchone();item['customer']=dict(customer) if customer else {};result.append(item)
+LINE 51 except InvalidOperation:quote=Decimal('0')
+LINE 52 if quote.is_finite() and quote>0:c.execute("UPDATE orders SET status='Подтверждена',updated_at=? WHERE id=?",(core.now().isoformat(),oid))
+LINE 53 old=c.execute('SELECT pilot_id FROM pd_pilot_assignments WHERE order_id=?',(oid,)).fetchone()
+LINE 54 if (old['pilot_id'] if old else None)!=pilot:
+LINE 55 now=core.now().isoformat()
+LINE 56 if pilot is None:c.execute('DELETE FROM pd_pilot_assignments WHERE order_id=?',(oid,))
+LINE 59 return jsonify(ok=True,notification=notify_assignment(core,oid) if pilot is not None else 'not_assigned')
+LINE 60 @app.post('/api/driver/work/<int:oid>/accept-manual')
+LINE 61 def accept_manual(oid):
+LINE 62 auth()
+LINE 63 return jsonify(error='Заказ подтверждает диспетчер. Повторное принятие пилотом не требуется.'),403
+LINE 64 
+LINE 65 @app.post('/api/driver/work/<int:oid>/status')
+LINE 66 def status(oid):
+LINE 67 uid,_=auth()
+LINE 68 if not approved(uid):raise PermissionError('Доступ пилота отсутствует')
+LINE 69 d=request.get_json(silent=True) or {};target=d.get('status');allowed={'В пути':'Подтверждена','Выполнена':'В пути'}
+LINE 70 if target not in allowed:raise ValueError('Недопустимый статус')
+LINE 71 with core.db(core.ORDERS_DB) as c:
+LINE 72 c.execute('ATTACH DATABASE ? AS pilot_users',(str(core.USERS_DB),));c.execute('BEGIN IMMEDIATE')
+LINE 73 still_approved=c.execute("SELECT 1 FROM pilot_users.pd_driver_applications WHERE telegram_id=? AND status='approved'",(uid,)).fetchone()
+LINE 74 if not still_approved:raise PermissionError('Доступ пилота отсутствует')
+LINE 75 r=c.execute('SELECT o.status,o.telegram_id,o.payment_status FROM orders o JOIN pd_pilot_assignments a ON a.order_id=o.id WHERE o.id=? AND a.pilot_id=?',(oid,uid)).fetchone()
+LINE 76 if not r:return jsonify(error='Заказ не найден'),404
+LINE 77 if r['status']!=allowed[target]:raise ValueError('Статус заказа уже изменился')
+LINE 78 if target=='В пути' and r['payment_status']!='Оплачено':raise ValueError('Дождитесь подтверждённой оплаты перед началом поездки')
+LINE 79 c.execute('UPDATE orders SET status=?,updated_at=? WHERE id=?',(target,core.now().isoformat(),oid))
+LINE 80 try:
+LINE 81 text=f'🚘 Заказ №{oid}: статус «{target}».'
+LINE 82 if target=='Выполнена':text+='\nПоездка окончена. Спасибо за поездку! Откройте приложение, чтобы оценить водителя.'
+LINE 83 core.say(r['telegram_id'],text)
+SECTION ADMIN_CONSOLE_GUARD matches 4
+LINE 151 return jsonify(ok=True,revision=revision(new),needs_reprice=bool(set(changes)-{'admin_note'}))
+LINE 152 
+LINE 153 @app.post('/api/admin/console/orders/<int:oid>/action')
+LINE 154 def pd_admin_console_action(oid):
+LINE 155 uid=admin();body=request.get_json(silent=True) or {};reason=str(body.get('reason','')).strip()
+LINE 156 if body.get('action') not in ('arrive','start','finish') or not 3<=len(reason)<=500:
+LINE 157 raise ValueError('Укажите действие и причину')
+LINE 158 transition=app.config.get('PD_TRIP_TRANSITION_V4')
+LINE 159 if not transition:raise ValueError('Сценарий поездки ещё не подключён')
+LINE 160 # Transition itself locks the row and checks payment/state; all changes share its transaction.
+LINE 161 return jsonify(transition(oid,body['action'],uid,admin_reason=reason))
+LINE 162 
+LINE 163 @app.before_request
+LINE 164 def pd_admin_console_assignment_guard():
+LINE 165 if request.method!='POST' or not request.path.startswith('/api/admin/pilot-assignments/'):
+LINE 166 return
+LINE 167 admin()
+LINE 168 oid=(request.view_args or {}).get('oid')
+LINE 169 with core.db(core.ORDERS_DB) as c:
+READ_ONLY_NO_ORDER_OR_PAYMENT_DATA_ACCESSED

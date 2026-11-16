@@ -29,15 +29,27 @@ def overlay(src):
     validate(src.count('id="pdPilotWork"')==1 and src.count('id="pdPilotWorkList"')==1,"PILOT_HOST_UNIQUE")
     validate('pdPilotCockpit' not in src,"NO_EXISTING_COCKPIT")
     # CSS is scoped to the cockpit body class. No other UI is touched.
-    out=src.replace("</head>","<style id=\"pd-pilot-cockpit-stage-css\">\\n"+css+"\\n</style>\\n</head>",1)
-    embed=("<script id=\"pd-pilot-cockpit-stage-js\">\\n"+module+"\\n</script>\\n"+
-           "<script id=\"pd-pilot-cockpit-adapter-stage-js\">\\n"+adapter+"\\n</script>\\n")
+    out=src.replace("</head>","<style id=\"pd-pilot-cockpit-stage-css\">\n"+css+"\n</style>\n</head>",1)
+    embed=("<script id=\"pd-pilot-cockpit-stage-js\">\n"+module+"\n</script>\n"+
+           "<script id=\"pd-pilot-cockpit-adapter-stage-js\">\n"+adapter+"\n</script>\n")
     out=out.replace("</body>",embed+"</body>",1)
     validate(out.count("pd-pilot-cockpit-stage-css")==1 and out.count("pd-pilot-cockpit-adapter-stage-js")==1,"EXACTLY_ONCE_INJECTED")
+    # Validate the JS and CSS *as embedded in the produced HTML*, not just
+    # the source files. Broken escaping in an overlay must fail closed.
+    for ident in ("pd-pilot-cockpit-stage-js","pd-pilot-cockpit-adapter-stage-js"):
+        opening='<script id="'+ident+'">'
+        tail=out.split(opening,1)[1].split("</script>",1)[0]
+        with tempfile.TemporaryDirectory(prefix="pd-inline-js-check-") as td:
+            js=pathlib.Path(td)/(ident+".js")
+            js.write_text(tail,encoding="utf8")
+            subprocess.run(["node","--check",str(js)],capture_output=True,check=True)
+        print("PASS EMBEDDED_JS_SYNTAX",ident,flush=True)
+    embedded_css=out.split('<style id="pd-pilot-cockpit-stage-css">',1)[1].split("</style>",1)[0]
+    validate("body.pd-pilot-cockpit-on" in embedded_css,"EMBEDDED_CSS_SCOPE")
     for text in ('id="pdbPays"','id="pdPilotWork"','id="pdPilotWorkList"','id="mainNav"',
                  "/assets/pd-admin-console-v4.js","/assets/pd-trip-runtime-v4.js"):
         validate(src.count(text)==out.count(text),"EXISTING_UI_UNCHANGED_"+text[:38])
-    validate(out.endswith("</html>\\n") or out.rstrip().endswith("</html>"),"VALID_HTML_TAIL")
+    validate(out.endswith("</html>\n") or out.rstrip().endswith("</html>"),"VALID_HTML_TAIL")
     return out
 def main():
     token=re.sub(r"^Token\s+","",os.environ["PYTHONANYWHERE_API_TOKEN"].strip(),flags=re.I)

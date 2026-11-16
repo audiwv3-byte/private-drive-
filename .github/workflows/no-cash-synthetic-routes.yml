@@ -4,6 +4,7 @@ on:
     branches: [audit/selected-launch-updates-20261116]
     paths:
       - ops/test_no_cash_synthetic_routes.py
+      - ops/cash_offline_overlay_dryrun.py
       - .github/workflows/no-cash-synthetic-routes.yml
 permissions:
   contents: write

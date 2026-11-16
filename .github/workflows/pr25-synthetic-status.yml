@@ -1,0 +1,42 @@
+name: PRIVATE DRIVE - PR25 live handler synthetic full lifecycle
+on:
+  push:
+    branches: [ops/pr25-live-overlay-dryrun-20261116]
+    paths:
+      - .github/workflows/pr25-synthetic-status.yml
+      - ops/pr25_synthetic_status_integration.py
+permissions:
+  contents: write
+jobs:
+  isolated:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements-runtime.lock.txt
+      - run: python -m py_compile ops/pr25_synthetic_status_integration.py ops/pr25_live_overlay_dryrun.py
+      - name: Exercise current production handlers in throwaway Flask and SQLite
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: |
+          mkdir -p reports
+          if python ops/pr25_synthetic_status_integration.py > reports/pr25_synthetic_lifecycle.txt 2>&1; then
+            echo PR25_SYNTHETIC_LIFECYCLE_PASSED >> reports/pr25_synthetic_lifecycle.txt
+          else
+            echo PR25_SYNTHETIC_LIFECYCLE_FAILED >> reports/pr25_synthetic_lifecycle.txt
+          fi
+      - name: Save non-sensitive outcome
+        if: always()
+        run: |
+          if [ -f reports/pr25_synthetic_lifecycle.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pr25_synthetic_lifecycle.txt
+            git commit -m "test(pr25): synthetic status and role regression report" || true
+            git push origin HEAD:ops/pr25-live-overlay-dryrun-20261116
+          fi
+      - name: Require all synthetic route checks to pass
+        run: grep -q '^PR25_SYNTHETIC_LIFECYCLE_PASSED$' reports/pr25_synthetic_lifecycle.txt

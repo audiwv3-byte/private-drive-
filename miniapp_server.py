@@ -18,6 +18,7 @@ register_request_guard(app)
 import pd_languages
 import pd_stops
 import pd_fixed_prices
+import pd_paypal_checkout as pd_paypal
 TIMEZONE = ZoneInfo('Europe/Vilnius')
 MAX_AGE = 86400
 
@@ -469,6 +470,7 @@ def payment(oid):
     if not r or (r['telegram_id']!=uid and not core.is_admin(uid)):raise PermissionError('Нет доступа')
     return jsonify(id=oid,price=r['price'],status=r['status'],payment_status=r['payment_status'],
        card_link=r['card_payment_url'] if r['status']=='Подтверждена' else '',
+       paypal_available=bool(pd_paypal.settings()) and r['status']=='Подтверждена' and bool(r['price']) and r['payment_status'] not in ('Оплачено', 'Перевод на проверке', 'Ожидается банковский перевод'),
        currencies=['USDC','BTC','ETH'], addresses={c: core.CRYPTO_ADDRESSES.get(c, '') if r['status']=='Подтверждена' and r['crypto_currency']==c and r['crypto_amount'] else '' for c in core.PAYMENT_CURRENCIES}, crypto_currency=r['crypto_currency'], crypto_amount=r['crypto_amount'] if r['status']=='Подтверждена' else '')
 
 
@@ -492,6 +494,119 @@ def select_cash(oid):
             raise ValueError('Платёж уже обрабатывается. Обратитесь к администратору.')
     core.notify_admins(f'💶 Заказ №{oid}: пассажир выбрал оплату наличными водителю.')
     return jsonify(ok=True, payment_status='Ожидается оплата наличными')
+
+
+# PayPal is OFF by default and never replaces the existing payment methods.
+# The authenticated passenger must own the confirmed booking. Provider
+# credentials and the definitive amount are always server-side.
+def paypal_ready():
+    cfg = pd_paypal.settings()
+    if not cfg:
+        return None
+    return cfg
+
+
+def paypal_check_booking(conn, oid, uid, *, allow_paid=False):
+    row = conn.execute("SELECT * FROM orders WHERE id=?", (oid,)).fetchone()
+    if not row or int(row['telegram_id']) != uid:
+        raise PermissionError('Нет доступа')
+    if row['status'] != 'Подтверждена':
+        raise ValueError('Заказ ещё не подтверждён')
+    if row['payment_status'] == 'Оплачено' and allow_paid:
+        return row
+    if row['payment_status'] not in ('Не оплачено', ''):
+        raise ValueError('Заказ уже оплачен или ожидает другой платёж')
+    if row['stripe_session_id'] or row['crypto_txid'] or row['card_payment_url']:
+        raise ValueError('По заказу уже создан другой онлайн-платёж')
+    pd_paypal.money(row['price'])
+    return row
+
+
+def paypal_table(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS pd_paypal_orders (
+        order_id INTEGER PRIMARY KEY,
+        paypal_order_id TEXT NOT NULL UNIQUE,
+        amount_eur TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        capture_id TEXT UNIQUE,
+        created_at TEXT NOT NULL,
+        captured_at TEXT
+    )""")
+
+
+@app.get('/api/payment/<int:oid>/paypal/config')
+def paypal_client_config(oid):
+    uid, _ = auth()
+    cfg = paypal_ready()
+    if not cfg:
+        return jsonify(enabled=False)
+    with core.db(core.ORDERS_DB) as conn:
+        paypal_check_booking(conn, oid, uid)
+    return jsonify(enabled=True, client_id=cfg['client_id'], currency='EUR')
+
+
+@app.post('/api/payment/<int:oid>/paypal/create')
+def paypal_create_order(oid):
+    uid, _ = auth()
+    cfg = paypal_ready()
+    if not cfg:
+        return jsonify(error='PayPal ещё не подключён'), 503
+    core.initialize()
+    with core.db(core.ORDERS_DB) as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        row = paypal_check_booking(conn, oid, uid)
+        paypal_table(conn)
+        previous = conn.execute('SELECT * FROM pd_paypal_orders WHERE order_id=?', (oid,)).fetchone()
+        amount = pd_paypal.money(row['price'])
+        if previous:
+            if previous['amount_eur'] != amount or previous['mode'] != cfg['mode']:
+                raise ValueError('Цена или режим PayPal изменились. Обратитесь к диспетчеру.')
+            if previous['capture_id']:
+                raise ValueError('Этот заказ уже оплачен')
+            return jsonify(id=previous['paypal_order_id'])
+        # Keep the per-order transaction lock through the provider request:
+        # simultaneous create clicks cannot issue distinct PayPal orders.
+        paypal_id = pd_paypal.create(cfg, oid, amount)
+        conn.execute('INSERT INTO pd_paypal_orders(order_id,paypal_order_id,amount_eur,mode,created_at) VALUES(?,?,?,?,?)',
+                     (oid, paypal_id, amount, cfg['mode'], core.now().isoformat()))
+        return jsonify(id=paypal_id)
+
+
+@app.post('/api/payment/<int:oid>/paypal/capture')
+def paypal_capture_order(oid):
+    uid, _ = auth()
+    cfg = paypal_ready()
+    if not cfg:
+        return jsonify(error='PayPal ещё не подключён'), 503
+    body = request.get_json(silent=True) or {}
+    paypal_id = body.get('paypal_order_id')
+    if not isinstance(paypal_id, str):
+        raise ValueError('Некорректная ссылка PayPal')
+    with core.db(core.ORDERS_DB) as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        paypal_table(conn)
+        record = conn.execute('SELECT * FROM pd_paypal_orders WHERE order_id=?', (oid,)).fetchone()
+        if not record or record['paypal_order_id'] != paypal_id or record['mode'] != cfg['mode']:
+            raise PermissionError('Платёж не принадлежит заказу')
+        row = paypal_check_booking(conn, oid, uid, allow_paid=True)
+        if record['capture_id']:
+            if row['payment_status'] != 'Оплачено':
+                raise ValueError('Требуется проверка оплаченного заказа диспетчером')
+            return jsonify(ok=True, payment_status='Оплачено', replayed=True)
+        if row['payment_status'] == 'Оплачено':
+            raise ValueError('Заказ уже оплачен другим способом')
+        if pd_paypal.money(row['price']) != record['amount_eur']:
+            raise ValueError('Сумма заказа изменилась; оплата остановлена')
+        # PayPal-Request-Id makes retries idempotent at the provider.
+        result = pd_paypal.capture(cfg, paypal_id, oid)
+        capture_id = pd_paypal.validated_capture(result, oid, record['amount_eur'])
+        conn.execute('UPDATE pd_paypal_orders SET capture_id=?,captured_at=? WHERE order_id=? AND capture_id IS NULL',
+                     (capture_id, core.now().isoformat(), oid))
+        conn.execute("""UPDATE orders SET payment_status='Оплачено',
+            payment_method='PayPal', updated_at=?
+            WHERE id=? AND payment_status IN ('Не оплачено', '')""",
+            (core.now().isoformat(), oid))
+    return jsonify(ok=True, payment_status='Оплачено')
 
 
 # Stripe: the secret key is loaded from .env by the core module. No secrets in HTML.

@@ -16,6 +16,8 @@ on:
       - test_pd_issue30_stage_adapter.py
       - pd_issue30_decision_bridge.py
       - test_pd_issue30_decision_bridge.py
+      - pd_issue30_document_storage_guard.py
+      - test_pd_issue30_document_storage_guard.py
   workflow_dispatch:
 
 permissions:
@@ -32,7 +34,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Run isolated tests
-        run: python -m unittest -v test_pd_document_review_synthetic.py test_pd_issue30_stage_adapter.py test_pd_issue30_decision_bridge.py
+        run: python -m unittest -v test_pd_document_review_synthetic.py test_pd_issue30_stage_adapter.py test_pd_issue30_decision_bridge.py test_pd_issue30_document_storage_guard.py
   readonly-audit:
     name: PythonAnywhere GET-only source fingerprint
     runs-on: ubuntu-latest

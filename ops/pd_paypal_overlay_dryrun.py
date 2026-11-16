@@ -70,6 +70,9 @@ def main():
     checked=0
     for index,((attrs,body),(old_attrs,old_body)) in enumerate(zip(script_tags,prior_scripts)):
         if re.search(r"\bsrc\s*=",attrs,re.I) or not body.strip():continue
+        if body==old_body:
+            # Old unrelated script; never approve PayPal using its parse status.
+            continue
         if re.search(r"\btype\s*=\s*['\"](?:application/json|application/ld\+json)",attrs,re.I):continue
         with tempfile.TemporaryDirectory(prefix="pd-paypal-js-") as temp:
             pathname=pathlib.Path(temp)/"inline.js"

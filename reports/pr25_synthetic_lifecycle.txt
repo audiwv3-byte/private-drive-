@@ -20,4 +20,8 @@ PASS OLD_PILOT_PAID_START_SUCCESS
 PASS PAID_TRIP_STATUS_IN_PROGRESS
 PASS TRIP_START_TIMESTAMP_RECORDED
 ISOLATED_TEST_FAILED TypeError unsupported operand type(s) for +: 'NoneType' and 'int'
+FAILURE_FRAME app.py 880 full_dispatch_request
+FAILURE_FRAME app.py 865 dispatch_request
+FAILURE_FRAME pd_trip_runtime_v4.py 707 guarded_legacy_status
+FAILURE_FRAME pd_trip_runtime_v4.py 335 transition
 PR25_SYNTHETIC_LIFECYCLE_FAILED

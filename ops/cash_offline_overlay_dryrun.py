@@ -23,7 +23,8 @@ def candidate(s,html,bot):
     start=s.index("def select_cash(oid):")
     end=s.find("\n@app.",start)
     fn=s[start:end if end>=0 else len(s)]
-    if "r['payment_method']" not in fn:raise RuntimeError("CASH_ENDPOINT_MUST_BE_REVIEWED")
+    if "UPDATE orders SET payment_method='Наличные'" not in fn:
+        raise RuntimeError("CASH_ENDPOINT_MUTATION_ANCHOR_MISSING")
     # Do not modify cash receipt ledger or admin confirmations for old bookings.
     # Append a strict guard only inside select_cash before any state mutation.
     checkpoint="    with core.db(core.ORDERS_DB) as conn:\n"

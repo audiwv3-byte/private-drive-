@@ -72,10 +72,15 @@ def main():
    def handle_data(self,text):
     if self.capture:self.parts[-1]+=text
   parser=Extract();parser.feed(candidate)
-  for i,body in enumerate(parser.parts):
-   f=pathlib.Path(tmp)/f"inline_{i}.js";f.write_text(body,encoding="utf8")
-   subprocess.run(["node","--check",str(f)],capture_output=True,check=True)
-  print("PASS EMBEDDED_JS_SYNTAX",len(parser.parts),flush=True)
+  touched=[(i,body) for i,body in enumerate(parser.parts) if "function pdStage2ApprovalHint(a,missingPhotos)" in body]
+  assert len(touched)==1,"Exactly one existing inline script should receive the stage2 hint"
+  for i,body in touched:
+   f=pathlib.Path(tmp)/f"modified_inline_{i}.js";f.write_text(body,encoding="utf8")
+   result=subprocess.run(["node","--check",str(f)],capture_output=True,text=True)
+   if result.returncode:
+    print("MODIFIED_INLINE_PARSE_ERROR",result.stderr[-1200:],flush=True)
+    raise RuntimeError("MODIFIED_INLINE_SCRIPT_SYNTAX_INVALID")
+  print("PASS MODIFIED_EMBEDDED_JS_SYNTAX",len(touched),flush=True)
   # Execute only the pure explanation helper on synthetic records.
   helper=FUNCTION+"""
   const assert=require('assert');

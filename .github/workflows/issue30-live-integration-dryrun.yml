@@ -1,0 +1,47 @@
+name: PRIVATE DRIVE issue30 - exact live integration dryrun ONLY
+on:
+  push:
+    branches: [feature/issue-30-live-integration-dryrun-20261117]
+    paths:
+      - ops/issue30_build_live_candidates.py
+      - ops/test_issue30_live_integration_dryrun.py
+      - pd_document_review.py
+      - .github/workflows/issue30-live-integration-dryrun.yml
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install synthetic test-only Flask and Pillow
+        run: python -m pip install Flask==3.1.2 Pillow==11.3.0
+      - name: Check Python syntax and build exact-live candidates in temporary workspace
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: |
+          mkdir -p reports
+          if python -m py_compile pd_document_review.py ops/issue30_build_live_candidates.py ops/test_issue30_live_integration_dryrun.py && python ops/test_issue30_live_integration_dryrun.py > reports/issue30_live_integration_dryrun.txt 2>&1; then
+            echo ISSUE30_LIVE_INTEGRATION_CI_SUCCESS >> reports/issue30_live_integration_dryrun.txt
+          else
+            echo ISSUE30_LIVE_INTEGRATION_CI_FAIL >> reports/issue30_live_integration_dryrun.txt
+          fi
+      - name: Preserve sanitized result
+        if: always()
+        run: |
+          if [ -f reports/issue30_live_integration_dryrun.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/issue30_live_integration_dryrun.txt
+            git commit -m "test(issue30): record exact-live offline candidate compatibility" || true
+            git push origin HEAD:feature/issue-30-live-integration-dryrun-20261117
+          fi
+      - name: Require passing dryrun
+        run: grep -Fqx ISSUE30_LIVE_INTEGRATION_CI_SUCCESS reports/issue30_live_integration_dryrun.txt

@@ -112,6 +112,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix="pd-pr25-live-full-synthetic-") as tempdir:
         temp=pathlib.Path(tempdir)
         source=prepare(temp,token)
+        # Inspect only arithmetic around the synthetic finish failure; no secrets or records.
+        code_lines=source["pd_trip_runtime_v4.py"].splitlines()
+        for line_number in range(331,340):
+            line=code_lines[line_number-1]
+            if any(word in line.lower() for word in ("secret","token","password","api_key")):continue
+            print("FINISH_LOGIC_LINE",line_number,line[:180].strip(),flush=True)
         core=fake_core(temp)
         app=Flask("isolated_pr25_status")
         app.config["TESTING"]=True

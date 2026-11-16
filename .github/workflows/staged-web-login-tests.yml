@@ -1,0 +1,40 @@
+name: PRIVATE DRIVE - isolated web login staging tests
+on:
+  push:
+    branches: [feature/web-login-isolated-20261116]
+    paths:
+      - experimental/pd_web_identity_staged.py
+      - experimental/test_pd_web_identity_staged.py
+      - .github/workflows/staged-web-login-tests.yml
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install 'Flask>=3,<4'
+      - name: Test web-only identity without connecting it to production
+        run: |
+          mkdir -p reports
+          if python experimental/test_pd_web_identity_staged.py > reports/web_login_staging.txt 2>&1; then
+            echo 'WEB_LOGIN_STAGING_PASS' >> reports/web_login_staging.txt
+          else
+            echo 'WEB_LOGIN_STAGING_BLOCK' >> reports/web_login_staging.txt
+          fi
+      - name: Save sanitized report
+        if: always()
+        run: |
+          if [ -f reports/web_login_staging.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/web_login_staging.txt
+            git commit -m "test: web login prototype results" || true
+            git push origin HEAD:feature/web-login-isolated-20261116
+          fi
+      - name: Require tests
+        run: grep -Fqx 'WEB_LOGIN_STAGING_PASS' reports/web_login_staging.txt

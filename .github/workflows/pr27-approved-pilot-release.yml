@@ -1,0 +1,57 @@
+name: PRIVATE DRIVE - PR27 approved one-file cockpit production release
+on:
+  push:
+    branches: [feature/pilot-cockpit-isolated-20261116]
+    paths:
+      - .github/workflows/pr27-approved-pilot-release.yml
+permissions:
+  contents: write
+concurrency:
+  group: private-drive-production-pilot-html-20261116
+  cancel-in-progress: false
+jobs:
+  approve-gates-and-install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate GPS, role isolation and staged adapter
+        run: |
+          mkdir -p reports
+          node --check experimental/pd_pilot_cockpit_staged.js
+          node --check experimental/pd_pilot_cockpit_adapter_staged.js
+          node experimental/test_pd_pilot_cockpit_staged.cjs
+          node experimental/test_pd_pilot_integration_adapter.cjs
+          python ops/test_pr27_guarded_install_offline.py
+      - name: Pin latest live HTML and verify embedded JS/CSS before any write
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: python ops/pr27_live_pilot_overlay_dryrun.py
+      - name: Verified original backup, one-file rollout, reload, rollback on failure
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+          OPERATOR_APPROVED_PR27: "YES"
+        run: |
+          if python ops/pr27_guarded_install_NOT_EXECUTED.py --execute > reports/pr27_production_release.txt 2>&1; then
+            echo PR27_RELEASE_WORKFLOW_SUCCESS >> reports/pr27_production_release.txt
+          else
+            echo PR27_RELEASE_WORKFLOW_FAILED >> reports/pr27_production_release.txt
+          fi
+      - name: Save sanitized operational results
+        if: always()
+        run: |
+          if [ -f reports/pr27_production_release.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pr27_production_release.txt
+            git commit -m "release(pilot): record one-file live installation status" || true
+            git push origin HEAD:feature/pilot-cockpit-isolated-20261116
+          fi
+      - name: Deployment must confirm success
+        run: grep -Fqx PR27_RELEASE_WORKFLOW_SUCCESS reports/pr27_production_release.txt

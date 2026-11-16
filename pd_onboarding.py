@@ -53,6 +53,11 @@ def register(app,core,auth):
     def document_sides(uid):
         with core.db(core.USERS_DB) as c:
             return [r['side'] for r in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(uid,))]
+    with core.db(core.USERS_DB) as c:
+        c.execute("""CREATE TABLE IF NOT EXISTS pd_driver_document_replacements(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,telegram_id INTEGER NOT NULL,side TEXT NOT NULL,
+          dispatcher_id INTEGER NOT NULL,previous_sha256 TEXT NOT NULL,new_sha256 TEXT NOT NULL,
+          replaced_at TEXT NOT NULL)""")
     @app.get('/api/driver/documents/<int:applicant>/<side>')
     def pd_driver_document(applicant,side):
         uid,_=auth()
@@ -100,12 +105,18 @@ def register(app,core,auth):
         with core.db(core.USERS_DB) as c:
             c.execute('BEGIN IMMEDIATE')
             stored={r['side'] for r in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(uid,))}
-            if set(ACTIVE_SIDES)-stored-set(photos):raise ValueError('Добавьте все обязательные фотографии документов')
+            existing=c.execute('SELECT status FROM pd_driver_applications WHERE telegram_id=?',(uid,)).fetchone()
+            if existing and existing['status']=='approved':
+                raise ValueError('Анкета одобренного пилота изменяется только диспетчером')
+            if stored.intersection(photos):
+                raise PermissionError('Замену ранее загруженных фотографий выполняет только диспетчер')
+            if set(ACTIVE_SIDES)-stored-set(photos):
+                raise ValueError('Добавьте все обязательные фотографии документов')
             car_rows={x['side']:bytes(x['image']) for x in c.execute("SELECT side,image FROM pd_driver_documents WHERE telegram_id=? AND side IN ('car_front','car_rear','car_interior')",(uid,))}
             car_rows.update({k:v for k,v in photos.items() if k.startswith('car_')})
             if len({hashlib.sha256(v).digest() for v in car_rows.values()})!=3:raise ValueError('Добавьте три разных фото автомобиля: спереди, сзади и салон')
             for side,image in photos.items():
-                c.execute('INSERT INTO pd_driver_documents(telegram_id,side,image,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_id,side) DO UPDATE SET image=excluded.image,updated_at=excluded.updated_at',(uid,side,image,now))
+                c.execute('INSERT INTO pd_driver_documents(telegram_id,side,image,updated_at) VALUES(?,?,?,?)',(uid,side,image,now))
             c.execute('''INSERT INTO pd_driver_applications
               (telegram_id,name,phone,city,vehicle,vehicle_year,plate,seats,status,created_at,updated_at)
               VALUES(?,?,?,?,?,?,?,?,'pending',?,?) ON CONFLICT(telegram_id) DO UPDATE SET
@@ -115,13 +126,38 @@ def register(app,core,auth):
               (uid,out['name'],phone,out['city'],out['vehicle'],year,plate,seats,now,now))
         return jsonify(ok=True,submitted=True)
 
+    @app.post('/api/admin/driver-applications/<int:applicant>/documents/<side>/replace')
+    def pd_dispatcher_replace_driver_photo(applicant,side):
+        dispatcher,_=auth()
+        if not core.is_admin(dispatcher):raise PermissionError('Только диспетчер может заменить фото')
+        if side not in ACTIVE_SIDES:raise ValueError('Недоступная сторона документа')
+        photos=read_photos()
+        if set(photos)!={side}:raise ValueError('Загрузите одно фото выбранного документа')
+        with core.db(core.USERS_DB) as c:
+            c.execute('BEGIN IMMEDIATE')
+            application=c.execute('SELECT telegram_id FROM pd_driver_applications WHERE telegram_id=?',(applicant,)).fetchone()
+            if not application:return jsonify(error='Заявка не найдена'),404
+            existing=c.execute('SELECT image FROM pd_driver_documents WHERE telegram_id=? AND side=?',(applicant,side)).fetchone()
+            if not existing:return jsonify(error='Сначала пилот должен загрузить фото'),404
+            old_sha=hashlib.sha256(bytes(existing['image'])).hexdigest()
+            new_sha=hashlib.sha256(photos[side]).hexdigest()
+            if old_sha==new_sha:return jsonify(ok=True,replayed=True)
+            now=core.now().isoformat()
+            c.execute('UPDATE pd_driver_documents SET image=?,updated_at=? WHERE telegram_id=? AND side=?',
+                      (photos[side],now,applicant,side))
+            c.execute('INSERT INTO pd_driver_document_replacements(telegram_id,side,dispatcher_id,previous_sha256,new_sha256,replaced_at) VALUES(?,?,?,?,?,?)',
+                      (applicant,side,dispatcher,old_sha,new_sha,now))
+        return jsonify(ok=True,updated_by_dispatcher=True)
+
     @app.get('/api/admin/driver-applications')
     def pd_driver_applications():
         uid,_=auth()
         if not core.is_admin(uid):raise PermissionError('Нет доступа')
         with core.db(core.USERS_DB) as c:
             rows=c.execute('SELECT * FROM pd_driver_applications ORDER BY updated_at DESC LIMIT 200').fetchall()
-        return jsonify(applications=[dict(**dict(r),document_sides=document_sides(r["telegram_id"])) for r in rows])
+        return jsonify(applications=[dict(**dict(r),
+            document_sides=document_sides(r["telegram_id"]),
+            missing_document_sides=sorted(set(ACTIVE_SIDES)-set(document_sides(r["telegram_id"])))) for r in rows])
 
     @app.post('/api/admin/driver-applications/<int:applicant>/decision')
     def pd_driver_decide(applicant):
@@ -135,8 +171,9 @@ def register(app,core,auth):
             if not r:return jsonify(error='Заявка не найдена'),404
             if target=='approved' and r['status']!='approved':
                 stored={x['side'] for x in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(applicant,))}
-                if set(ACTIVE_SIDES)-stored:
-                    raise ValueError('Для одобрения нужны обе стороны прав и три фотографии автомобиля')
+                missing=sorted(set(ACTIVE_SIDES)-stored)
+                if missing:
+                    raise ValueError('Нельзя одобрить: отсутствуют документы: '+', '.join(missing))
             if r['status']!=target:
                 now=core.now().isoformat()
                 c.execute('UPDATE pd_driver_applications SET status=?,updated_at=? WHERE telegram_id=?',(target,now,applicant))

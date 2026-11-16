@@ -1,0 +1,22 @@
+name: PRIVATE DRIVE - PR25 independent postdeploy GET-only verification
+on:
+  push:
+    branches: [ops/pr25-live-overlay-dryrun-20261116]
+    paths:
+      - .github/workflows/pr25-postdeploy-readonly.yml
+      - ops/pr25_postdeploy_readonly.py
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify deployed source SHA256 and GET-only live HTTP checks
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: python ops/pr25_postdeploy_readonly.py

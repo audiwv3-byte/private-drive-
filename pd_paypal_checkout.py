@@ -20,9 +20,10 @@ def settings():
     secret = os.environ.get('PAYPAL_CLIENT_SECRET', '').strip()
     if not client or not secret:
         return None
-    # Live requires explicit acknowledgement and verified webhook configuration.
-    if mode == 'live' and (os.environ.get('PD_PAYPAL_LIVE_APPROVED') != 'yes'
-                           or not os.environ.get('PAYPAL_WEBHOOK_ID', '').strip()):
+    # Fail closed: live settlement requires independently verified webhooks,
+    # refunds/reconciliation review, and a separate production deployment.
+    # This staged version intentionally cannot activate live payments.
+    if mode == 'live':
         return None
     return {'mode': mode, 'client_id': client, 'secret': secret,
             'base': 'https://api-m.paypal.com' if mode == 'live'

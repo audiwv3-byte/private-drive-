@@ -17,10 +17,10 @@ const passport=new Element('section');passport.id='passenger-home';
 const admin=new Element('section');admin.id='admin-home';root.append(passport,admin);
 const timers=new Map();let nextTimer=0;
 const mockWindow={setInterval:(fn)=>{const n=++nextTimer;timers.set(n,fn);return n;},clearInterval:n=>timers.delete(n)};
-let createdMaps=0,moved=0,setPosition=0,removed=0,latestMarker=null;
+let createdMaps=0,moved=0,setPosition=0,removed=0,latestMarker=null,dragHandler=null;
 const leaflet={
  map:()=>{createdMaps++;return{
-   setView(){return this;},panTo(){moved++;return this;},invalidateSize(){},remove(){removed++;}
+   setView(){return this;},panTo(){moved++;return this;},invalidateSize(){},on(name,cb){if(name==='dragstart')dragHandler=cb;return this;},remove(){removed++;}
  }},
  tileLayer:()=>({addTo(){}}),
  marker:()=>{latestMarker={setLatLng(){setPosition++;},addTo(){return this;}};return latestMarker;}
@@ -73,12 +73,23 @@ async function test(){
  await new Promise(res=>setImmediate(res));
  assert.equal(createdMaps,1,'map should not be recreated');
  assert.equal(setPosition>=1,true,'marker should move in place');
+ const firstMove=moved;
+ dragHandler();
+ gpsCallbacks[0]({coords:{latitude:54.682,longitude:25.272,accuracy:5}});
+ await new Promise(res=>setImmediate(res));
+ assert.equal(moved,firstMove,'manual map pan should suspend auto-follow');
+ assert.equal(cockpit.state().followGps,false);
+ const followButton=root.children[2].children[2].children[1].children[2];
+ followButton.onclick();
+ assert.equal(cockpit.state().followGps,true);
+ assert.equal(moved,firstMove+1,'follow me should immediately recenter');
  console.log('PASS GPS_BUTTON_HIDES_AND_MAP_MARKER_UPDATES_IN_PLACE');
  cockpit.stopGps();
  assert.equal(cockpit.state().gpsEnabled,false);
  assert.equal(clearCount>=1,true);
  assert.equal(gpsButtons[0].hidden,false);
  console.log('PASS GPS_STOP_RESTORES_BUTTON_AND_RELEASES_WATCH');
+ cockpit.stopGps();
  cockpit.dispose();
  assert.equal(removed,1);
  assert.equal(timers.size,0);

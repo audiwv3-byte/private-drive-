@@ -1,13 +1,8 @@
 PASS PILOT_STATE_ACTIONS_AND_COORDS
 PASS UNAPPROVED_PILOT_NO_MAP_OR_TRIPS
-AssertionError [ERR_ASSERTION]: null == 32
-    at test (/home/runner/work/private-drive-/private-drive-/experimental/test_pd_pilot_cockpit_staged.cjs:62:9)
-    at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
-  generatedMessage: true,
-  code: 'ERR_ASSERTION',
-  actual: null,
-  expected: 32,
-  operator: '==',
-  diff: 'simple'
-}
-PILOT_COCKPIT_STAGING_BLOCK
+PASS FULLSCREEN_COCKPIT_MOUNTS_WITHOUT_OTHER_ROLE_MODIFICATIONS
+PASS GPS_BUTTON_HIDES_AND_MAP_MARKER_UPDATES_IN_PLACE
+PASS GPS_STOP_RESTORES_BUTTON_AND_RELEASES_WATCH
+PASS DISPOSE_CLEANS_MAP_TIMERS_AND_PRESERVES_PASSENGER_ADMIN
+PILOT_COCKPIT_ISOLATED_TESTS_PASSED
+PILOT_COCKPIT_STAGING_PASS

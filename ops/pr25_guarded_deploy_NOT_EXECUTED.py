@@ -149,9 +149,22 @@ def main():
                 current=read(ROOT+"/"+name,token)
                 if current==old[name]:continue
                 if current!=new[name]:
-                    errors.append("ROLLBACK_CONCURRENT_MODIFICATION_"+name)
+                    # Recover an interrupted/truncated upload ONLY when the
+                    # observed bytes are an exact non-empty prefix of OUR
+                    # expected candidate. Arbitrary contents may belong to
+                    # another operator, so never overwrite those.
+                    partial=(0<len(current)<len(new[name])
+                             and new[name].startswith(current))
+                    if not partial:
+                        errors.append("ROLLBACK_CONCURRENT_MODIFICATION_"+name)
+                        continue
+                    print("PARTIAL_UPLOAD_IDENTIFIED",name,flush=True)
+                # The stored original must still be intact before restoring.
+                backup_bytes=read(backup+"/original/"+name,token)
+                if sha(backup_bytes)!=sha(old[name]):
+                    errors.append("ROLLBACK_BACKUP_HASH_MISMATCH_"+name)
                     continue
-                upload(ROOT+"/"+name,old[name],token)
+                upload(ROOT+"/"+name,backup_bytes,token)
             except Exception:
                 errors.append("RESTORE_FAILED_"+name)
         try:reload(token)

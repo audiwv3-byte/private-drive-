@@ -63,10 +63,14 @@ class FakeRemote:
         if self.phase=="before" and self.scenario=="second_file_failure" and name==deploy.TARGETS[1]:
             # Fail BEFORE the second live file is written.
             raise IOError("SIMULATED_SECOND_FILE_UPLOAD_REJECTED")
-        if self.phase=="before" and self.scenario=="partial_second_upload" and name==deploy.TARGETS[1]:
-            # Fail AFTER a short/incomplete remote write.
-            self.path(remote).write_bytes(b"BROKEN_INCOMPLETE_BYTES")
+        if self.phase=="before" and self.scenario=="partial_second_upload" and name==deploy.TARGETS[1] and data==PATCHED[name]:
+            # Interrupted write: byte-exact prefix of the intended candidate.
+            self.path(remote).write_bytes(PATCHED[name][:12])
             raise IOError("SIMULATED_PARTIAL_SECOND_UPLOAD")
+        if self.phase=="before" and self.scenario=="unknown_second_upload" and name==deploy.TARGETS[1] and data==PATCHED[name]:
+            # Unknown bytes could be a concurrent editor; must fail closed.
+            self.path(remote).write_bytes(b"THIRD_PARTY_UNKNOWN_CONTENT")
+            raise IOError("SIMULATED_UNKNOWN_SECOND_UPLOAD")
         self.path(remote).write_bytes(data)
         assert self.path(remote).read_bytes()==data
         if self.phase=="before" and data==PATCHED[name]:
@@ -131,10 +135,12 @@ def run_case(scenario, expect_manual=False):
 run_case("second_file_failure")
 # Failure after both patched files are uploaded, during post-reload availability:
 run_case("health_check_failure")
-# Failure during second upload after partial bytes; deliberately don't overwrite
-# modified remote bytes: script reports manual intervention, as designed.
-with tempfile.TemporaryDirectory(prefix="private-drive-pr25-partial-") as tmp:
-    remote=FakeRemote(pathlib.Path(tmp),"partial_second_upload")
+# Interrupted upload must be restored automatically from the checksum-verified
+# backup, not from unverified local source bytes.
+run_case("partial_second_upload")
+# Unknown content must never be overwritten: manual intervention remains required.
+with tempfile.TemporaryDirectory(prefix="private-drive-pr25-unknown-") as tmp:
+    remote=FakeRemote(pathlib.Path(tmp),"unknown_second_upload")
     log=io.StringIO()
     with (
         patch.object(deploy,"secret",return_value="SYNTHETIC_TOKEN"),
@@ -149,17 +155,17 @@ with tempfile.TemporaryDirectory(prefix="private-drive-pr25-partial-") as tmp:
     ):
         try:
             deploy.main()
-            raise AssertionError("Partial write should fail")
+            raise AssertionError("Unknown-byte write should fail")
         except IOError:
             pass
     output=log.getvalue()
     remote.assert_backup()
     assert remote.live()["miniapp_server.py"]==ORIGINAL["miniapp_server.py"]
-    assert remote.live()["pd_trip_runtime_v4.py"]==b"BROKEN_INCOMPLETE_BYTES"
+    assert remote.live()["pd_trip_runtime_v4.py"]==b"THIRD_PARTY_UNKNOWN_CONTENT"
     assert "ROLLBACK_CONCURRENT_MODIFICATION_pd_trip_runtime_v4.py" in output
     assert "ROLLBACK_MANUAL_INTERVENTION_REQUIRED" in output
     assert "ROLLBACK_CONTENT_MISMATCH_pd_trip_runtime_v4.py" in output
-    print("PASS PARTIAL_WRITE_FAIL_CLOSED MANUAL_RECOVERY_REQUIRED",flush=True)
+    print("PASS UNKNOWN_BYTES_FAIL_CLOSED_MANUAL_RECOVERY_REQUIRED",flush=True)
 
 # Do not let a missing operator approval trigger any (mocked) reads or writes.
 with patch.object(deploy,"secret",side_effect=AssertionError("No secret reads allowed")), \

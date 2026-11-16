@@ -27,7 +27,7 @@ def run():
                     x=sub.args[0]
                     if isinstance(x,ast.Constant) and isinstance(x.value,str) and any(v in x.value.lower() for v in ("pd_driver_applications","pd_driver_documents")):
                         sql=squish(x.value)
-                        if sql.upper().startswith(("CREATE TABLE","INSERT INTO PD_DRIVER_APPLICATIONS","UPDATE PD_DRIVER_APPLICATIONS")):
+                        if sql.upper().startswith(("CREATE TABLE","INSERT INTO PD_DRIVER_APPLICATIONS","UPDATE PD_DRIVER_APPLICATIONS","ALTER TABLE","PRAGMA TABLE_INFO")):
                             print("LIVE_SQL",node.name,sub.lineno,sql[:1400])
                 if node.name in ("pd_driver_apply","pd_driver_decide"):
                     if isinstance(sub,ast.If) and any(t in expr(sub.test).lower() for t in ("stage","status","target")):

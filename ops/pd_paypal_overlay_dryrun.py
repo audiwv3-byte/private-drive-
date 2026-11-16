@@ -3,6 +3,9 @@ import ast
 import os
 import re
 import urllib.request
+import tempfile
+import subprocess
+import pathlib
 
 API="https://www.pythonanywhere.com/api/v0/user/wilsonpark/files/path"
 LIVE="/home/wilsonpark/euro_baltic_transfer/PRIVATE_DRIVE_MiniApp_2026_10_18/"
@@ -60,6 +63,18 @@ def main():
     html=one(html,"async function cashNotice()",js+"async function cashNotice()")
     if html.count("async function paypalNotice()") !=1:
         raise ValueError("PAYPAL_HANDLER_COUNT")
+    # Each inline script must remain parseable after the live-source overlay.
+    script_tags=re.findall(r"<script\\b([^>]*)>([\\s\\S]*?)</script>",html,flags=re.I)
+    checked=0
+    for attrs,body in script_tags:
+        if re.search(r"\\bsrc\\s*=",attrs,re.I) or not body.strip():continue
+        with tempfile.TemporaryDirectory(prefix="pd-paypal-js-") as temp:
+            pathname=pathlib.Path(temp)/"inline.js"
+            pathname.write_text(body,encoding="utf-8")
+            result=subprocess.run(["node","--check",str(pathname)],capture_output=True,text=True)
+            if result.returncode!=0:raise ValueError("HTML_INLINE_JS_SYNTAX_INVALID")
+        checked+=1
+    print("HTML_INLINE_JAVASCRIPT_CHECKED",checked,flush=True)
     print("PASSENGER_UI_PATCH_OK",flush=True)
     print("SAFE_STAGING_OVERLAY_READY",flush=True)
     print("NO_LIVE_CHANGES_NO_PAYMENTS",flush=True)

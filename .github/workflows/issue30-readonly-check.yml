@@ -11,6 +11,8 @@ on:
       - pd_issue30_live_transition_probe.py
       - pd_issue30_live_schema_probe.py
       - pd_issue30_live_handler_inspect.py
+      - pd_issue30_patch_live_onboarding_offline.py
+      - test_pd_issue30_live_onboarding_patch.py
       - pd_document_review.py
       - test_pd_document_review_synthetic.py
       - pd_issue30_stage_adapter.py
@@ -40,6 +42,27 @@ jobs:
         run: python -m pip install 'Flask>=3,<4'
       - name: Run isolated tests
         run: python -m unittest -v test_pd_document_review_synthetic.py test_pd_issue30_stage_adapter.py test_pd_issue30_decision_bridge.py test_pd_issue30_document_storage_guard.py test_pd_issue30_flask_integration.py
+  live-patch-synthetic:
+    name: Verified live-source patch in isolated Flask/SQLite
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated test dependencies
+        run: python -m pip install 'Flask>=3,<4' Pillow requests
+      - name: GET verified deployed source and test patched copy only in memory
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: |
+          if [ -z "$PA_API_TOKEN" ]; then
+            echo "BLOCKED: read-only API token unavailable; tests not run"
+            exit 1
+          fi
+          python -m unittest -v test_pd_issue30_live_onboarding_patch.py
+
   readonly-audit:
     name: PythonAnywhere GET-only source fingerprint
     runs-on: ubuntu-latest

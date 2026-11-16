@@ -1,0 +1,143 @@
+SECTION SERVER_NEW_BOOKING MATCHES 16
+LINE 269 
+LINE 270 @app.post('/api/order')
+LINE 271 def create_order():
+LINE 272     uid, _ = auth()
+LINE 295     if not core.validate_departure(date, hour): raise ValueError('Дата или время поездки неверны')
+LINE 296     method = str(d.get('payment_method', 'Наличными'))
+LINE 297     if method not in ('Наличными', 'Банковская карта', 'Криптовалюта', 'Банковский перевод'):
+LINE 298         raise ValueError('Некорректный способ оплаты')
+LINE 328         origin=origin,destination=dest,trip_date=date,trip_time=hour,passengers=passenger_value,luggage=luggage,
+LINE 329         passenger_count_confirmed=int('passengers' in d),details=details,payment_method=method,price=price,
+LINE 330         distance_km=km,duration_min=minutes,route_source='OpenRouteService' if km is not None else '',
+LINE 465         if not r: raise ValueError('Заказ не найден')
+LINE 466         if r['payment_method'] not in ('Наличные', 'Наличными'):
+LINE 467             raise ValueError('Подтверждение вручную разрешено только для наличных')
+LINE 468         if r['payment_status'] not in ('Не оплачено', 'Ожидается оплата наличными'):
+LINE 469             raise ValueError('Платёж уже оплачен или обрабатывается')
+LINE 472         if r['stripe_session_id'] or r['card_payment_url'] or r['crypto_amount'] or r['crypto_txid']:
+LINE 473             raise ValueError('У заказа есть онлайн-платёж или криптооперация; нельзя отмечать наличные')
+LINE 474         amount = cents_for_order(r['price'])
+LINE 480     try:
+LINE 481         core.say(r['telegram_id'], f'✅ Заказ №{oid}: получение наличных подтверждено.')
+LINE 482     except Exception: core.LOG.exception('Cash notification failed')
+LINE 523     with core.db(core.ORDERS_DB) as conn:
+LINE 524         changed = conn.execute("UPDATE orders SET payment_method='Наличные', payment_status='Ожидается оплата наличными',updated_at=? WHERE id=? AND payment_status IN ('Не оплачено','','Ожидается опла
+LINE 525         if changed.rowcount != 1:
+LINE 526             raise ValueError('Платёж уже обрабатывается. Обратитесь к диспетчеру.')
+LINE 527     core.notify_admins(f'💶 Заказ №{oid}: пассажир выбрал оплату наличными водителю.')
+LINE 528     return jsonify(ok=True, payment_status='Ожидается оплата наличными')
+LINE 529 
+LINE 639         conn.execute("""UPDATE orders SET payment_status='Оплачено',
+LINE 640             payment_method='PayPal', updated_at=?
+LINE 641             WHERE id=? AND payment_status IN ('Не оплачено', '')""",
+LINE 700             idempotency_key=f'private-drive-test-order-{oid}-cents-{amount}-v1')
+LINE 701         conn.execute("UPDATE orders SET stripe_session_id=?,stripe_amount_cents=?,card_payment_url=?,payment_method='Онлайн (Stripe)',updated_at=? WHERE id=? AND payment_status!='Оплачено'",
+LINE 702             (session.id, amount, session.url, core.now().isoformat(), oid))
+LINE 740         if r['payment_status'] != 'Оплачено':
+LINE 741             conn.execute("UPDATE orders SET payment_status='Оплачено',payment_method='Онлайн (Stripe)',updated_at=? WHERE id=? AND payment_status!='Оплачено'",
+LINE 742                          (core.now().isoformat(), oid))
+SECTION SERVER_LEGACY_CASH MATCHES 3
+LINE 453 @app.post('/api/admin/cash-received')
+LINE 454 def admin_cash_received_web():
+LINE 455     uid, _ = auth()
+LINE 486 @app.get('/api/admin/cash-receipts')
+LINE 487 def admin_cash_receipts_pd():
+LINE 488     uid,_=auth()
+LINE 509 
+LINE 510 @app.post('/api/payment/<int:oid>/cash')
+LINE 511 def select_cash(oid):
+SECTION UI_NEW_BOOKING MATCHES 19
+LINE 20  if(typeof pdbChosen!=='undefined'&&Array.isArray(d.extras)){const known=[...document.querySelectorAll('#pdbExtras button')].map(e=>e.dataset.extra);pdbChosen=new Set(d.extras.filter(v=>known.includes
+LINE 21  if(typeof pdbPay!=='undefined'&&[...document.querySelectorAll('#pdbPays button')].some(e=>e.dataset.method===d.pay)){pdbPay=d.pay;document.querySelectorAll('#pdbPays button').forEach(e=>e.classList.t
+LINE 22  if(typeof pdbSelectedPoints!=='undefined')pdbSelectedPoints=d.points||{};
+LINE 199 <section class="panel hidden" id="step5"><h2>5. Предварительный расчёт</h2><div id="estimate" class="item">Маршрут ещё не рассчитан</div><p>Цена ориентировочная, подтверждается пилотом. Время без учёт
+LINE 200 <section class="panel hidden" id="step6"><h2>6. Подтверждение</h2><div id="summary"></div><label>Способ оплаты</label><select id="payMethod"><option value="Наличными">💶 Наличными водителю</option><opt
+LINE 201 <section class="panel hidden" id="step7"><h2>7. Заявка отправлена</h2><p id="done">Ожидайте подтверждения пилотом.</p><button onclick="go(8)" data-pd-passenger-trips>Поездки</button><button class="sec
+LINE 224 <button type="button" class="secondary pd-route-calculate" onclick="pdbCalculate()">Рассчитать маршрут →</button><p class="pdb-status" id="pdbRouteStatus">Цена уточняется пилотом, если расчёт недоступ
+LINE 225 <label>Как хотите оплатить?</label><div class="pdb-pay" id="pdbPays" role="group" aria-label="Способ оплаты"><button type="button" class="active" data-method="Наличными">💶 Наличными</button><button ty
+LINE 226 <p id="pdbPaymentSelection" class="pdb-note" role="status" aria-live="polite" aria-atomic="true"></p>
+LINE 432 function showSummary(){$('summary').innerHTML=`<div class="item">🚘 ${roundtrip?pdL("Туда и обратно"):pdL("В одну сторону")}</div><div class="item">📍 ${escapeHtml(v('origin'))} → ${escapeHtml(v('destin
+LINE 433 async function submitOrder(){if(!initData)return message(pdL("Откройте приложение через кнопку Telegram-бота"),true);let b=$('submitButton');b.disabled=true;try{let name=v('name'),phone=v('phone');awa
+LINE 434 async function loadOrders(){try{let r=await api('/api/orders');$('orders').innerHTML=r.orders.length?r.orders.map(o=>pdTpl`<div class="item"><b>№${o.id}</b> · ${escapeHtml(pdL(o.status))}<br>${escapeH
+LINE 488 }
+LINE 489 async function cashNotice(){let p=window.currentPayment,box=$('paymentDetail');if(!p)return;box.textContent=pdL("Подтверждаем выбор наличных…");try{await api('/api/payment/'+p.id+'/cash',{});box.textC
+LINE 490 async function cardNotice(){let p=window.currentPayment;let box=$('paymentDetail');box.textContent=pdL("Создаём защищённую тестовую оплату…");try{let r=await api('/api/payment/'+p.id+'/checkout',{});i
+LINE 492 async function showWallet(t){let p=window.currentPayment,box=$('wallet');if(!p||!box)return;let a=p.addresses?.[t],amount=p.crypto_currency===t?p.crypto_amount:'';if(!a||!amount){box.textContent=pdL("
+LINE 493 async function loadAdmin(){try{let r=await api('/api/admin/orders');let orders=r.orders||[];const actions={'Новая':[['✅ Принять','Подтверждена'],['❌ Отклонить','Отменена']],'Подтверждена':[['🚘 В пути'
+LINE 494 async function confirmCash(id){if(!confirm(pdL("Подтвердить, что наличные по заказу №")+id+pdL(" действительно получены?")))return;try{await api('/api/admin/cash-received',{id});await loadAdmin();mess
+LINE 516  const c=window.pdCustomersById?.[Number(o.telegram_id)]||{};
+LINE 517  return [o.id,o.origin,o.destination,o.stop_address,c.name,c.phone,c.username,c.email,c.home_city,o.payment_method,o.payment_status]
+LINE 518   .some(x=>String(x||'').toLocaleLowerCase().includes(q));
+LINE 544    const controls=(actions[o.status]||[]).map(([title,target])=>`<button class="secondary" onclick="setStatus(${id},'${target}')">${title}</button>`).join('');
+LINE 545    const cash=o.payment_method==='Наличные'&&o.payment_status==='Ожидается оплата наличными'?pdTpl`<button class="secondary" onclick="confirmCash(${id})">💶 Получил наличные</button>`:'';
+LINE 546    const invoice='';
+LINE 547    return pdTpl`<div class="item"><b>Заказ №${id}</b> · <span class="pill">${escapeHtml(pdL(o.status))}</span><p class="pd-short">${pdTripRouteText(o)}</p><small>${pdTripTypeText(o)}</small><div>📅 ${e
+LINE 548   }).join(''):pdL("<p>Заказов по фильтру нет</p>");
+LINE 555     const id=Number(o.id),c=window.pdCustomersById?.[Number(o.telegram_id)]||{};
+LINE 556     return pdTpl`<div class="item"><b>Заказ №${id}</b> · <span class="pill">${escapeHtml(pdL(o.status))}</span><div>👤 ${escapeHtml(c.name||pdL("Клиент"))}</div><div>💶 ${escapeHtml(o.price||pdL("По сог
+LINE 557   }).join(''):pdL("<p>Документы и платежи не найдены</p>");
+LINE 817 }
+LINE 818 let pdbMap=null,pdbRoute=null,pdbLayers=[],pdbPay='Наличными';let pdbChosen=new Set(['Без пожеланий']);
+LINE 819 const pdPassengerText=(ru,en,lt)=>window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru;
+LINE 833  const opts=$('pdbExtras');opts.addEventListener('click',e=>{const b=e.target.closest('button[data-extra]');if(!b)return;const key=b.dataset.extra;if(key==='Без пожеланий'){pdbChosen=new Set([key])}el
+LINE 834  $('pdbPays').addEventListener('click',e=>{const b=e.target.closest('button[data-method]');if(!b)return;pdbPay=b.dataset.method;document.querySelectorAll('#pdbPays button').forEach(x=>x.classList.togg
+LINE 835  $('pdbPopular').addEventListener('click',e=>{const b=e.target.closest('button[data-origin]');if(!b)return;$('pdbOrigin').value=b.dataset.origin;$('pdbDest').value=b.dataset.dest;pdbSelectedPoints={};
+LINE 916   const temperature='';const details=(temperature?'Температура в салоне: '+temperature+' °C; ':'')+'Услуги: '+(extra.join(', ')||'Без пожеланий')+'; Комментарий: '+($('pdbWishes').value.trim()||'Нет')
+LINE 917   const payload={ride_service:pdRideService,origin:a,destination:b,...pdStopPayload(),trip_date:date,trip_time:$('pdbTime').value,roundtrip:pdIsRoundtrip(),passengers:1,luggage:'Не указано',details,ex
+LINE 918   const request_key=await pdbRequestKey(payload);
+LINE 1179  const render=filter=>{const rows=d.orders.filter(o=>filter==='all'||filter==='trips'&&o.status==='Выполнена'||filter==='active'&&['Новая','Подтверждена','В пути'].includes(o.status)||filter==='cancel
+LINE 1180  $('pdClientHistory').innerHTML=rows.length?rows.map(o=>'<article class="item"><b>№'+Number(o.id)+'</b> · <span class="pill">'+escapeHtml(pdL(o.status))+'</span><p>'+pdTripRouteText(o)+'</p><small>'+p
+LINE 1181  for(const [key,label] of [['all','Все заказы'],['trips','Поездки'],['active','Активные'],['canceled','Отменённые']]){const b=document.createElement('button');b.type='button';b.className=key==='all'?'
+LINE 1265  const filter=$('pdDriverFilter').value||'all',rows=d.orders.filter(o=>filter==='all'||o.status===filter);
+LINE 1266  $('pdDriverOrders').innerHTML=rows.length?rows.map(o=>{const c=o.customer||{},phone=String(c.phone||'').replace(/[^+0-9]/g,'');return '<article class="item"><h3>№'+Number(o.id)+' · '+escapeHtml(pdL(o
+LINE 1267  }catch(e){$('pdDriverOrders').textContent=pdL(e.message)}
+LINE 1301 async function pdBankCopy(value){try{await navigator.clipboard.writeText(value);message(pdBT('Скопировано','Copied','Nukopijuota'))}catch(e){message(value,true)}}
+LINE 1302 function pdBankStatusText(o){if(o.status==='Отменена'&&o.payment_method==='Банковский перевод'&&['Ожидается банковский перевод','Перевод на проверке'].includes(o.payment_status)){return o.payment_stat
+LINE 1303 function pdBankAdminButton(o){return o.payment_method==='Банковский перевод'&&['Ожидается банковский перевод','Перевод на проверке'].includes(o.payment_status)&&['Подтверждена','В пути','Выполнена'].i
+LINE 1304 async function pdBankConfirm(id){if(document.getElementById('pdBankVerify'))return;const rows=(await api('/api/admin/bank-transfers')).transfers;const r=rows.find(x=>x.order_id===id);if(!r)return;cons
+SECTION BOT_NEW_BOOKING MATCHES 17
+LINE 111         ensure_columns(conn, 'orders', {
+LINE 112             'payment_method': "TEXT NOT NULL DEFAULT 'Не указано'",
+LINE 113             'distance_km': 'REAL', 'duration_min': 'REAL', 'route_source': 'TEXT',
+LINE 348           (telegram_id,order_type,origin,destination,trip_date,trip_time,passengers,luggage,
+LINE 349           details,status,price,payment_method,distance_km,duration_min,route_source,quote_status,
+LINE 350           updated_at,roundtrip_wait,passenger_count_confirmed,request_key,request_fingerprint,ride_service)
+LINE 353           st['passengers'], st['luggage'], st.get('details',''), 'Новая', st.get('price',''),
+LINE 354           st['payment_method'], st.get('distance_km'), st.get('duration_min'),
+LINE 355           st.get('route_source',''), st.get('quote_status','Не рассчитано'), now().isoformat(),
+LINE 394         f"Тип: {r['order_type']}", f"Дата: {r['trip_date']} в {r['trip_time']} (Вильнюс)",
+LINE 395         f"Оплата: {r['payment_method']}", f"Примечание: {r['details'] or 'Нет'}",
+LINE 396         f"Статус: {r['status']}", f"Цена: {r['price'] + ' €' if r['price'] else 'По согласованию'}"]
+LINE 418        f"📅 {st['trip_date']} {st['trip_time']} (Вильнюс)",
+LINE 419        f"💳 {st['payment_method']}"]
+LINE 420     if st.get('roundtrip_wait'):
+LINE 510                   luggage='Стандартный багаж',
+LINE 511                   step='roundtrip_wait' if st['order_type'] == 'Туда и обратно' else 'payment_method')
+LINE 512         if st['step'] == 'roundtrip_wait':
+LINE 514         else:
+LINE 515             say(message.chat.id, '💳 Как планируете оплатить?', cancel_menu([('💶 Наличные', '💳 Безналичная')]))
+LINE 516     elif step == 'roundtrip_wait':
+LINE 519             return
+LINE 520         st.update(roundtrip_wait=text, step='payment_method')
+LINE 521         say(message.chat.id, '💳 Как планируете оплатить?', cancel_menu([('💶 Наличные', '💳 Безналичная')]))
+LINE 522     elif step == 'payment_method':
+LINE 523         options = {'💶 Наличные': 'Наличные', '💳 Безналичная': 'Безналичная (по согласованию)'}
+LINE 524         if text not in options:
+LINE 526             return
+LINE 527         st.update(payment_method=options[text], step='details')
+LINE 528         say(message.chat.id, extra_wishes_prompt(), wishes_menu())
+LINE 609     kb = types.InlineKeyboardMarkup()
+LINE 610     kb.add(types.InlineKeyboardButton('✅ Получил наличные', callback_data=f'cashpaid:{oid}'))
+LINE 611     return kb
+LINE 658     bot.answer_callback_query(call.id, 'Подтвердите поступление в приложении')
+LINE 659     say(call.message.chat.id, 'Подтверждайте наличные в административной панели PRIVATE DRIVE. '
+LINE 660         'Там проверяются статус заказа, способ оплаты и журнал поступлений.', miniapp_payment_button())
+SECTION BANK_CASH_COMPAT MATCHES 2
+LINE 46     def pd_bank_prevent_duplicate_payment():
+LINE 47         if request.endpoint in ('select_cash','create_stripe_checkout'):
+LINE 48             uid,_=auth(); oid=(request.view_args or {}).get('oid')
+LINE 79                     raise ValueError('У заказа уже есть онлайн-платёж. Обратитесь к диспетчеру.')
+LINE 80                 if r['payment_status'] not in ('Не оплачено','','Ожидается оплата наличными',WAIT,CLAIM):
+LINE 81                     raise ValueError('Другой платёж уже обрабатывается')
+NO_WRITES_NO_ORDERS_NO_PAYMENTS

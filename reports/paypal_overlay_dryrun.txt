@@ -3,7 +3,4 @@ SERVER_PATCH_SYNTAX_OK
 HTML_UI_ANCHOR_COUNT 0
 HTML_CASH_HANDLER_COUNT 1
 UI_CONTEXT 'ed\',\'Mokėjimas gautas\');return}\n if(p.status!==\'Подтверждена\'){x.textContent=p.status===\'Отменена\'?pdReleaseText(\'Заказ отменён. Новая оплата недоступна.\',\'Order cancelled. New payment is unavailable.\',\'Užsakymas atšauktas. Naujas mokėjimas negalimas.\'):pdReleaseText(\'Оплата откроется после подтверждения диспетчером и назначения пилота.\',\'Payment opens after dispatcher confirmation and pilot assignment.\',\'Mokėti galėsite dispatcheriui patvirtinus užsakymą ir priskyrus pilotą.\');return}\n if(!p.price){x.textContent=pdL(\'Цена ещё не согласована\');return}\n x.replaceChildren();const title=document.createElement(\'p\');title.textContent=\'№\'+id+\' · \'+p.price+\' €\';x.append(title);\n for(const[label,action]of [[pdReleaseText(\'💶 Наличными\',\'💶 Cash\',\'💶 Grynaisiais\'),cashNotice],[pdReleaseText(\'₿ Криптовалютой\',\'₿ Cryptocurrency\',\'₿ Kriptovaliuta\'),()=>cryptoNotice(id)]]){const b=document.createElement(\'button\');b.type=\'button\';b.className=\'pay-choice\';b.textContent=label;b.onclick=action;x.append(b)}const detail=document.createElement(\'div\');detail.id=\'paymentDetail\';x.append(detail);\n }catch(e){x.textContent=pdReleaseText(\'Не удалось открыть оплату: \',\'Unable to open payment: \',\'Nepavyko atidaryti mokėjimo: \')+pdL(e.message)}\n}\nasync function cashNotice(){let p=window.currentPayment,box=$(\'paymentDetail\');if(!p)return;box.textContent=pdL("Подтверждаем выбор наличных…");try{await api(\'/api/p'
-HTML_INLINE_JAVASCRIPT_CHECKED 0
-PASSENGER_UI_PATCH_OK
-SAFE_STAGING_OVERLAY_READY
-NO_LIVE_CHANGES_NO_PAYMENTS
+DRY_RUN_BLOCKED ValueError HTML_INLINE_JS_SYNTAX_INVALID

@@ -21,6 +21,7 @@ from PIL import Image
 from flask import Flask, jsonify, request
 
 import pd_issue30_patch_live_onboarding_offline as patcher
+import pd_issue30_document_storage_guard as storage_guard
 
 
 def get_verified_live_bytes():
@@ -211,7 +212,7 @@ class LivePatchIntegration(unittest.TestCase):
         self.admin_approve()
         original = self.image("license_front")
         # Stage 2 can receive legacy stage-1 photo fields, but must reject.
-        with self.assertRaises((ValueError, Exception)):
+        with self.assertRaises(storage_guard.DocumentStorageError):
             self.submit(2, ("license_front","registration_front",
                             "ltsa","activity","insurance","portrait"))
         self.assertEqual(self.image("license_front"), original)
@@ -249,6 +250,37 @@ class LivePatchIntegration(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.submit(2, ("registration_front",))
         self.assertEqual(self.status(), ("stage2",1))
+
+    def test_stage2_duplicate_file_rejected_without_mutation(self):
+        self.submit(1, ("license_front","license_back",
+                        "car_front","car_rear","car_interior"))
+        self.admin_approve()
+        self.submit(2, ("registration_front","ltsa",
+                        "activity","insurance","portrait"))
+        prior = self.image("insurance")
+        with self.assertRaises(storage_guard.DocumentStorageError):
+            self.submit(2, ("insurance",))
+        self.assertEqual(self.image("insurance"), prior)
+        self.assertEqual(self.status(), ("pending", 2))
+
+    def test_stage2_multi_file_failed_insert_is_atomic(self):
+        self.submit(1, ("license_front","license_back",
+                        "car_front","car_rear","car_interior"))
+        self.admin_approve()
+        # Simulate a document already supplied in another valid attempt.
+        with self.core.db(self.core.USERS_DB) as c:
+            c.execute("BEGIN IMMEDIATE")
+            c.execute("INSERT INTO pd_driver_documents "
+                      "(telegram_id,side,image,updated_at) VALUES(1001,?,?,?)",
+                      ("insurance", b"unchanged synthetic", "synthetic"))
+        # This stage2 request would create registration_front before trying to
+        # overwrite insurance. Must rollback the new file and application UPSERT.
+        with self.assertRaises(storage_guard.DocumentStorageError):
+            self.submit(2, ("registration_front","ltsa",
+                            "activity","insurance","portrait"))
+        self.assertIsNone(self.image("registration_front"))
+        self.assertEqual(self.image("insurance"), b"unchanged synthetic")
+        self.assertEqual(self.status(), ("stage2", 1))
 
     def test_patch_rejects_unknown_live_source(self):
         with self.assertRaises(patcher.PatchMismatch):

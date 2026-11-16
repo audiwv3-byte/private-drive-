@@ -1,0 +1,53 @@
+name: PRIVATE DRIVE - stage2 single HTML approved production release
+on:
+  push:
+    branches: [fix/driver-approval-photo-rights-admin-filters-20261116]
+    paths:
+      - .github/workflows/stage2-approved-onefile-release.yml
+permissions:
+  contents: write
+concurrency:
+  group: pd-stage2-onefile-production-release
+  cancel-in-progress: false
+jobs:
+  approved-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify compatibility on actual current production HTML GET-only
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: |
+          mkdir -p reports
+          python ops/stage2_ui_live_compatible_dryrun.py
+      - name: Verify rollback on synthetic partial upload and public check failure
+        run: python ops/test_stage2_onefile_rollback.py
+      - name: Verified backup plus one-file approved release and automatic rollback
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+          PD_APPROVED_STAGE2_UI: "YES"
+        run: |
+          if python ops/stage2_onefile_guarded_release.py --execute > reports/stage2_production_release.txt 2>&1; then
+            echo STAGE2_RELEASE_WORKFLOW_SUCCESS >> reports/stage2_production_release.txt
+          else
+            echo STAGE2_RELEASE_WORKFLOW_FAILED >> reports/stage2_production_release.txt
+          fi
+      - name: Save release proof and backup location only
+        if: always()
+        run: |
+          if [ -f reports/stage2_production_release.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/stage2_production_release.txt
+            git commit -m "release(stage2): record approved UI-only live outcome" || true
+            git push origin HEAD:fix/driver-approval-photo-rights-admin-filters-20261116
+          fi
+      - name: Confirm one-file release success
+        run: grep -Fqx STAGE2_RELEASE_WORKFLOW_SUCCESS reports/stage2_production_release.txt

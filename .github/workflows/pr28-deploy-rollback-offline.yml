@@ -1,0 +1,40 @@
+name: PRIVATE DRIVE - PR28 guarded rollback offline
+on:
+  push:
+    branches: [audit/selected-launch-updates-20261116]
+    paths:
+      - ops/pr28_guarded_deploy_NOT_EXECUTED.py
+      - ops/test_pr28_deploy_rollback_offline.py
+      - .github/workflows/pr28-deploy-rollback-offline.yml
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Offline source compile and rollback injection, no API token
+        run: |
+          mkdir -p reports
+          python -m py_compile ops/pr28_guarded_deploy_NOT_EXECUTED.py ops/test_pr28_deploy_rollback_offline.py
+          if python ops/test_pr28_deploy_rollback_offline.py > reports/pr28_deploy_rollback_offline.txt 2>&1; then
+            echo 'PR28_OFFLINE_ROLLBACK_PASS' >> reports/pr28_deploy_rollback_offline.txt
+          else
+            echo 'PR28_OFFLINE_ROLLBACK_BLOCK' >> reports/pr28_deploy_rollback_offline.txt
+          fi
+      - name: Record result
+        if: always()
+        run: |
+          if [ -f reports/pr28_deploy_rollback_offline.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pr28_deploy_rollback_offline.txt
+            git commit -m "test: record PR28 controlled rollback status" || true
+            git push origin HEAD:audit/selected-launch-updates-20261116
+          fi
+      - name: Require rollback checks
+        run: grep -Fqx 'PR28_OFFLINE_ROLLBACK_PASS' reports/pr28_deploy_rollback_offline.txt

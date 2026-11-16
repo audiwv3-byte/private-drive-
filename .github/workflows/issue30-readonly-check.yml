@@ -10,6 +10,8 @@ on:
       - pd_issue30_live_ast_probe.py
       - pd_document_review.py
       - test_pd_document_review_synthetic.py
+      - pd_issue30_stage_adapter.py
+      - test_pd_issue30_stage_adapter.py
   workflow_dispatch:
 
 permissions:
@@ -26,7 +28,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Run isolated tests
-        run: python -m unittest -v test_pd_document_review_synthetic.py
+        run: python -m unittest -v test_pd_document_review_synthetic.py test_pd_issue30_stage_adapter.py
   readonly-audit:
     name: PythonAnywhere GET-only source fingerprint
     runs-on: ubuntu-latest

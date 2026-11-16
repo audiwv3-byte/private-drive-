@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/pr25-synthetic-status.yml
       - ops/pr25_synthetic_status_integration.py
+      - ops/pr25_synthetic_status_integration.py
 permissions:
   contents: write
 jobs:
@@ -28,15 +29,35 @@ jobs:
           else
             echo PR25_SYNTHETIC_LIFECYCLE_FAILED >> reports/pr25_synthetic_lifecycle.txt
           fi
+      - name: Verify whole application in its own temporary test databases
+        run: |
+          if python test_release_validation.py > /tmp/pd_pr25_full_release.log 2>&1; then
+            grep -E '^(PASS |ALL RELEASE CHECKS)' /tmp/pd_pr25_full_release.log > reports/pr25_full_app.txt || true
+            echo PR25_FULL_APP_RELEASE_PASSED >> reports/pr25_full_app.txt
+          else
+            echo PR25_FULL_APP_RELEASE_FAILED > reports/pr25_full_app.txt
+            tail -n 10 /tmp/pd_pr25_full_release.log >> reports/pr25_full_app.txt
+          fi
+          if python test_tips_entry.py > /tmp/pd_pr25_tips.log 2>&1 && node test_role_visibility.cjs > /tmp/pd_pr25_roles.log 2>&1 && node test_miniapp_interactions.cjs > /tmp/pd_pr25_interactions.log 2>&1; then
+            echo PR25_UI_AND_TIPS_REGRESSION_PASSED >> reports/pr25_full_app.txt
+          else
+            echo PR25_UI_AND_TIPS_REGRESSION_FAILED >> reports/pr25_full_app.txt
+          fi
       - name: Save non-sensitive outcome
         if: always()
         run: |
           if [ -f reports/pr25_synthetic_lifecycle.txt ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add reports/pr25_synthetic_lifecycle.txt
+            git add reports/pr25_synthetic_lifecycle.txt reports/pr25_full_app.txt
             git commit -m "test(pr25): synthetic status and role regression report" || true
             git push origin HEAD:ops/pr25-live-overlay-dryrun-20261116
           fi
       - name: Require all synthetic route checks to pass
-        run: grep -q '^PR25_SYNTHETIC_LIFECYCLE_PASSED$' reports/pr25_synthetic_lifecycle.txt
+        run: |
+          grep -q '^PR25_SYNTHETIC_LIFECYCLE_PASSED
+ reports/pr25_synthetic_lifecycle.txt
+          grep -q '^PR25_FULL_APP_RELEASE_PASSED
+ reports/pr25_full_app.txt
+          grep -q '^PR25_UI_AND_TIPS_REGRESSION_PASSED
+ reports/pr25_full_app.txt

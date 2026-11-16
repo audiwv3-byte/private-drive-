@@ -1,0 +1,32 @@
+name: PRIVATE DRIVE - live GPS and roles read only code audit
+on:
+  push:
+    branches: [ops/paypal-readonly-live-audit-20261116]
+    paths:
+      - .github/workflows/pd-gps-roles-live-audit.yml
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: mkdir -p reports
+      - name: Compare current production module hashes and safety markers using GET only
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: python ops/pd_gps_roles_live_audit.py > reports/gps_roles_live_audit.txt
+      - name: Save sanitized read-only audit
+        if: always()
+        run: |
+          if [ -f reports/gps_roles_live_audit.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/gps_roles_live_audit.txt
+            git commit -m "audit(pilot): record live GPS and role comparison" || true
+            git push origin HEAD:ops/paypal-readonly-live-audit-20261116
+          fi

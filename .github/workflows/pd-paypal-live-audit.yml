@@ -28,9 +28,11 @@ jobs:
       - name: Dry-run PayPal server and UI overlay without live changes
         env:
           PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
-        run: python ops/pd_paypal_overlay_dryrun.py > reports/paypal_overlay_dryrun.txt
+        run: |
+          python ops/pd_paypal_overlay_dryrun.py > reports/paypal_overlay_dryrun.txt || echo 'OVERLAY_GATE_FAILED' >> reports/paypal_overlay_dryrun.txt
       - name: Public launch readiness smoke checks (GET only)
-        run: python ops/pd_launch_readonly_smoke.py > reports/launch_smoke.txt
+        run: |
+          python ops/pd_launch_readonly_smoke.py > reports/launch_smoke.txt || echo 'PUBLIC_GATE_FAILED' >> reports/launch_smoke.txt
       - name: Save sanitized audit findings to isolated branch
         if: always()
         run: |
@@ -40,4 +42,9 @@ jobs:
             git add reports/paypal_live_compatibility.txt reports/paypal_overlay_dryrun.txt reports/launch_smoke.txt
             git commit -m "audit(paypal): record safe live compatibility statuses" || true
             git push origin HEAD:ops/paypal-readonly-live-audit-20261116
+          fi
+      - name: Enforce release gates
+        run: |
+          grep -q 'SAFE_STAGING_OVERLAY_READY' reports/paypal_overlay_dryrun.txt
+          grep -q 'PUBLIC_READONLY_SMOKE_PASSED' reports/launch_smoke.txt
           fi

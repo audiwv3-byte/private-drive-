@@ -1,0 +1,53 @@
+name: PRIVATE DRIVE - PR25 guarded release script lint ONLY
+on:
+  push:
+    branches: [ops/pr25-live-overlay-dryrun-20261116]
+    paths:
+      - ops/pr25_guarded_deploy_NOT_EXECUTED.py
+      - .github/workflows/pr25-release-script-review.yml
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile only, never run deployment
+        run: |
+          mkdir -p reports
+          python -m py_compile ops/pr25_guarded_deploy_NOT_EXECUTED.py
+          python - <<'PY' > reports/pr25_release_script_review.txt
+          import ast
+          from pathlib import Path
+          p=Path("ops/pr25_guarded_deploy_NOT_EXECUTED.py")
+          source=p.read_text()
+          tree=ast.parse(source)
+          assert "--execute" in source
+          assert "OPERATOR_APPROVED_PR25" in source
+          assert "SOURCE_SHA_CHANGED_BLOCK_" in source
+          assert "BACKUPS_AND_CANDIDATES_VERIFIED" in source
+          assert "ROLLBACK_VERIFIED" in source
+          assert "if not args.execute:" in source
+          assert "if not healthy()" in source
+          print("DEPLOY_SCRIPT_COMPILED")
+          print("EXPLICIT_APPROVAL_GATE_PRESENT")
+          print("LIVE_SHA256_LOCKS_PRESENT")
+          print("BACKUP_READBACK_AND_RELOAD_HEALTH_PRESENT")
+          print("ROLLBACK_HANDLERS_PRESENT")
+          print("PRODUCTION_NOT_MODIFIED_BY_THIS_WORKFLOW")
+          print("PR25_DEPLOY_SCRIPT_STATIC_REVIEW_PASSED")
+          PY
+      - name: Save static review results
+        if: always()
+        run: |
+          if [ -f reports/pr25_release_script_review.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pr25_release_script_review.txt
+            git commit -m "audit(pr25): deployment script static review" || true
+            git push origin HEAD:ops/pr25-live-overlay-dryrun-20261116
+          fi

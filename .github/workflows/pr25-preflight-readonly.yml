@@ -1,0 +1,34 @@
+name: PRIVATE DRIVE - PR25 release preflight read only
+on:
+  push:
+    branches: [ops/pr25-live-overlay-dryrun-20261116]
+    paths:
+      - ops/pr25_production_preflight.py
+      - .github/workflows/pr25-preflight-readonly.yml
+permissions:
+  contents: write
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Record fresh source SHA256 without production modifications
+        env:
+          PYTHONANYWHERE_API_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+        run: |
+          mkdir -p reports
+          python ops/pr25_production_preflight.py > reports/pr25_production_preflight.txt
+      - name: Save non-secret preflight report
+        if: always()
+        run: |
+          if [ -f reports/pr25_production_preflight.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/pr25_production_preflight.txt
+            git commit -m "audit(pr25): fresh live source checksums" || true
+            git push origin HEAD:ops/pr25-live-overlay-dryrun-20261116
+          fi

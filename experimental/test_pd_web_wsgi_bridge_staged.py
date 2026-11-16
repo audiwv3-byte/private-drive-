@@ -37,15 +37,15 @@ with tempfile.TemporaryDirectory(prefix="pd-wsgi-stage-") as tmp:
     c=Client(combined,Response,use_cookies=True)
     def get(path):return c.get(path,base_url=ORIGIN)
     def post(path,**kwargs):return c.post(path,base_url=ORIGIN,**kwargs)
-    status=c.get("/")
+    status=get("/")
     require(status.status_code==200 and b"original passenger app" in status.data,
             "LEGACY_PASSENGER_HTML_UNCHANGED")
-    require(c.get("/api/me").status_code==401,"LEGACY_TELEGRAM_AUTH_UNCHANGED")
-    require(c.post("/api/order",json={}).status_code==401,"LEGACY_ORDER_CREATE_UNCHANGED")
-    require(c.get("/api/admin/orders").status_code==401,"LEGACY_ADMIN_GUARD_UNCHANGED")
-    require(c.get("/api/web/me").status_code==404 or c.get("/api/web/me").status_code==401,
+    require(get("/api/me").status_code==401,"LEGACY_TELEGRAM_AUTH_UNCHANGED")
+    require(post("/api/order",json={}).status_code==401,"LEGACY_ORDER_CREATE_UNCHANGED")
+    require(get("/api/admin/orders").status_code==401,"LEGACY_ADMIN_GUARD_UNCHANGED")
+    require(get("/api/web/me").status_code==404 or get("/api/web/me").status_code==401,
             "WEB_API_NOT_CONFUSED_WITH_TELEGRAM")
-    csrf=c.get("/api/web/csrf")
+    csrf=get("/api/web/csrf")
     require(csrf.status_code==200,"WEB_CSRF_ROUTE_INDEPENDENT")
     web_cookie=csrf.headers.get("Set-Cookie","")
     require("pd_web_session_staged=" in web_cookie and "HttpOnly" in web_cookie and "Secure" in web_cookie,
@@ -53,26 +53,26 @@ with tempfile.TemporaryDirectory(prefix="pd-wsgi-stage-") as tmp:
     require("legacy_telegram_session=" not in web_cookie,"LEGACY_COOKIE_NOT_OVERWRITTEN")
     token=csrf.json["csrf_token"]
     headers={"Origin":ORIGIN,"X-CSRF-Token":token}
-    require(c.post("/api/web/start",json={"email":"isolated@example.test"},headers=headers).status_code==200,
+    require(post("/api/web/start",json={"email":"isolated@example.test"},headers=headers).status_code==200,
             "WEB_OTP_STARTED_ISOLATED")
     code=notifications[-1][1]
-    require(c.post("/api/web/verify",json={"code":code},headers=headers).status_code==200,
+    require(post("/api/web/verify",json={"code":code},headers=headers).status_code==200,
             "WEB_OTP_CONFIRMED_ISOLATED")
-    me=c.get("/api/web/me")
+    me=get("/api/web/me")
     require(me.status_code==200 and me.json["role"]=="passenger","WEB_PASSENGER_LOGIN")
-    require(c.get("/api/me").status_code==401,"WEB_COOKIE_DOES_NOT_GRANT_TELEGRAM_ID")
-    require(c.get("/api/admin/orders").status_code==401,"WEB_COOKIE_DOES_NOT_GRANT_ADMIN")
-    token=c.get("/api/web/csrf").json["csrf_token"]
+    require(get("/api/me").status_code==401,"WEB_COOKIE_DOES_NOT_GRANT_TELEGRAM_ID")
+    require(get("/api/admin/orders").status_code==401,"WEB_COOKIE_DOES_NOT_GRANT_ADMIN")
+    token=get("/api/web/csrf").json["csrf_token"]
     headers={"Origin":ORIGIN,"X-CSRF-Token":token}
-    booking=c.post("/api/web/bookings",headers=headers,json={
+    booking=post("/api/web/bookings",headers=headers,json={
         "origin":"Vilnius","destination":"Kaunas","request_key":"synthetic_12345678909876",
         "payment_method":"Банковский перевод"})
     require(booking.status_code==201,"WEB_BOOKING_USES_ONLY_TEMP_DB")
     bid=booking.json["id"]
-    require(c.get(f"/api/web/bookings/{bid}/payment").json["checkout_enabled"] is False,
+    require(get(f"/api/web/bookings/{bid}/payment").json["checkout_enabled"] is False,
             "WEB_PAYMENT_DISABLED_UNTIL_PROVIDER_TEST")
-    require(c.post("/api/order",json={"id":bid}).status_code==401,
+    require(post("/api/order",json={"id":bid}).status_code==401,
             "STAGED_WEB_BOOKING_CANNOT_BYPASS_REAL_TELEGRAM_ORDER_ENDPOINT")
-    require(c.get("/api/admin/orders").status_code==401,"ADMIN_UNCHANGED_AFTER_WEB_BOOKING")
+    require(get("/api/admin/orders").status_code==401,"ADMIN_UNCHANGED_AFTER_WEB_BOOKING")
 print("WEB_WSGI_STAGED_INTEGRATION_TESTS_PASS")
 print("NO_LIVE_SERVER_ORDERS_USERS_OR_PAYMENTS")

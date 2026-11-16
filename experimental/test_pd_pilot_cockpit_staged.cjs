@@ -54,7 +54,7 @@ async function test(){
  console.log('PASS UNAPPROVED_PILOT_NO_MAP_OR_TRIPS');
  workOrders=[{id:32,status:'Подтверждена',origin:'Vilnius',destination:'Kaunas',arrived_at:null}];
  assert.equal(cockpit.mount(root,true),true);
- await Promise.resolve();await Promise.resolve();
+ await new Promise(res=>setImmediate(res));
  assert.equal(createdMaps,1);
  assert.equal(root.children.length,3);
  assert.equal(root.children[0],passport);assert.equal(root.children[1],admin);

@@ -33,8 +33,10 @@ with tempfile.TemporaryDirectory(prefix="pd-wsgi-stage-") as tmp:
         "offline-only-web-secret-"+("x"*48),
         lambda email,code:notifications.append((email,code)),
         allowed_origin=ORIGIN)
-    require(legacy.wsgi_app is saved_wsgi,"ORIGINAL_LEGACY_WSGI_UNCHANGED")
+    require(legacy.wsgi_app.__self__ is saved_wsgi.__self__ and legacy.wsgi_app.__func__ is saved_wsgi.__func__,"ORIGINAL_LEGACY_WSGI_UNCHANGED")
     c=Client(combined,Response,use_cookies=True)
+    def get(path):return c.get(path,base_url=ORIGIN)
+    def post(path,**kwargs):return c.post(path,base_url=ORIGIN,**kwargs)
     status=c.get("/")
     require(status.status_code==200 and b"original passenger app" in status.data,
             "LEGACY_PASSENGER_HTML_UNCHANGED")

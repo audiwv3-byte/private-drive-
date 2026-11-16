@@ -62,6 +62,17 @@ def main():
       "SERVER_ADMIN_ORDER_GET":"/api/admin/orders" in server,
     }
     for k,v in markers.items():check(k,v)
+    # Detailed classification without printing source code or app data.
+    trip_actions={
+        "START_ACTION_CALL": bool(re.search(r"action\\s*\\(\\s*['\\\"]start['\\\"]",trip)),
+        "START_ACTION_REQUEST_LITERAL": "start" in trip and "/action" in trip,
+        "ARRIVE_ACTION_CALL": bool(re.search(r"action\\s*\\(\\s*['\\\"]arrive['\\\"]",trip)),
+        "CONDITIONAL_START_TRIGGER": bool(re.search(r"arrived_at.{0,130}start",trip,re.S)),
+        "START_LABEL": "Начать поездку" in trip,
+        "IN_ROUTE_LABEL": "В пути" in trip,
+        "ARRIVED_AT_FIELD": "arrived_at" in trip,
+    }
+    for name,check_value in trip_actions.items():check(name,check_value)
     present=all(bool(live[p]) for p in PATHS)
     print("LIVE_SOURCE_FILES_ALL_PRESENT",present,flush=True)
     print("NOTE_SERVER_SIDE_TRIP_ROLE_GUARDS_NOT_EXECUTED",flush=True)

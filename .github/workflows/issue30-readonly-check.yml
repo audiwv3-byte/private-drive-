@@ -52,7 +52,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install isolated test dependencies
-        run: python -m pip install 'Flask>=3,<4' Pillow requests
+        run: python -m pip install 'Flask>=3,<4' Pillow pillow-heif requests
       - name: GET verified deployed source and test patched copy only in memory
         env:
           PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}

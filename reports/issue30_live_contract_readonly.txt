@@ -1,0 +1,205 @@
+FILE pd_onboarding.py SHA256 7ae5a7b3dc3ed2a217be4368d79e6d6ebfd86c5222cae652edee900297ae0e9b LINES 176
+RANGE 1 38
+L1: """Separate driver connection applications. Decisions and records stay in the admin cabinet."""
+L2: import json,re,io,warnings,hashlib
+L3: from PIL import Image,ImageOps,UnidentifiedImageError
+L4: import sys
+L5: from pathlib import Path
+L6: sys.path.insert(0,str(Path(__file__).with_name('pd_photo_vendor')))
+L7: from pillow_heif import register_heif_opener
+L8: register_heif_opener()
+L9: from flask import Response
+L10: SIDES=("license_front","license_back","registration_front","registration_back","ltsa","activity","insurance","portrait","car_front","car_rear","car_interior")
+L11: ACTIVE_SIDES=("license_front","license_back","car_front","car_rear","car_interior")
+L12: SECOND_SIDES=("registration_front","registration_back","ltsa","activity","insurance","portrait")
+L13: REQUIRED_SECOND=tuple(x for x in SECOND_SIDES if x!="registration_back")
+L14: MAX_PHOTO=10*1024*1024
+L15: from flask import request,jsonify
+L16: import pd_languages
+L17: 
+L18: def ensure_tables(core):
+L19:     with core.db(core.USERS_DB) as c:
+L20:         c.execute('''CREATE TABLE IF NOT EXISTS pd_driver_applications (
+L21:             telegram_id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL,
+L22:             city TEXT NOT NULL, vehicle TEXT NOT NULL, vehicle_year INTEGER NOT NULL,
+L23:             plate TEXT NOT NULL, seats INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+L24:             created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''')
+L25:         if 'stage' not in {r['name'] for r in c.execute('PRAGMA table_info(pd_driver_applications)')}:
+L26:             c.execute('ALTER TABLE pd_driver_applications ADD COLUMN stage INTEGER NOT NULL DEFAULT 2')
+L27:         c.execute('''CREATE TABLE IF NOT EXISTS pd_driver_application_decisions (
+L28:             id INTEGER PRIMARY KEY AUTOINCREMENT,telegram_id INTEGER NOT NULL,
+L29:             admin_id INTEGER NOT NULL,old_status TEXT NOT NULL,new_status TEXT NOT NULL,
+L30:             decided_at TEXT NOT NULL)''')
+L31: 
+L32: def read_photos(allowed=ACTIVE_SIDES):
+L33:     photos={}
+L34:     for side in SIDES:
+L35:         f=request.files.get(side)
+L36:         if not f:continue
+L37:         if side not in allowed:raise ValueError("Загружаются водительские права и три фотографии автомобиля")
+L38:         data=f.read(MAX_PHOTO+1)
+RANGE 62 80
+L62:     def document_sides(uid):
+L63:         with core.db(core.USERS_DB) as c:
+L64:             return [r['side'] for r in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(uid,))]
+L65:     @app.get('/api/driver/documents/<int:applicant>/<side>')
+L66:     def pd_driver_document(applicant,side):
+L67:         uid,_=auth()
+L68:         if uid!=applicant and not core.is_admin(uid):raise PermissionError('Нет доступа')
+L69:         if side not in SIDES:return jsonify(error='Фото не найдено'),404
+L70:         with core.db(core.USERS_DB) as c:
+L71:             row=c.execute('SELECT image FROM pd_driver_documents WHERE telegram_id=? AND side=?',(applicant,side)).fetchone()
+L72:         if not row:return jsonify(error='Фото не найдено'),404
+L73:         return Response(bytes(row['image']),mimetype='image/jpeg',headers={
+L74:           'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',
+L75:           'Content-Disposition':'inline; filename="document.jpg"','Referrer-Policy':'no-referrer'})
+L76:     def own(uid):
+L77:         with core.db(core.USERS_DB) as c:
+L78:             row=c.execute('''SELECT name,phone,city,vehicle,vehicle_year,plate,seats,
+L79:                  status, stage, created_at AS submitted_at FROM pd_driver_applications WHERE telegram_id=?''',(uid,)).fetchone()
+L80:         return dict(submitted=True,document_sides=document_sides(uid),**dict(row)) if row else None
+RANGE 88 98
+L88:     def pd_driver_apply():
+L89:         uid,_=auth()
+L90:         try:d=json.loads(request.form.get('application','null')) if request.mimetype=='multipart/form-data' else request.get_json(silent=True)
+L91:         except (ValueError,TypeError):raise ValueError('Проверьте данные заявки водителя')
+L92:         if not isinstance(d,dict):raise ValueError('Проверьте данные заявки водителя')
+L93:         existing=own(uid)
+L94:         stage=2 if existing and (existing['status']=='stage2' or existing['stage']==2) else 1
+L95:         if existing and existing['stage']==1 and existing['status']=='pending':
+L96:             raise ValueError('Дождитесь подтверждения первого этапа администратором')
+L97:         if stage==1:
+L98:             d={**d,'city':'','vehicle':'','vehicle_year':1980,'plate':'','seats':4}
+RANGE 120 172
+L120:             stored={r['side'] for r in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(uid,))}
+L121:             required=ACTIVE_SIDES if stage==1 else ACTIVE_SIDES+REQUIRED_SECOND
+L122:             if set(required)-stored-set(photos):raise ValueError('Добавьте все обязательные фотографии документов')
+L123:             car_rows={x['side']:bytes(x['image']) for x in c.execute("SELECT side,image FROM pd_driver_documents WHERE telegram_id=? AND side IN ('car_front','car_rear','car_interior')",(uid,))}
+L124:             car_rows.update({k:v for k,v in photos.items() if k.startswith('car_')})
+L125:             if len({hashlib.sha256(v).digest() for v in car_rows.values()})!=3:raise ValueError('Добавьте три разных фото автомобиля: спереди, сзади и салон')
+L126:             for side,image in photos.items():
+L127:                 c.execute('INSERT INTO pd_driver_documents(telegram_id,side,image,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_id,side) DO UPDATE SET image=excluded.image,updated_at=excluded.updated_at',(uid,side,image,now))
+L128:             c.execute('''INSERT INTO pd_driver_applications
+L129:               (telegram_id,name,phone,city,vehicle,vehicle_year,plate,seats,status,created_at,updated_at,stage)
+L130:               VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?) ON CONFLICT(telegram_id) DO UPDATE SET
+L131:               name=excluded.name,phone=excluded.phone,city=excluded.city,vehicle=excluded.vehicle,
+L132:               vehicle_year=excluded.vehicle_year,plate=excluded.plate,seats=excluded.seats,
+L133:               status='pending',stage=excluded.stage,updated_at=excluded.updated_at''',
+L134:               (uid,out['name'],phone,out['city'],out['vehicle'],year,plate,seats,now,now,stage))
+L135:         if current is None or current['status'] != 'pending':
+L136:             label = '🚘 Новая регистрация водителя' if current is None else '🚘 Анкета водителя обновлена'
+L137:             core.notify_admins(f"{label}: {out['name']}, {phone}, Telegram {uid}\nЭтап {stage}. Заявка ожидает проверки в кабинете диспетчера.")
+L138:         return jsonify(ok=True,submitted=True)
+L139: 
+L140:     @app.get('/api/admin/driver-applications')
+L141:     def pd_driver_applications():
+L142:         uid,_=auth()
+L143:         if not core.is_admin(uid):raise PermissionError('Нет доступа')
+L144:         with core.db(core.USERS_DB) as c:
+L145:             rows=c.execute('SELECT * FROM pd_driver_applications ORDER BY updated_at DESC LIMIT 200').fetchall()
+L146:         return jsonify(applications=[dict(**dict(r),document_sides=document_sides(r["telegram_id"])) for r in rows])
+L147: 
+L148:     @app.post('/api/admin/driver-applications/<int:applicant>/decision')
+L149:     def pd_driver_decide(applicant):
+L150:         uid,_=auth()
+L151:         if not core.is_admin(uid):raise PermissionError('Нет доступа')
+L152:         d=request.get_json(silent=True);target=d.get('status') if isinstance(d,dict) else None
+L153:         if target not in ('pending','approved','rejected'):raise ValueError('Некорректный статус заявки')
+L154:         with core.db(core.USERS_DB) as c:
+L155:             c.execute('BEGIN IMMEDIATE')
+L156:             r=c.execute('SELECT status,stage FROM pd_driver_applications WHERE telegram_id=?',(applicant,)).fetchone()
+L157:             if not r:return jsonify(error='Заявка не найдена'),404
+L158:             if target=='approved' and r['status']!='approved':
+L159:                 stored={x['side'] for x in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(applicant,))}
+L160:                 required=ACTIVE_SIDES if r['stage']==1 else ACTIVE_SIDES+REQUIRED_SECOND
+L161:                 if set(required)-stored:
+L162:                     raise ValueError('Для одобрения нужны все обязательные фотографии текущего этапа')
+L163:                 if r['stage']==1:target='stage2'
+L164:             if r['status']=='stage2' and target=='approved':
+L165:                 raise ValueError('Дождитесь заполнения второго этапа водителем')
+L166:             if r['status']!=target:
+L167:                 now=core.now().isoformat()
+L168:                 c.execute('UPDATE pd_driver_applications SET status=?,updated_at=? WHERE telegram_id=?',(target,now,applicant))
+L169:                 c.execute('INSERT INTO pd_driver_application_decisions(telegram_id,admin_id,old_status,new_status,decided_at) VALUES(?,?,?,?,?)',(applicant,uid,r['status'],target,now))
+L170:         # Reviewing an application never grants dispatcher access or exposes customer orders.
+L171:         return jsonify(ok=True)
+L172: 
+END_FILE pd_onboarding.py
+FILE miniapp/templates/index.html SHA256 d475f5b08f9466eb41ab7dd20db7dde59aecdae059927fc880ee7ab7ab1bddc0 LINES 1873
+RANGE 323 344
+L323: <div class="pd-address-field" hidden style="display:none"><label id="pdCabinTempLabel" for="pdCabinTemp">Температура в салоне автомобиля</label><select id="pdCabinTemp"><option value="" hidden>Температура не указана</option><option value="18">18 °C</option><option value="19">19 °C</option><option value="20">20 °C</option><option value="21">21 °C</option><option value="22">22 °C</option><option value="23">23 °C</option><option value="24">24 °C</option><option value="25">25 °C</option><option value="26">26 °C</option></select></div><label>Дополнительный комментарий</label><textarea id="pdbWishes" maxlength="550" placeholder="Номер рейса, пожелания по времени, адресу подачи…"></textarea>
+L324: <button type="button" class="secondary pd-route-calculate" onclick="pdbCalculate()">Рассчитать маршрут →</button><p class="pdb-status" id="pdbRouteStatus">Цена уточняется пилотом, если расчёт недоступен.</p>
+L325: <label>Как хотите оплатить?</label><div class="pdb-pay" id="pdbPays" role="group" aria-label="Способ оплаты"><button type="button" class="active" data-method="Наличными">💶 Наличными</button><button type="button" data-method="Банковский перевод">🏦 Банковский перевод</button><button type="button" data-method="Криптовалюта">₿ Крипто</button></div>
+L326: <p id="pdbPaymentSelection" class="pdb-note" role="status" aria-live="polite" aria-atomic="true"></p>
+L327: <div id="pdBookingProfileHome"><div class="pdb-price" id="pdbProfile"><h3>Ваш профиль</h3><p id="pdbProfileSummary">Зарегистрируйтесь через Telegram или укажите данные вручную.</p><p class="pdb-note pd-privacy-notice">Имя, телефон и сведения о поездке используются для регистрации и выполнения заказа. Email, город и постоянные пожелания необязательны.</p><label class="pd-phone-consent"><input id="pdbPhoneConsent" type="checkbox" required><span data-pd-phone-consent-text>Согласен передать и использовать мой номер телефона для связи по поездке.</span></label><button type="button" id="pdbTelegramRegister" class="pay-choice" onclick="pdbRegisterTelegram()">Продолжить через Telegram</button><button type="button" id="pdBookingEditProfile" class="secondary pay-choice" onclick="pdbEditProfile()">Изменить данные</button><div id="pdbProfileFields" class="hidden"><label for="pdbName">Ваше имя</label><input id="pdbName" autocomplete="name" placeholder="Имя"><label for="pdbPhone">Телефон</label><input id="pdbPhone" autocomplete="tel" type="tel" placeholder="+370..."><details class="pd-profile-details"><summary>Дополнить профиль (необязательно)</summary><p>Контакты и пожелания для связи по вашим поездкам. Эти данные видны диспетчеру и водителю сервиса. Дополнительные поля необязательны. История изменений доступна только диспетчеру. По вопросам удаления данных свяжитесь с нами.</p><label for="pdbEmail">Электронная почта</label><input id="pdbEmail" type="email" maxlength="254" autocomplete="email" placeholder="name@example.com"><label for="pdbHomeCity">Ваш город</label><input id="pdbHomeCity" maxlength="120" autocomplete="address-level2"><label for="pdbPreferences">Постоянные пожелания к поездкам</label><textarea id="pdbPreferences" maxlength="1000" placeholder="Например: тишина в салоне"></textarea><p>Для конкретного заказа укажите пожелания также в деталях поездки.</p></details><button type="button" class="pay-choice" id="pdbSaveProfile" onclick="pdbSaveProfile()">Сохранить данные</button></div><p id="pdbProfileStatus" class="pdb-note" role="status">Телефон передаётся только с вашего разрешения. Данные можно изменить.</p></div></div>
+L328: <label><input type="checkbox" class="pdb-checkbox" id="pdbAgree">Подтверждаю отправку заявки с указанными данными</label>
+L329: <div id="pdbFeedback" class="pdb-feedback" role="status"></div><button type="button" id="pdBookedPilot" class="secondary hidden" onclick="go(9)">Карточка пилота</button><button type="button" class="secondary pay-choice hidden" id="pdbNewRequest" onclick="pdbNewRequest()">Создать новую заявку</button><p class="pdb-note">Оплата сейчас не списывается. Заказ подтверждает диспетчер.</p>
+L330: </div><div class="pdb-card"><div class="pdb-step" id="pdPassengerRouteStep">МАРШРУТ И СТОИМОСТЬ</div><h2>Ваш маршрут</h2>
+L331: <h3>Вы выбираете направление.<br>Мы заботимся о деталях.</h3><div class="pdb-price"><span>Ваша поездка</span><div id="pdbSummary" class="pdb-preview">Укажите маршрут и дату</div><hr style="border:0;border-top:1px solid #53644d"></div>
+L332: </div></div><div class="pd-booking-dock"><div class="pd-booking-total"><span>Предварительная стоимость</span><strong id="pdbPrice" aria-live="polite">—</strong></div><button type="button" class="pdb-primary" id="pdbSend" onclick="pdbSendOrder()">Заказать поездку →</button></div></div></section>
+L333: <section class="panel hidden" id="step12"><h1>🎁 Бонусы и приглашения</h1><p>Приглашайте друзей в privatdrive и следите за начислениями.</p><div id="pdBonusSummary" role="status">Загрузка…</div><label for="pdReferralLink">Ваша личная ссылка</label><input id="pdReferralLink" readonly aria-label="Ваша личная ссылка"><div class="actions"><a id="pdShareLink" class="chip hidden" target="_blank" rel="noopener noreferrer">Пригласить друга</a><button class="secondary" type="button" onclick="pdBonusCopy()">Скопировать ссылку</button><button class="secondary" type="button" onclick="pdBonusLoad()">Обновить</button></div><p>3 балла и партнёрское начисление 13% от полной стоимости первой завершённой и оплаченной поездки нового друга. Второго уровня нет. Денежные выплаты не выполняются автоматически. Баллы не являются деньгами. Автоматическая скидка пока не включена. Тестовые платежи Stripe не учитываются.</p><h2>Промокод</h2><label for="pdPromoCode">Введите промокод</label><input id="pdPromoCode" maxlength="32" autocomplete="off" autocapitalize="characters" placeholder="Например: PRIVATE"><button type="button" id="pdPromoSubmit" class="pay-choice" onclick="pdBonusRedeem()">Активировать промокод</button><p id="pdBonusFeedback" role="status"></p><p class="muted">Один промокод можно активировать один раз. У каждого промокода есть общий лимит использований.</p></section>
+L334: <section class="panel hidden" id="step13"><h2>Рабочее место водителя</h2><p>Новые заявки, предстоящие и текущие поездки; завершённые за сегодня. Полное управление оплатами и документами доступно в админпанели.</p><button type="button" class="secondary" onclick="pdDriverLoad()">Обновить поездки</button><label for="pdDriverFilter">Показать поездки</label><select id="pdDriverFilter" onchange="pdDriverLoad()"><option value="all">Все рабочие поездки</option><option value="Новая">Новые заявки</option><option value="Подтверждена">Предстоящие</option><option value="В пути">В пути</option><option value="Выполнена">Завершённые сегодня</option></select><div id="pdDriverOrders"></div></section><section id="pdPilotWork" class="panel hidden"><h1 id="pdPilotWorkTitle">Мои поездки</h1><button type="button" id="pdPilotWorkRefresh" class="secondary" onclick="pdPilotWork()">Обновить</button><button type="button" id="pdPilotPassenger" class="secondary hidden" onclick="pdPilotPassenger()">Как пассажир</button><div id="pdPilotWorkList" role="status"></div></section><section class="panel hidden" id="step14"><h1>Мой профиль</h1><p>Ваши контакты и пожелания для поездок с privatdrive. Основные данные можно изменить, дополнительные поля — заполнить по желанию.</p><div id="pdProfilePageHome"></div></section><footer class="pd-contact-footer pd-registered-only hidden"><div class="pd-contact-email"></div></footer><section id="step15" class="panel hidden">{% include '_about_content.html' %}</section><nav class="nav" id="mainNav"><button class="secondary" onclick="go(0)">Главная</button><button class="secondary" onclick="go(11)">Заказ</button><button class="secondary" onclick="go(8)">Поездки</button><button class="secondary" onclick="go(14)">Профиль</button><button class="secondary" onclick="go(12)">Бонусы</button><button id="adminNav" class="secondary hidden" onclick="go(10)">Диспетчер</button></nav></main>
+L335: <script>let pdActiveDocumentSides=["license_front","license_back","car_front","car_rear","car_interior"];
+L336: const pdPilotTestWords={"ru": {"notice": "Заполните контакты и данные автомобиля. Приложите обе стороны водительских прав и три фото авто: спереди, сзади и салон.", "frozen": "Остальные документы временно отключены", "frozenNote": "Загрузка LTSA, свидетельства индивидуальной деятельности, страховки, техпаспорта и личного фото пока недоступна. Уже загруженные документы сохраняются.", "card": "Карточка пилота", "error": "Загружаются обе стороны прав и три фотографии автомобиля"}, "en": {"notice": "Enter your contact and vehicle details. Upload both sides of your driving licence and three car photos: front, rear and interior.", "frozen": "Other documents are temporarily disabled", "frozenNote": "LTSA, individual activity, insurance, vehicle registration and personal photo uploads are currently unavailable. Previously uploaded documents are retained.", "card": "Pilot card", "error": "Upload both sides of the licence and three car photos"}, "lt": {"notice": "Įveskite kontaktus ir automobilio duomenis. Įkelkite abi vairuotojo pažymėjimo puses ir tris automobilio nuotraukas: priekį, galą ir saloną.", "frozen": "Kitų dokumentų įkėlimas laikinai išjungtas", "frozenNote": "LTSA, individualios veiklos, draudimo, registracijos liudijimo ir asmeninės nuotraukos įkėlimas šiuo metu negalimas. Anksčiau įkelti dokumentai išsaugomi.", "card": "Piloto kortelė", "error": "Įkelkite abi pažymėjimo puses ir tris automobilio nuotraukas"}};
+L337: document.addEventListener('DOMContentLoaded',()=>{const w=pdPilotTestWords[window.PD_LANG]||pdPilotTestWords.ru;$('pdPilotTestNotice').textContent=w.notice;$('pdFrozenPilotTitle').textContent=w.frozen;$('pdFrozenPilotNote').textContent=w.frozenNote;$('pdPilotCardTitle').textContent=w.card;document.querySelectorAll('[data-pilot-card-label]').forEach(e=>e.textContent=w.card);window.PD_UI['Сейчас загружаются только водительские права']=w.error;window.PD_UI['Добавьте все обязательные фотографии документов']={ru:'Добавьте обе стороны прав и три фотографии автомобиля',en:'Add both sides of your licence and three car photos',lt:'Pridėkite abi pažymėjimo puses ir tris automobilio nuotraukas'}[window.PD_LANG]||'Добавьте обе стороны прав и три фотографии автомобиля';pdDocumentRefresh()});
+L338: 
+L339: const pdDocumentSides=['license_front','license_back','registration_front','registration_back','ltsa','activity','insurance','portrait','car_front','car_rear','car_interior'];
+L340: const pdDocumentLabels={license_front:'Права — лицевая сторона',license_back:'Права — обратная сторона',registration_front:'Техпаспорт — лицевая сторона',registration_back:'Техпаспорт — обратная сторона',ltsa:'Регистрация LTSA',activity:'Свидетельство индивидуальной деятельности',insurance:'Страховка',portrait:'Личное фото для карточки пилота',car_front:'Автомобиль — вид спереди',car_rear:'Автомобиль — вид сзади',car_interior:'Автомобиль — салон'};
+L341: const pdDocumentFiles=new Map(),pdDocumentURLs=new Map(),pdDocumentChecks=new Set();
+L342: function pdDriverStage(){return window.pdOnboardingUser?.driver_application?.status==='stage2'||window.pdOnboardingUser?.driver_application?.stage===2?2:1}
+L343: function pdDriverStageRefresh(){
+L344:  const second=pdDriverStage()===2;
+RANGE 475 493
+L475:  if(pdObBusy||!pdObSigned())return;pdObBusy=true;$('pdObPassengerSubmit').disabled=true;$('pdObStatus').textContent=pdL('Сохраняем…');
+L476:  try{await api('/api/register',{name:$('pdObPassengerName').value.trim(),phone:$('pdObPassengerPhone').value.trim()});await pdCompletePassengerRegistration()}
+L477:  catch(e){$('pdObStatus').textContent=pdL(e.message)}finally{pdObBusy=false;$('pdObPassengerSubmit').disabled=false}
+L478: }
+L479: async function pdRegisterPassengerTelegram(){
+L480:  if(!pdRequirePhoneConsent("pdObPhoneConsent","pdObStatus"))return;
+L481:  if(pdObBusy||!pdObSigned())return;pdObBusy=true;$('pdObStatus').textContent=pdL('Разрешите Telegram передать ваш телефон для регистрации.');
+L482:  try{await pdbRegisterTelegram();const r=await api('/api/me');if(r.registered&&r.phone){await pdCompletePassengerRegistration()}else{$('pdObPassengerName').value=$('pdbName').value||'';$('pdObStatus').textContent=$('pdbProfileStatus').textContent||pdL('Укажите имя и телефон вручную.')}}
+L483:  catch(e){$('pdObStatus').textContent=pdL(e.message)}finally{pdObBusy=false}
+L484: }
+L485: function pdDriverSubmitText(ru,en,lt){return window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru}
+L486: function pdDriverSubmitStatus(text,error=false){const el=$('pdDriverSubmitStatus');el.textContent=text;el.style.color=error?'#ffb6a8':'#f0ce87';el.setAttribute('role',error?'alert':'status');if(error)el.scrollIntoView({block:'center',behavior:'smooth'})}
+L487: async function pdRegisterDriver(){
+L488:  if(pdObBusy)return;
+L489:  const form=$('pdObDriver'),button=$('pdObDriverSubmit');pdDocumentRefresh();
+L490:  if(pdDocumentChecks.size){pdDriverSubmitStatus(pdDriverSubmitText('Фотографии ещё проверяются. Подождите несколько секунд.','Photos are still being checked. Please wait.','Nuotraukos dar tikrinamos. Palaukite.'),true);return}
+L491:  if(!form.checkValidity()){const input=form.querySelector(':invalid');const label=input?.id?form.querySelector('label[for="'+input.id+'"]'):null;pdDriverSubmitStatus(pdDriverSubmitText('Заявка не отправлена. Проверьте поле: ','Application not sent. Check: ','Paraiška neišsiųsta. Patikrinkite: ')+(label?.textContent||input?.name||'')+'. '+(input?.validationMessage||''),true);input?.focus();form.reportValidity();return}
+L492:  if(!initData){pdDriverSubmitStatus(pdDriverSubmitText('Заявка не отправлена. Откройте Mini App через Telegram.','Application not sent. Open the Mini App through Telegram.','Paraiška neišsiųsta. Atidarykite programėlę per Telegram.'),true);return}
+L493:  pdObBusy=true;button.disabled=true;const originalText=button.textContent;button.textContent=pdDriverSubmitText('Отправляем…','Sending…','Siunčiama…');form.setAttribute('aria-busy','true');pdDriverSubmitStatus(pdDriverSubmitText('Отправляем заявку и фотографии. Дождитесь подтверждения.','Sending your application and photos. Please wait for confirmation.','Siunčiama paraiška ir nuotraukos. Palaukite patvirtinimo.'));let saved=false;
+END_FILE miniapp/templates/index.html
+FILE miniapp_server.py SHA256 f4a4dcfe4c9f406e7fe3188ca39a27eb53952bedfb09cd41f82a3613f790adc4 LINES 1091
+RANGE 1048 1061
+L1048: 
+L1049: import pd_recent_routes
+L1050: pd_recent_routes.register(app, auth)
+L1051: 
+L1052: # Separate first-entry forms and private driver applications.
+L1053: import pd_onboarding
+L1054: pd_onboarding.register(app, core, auth)
+L1055: 
+L1056: # Optional intermediate stop, preserving old orders and two-address routes.
+L1057: pd_stops.ensure_schema(core)
+L1058: 
+L1059: # Profile snapshots are private to the authenticated dispatcher cabinet.
+L1060: import pd_profile_history
+L1061: pd_profile_history.register(app,core,auth)
+RANGE 1049 1062
+L1049: import pd_recent_routes
+L1050: pd_recent_routes.register(app, auth)
+L1051: 
+L1052: # Separate first-entry forms and private driver applications.
+L1053: import pd_onboarding
+L1054: pd_onboarding.register(app, core, auth)
+L1055: 
+L1056: # Optional intermediate stop, preserving old orders and two-address routes.
+L1057: pd_stops.ensure_schema(core)
+L1058: 
+L1059: # Profile snapshots are private to the authenticated dispatcher cabinet.
+L1060: import pd_profile_history
+L1061: pd_profile_history.register(app,core,auth)
+L1062: 
+END_FILE miniapp_server.py
+ISSUE30_LIVE_READONLY_AUDIT_SUCCESS

@@ -1,0 +1,31 @@
+name: PRIVATE DRIVE - production passenger UI browser smoke
+on:
+  push:
+    branches: [ops/paypal-readonly-live-audit-20261116]
+    paths:
+      - .github/workflows/pd-launch-browser-smoke.yml
+permissions:
+  contents: write
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install playwright==1.56.0
+      - run: python -m playwright install --with-deps chromium
+      - name: Check mobile and desktop UI without logging in or booking
+        run: python ops/pd_launch_browser_smoke.py > reports/launch_browser_smoke.txt
+      - name: Record sanitized browser test status
+        if: always()
+        run: |
+          if [ -f reports/launch_browser_smoke.txt ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add reports/launch_browser_smoke.txt
+            git commit -m "test: record real browser launch smoke" || true
+            git push origin HEAD:ops/paypal-readonly-live-audit-20261116
+          fi

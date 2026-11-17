@@ -127,6 +127,7 @@ export async function mountIssue30Review(host, applicantId, initData) {
       grid.append(row);
     }
     notice.textContent = "Проверяй каждую сторону документа отдельно";
+    host.dispatchEvent(new CustomEvent('pd-issue30-review-updated', {bubbles:true}));
   }
   try {
     await refresh();

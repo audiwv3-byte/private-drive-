@@ -25,8 +25,22 @@ jobs:
       - name: Create isolated Android Flutter scaffold
         run: |
           flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
-          cp flutter_app/lib/main.dart private_drive_build/lib/main.dart
+          cp -R flutter_app/lib/. private_drive_build/lib/
+          cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
+          cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
           rm -f private_drive_build/test/widget_test.dart
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest = Path("private_drive_build/android/app/src/main/AndroidManifest.xml")
+          data = manifest.read_text()
+          assert "<manifest" in data and "<application" in data
+          insert = ('    <uses-permission android:name="android.permission.INTERNET"/>\\n'
+                    '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\\n'
+                    '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\\n')
+          insert = insert.replace('\\n', '\n')
+          data = data.replace("<application", insert + "    <application", 1)
+          manifest.write_text(data)
+          PY
       - name: Analyze and build debug APK (no production secrets)
         working-directory: private_drive_build
         run: |

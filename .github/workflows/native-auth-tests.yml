@@ -15,4 +15,4 @@ jobs:
         with:
           python-version: '3.13'
       - name: Test OTP module without production access
-        run: python -m unittest -v test_native_auth.py test_native_auth_http.py
+        run: python -m unittest -v test_native_auth.py test_native_auth_http.py test_native_auth_sms.py

@@ -15,6 +15,9 @@ on:
       - pd_issue30_admin_review_routes.py
       - test_pd_issue30_admin_review_routes.py
       - test_pd_issue30_live_core_db_contract.py
+      - pd_issue30_patch_live_wsgi_offline.py
+      - test_pd_issue30_live_wsgi_patch.py
+      - pd_issue30_live_admin_html_probe.py
       - miniapp/static/pd_issue30_admin_review.js
       - pd_issue30_patch_live_onboarding_offline.py
       - test_pd_issue30_live_onboarding_patch.py
@@ -72,7 +75,7 @@ jobs:
             echo "BLOCKED: read-only API token unavailable; tests not run"
             exit 1
           fi
-          python -m unittest -v test_pd_issue30_live_onboarding_patch.py test_pd_issue30_live_dispatcher_patch.py test_pd_issue30_admin_review_routes.py test_pd_issue30_live_core_db_contract.py
+          python -m unittest -v test_pd_issue30_live_onboarding_patch.py test_pd_issue30_live_dispatcher_patch.py test_pd_issue30_admin_review_routes.py test_pd_issue30_live_core_db_contract.py test_pd_issue30_live_wsgi_patch.py
 
   readonly-audit:
     name: PythonAnywhere GET-only source fingerprint
@@ -99,3 +102,4 @@ jobs:
           python pd_issue30_live_schema_probe.py
           python pd_issue30_live_handler_inspect.py
           python pd_issue30_live_runtime_structure_probe.py
+          python pd_issue30_live_admin_html_probe.py

@@ -128,6 +128,10 @@ export async function mountIssue30Review(host, applicantId, initData) {
     }
     notice.textContent = "Проверяй каждую сторону документа отдельно";
   }
-  await refresh();
+  try {
+    await refresh();
+  } catch (err) {
+    notice.textContent = err.message || 'Не удалось загрузить документы';
+  }
   return {refresh};
 }

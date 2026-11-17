@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 /// Offline-only UI preview. No routing, network, GPS, payments or real orders.
 class PrivateDriveDemo extends StatelessWidget {
@@ -21,7 +26,7 @@ class PrivateDriveDemo extends StatelessWidget {
                   const SizedBox(height: 16),
                   const Text('Выбери тестовый интерфейс', style: TextStyle(fontSize: 22)),
                   const SizedBox(height: 12),
-                  const Text('Только локальный просмотр. Заказы, оплата и GPS отключены.',
+                  const Text('Демоверсия: заказы и оплата отключены. GPS — только по разрешению.',
                       textAlign: TextAlign.center),
                   const SizedBox(height: 28),
                   FilledButton.icon(
@@ -86,19 +91,101 @@ class PassengerDemo extends StatelessWidget {
   }
 }
 
-/// Isolated pilot-only full-viewport map placeholder with local UI state.
+/// Pilot-only foreground map; all trip controls change local demo state only.
+/// In widget tests [enableMapTiles] is false: there are no tile HTTP requests.
 class PilotDemo extends StatefulWidget {
-  const PilotDemo({super.key});
+  const PilotDemo({super.key, this.enableMapTiles = true, this.positions});
+
+  final bool enableMapTiles;
+  /// Synthetic stream for deterministic tests; never enabled by production.
+  final Stream<LatLng>? positions;
 
   @override
   State<PilotDemo> createState() => _PilotDemoState();
 }
 
 class _PilotDemoState extends State<PilotDemo> {
+  final MapController _map = MapController();
+  StreamSubscription<Position>? _gps;
+  StreamSubscription<LatLng>? _synthetic;
+  LatLng? _position;
+  bool _following = true;
+  bool _gpsEnabled = false;
+  String _gpsMessage = 'GPS выключен';
   int stage = 0;
   bool paused = false;
   static const stages = ['К пассажиру', 'В путь', 'Завершить'];
   static const labels = ['Нет активной поездки', 'Едем к пассажиру', 'Поездка выполняется'];
+  static const vilnius = LatLng(54.6872, 25.2797);
+
+  void _onPosition(LatLng value) {
+    if (!mounted || !value.latitude.isFinite || !value.longitude.isFinite ||
+        value.latitude.abs() > 90 || value.longitude.abs() > 180) return;
+    setState(() {
+      _position = value;
+      _gpsMessage = 'GPS активен · только на устройстве';
+    });
+    if (_following && widget.enableMapTiles) _map.move(value, _map.camera.zoom);
+  }
+
+  Future<void> _enableGps() async {
+    if (_gpsEnabled) return;
+    // Synthetic positions never request platform permissions or network calls.
+    if (widget.positions != null) {
+      setState(() {
+        _gpsEnabled = true;
+        _gpsMessage = 'Тестовый GPS';
+      });
+      _synthetic = widget.positions!.listen(_onPosition);
+      return;
+    }
+    if (!widget.enableMapTiles) return;
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) setState(() => _gpsMessage = 'Включи геолокацию устройства');
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) setState(() => _gpsMessage = 'Доступ к GPS не предоставлен');
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _gpsEnabled = true;
+        _gpsMessage = 'Ожидание координат GPS…';
+      });
+      _gps = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 5,
+        ),
+      ).listen(
+        (p) => _onPosition(LatLng(p.latitude, p.longitude)),
+        onError: (Object error) {
+          if (mounted) setState(() => _gpsMessage = 'GPS недоступен');
+        },
+      );
+    } catch (_) {
+      if (mounted) setState(() => _gpsMessage = 'GPS недоступен');
+    }
+  }
+
+  void _stopGps() {
+    _gps?.cancel();
+    _gps = null;
+    _synthetic?.cancel();
+    _synthetic = null;
+    setState(() {
+      _gpsEnabled = false;
+      _gpsMessage = 'GPS выключен';
+      _position = null;
+    });
+  }
 
   void advance() {
     setState(() {
@@ -112,17 +199,62 @@ class _PilotDemoState extends State<PilotDemo> {
   }
 
   @override
+  void dispose() {
+    _gps?.cancel();
+    _synthetic?.cancel();
+    _map.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
-          const RepaintBoundary(
-            child: CustomPaint(
-              key: Key('pilot-map-surface'),
-              painter: DemoMapPainter(),
+          if (widget.enableMapTiles)
+            FlutterMap(
+              key: const Key('pilot-map-surface'),
+              mapController: _map,
+              options: MapOptions(
+                initialCenter: vilnius,
+                initialZoom: 14,
+                onPositionChanged: (camera, hasGesture) {
+                  if (hasGesture && _following && mounted) {
+                    setState(() => _following = false);
+                  }
+                },
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'lt.privatedrive.privateDrive',
+                  maxNativeZoom: 19,
+                ),
+                if (_position != null)
+                  MarkerLayer(markers: [
+                    Marker(
+                      point: _position!,
+                      width: 48,
+                      height: 48,
+                      child: const Icon(Icons.navigation, size: 38,
+                          color: Color(0xFFDDC184)),
+                    ),
+                  ]),
+                const RichAttributionWidget(
+                  attributions: [
+                    TextSourceAttribution('© OpenStreetMap contributors'),
+                  ],
+                ),
+              ],
+            )
+          else
+            const RepaintBoundary(
+              child: CustomPaint(
+                key: Key('pilot-map-surface'),
+                painter: DemoMapPainter(),
+              ),
             ),
-          ),
           SafeArea(
             child: Stack(
               children: [
@@ -136,13 +268,58 @@ class _PilotDemoState extends State<PilotDemo> {
                     icon: const Icon(Icons.arrow_back),
                   ),
                 ),
-                const Positioned(
-                  top: 12,
+                Positioned(
+                  top: 8,
                   right: 12,
-                  child: Chip(label: Text('ДЕМО · GPS отключён')),
+                  child: Chip(
+                    key: const Key('pilot-gps-status'),
+                    label: Text(_gpsMessage),
+                  ),
                 ),
-                const Center(
-                  child: Icon(Icons.navigation, size: 44, color: Color(0xFFDDC184)),
+                if (_position != null && !widget.enableMapTiles)
+                  const Center(
+                    child: Icon(Icons.navigation, size: 44,
+                        color: Color(0xFFDDC184)),
+                  ),
+                Positioned(
+                  top: 60,
+                  right: 12,
+                  child: Column(
+                    children: [
+                      if (!_gpsEnabled)
+                        FloatingActionButton.small(
+                          key: const Key('pilot-enable-gps'),
+                          heroTag: 'pilot-gps',
+                          tooltip: 'Включить GPS',
+                          onPressed: _enableGps,
+                          child: const Icon(Icons.my_location),
+                        )
+                      else
+                        FloatingActionButton.small(
+                          key: const Key('pilot-disable-gps'),
+                          heroTag: 'pilot-stop-gps',
+                          tooltip: 'Выключить GPS',
+                          onPressed: _stopGps,
+                          child: const Icon(Icons.location_off),
+                        ),
+                      if (_gpsEnabled && _position != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: FloatingActionButton.small(
+                            key: const Key('pilot-center-map'),
+                            heroTag: 'pilot-center',
+                            tooltip: 'Центрировать карту',
+                            onPressed: () {
+                              setState(() => _following = true);
+                              if (widget.enableMapTiles) {
+                                _map.move(_position!, _map.camera.zoom);
+                              }
+                            },
+                            child: const Icon(Icons.gps_fixed),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 Align(
                   alignment: Alignment.bottomCenter,

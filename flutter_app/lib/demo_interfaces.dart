@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'passenger_demo.dart';
 import 'demo_trip_store.dart';
+import 'remote_sync_demo.dart';
 export 'passenger_demo.dart' show PassengerDemo;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -85,6 +86,14 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                         ))),
                       icon: const Icon(Icons.person_outline),
                       label: const Text('Пассажир'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      key: const Key('open-remote-sync-demo'),
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const RemoteSyncDemo())),
+                      icon: const Icon(Icons.sync_alt),
+                      label: const Text('Тестовая связь между устройствами'),
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(

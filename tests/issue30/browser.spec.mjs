@@ -9,10 +9,10 @@ async function launch(page, {
   stage=1, missing=[], rejectNext=false, denied=false,
 }={}) {
   const state={
-    documents:Object.fromEntries(ALL.map(side=>[side,{
-      status: side==='registration_back' ? 'missing' : stage===2&&FIRST.includes(side) ? 'approved' : 'pending',
-      sha256:SHA_A
-    }])),
+    documents:Object.fromEntries(ALL.map(side=>[side,
+      side==='registration_back' ? {status:'missing'} :
+      {status:stage===2&&FIRST.includes(side)?'approved':'pending',sha256:SHA_A}
+    ])),
     decisions:[], applicationApproved:false, replaceCount:0, rejectedCount:0,
     rejectNext, denied, seenAuth:[], sawMultipart:false
   };

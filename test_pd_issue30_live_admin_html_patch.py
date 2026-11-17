@@ -34,6 +34,10 @@ class HtmlAdminIntegrationTests(unittest.TestCase):
         self.assertIn("pdStage2ApprovalHint",self.patched)
         self.assertIn("area.append(row)",self.patched)
 
+    def test_responsive_stylesheet_is_wired_into_patched_html(self):
+        self.assertEqual(self.patched.count('/static/pd_issue30_admin_review.css'), 1)
+        self.assertIn('<link rel="stylesheet" href="/static/pd_issue30_admin_review.css">', self.patched)
+
     def test_changed_live_html_rejected(self):
         with self.assertRaises(patch.HtmlPatchMismatch):
             patch.patch_source(self.raw+b"\n<!-- unexpected -->")

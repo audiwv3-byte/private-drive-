@@ -25,6 +25,7 @@ FILES = {
 # Exact set needed to run the combined opt-in server/UI feature; no unrelated
 # service source, environment variables, credentials or personal data.
 HELPERS = (
+    "pd_issue30_connection.py",
     "pd_document_review.py",
     "pd_issue30_stage_adapter.py",
     "pd_issue30_decision_bridge.py",

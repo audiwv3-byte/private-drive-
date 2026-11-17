@@ -80,18 +80,18 @@ class FakeGateway extends RemoteTripGateway {
 void main() {
   test('Remote API only allows HTTPS or device-local loopback addresses', () {
     expect(
-      () => RemoteDemoClient('http://example.com', 'x' * 40),
+      () => RemoteDemoClient('http://example.com', List.filled(40, 'x').join()),
       throwsA(isA<RemoteDemoException>()),
     );
     expect(
-      () => RemoteDemoClient('https://example.com?token=x', 'x' * 40),
+      () => RemoteDemoClient('https://example.com?token=x', List.filled(40, 'x').join()),
       throwsA(isA<RemoteDemoException>()),
     );
     expect(
       () => RemoteDemoClient('https://example.com', 'short'),
       throwsA(isA<RemoteDemoException>()),
     );
-    final client = RemoteDemoClient('https://demo.example.org', 'x' * 40);
+    final client = RemoteDemoClient('https://demo.example.org', List.filled(40, 'x').join());
     client.close();
   });
 
@@ -100,6 +100,7 @@ void main() {
     final server = FakeDemoServer();
     const interval = Duration(hours: 1);
     await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      key: const ValueKey('passenger-initial'),
       gateway: server.actor('passenger'),
       enableMapTiles: false, pollInterval: interval,
     )));
@@ -113,6 +114,7 @@ void main() {
     expect(server.trip!['origin'], 'Вильнюс');
 
     await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      key: const ValueKey('dispatcher'),
       gateway: server.actor('dispatcher'),
       enableMapTiles: false, pollInterval: interval,
     )));
@@ -124,6 +126,7 @@ void main() {
     expect(server.trip!['status'], 'assigned');
 
     await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      key: const ValueKey('pilot'),
       gateway: server.actor('pilot'),
       enableMapTiles: false, pollInterval: interval,
     )));
@@ -149,6 +152,7 @@ void main() {
 
     // New widget simulates app restart: same server, new client session.
     await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      key: const ValueKey('passenger-restart'),
       gateway: server.actor('passenger'),
       enableMapTiles: false, pollInterval: interval,
     )));

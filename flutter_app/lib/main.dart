@@ -189,6 +189,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     controller: code,
                     enabled: !busy,
                     maxLength: 6,
+                    onChanged: (_) => setState(() {}),
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'Код подтверждения',

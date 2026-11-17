@@ -111,7 +111,7 @@ void main() {
     await tester.pump();
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
 
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('exit-pilot-preview')));
     await tester.pumpAndSettle();
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
     await tester.tap(find.byKey(const Key('open-passenger-preview')));

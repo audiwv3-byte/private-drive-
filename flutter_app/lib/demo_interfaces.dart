@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'passenger_demo.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -48,43 +49,6 @@ class PrivateDriveDemo extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class PassengerDemo extends StatelessWidget {
-  const PassengerDemo({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('PRIVATE DRIVE · Пассажир')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const Text('Тестовый заказ поездки', style: TextStyle(fontSize: 22)),
-            const SizedBox(height: 8),
-            const Text('Демонстрация. Не отправляет заказы и не списывает деньги.'),
-            const SizedBox(height: 24),
-            const ListTile(
-              leading: Icon(Icons.trip_origin),
-              title: Text('Откуда'),
-              subtitle: Text('Адрес пока не выбирается'),
-            ),
-            const ListTile(
-              leading: Icon(Icons.place_outlined),
-              title: Text('Куда'),
-              subtitle: Text('Адрес пока не выбирается'),
-            ),
-            const SizedBox(height: 24),
-            const FilledButton(
-              onPressed: null,
-              child: Text('Заказать поездку — недоступно в демоверсии'),
-            ),
-          ],
         ),
       ),
     );

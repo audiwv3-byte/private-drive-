@@ -1,0 +1,42 @@
+name: PRIVATE DRIVE Flutter iOS unsigned prototype
+
+on:
+  push:
+    branches:
+      - feature/flutter-independent-auth
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-ios-prototype.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-unsigned:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create isolated iOS Flutter scaffold
+        run: |
+          flutter create --platforms=ios --org=lt.privatedrive --project-name=private_drive private_drive_ios_build
+          cp flutter_app/lib/main.dart private_drive_ios_build/lib/main.dart
+          rm -f private_drive_ios_build/test/widget_test.dart
+      - name: Analyze and compile unsigned iOS app
+        working-directory: private_drive_ios_build
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter build ios --debug --no-codesign
+      - name: Upload unsigned iOS compile artifact (not installable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-ios-unsigned-debug
+          path: private_drive_ios_build/build/ios/iphoneos/Runner.app
+          if-no-files-found: error
+          retention-days: 7

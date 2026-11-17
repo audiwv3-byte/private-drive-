@@ -12,6 +12,9 @@ on:
       - pd_issue30_live_schema_probe.py
       - pd_issue30_live_handler_inspect.py
       - pd_issue30_live_runtime_structure_probe.py
+      - pd_issue30_admin_review_routes.py
+      - test_pd_issue30_admin_review_routes.py
+      - miniapp/static/pd_issue30_admin_review.js
       - pd_issue30_patch_live_onboarding_offline.py
       - test_pd_issue30_live_onboarding_patch.py
       - pd_issue30_patch_live_dispatcher_offline.py
@@ -45,6 +48,8 @@ jobs:
           python-version: '3.13'
       - name: Install isolated Flask test dependency
         run: python -m pip install 'Flask>=3,<4'
+      - name: Validate opt-in admin UI JavaScript syntax
+        run: node --input-type=module --check < miniapp/static/pd_issue30_admin_review.js
       - name: Run isolated tests
         run: python -m unittest -v test_pd_document_review_synthetic.py test_pd_issue30_stage_adapter.py test_pd_issue30_decision_bridge.py test_pd_issue30_document_storage_guard.py test_pd_issue30_flask_integration.py test_pd_issue30_release_readiness_offline.py
   live-patch-synthetic:
@@ -66,7 +71,7 @@ jobs:
             echo "BLOCKED: read-only API token unavailable; tests not run"
             exit 1
           fi
-          python -m unittest -v test_pd_issue30_live_onboarding_patch.py test_pd_issue30_live_dispatcher_patch.py
+          python -m unittest -v test_pd_issue30_live_onboarding_patch.py test_pd_issue30_live_dispatcher_patch.py test_pd_issue30_admin_review_routes.py
 
   readonly-audit:
     name: PythonAnywhere GET-only source fingerprint

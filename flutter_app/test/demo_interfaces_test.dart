@@ -25,12 +25,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(PassengerDemo), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-to')),
+      200,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ),
+    );
     expect(find.text('Откуда'), findsOneWidget);
     expect(find.text('Куда'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-book-disabled')),
       250,
-      scrollable: find.byKey(const Key('passenger-form')),
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ),
     );
     expect(find.textContaining('Заказать поездку — недоступно'), findsOneWidget);
     final booking = tester.widget<FilledButton>(

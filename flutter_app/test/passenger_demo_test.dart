@@ -13,6 +13,15 @@ void main() {
 
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-to')),
+      180,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+
     expect(
       tester.widget<TextField>(find.byKey(const Key('passenger-from')))
           .controller!.text,
@@ -64,7 +73,7 @@ void main() {
       scrollable: find.descendant(
         of: find.byKey(const Key('passenger-form')),
         matching: find.byType(Scrollable),
-      ),
+      ).first,
     );
     await tester.tap(find.byKey(const Key('service-meet-sign')));
     await tester.pump();
@@ -80,7 +89,7 @@ void main() {
       scrollable: find.descendant(
         of: find.byKey(const Key('passenger-form')),
         matching: find.byType(Scrollable),
-      ),
+      ).first,
     );
     await tester.tap(find.byKey(const Key('payment-PayPal')));
     await tester.pump();
@@ -98,7 +107,7 @@ void main() {
       scrollable: find.descendant(
         of: find.byKey(const Key('passenger-form')),
         matching: find.byType(Scrollable),
-      ),
+      ).first,
     );
     expect(
       tester.widget<FilledButton>(find.byKey(const Key('passenger-book-disabled')))

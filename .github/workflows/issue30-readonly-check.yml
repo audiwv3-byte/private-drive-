@@ -10,6 +10,7 @@ on:
       - pd_issue30_readonly_audit.py
       - pd_issue30_connection.py
       - test_pd_issue30_connection_lifecycle.py
+      - pd_issue30_live_request_guard_probe.py
       - pd_issue30_rc_build.py
       - test_pd_issue30_rc_manifest.py
       - pd_issue30_live_ast_probe.py
@@ -112,6 +113,7 @@ jobs:
           python pd_issue30_live_handler_inspect.py
           python pd_issue30_live_runtime_structure_probe.py
           python pd_issue30_live_admin_html_probe.py
+          python pd_issue30_live_request_guard_probe.py
 
   browser-synthetic:
     name: Isolated Chromium dispatcher UI (no production access)

@@ -1,0 +1,44 @@
+name: PRIVATE DRIVE Flutter widget tests and static analysis (Linux)
+
+on:
+  push:
+    branches:
+      - feature/flutter-independent-auth
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-linux-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: flutter_app
+    env:
+      PD_NATIVE_AUTH_API_URL: ''
+    steps:
+      - name: Checkout feature source
+        uses: actions/checkout@v4
+      - name: Install stable Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Verify offline test environment
+        run: |
+          set -euo pipefail
+          test -f pubspec.yaml
+          test -f test/offline_auth_test.dart
+          test -z "${PD_NATIVE_AUTH_API_URL}"
+          echo "PRIVATE DRIVE offline checks: no real OTP or production API configured"
+      - name: Fetch Dart packages
+        run: flutter pub get
+      - name: Run widget tests without backend or SMS
+        run: flutter test --no-pub --reporter expanded
+      - name: Analyze Flutter source
+        run: flutter analyze --no-fatal-infos

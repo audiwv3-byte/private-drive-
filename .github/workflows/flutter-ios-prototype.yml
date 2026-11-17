@@ -27,6 +27,19 @@ jobs:
           flutter create --platforms=ios --org=lt.privatedrive --project-name=private_drive private_drive_ios_build
           cp flutter_app/lib/main.dart private_drive_ios_build/lib/main.dart
           rm -f private_drive_ios_build/test/widget_test.dart
+      # Export the genuine Flutter-created Xcode scaffold; later commit only reviewed sources.
+      - name: Archive generated iOS scaffold for source review
+        run: |
+          set -euo pipefail
+          tar -czf "$RUNNER_TEMP/private-drive-ios-scaffold.tar.gz" \
+            -C private_drive_ios_build ios pubspec.yaml analysis_options.yaml
+      - name: Upload iOS scaffold source (unsigned, no secrets)
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-ios-scaffold-source
+          path: ${{ runner.temp }}/private-drive-ios-scaffold.tar.gz
+          if-no-files-found: error
+          retention-days: 7
       - name: Analyze and compile unsigned iOS app
         working-directory: private_drive_ios_build
         run: |

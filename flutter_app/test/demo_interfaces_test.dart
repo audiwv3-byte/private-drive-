@@ -8,7 +8,13 @@ void main() {
       (tester) async {
     expect(apiBaseUrl, isEmpty);
     await tester.pumpWidget(const PrivateDriveApp());
-    await tester.ensureVisible(find.byKey(const Key('open-offline-demo')));
+    // ListView lazily builds off-screen children: scroll until the demo entry
+    // is in the widget tree before attempting to tap it.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('open-offline-demo')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.byKey(const Key('open-offline-demo')));
     await tester.pumpAndSettle();
 

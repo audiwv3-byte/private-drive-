@@ -15,12 +15,14 @@ from urllib.parse import quote
 import pd_issue30_patch_live_dispatcher_offline as dispatcher
 import pd_issue30_patch_live_wsgi_offline as wsgi
 import pd_issue30_patch_live_admin_html_offline as html
+import pd_issue30_patch_live_request_guard_offline as guard
 
 ROOT = "/home/wilsonpark/euro_baltic_transfer/PRIVATE_DRIVE_MiniApp_2026_10_18/"
 FILES = {
     "pd_onboarding.py": dispatcher.onboarding.EXPECTED_SHA256,
     "miniapp_server.py": wsgi.EXPECTED_SHA256,
     "miniapp/templates/index.html": html.EXPECTED_SHA256,
+    "pd_request_security.py": guard.EXPECTED_SHA256,
 }
 # Exact set needed to run the combined opt-in server/UI feature; no unrelated
 # service source, environment variables, credentials or personal data.
@@ -39,6 +41,7 @@ PATCHERS = (
     "pd_issue30_patch_live_dispatcher_offline.py",
     "pd_issue30_patch_live_wsgi_offline.py",
     "pd_issue30_patch_live_admin_html_offline.py",
+    "pd_issue30_patch_live_request_guard_offline.py",
 )
 MIGRATIONS = ("pd_document_review.ensure_tables", "pd_issue30_document_storage_guard.ensure_tables")
 
@@ -63,11 +66,14 @@ def build_manifest(sources, root):
         "pd_onboarding.py": dispatcher.patch_source(sources["pd_onboarding.py"]).encode(),
         "miniapp_server.py": wsgi.patch_source(sources["miniapp_server.py"]).encode(),
         "miniapp/templates/index.html": html.patch_source(sources["miniapp/templates/index.html"]).encode(),
+        "pd_request_security.py": guard.patch_source(sources["pd_request_security.py"]).encode(),
     }
     onboarding_src = patched["pd_onboarding.py"].decode()
     wsgi_src = patched["miniapp_server.py"].decode()
     admin_html = patched["miniapp/templates/index.html"].decode()
+    request_guard_src = patched["pd_request_security.py"].decode()
     gates = {
+        "multipart_admin_replace_allowlist": "documents/" in request_guard_src and "request.method == 'POST'" in request_guard_src and "request.mimetype == 'multipart/form-data'" in request_guard_src,
         "pilot_guard": "pd_issue30_store.pilot_insert_missing" in onboarding_src,
         "admin_decision_bridge": "pd_issue30_bridge.guard_admin_approval" in onboarding_src,
         "no_legacy_photo_upsert": "ON CONFLICT(telegram_id,side) DO UPDATE SET image" not in onboarding_src,

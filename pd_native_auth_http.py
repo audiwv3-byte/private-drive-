@@ -10,6 +10,7 @@ import re
 import sqlite3
 import time
 from pd_native_auth import issue_code, verify_code
+from pd_native_auth_sessions import issue_session
 
 MAX_BODY = 2048
 MAX_IP_REQUESTS_PER_MINUTE = 4
@@ -86,14 +87,23 @@ def make_native_auth_app(conn, secret, deliver, clock=None):
             challenge_id = data["challenge_id"]
             code = data["code"]
             result = verify_code(conn, secret, challenge_id, code, now=now)
-            conn.commit()
         except (KeyError, TypeError, ValueError):
             result = None
         if result is None:
+            conn.commit()
             return reply(start_response, "401 Unauthorized", {"error": "invalid_or_expired_code"})
         channel, destination = result
+        # Verified destination is trusted only after the one-time OTP succeeds.
+        # Both the consumed challenge and the session must commit together.
+        try:
+            session = issue_session(conn, channel, destination, now=now)
+            conn.commit()
+        except sqlite3.Error:
+            conn.rollback()
+            return reply(start_response, "500 Internal Server Error", {"error": "session_unavailable"})
         return reply(start_response, "200 OK", {
-            "verified": True, "channel": channel, "destination": destination
+            "verified": True, "channel": channel, "destination": destination,
+            **session
         })
 
     return app

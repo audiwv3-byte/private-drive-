@@ -29,7 +29,7 @@ def make_native_auth_app(conn, secret, deliver, clock=None):
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         start_response(status, [
             ("Content-Type", "application/json; charset=utf-8"),
-            ("Content-Length", str(len(body)),
+            ("Content-Length", str(len(body))),
             ("Cache-Control", "no-store"),
             ("X-Content-Type-Options", "nosniff"),
         ])

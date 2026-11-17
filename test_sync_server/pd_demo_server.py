@@ -224,6 +224,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path.query and not (method == "GET" and path.path.endswith("/events")):
                 raise TripError("invalid_query")
             parts = path.path.strip("/").split("/")
+            if method == "GET" and parts == ["v1", "me"]:
+                self._reply(200, {"role": role, "actor": actor, "demo": True})
+                return
             if method == "GET" and parts == ["v1", "current"]:
                 self._reply(200, {"trip": self.server.store.current(role, actor)})
                 return

@@ -16,7 +16,7 @@ on:
       - test_pd_issue30_admin_review_routes.py
       - test_pd_issue30_live_core_db_contract.py
       - pd_issue30_patch_live_wsgi_offline.py
-      - test_pd_issue30_live_wsgi_patch.py test_pd_issue30_live_admin_html_patch.py
+      - test_pd_issue30_live_wsgi_patch.py
       - pd_issue30_live_admin_html_probe.py
       - pd_issue30_patch_live_admin_html_offline.py
       - test_pd_issue30_live_admin_html_patch.py

@@ -48,7 +48,7 @@ def _post(path, fields, *, env, transport):
     try:
         with transport(request, timeout=10) as response:
             payload = json.load(response)
-    except (HTTPError, URLError, ValueError, TimeoutError, OSError) from None:
+    except (HTTPError, URLError, ValueError, TimeoutError, OSError):
         raise VerifyError("Twilio Verify request failed") from None
     if not isinstance(payload, dict):
         raise VerifyError("Unexpected Twilio Verify response")

@@ -1,4 +1,4 @@
-name: PRIVATE DRIVE Flutter iOS unsigned prototype
+name: PRIVATE DRIVE permanent Flutter iOS unsigned CI
 
 on:
   push:
@@ -10,103 +10,60 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-ios-unsigned:
     runs-on: macos-15-intel
     timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: flutter_app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-      - name: Create isolated iOS Flutter scaffold
-        run: |
-          flutter create --platforms=ios --org=lt.privatedrive --project-name=private_drive private_drive_ios_build
-          cp flutter_app/lib/main.dart private_drive_ios_build/lib/main.dart
-          rm -f private_drive_ios_build/test/widget_test.dart
-      - name: Set PRIVATE DRIVE iOS metadata
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          root = Path("private_drive_ios_build")
-          plist = root / "ios/Runner/Info.plist"
-          p = plist.read_text()
-          assert "<string>Private Drive</string>" in p
-          p = p.replace("<string>Private Drive</string>", "<string>PRIVATE DRIVE</string>")
-          p = p.replace("<string>private_drive</string>", "<string>PRIVATE DRIVE</string>")
-          plist.write_text(p)
-          pubspec = root / "pubspec.yaml"
-          t = pubspec.read_text()
-          assert "version: 1.0.0+1" in t
-          pubspec.write_text(t.replace("version: 1.0.0+1", "version: 0.1.0+1"))
-          proj = (root / "ios/Runner.xcodeproj/project.pbxproj").read_text()
-          assert "PRODUCT_BUNDLE_IDENTIFIER = lt.privatedrive.privateDrive;" in proj
-          assert "version: 0.1.0+1" in pubspec.read_text()
-          PY
-      # Export the genuine Flutter-created Xcode scaffold; later commit only reviewed sources.
-      - name: Archive generated iOS scaffold for source review
+
+      - name: Verify committed iOS project and safe metadata
         run: |
           set -euo pipefail
-          tar -czf "$RUNNER_TEMP/private-drive-ios-scaffold.tar.gz" \
-            -C private_drive_ios_build ios pubspec.yaml analysis_options.yaml
-      - name: Upload iOS scaffold source (unsigned, no secrets)
-        uses: actions/upload-artifact@v4
-        with:
-          name: private-drive-ios-scaffold-source
-          path: ${{ runner.temp }}/private-drive-ios-scaffold.tar.gz
-          if-no-files-found: error
-          retention-days: 7
-      - name: Analyze and compile unsigned iOS app
-        working-directory: private_drive_ios_build
+          test -f ios/Runner.xcodeproj/project.pbxproj
+          test -f ios/Runner/Info.plist
+          test -f ios/Runner.xcworkspace/contents.xcworkspacedata
+          test -f pubspec.yaml
+          grep -Fq 'PRODUCT_BUNDLE_IDENTIFIER = lt.privatedrive.privateDrive;' ios/Runner.xcodeproj/project.pbxproj
+          grep -Fq '<string>PRIVATE DRIVE</string>' ios/Runner/Info.plist
+          grep -Fq 'version: 0.1.0+1' pubspec.yaml
+          test ! -e ios/Flutter/Generated.xcconfig
+          test ! -e ios/Flutter/flutter_export_environment.sh
+          echo 'Committed iOS project verified: PRIVATE DRIVE / 0.1.0+1'
+
+      - name: Resolve packages, analyze and compile unsigned iOS Debug
         run: |
+          set -euo pipefail
           flutter pub get
           flutter analyze --no-fatal-infos
           flutter build ios --debug --no-codesign
-      - name: Upload unsigned iOS compile artifact (not installable)
+
+      - name: Upload unsigned Debug artifact (not installable)
         uses: actions/upload-artifact@v4
         with:
           name: private-drive-ios-unsigned-debug
-          path: private_drive_ios_build/build/ios/iphoneos/Runner.app
+          path: flutter_app/build/ios/iphoneos/Runner.app
           if-no-files-found: error
           retention-days: 7
+
       - name: Compile unsigned iOS Release (not distributable)
-        working-directory: private_drive_ios_build
         run: |
           set -euo pipefail
           flutter build ios --release --no-codesign
 
-      - name: Upload unsigned iOS Release artifact (not installable)
+      - name: Upload unsigned Release artifact (not installable)
         uses: actions/upload-artifact@v4
         with:
           name: private-drive-ios-unsigned-release
-          path: private_drive_ios_build/build/ios/iphoneos/Runner.app
+          path: flutter_app/build/ios/iphoneos/Runner.app
           if-no-files-found: error
           retention-days: 7
-      - name: Commit reviewed iOS sources to isolated feature branch
-        if: success() && github.ref == 'refs/heads/feature/flutter-independent-auth'
-        run: |
-          set -euo pipefail
-          test "$GITHUB_REF_NAME" = "feature/flutter-independent-auth"
-          mkdir -p flutter_app/ios
-          rsync -a \
-            --exclude 'Flutter/ephemeral/' \
-            --exclude 'Flutter/Generated.xcconfig' \
-            --exclude 'Flutter/flutter_export_environment.sh' \
-            --exclude 'Runner/GeneratedPluginRegistrant.*' \
-            private_drive_ios_build/ios/ flutter_app/ios/
-          cp private_drive_ios_build/pubspec.yaml flutter_app/pubspec.yaml
-          cp private_drive_ios_build/analysis_options.yaml flutter_app/analysis_options.yaml
-          rm -rf flutter_app/ios/Flutter/ephemeral
-          rm -f flutter_app/ios/Flutter/Generated.xcconfig flutter_app/ios/Flutter/flutter_export_environment.sh
-          git add flutter_app/ios flutter_app/pubspec.yaml flutter_app/analysis_options.yaml
-          if git diff --cached --quiet; then
-            echo "Reviewed iOS sources already committed"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "feat(ios): commit permanent PRIVATE DRIVE unsigned iOS project"
-          git push origin HEAD:refs/heads/feature/flutter-independent-auth

@@ -1,0 +1,21 @@
+/* Opt-in PRIVATE DRIVE Issue #30 admin panel. No live HTML is modified. */
+.pd-issue30-panel { color:#f4eee2; background:#101419; border:1px solid #b48b42; border-radius:14px; padding:12px; max-width:100%; min-width:0; box-sizing:border-box; }
+.pd-issue30-panel * { box-sizing:border-box; }
+.pd-issue30-panel h3 { color:#f2cd83; margin:0 0 12px; font-size:1.1rem; }
+.pd-issue30-panel [role="status"] { color:#f0ce87; overflow-wrap:anywhere; }
+.pd-issue30-document { display:grid; grid-template-columns:minmax(0,2fr) repeat(3,minmax(82px,1fr)); gap:8px; align-items:center; border-top:1px solid #34383c; padding:12px 0; min-width:0; }
+.pd-issue30-document-title { grid-column:1 / -1; font-weight:600; overflow-wrap:anywhere; }
+.pd-issue30-document input, .pd-issue30-document button { min-width:0; max-width:100%; min-height:42px; border-radius:7px; font:inherit; }
+.pd-issue30-document input { padding:7px; background:#232a30; color:#f4eee2; border:1px solid #5a5f64; }
+.pd-issue30-document input[type=file] { grid-column:1 / 4; font-size:0.85rem; width:100%; }
+.pd-issue30-document button { background:#292c2f; color:#f4eee2; border:1px solid #b48b42; padding:8px; cursor:pointer; overflow-wrap:anywhere; }
+.pd-issue30-document button:disabled { opacity:0.4; cursor:not-allowed; border-color:#666; }
+.pd-issue30-document button:focus-visible { outline:3px solid #f2cd83; outline-offset:2px; }
+@media (max-width:600px) {
+  .pd-issue30-panel { padding:8px; }
+  .pd-issue30-document { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .pd-issue30-document-title { grid-column:1 / -1; }
+  .pd-issue30-document input { grid-column:1 / -1; width:100%; }
+  .pd-issue30-document input[type=file] { grid-column:1 / -1; }
+  .pd-issue30-document button { font-size:0.91rem; }
+}

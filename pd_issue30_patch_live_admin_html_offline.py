@@ -74,7 +74,7 @@ def patch_source(raw):
     css_tag = '<link rel="stylesheet" href="/static/pd_issue30_admin_review.css">'
     if out.count("</head>") != 1 or css_tag in out:
         raise HtmlPatchMismatch("Expected single HTML head and absent Issue 30 stylesheet")
-    out = out.replace("</head>", css_tag + "\\n</head>", 1)
+    out = out.replace("</head>", css_tag + chr(10) + "</head>", 1)
     if out.count("mountIssue30Review(")!=1 or out.count("!pdDocsApproved")!=1:
         raise HtmlPatchMismatch("Expected one opt-in admin panel mount and server review gate")
     if out.count("async function pdLoadDriverApplications(){")!=1:

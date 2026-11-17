@@ -1,0 +1,31 @@
+name: PRIVATE DRIVE isolated demo sync server checks
+
+on:
+  push:
+    branches:
+      - feature/flutter-independent-auth
+    paths:
+      - 'test_sync_server/**'
+      - '.github/workflows/demo-sync-server-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Python syntax
+        run: python3 -m compileall -q test_sync_server
+      - name: Verify isolated localhost role authentication, event log and restart
+        env:
+          PYTHONPATH: test_sync_server
+        run: python3 -m unittest discover -s test_sync_server -p 'test_*.py' -v
+      - name: Ensure test server has no runtime production dependencies
+        run: |
+          test ! -e test_sync_server/.env
+          test ! -e test_sync_server/demo.sqlite
+          echo 'Only synthetic test credentials and temporary SQLite databases were used'

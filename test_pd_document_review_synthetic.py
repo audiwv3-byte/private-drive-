@@ -115,6 +115,19 @@ class DocumentReviewSyntheticTests(unittest.TestCase):
                                   reason=reason, reviewer_id=ADMIN, expected_sha256=digest)
         self.assertEqual(self.events(), 0)
 
+    def test_incomplete_migration_is_rejected_without_implicit_repair(self):
+        digest=self.upload("license_front")
+        self.db.execute("DROP TABLE pd_document_review_events")
+        with self.assertRaises(review.ReviewError):
+            review.decide(self.db,applicant=APP,side="license_front",
+                          action="approved",reviewer_id=ADMIN,expected_sha256=digest)
+        with self.assertRaises(review.ReviewError):
+            review.require_approved_documents(self.db, APP, 1)
+        with self.assertRaises(review.ReviewError):
+            review.states(self.db,APP)
+        row=self.db.execute("SELECT name FROM sqlite_master WHERE name='pd_document_review_events'").fetchone()
+        self.assertIsNone(row)
+
     def test_no_implicit_application_approval(self):
         for side in review.FIRST + review.SECOND:
             self.approve(side)

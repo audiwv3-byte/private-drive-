@@ -54,11 +54,29 @@ export async function mountIssue30Review(host, applicantId, initData) {
       const state = response.documents?.[side] || {status: "missing"};
       const row = element("div");
       const description = element("span", label + " — " + state.status);
-      const preview = element("a", "Просмотреть");
-      preview.href = "/api/driver/documents/" + applicantId + "/" + encodeURIComponent(side);
-      preview.target = "_blank";
-      preview.rel = "noopener noreferrer";
-      if (state.status === "missing") preview.removeAttribute("href");
+      const preview = element("button", "Просмотреть");
+      preview.disabled = state.status === "missing";
+      preview.addEventListener("click", async () => {
+        try {
+          // Protected document GET requires the server-validated Telegram header.
+          const res = await fetch(
+            "/api/driver/documents/" + applicantId + "/" + encodeURIComponent(side),
+            {headers, credentials:"same-origin", cache:"no-store"}
+          );
+          if (!res.ok) throw new Error("Документ недоступен");
+          const blob = await res.blob();
+          if (blob.type !== "image/jpeg") throw new Error("Неверный тип документа");
+          const objectUrl = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = objectUrl;
+          anchor.target = "_blank";
+          anchor.rel = "noopener noreferrer";
+          anchor.click();
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+        } catch (err) {
+          notice.textContent = err.message;
+        }
+      });
       const reason = element("input");
       reason.placeholder = "Причина отклонения";
       reason.maxLength = 500;

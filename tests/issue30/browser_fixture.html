@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRIVATE DRIVE — Synthetic Issue 30 Dispatcher</title>
+<link rel="stylesheet" href="/miniapp/static/pd_issue30_admin_review.css">
+<style>
+  :root{color-scheme:dark;font-family:system-ui, sans-serif}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0b1016;color:#f4ead5}
+  main{width:100%;max-width:920px;min-width:0;margin:auto;padding:14px}
+  .card{border:1px solid #846539;border-radius:14px;padding:14px;margin-bottom:12px;max-width:100%}
+  .topline{font-size:.88rem;color:#e5bf7d}
+  #approve-applicant{background:#9a753e;color:#0b1016;padding:12px 18px;border:0;border-radius:8px;font-weight:700;min-height:44px}
+  #approve-applicant:disabled{background:#505050;color:#bababa;cursor:not-allowed}
+  #gate-reason{min-height:24px;overflow-wrap:anywhere}
+</style></head><body><main>
+<div class="topline">PRIVATE DRIVE · ИЗОЛИРОВАННЫЙ СТЕНД · ТОЛЬКО СИНТЕТИЧЕСКИЕ ДАННЫЕ</div>
+<section class="card">
+<h1>Кабинет диспетчера</h1>
+<p>Пилот #1001 · Синтетическая заявка</p>
+<p id="stage-description"></p>
+<button id="approve-applicant" disabled>Одобрить заявку</button>
+<p id="gate-reason" role="status"></p>
+</section>
+<section id="document-review-host"></section>
+<script type="module">
+import {mountIssue30Review} from "/miniapp/static/pd_issue30_admin_review.js";
+const id = 1001;
+const stage = new URLSearchParams(location.search).get("stage") === "2" ? 2 : 1;
+const first = ["license_front","license_back","car_front","car_rear","car_interior"];
+const second = ["registration_front","ltsa","activity","insurance","portrait"];
+const required = stage===1 ? first : [...first,...second];
+const token="SYNTHETIC_BROWSER_TOKEN_DO_NOT_USE_IN_PRODUCTION";
+const mainBtn=document.getElementById("approve-applicant");
+const reason=document.getElementById("gate-reason");
+document.getElementById("stage-description").textContent="Этап "+stage;
+async function loadOverview() {
+ const response=await fetch("/api/admin/driver-applications/"+id+"/document-reviews",
+   {headers:{"X-Telegram-Init-Data":token},cache:"no-store"});
+ if(!response.ok){mainBtn.disabled=true;reason.textContent="Проверка сервера недоступна";return;}
+ const result=await response.json();
+ const allApproved=required.every(side=>result.documents?.[side]?.status==="approved");
+ mainBtn.disabled=!allApproved;
+ reason.textContent=allApproved?"Все обязательные документы проверены":"Не все обязательные документы одобрены";
+}
+mainBtn.addEventListener("click",async()=>{
+ mainBtn.disabled=true;
+ try {
+   const response=await fetch("/api/admin/driver-applications/"+id+"/decision",{
+     method:"POST",headers:{"Content-Type":"application/json","X-Telegram-Init-Data":token},
+     body:JSON.stringify({status:"approved"})});
+   if(!response.ok) throw new Error("Сервер отказал в одобрении");
+   reason.textContent="Решение сохранено на синтетическом стенде";
+ }catch(e){ reason.textContent=e.message; await loadOverview(); }
+});
+await mountIssue30Review(document.getElementById("document-review-host"), id, token);
+await loadOverview();
+window.pdIssue30Synthetic={loadOverview,required};
+</script></main></body></html>

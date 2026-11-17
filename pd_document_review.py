@@ -68,6 +68,19 @@ def ensure_tables(conn):
       reason TEXT NOT NULL DEFAULT '')""")
 
 
+
+def _require_review_schema(conn):
+    """Fail closed if a coordinated schema migration was not completed."""
+    required = {"pd_document_reviews", "pd_document_review_events"}
+    present = {row[0] for row in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' "
+        "AND name IN ('pd_document_reviews','pd_document_review_events')"
+    )}
+    if not required.issubset(present):
+        raise ReviewError("Схема проверки документов не установлена")
+
+
+
 def _document(conn, applicant, side):
     row = conn.execute(
         "SELECT image FROM pd_driver_documents WHERE telegram_id=? AND side=?",
@@ -82,6 +95,7 @@ def states(conn, applicant):
     Reviews for a previous photo SHA become pending on replacement. Old files
     without a review row are also pending.
     """
+    _require_review_schema(conn)
     result = {}
     for side in SIDES:
         blob = _document(conn, applicant, side)
@@ -141,7 +155,7 @@ def decide(conn, *, applicant, side, action, reviewer_id, expected_sha256,
     now = reviewed_at or _utc()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        ensure_tables(conn)
+        _require_review_schema(conn)
         _ensure_applicant(conn, applicant)
         blob = _document(conn, applicant, side)
         if blob is None:
@@ -187,7 +201,7 @@ def require_approved_documents(conn, applicant, stage):
     """
     if stage not in (1, 2):
         raise ReviewError("Неизвестный этап регистрации")
-    ensure_tables(conn)
+    _require_review_schema(conn)
     current = states(conn, applicant)
     needed = FIRST if stage == 1 else FIRST + SECOND
     blocked = [side for side in needed if current[side]["status"] != "approved"]

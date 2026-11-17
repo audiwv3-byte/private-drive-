@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'demo_trip_store.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
@@ -6,9 +7,10 @@ import 'package:latlong2/latlong.dart' show LatLng;
 /// Map tiles are the only possible network activity; there is no orders API,
 /// geocoding, payment SDK, charge or persistent booking in this screen.
 class PassengerDemo extends StatefulWidget {
-  const PassengerDemo({super.key, this.enableMapTiles = true});
+  const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore});
 
   final bool enableMapTiles;
+  final DemoTripStore? tripStore;
 
   @override
   State<PassengerDemo> createState() => _PassengerDemoState();
@@ -25,6 +27,46 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _pets = false;
   bool _soberDriver = false;
   bool _music = false;
+
+
+  @override
+  void initState() {
+    super.initState();
+    widget.tripStore?.addListener(_onTripChanged);
+  }
+
+  void _onTripChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _createLocalTrip() {
+    final store = widget.tripStore;
+    if (store == null) return;
+    final date = _date ?? DateUtils.dateOnly(DateTime.now());
+    final time = _time ?? TimeOfDay.now();
+    final departure = DateTime(date.year, date.month, date.day,
+        time.hour, time.minute);
+    store.create(
+      from: _from.text,
+      to: _to.text,
+      paymentMethod: _payment,
+      departure: departure,
+      services: [
+        if (_meetSign) 'Встреча с табличкой',
+        if (_pets) 'Животные',
+        if (_soberDriver) 'Трезвый водитель',
+        if (_music) 'Музыка в дорогу',
+      ],
+    );
+  }
+
+  bool get _canCreateLocalTrip {
+    final store = widget.tripStore;
+    final a = _from.text.trim();
+    final b = _to.text.trim();
+    return store != null && !store.isActive && a.isNotEmpty &&
+        b.isNotEmpty && a.toLowerCase() != b.toLowerCase();
+  }
 
   static const _places = <String, LatLng>{
     'Вильнюс': LatLng(54.6872, 25.2797),
@@ -64,6 +106,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
   @override
   void dispose() {
+    widget.tripStore?.removeListener(_onTripChanged);
     _from.dispose();
     _to.dispose();
     super.dispose();
@@ -271,10 +314,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-summary'),
             ),
             const SizedBox(height: 12),
-            const FilledButton(
-              key: Key('passenger-book-disabled'),
-              onPressed: null,
-              child: Text('Заказать поездку — недоступно в демоверсии'),
+            if (widget.tripStore != null)
+              Text(widget.tripStore!.statusLabel,
+                  key: const Key('passenger-trip-status')),
+            FilledButton(
+              key: const Key('passenger-book-disabled'),
+              onPressed: _canCreateLocalTrip ? _createLocalTrip : null,
+              child: Text(widget.tripStore == null
+                  ? 'Заказать поездку — недоступно в демоверсии'
+                  : 'Создать тестовую заявку · без сервера'),
             ),
             const SizedBox(height: 12),
           ],

@@ -6,6 +6,7 @@ are injected by the WSGI application, never taken from request headers/JSON.
 """
 import pd_document_review as reviews
 import pd_issue30_document_storage_guard as storage
+from pd_issue30_connection import managed_core_db
 
 
 def register(app, core, auth, normalized_photos):
@@ -40,7 +41,7 @@ def register(app, core, auth, normalized_photos):
         if not image:
             raise storage.DocumentStorageError("Не удалось проверить фотографию")
 
-        with core.db(core.USERS_DB) as conn:
+        with managed_core_db(core) as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 result = storage.dispatcher_replace(

@@ -2,14 +2,30 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'passenger_demo.dart';
+import 'demo_trip_store.dart';
 export 'passenger_demo.dart' show PassengerDemo;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
-/// Offline-only UI preview. No routing, network, GPS, payments or real orders.
-class PrivateDriveDemo extends StatelessWidget {
-  const PrivateDriveDemo({super.key});
+/// Standalone offline simulator. Each launch creates one isolated trip store.
+class PrivateDriveDemo extends StatefulWidget {
+  const PrivateDriveDemo({super.key, this.enableMapTiles = true});
+
+  final bool enableMapTiles;
+
+  @override
+  State<PrivateDriveDemo> createState() => _PrivateDriveDemoState();
+}
+
+class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
+  final DemoTripStore _trip = DemoTripStore();
+
+  @override
+  void dispose() {
+    _trip.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,34 +35,70 @@ class PrivateDriveDemo extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.verified_user_outlined, size: 50, color: Color(0xFFDDC184)),
-                  const SizedBox(height: 16),
-                  const Text('Выбери тестовый интерфейс', style: TextStyle(fontSize: 22)),
-                  const SizedBox(height: 12),
-                  const Text('Демоверсия: заказы и оплата отключены. GPS — только по разрешению.',
-                      textAlign: TextAlign.center),
-                  const SizedBox(height: 28),
-                  FilledButton.icon(
-                    key: const Key('open-passenger-preview'),
-                    onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const PassengerDemo())),
-                    icon: const Icon(Icons.person_outline),
-                    label: const Text('Пассажир'),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    key: const Key('open-pilot-preview'),
-                    onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const PilotDemo())),
-                    icon: const Icon(Icons.navigation_outlined),
-                    label: const Text('Кабина пилота'),
-                  ),
-                ],
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.verified_user_outlined,
+                        size: 50, color: Color(0xFFDDC184)),
+                    const SizedBox(height: 16),
+                    const Text('Выбери тестовый интерфейс',
+                        style: TextStyle(fontSize: 22)),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Все заявки и назначения существуют только в памяти. '
+                      'Нет реальных заказов, платежей и сервера.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 18),
+                    AnimatedBuilder(
+                      animation: _trip,
+                      builder: (context, _) => Column(
+                        children: [
+                          Text(_trip.statusLabel,
+                              key: const Key('shared-trip-status'),
+                              textAlign: TextAlign.center),
+                          if (_trip.trip != null)
+                            Text('${_trip.trip!.from} → ${_trip.trip!.to}',
+                                key: const Key('shared-trip-route'),
+                                textAlign: TextAlign.center),
+                          const SizedBox(height: 8),
+                          if (_trip.status == DemoTripStatus.requested)
+                            OutlinedButton.icon(
+                              key: const Key('demo-dispatch-assign'),
+                              icon: const Icon(Icons.assignment_ind_outlined),
+                              onPressed: _trip.assignPilot,
+                              label: const Text('Демо-диспетчер: назначить пилота'),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      key: const Key('open-passenger-preview'),
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => PassengerDemo(
+                          enableMapTiles: widget.enableMapTiles,
+                          tripStore: _trip,
+                        ))),
+                      icon: const Icon(Icons.person_outline),
+                      label: const Text('Пассажир'),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      key: const Key('open-pilot-preview'),
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => PilotDemo(
+                          enableMapTiles: widget.enableMapTiles,
+                          tripStore: _trip,
+                        ))),
+                      icon: const Icon(Icons.navigation_outlined),
+                      label: const Text('Кабина пилота'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -59,11 +111,12 @@ class PrivateDriveDemo extends StatelessWidget {
 /// Pilot-only foreground map; all trip controls change local demo state only.
 /// In widget tests [enableMapTiles] is false: there are no tile HTTP requests.
 class PilotDemo extends StatefulWidget {
-  const PilotDemo({super.key, this.enableMapTiles = true, this.positions});
+  const PilotDemo({super.key, this.enableMapTiles = true, this.positions, this.tripStore});
 
   final bool enableMapTiles;
   /// Synthetic stream for deterministic tests; never enabled by production.
   final Stream<LatLng>? positions;
+  final DemoTripStore? tripStore;
 
   @override
   State<PilotDemo> createState() => _PilotDemoState();
@@ -82,6 +135,46 @@ class _PilotDemoState extends State<PilotDemo> {
   static const stages = ['К пассажиру', 'В путь', 'Завершить'];
   static const labels = ['Нет активной поездки', 'Едем к пассажиру', 'Поездка выполняется'];
   static const vilnius = LatLng(54.6872, 25.2797);
+  @override
+  void initState() {
+    super.initState();
+    widget.tripStore?.addListener(_onTripChanged);
+  }
+
+  void _onTripChanged() {
+    if (mounted) setState(() {});
+  }
+
+  String get _tripLabel => widget.tripStore?.statusLabel ??
+      (paused ? 'Остановка · демо' : labels[stage]);
+
+  String get _actionText {
+    final store = widget.tripStore;
+    if (store == null) return stages[stage];
+    return switch (store.status) {
+      DemoTripStatus.assigned => 'К пассажиру',
+      DemoTripStatus.approaching => 'В путь',
+      DemoTripStatus.underway => 'Завершить',
+      _ => 'Нет назначенной поездки',
+    };
+  }
+
+  bool get _canAdvance {
+    final store = widget.tripStore;
+    if (store == null) return !paused;
+    return !store.paused &&
+      (store.status == DemoTripStatus.assigned ||
+       store.status == DemoTripStatus.approaching ||
+       store.status == DemoTripStatus.underway);
+  }
+
+  bool get _canPause {
+    final store = widget.tripStore;
+    if (store == null) return stage != 0;
+    return store.status == DemoTripStatus.approaching ||
+        store.status == DemoTripStatus.underway;
+  }
+
 
   void _onPosition(LatLng value) {
     if (!mounted || !value.latitude.isFinite || !value.longitude.isFinite ||
@@ -153,6 +246,10 @@ class _PilotDemoState extends State<PilotDemo> {
   }
 
   void advance() {
+    if (widget.tripStore != null) {
+      widget.tripStore!.advancePilot();
+      return;
+    }
     setState(() {
       if (stage == 2) {
         stage = 0;
@@ -165,6 +262,7 @@ class _PilotDemoState extends State<PilotDemo> {
 
   @override
   void dispose() {
+    widget.tripStore?.removeListener(_onTripChanged);
     _gps?.cancel();
     _synthetic?.cancel();
     _map.dispose();
@@ -300,7 +398,7 @@ class _PilotDemoState extends State<PilotDemo> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(paused ? 'Остановка · демо' : labels[stage],
+                            Text(_tripLabel,
                                 key: const Key('pilot-trip-state')),
                             const SizedBox(height: 10),
                             Row(
@@ -308,17 +406,22 @@ class _PilotDemoState extends State<PilotDemo> {
                                 Expanded(
                                   child: FilledButton(
                                     key: const Key('pilot-next-trip'),
-                                    onPressed: paused ? null : advance,
-                                    child: Text(stages[stage]),
+                                    onPressed: _canAdvance ? advance : null,
+                                    child: Text(_actionText),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 OutlinedButton(
                                   key: const Key('pilot-pause-trip'),
-                                  onPressed: stage == 0
-                                      ? null
-                                      : () => setState(() => paused = !paused),
-                                  child: Text(paused ? 'Продолжить' : 'Остановка'),
+                                  onPressed: !_canPause ? null : () {
+                                    if (widget.tripStore != null) {
+                                      widget.tripStore!.togglePause();
+                                    } else {
+                                      setState(() => paused = !paused);
+                                    }
+                                  },
+                                  child: Text((widget.tripStore?.paused ?? paused)
+                                      ? 'Продолжить' : 'Остановка'),
                                 ),
                               ],
                             ),

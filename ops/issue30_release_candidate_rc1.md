@@ -1,4 +1,4 @@
-# PRIVATE DRIVE Issue #30 — Release Candidate RC1
+> **SUPERSEDED (2026-11-17):** Этот документ RC1 содержит устаревший состав из трёх исходных файлов и старый SHA-256 манифеста. Актуальный безопасный кандидат — [RC2 final](issue30_final_rc2_verification.md). **Не использовать RC1 для установки.**\n\n# PRIVATE DRIVE Issue #30 — Release Candidate RC1
 
 **State: STAGING-ONLY — NOT AUTHORIZED FOR PRODUCTION INSTALLATION**
 

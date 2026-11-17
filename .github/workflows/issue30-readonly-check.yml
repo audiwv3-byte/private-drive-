@@ -11,6 +11,8 @@ on:
       - pd_issue30_connection.py
       - test_pd_issue30_connection_lifecycle.py
       - pd_issue30_live_request_guard_probe.py
+      - pd_issue30_patch_live_request_guard_offline.py
+      - test_pd_issue30_live_request_guard.py
       - pd_issue30_rc_build.py
       - test_pd_issue30_rc_manifest.py
       - pd_issue30_live_ast_probe.py
@@ -25,7 +27,7 @@ on:
       - test_pd_issue30_live_wsgi_patch.py
       - pd_issue30_live_admin_html_probe.py
       - pd_issue30_patch_live_admin_html_offline.py
-      - test_pd_issue30_live_admin_html_patch.py
+      - test_pd_issue30_live_admin_html_patch.py test_pd_issue30_live_request_guard.py
       - miniapp/static/pd_issue30_admin_review.js
       - miniapp/static/pd_issue30_admin_review.css
       - 'tests/issue30/**'

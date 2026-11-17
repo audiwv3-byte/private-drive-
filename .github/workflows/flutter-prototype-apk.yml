@@ -26,6 +26,7 @@ jobs:
         run: |
           flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
           cp flutter_app/lib/main.dart private_drive_build/lib/main.dart
+          rm -f private_drive_build/test/widget_test.dart
       - name: Analyze and build debug APK (no production secrets)
         working-directory: private_drive_build
         run: |

@@ -11,6 +11,7 @@ on:
       - pd_issue30_live_transition_probe.py
       - pd_issue30_live_schema_probe.py
       - pd_issue30_live_handler_inspect.py
+      - pd_issue30_live_runtime_structure_probe.py
       - pd_issue30_patch_live_onboarding_offline.py
       - test_pd_issue30_live_onboarding_patch.py
       - pd_issue30_patch_live_dispatcher_offline.py
@@ -91,3 +92,4 @@ jobs:
           python pd_issue30_live_transition_probe.py
           python pd_issue30_live_schema_probe.py
           python pd_issue30_live_handler_inspect.py
+          python pd_issue30_live_runtime_structure_probe.py

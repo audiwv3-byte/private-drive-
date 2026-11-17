@@ -41,6 +41,7 @@ export async function mountIssue30Review(host, applicantId, initData) {
     if (!response.ok) throw new Error(payload.error || "Ошибка запроса");
     return payload;
   }
+  host.classList.add('pd-issue30-panel');
   host.replaceChildren();
   const heading = element("h3", "Документы пилота — индивидуальная проверка");
   const notice = element("p", "Статусы загружаются из сервера");
@@ -53,7 +54,9 @@ export async function mountIssue30Review(host, applicantId, initData) {
     for (const [side, label] of sides) {
       const state = response.documents?.[side] || {status: "missing"};
       const row = element("div");
+      row.className = 'pd-issue30-document';
       const description = element("span", label + " — " + state.status);
+      description.className = 'pd-issue30-document-title';
       const preview = element("button", "Просмотреть");
       preview.disabled = state.status === "missing";
       preview.addEventListener("click", async () => {
@@ -78,11 +81,13 @@ export async function mountIssue30Review(host, applicantId, initData) {
         }
       });
       const reason = element("input");
+      reason.setAttribute('aria-label', label + ': причина отклонения');
       reason.placeholder = "Причина отклонения";
       reason.maxLength = 500;
       const approve = element("button", "Одобрить");
       const reject = element("button", "Отклонить");
       const replaceInput = element("input");
+      replaceInput.setAttribute("aria-label", label + ": файл замены");
       replaceInput.type = "file";
       replaceInput.accept = "image/jpeg,image/png,image/webp";
       const replace = element("button", "Заменить документ");

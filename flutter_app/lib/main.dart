@@ -44,6 +44,9 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   bool busy = false;
   String? challengeId;
   String message = '';
+  String? sessionToken;
+  String? signedInUserId;
+  DateTime? sessionExpiry;
 
   @override
   void dispose() {
@@ -117,12 +120,23 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         'challenge_id': id,
         'code': code.text.trim(),
       });
-      if (result['verified'] != true) {
-        throw const FormatException('Код не подтверждён.');
+      final token = result['access_token'];
+      final userId = result['user_id'];
+      final tokenType = result['token_type'];
+      final expiresIn = result['expires_in'];
+      if (result['verified'] != true ||
+          token is! String || token.length < 40 ||
+          userId is! String || userId.isEmpty ||
+          tokenType != 'Bearer' ||
+          expiresIn is! int || expiresIn <= 0) {
+        throw const FormatException('Сервер не выдал корректную сессию.');
       }
       if (!mounted) return;
       setState(() {
-        message = 'Контакт подтверждён. Создание аккаунта и сессии ещё не подключено.';
+        sessionToken = token;
+        signedInUserId = userId;
+        sessionExpiry = DateTime.now().add(Duration(seconds: expiresIn));
+        message = '';
         challengeId = null;
         code.clear();
       });
@@ -133,9 +147,58 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     }
   }
 
+  void signOut() {
+    setState(() {
+      sessionToken = null;
+      signedInUserId = null;
+      sessionExpiry = null;
+      challengeId = null;
+      code.clear();
+      message = '';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     const gold = Color(0xFFDDC184);
+    // The token remains only in process memory; app restart requires sign-in.
+    // Server revocation and durable secure storage are separate future steps.
+    final active = sessionToken != null &&
+        signedInUserId != null &&
+        sessionExpiry != null &&
+        DateTime.now().isBefore(sessionExpiry!);
+    if (active) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('PRIVATE DRIVE')),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.verified_user_outlined, color: gold, size: 64),
+                    const SizedBox(height: 20),
+                    const Text('Вход выполнен',
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    const Text('Аккаунт подтверждён. Это тестовый экран авторизации. '
+                        'Кабина пилота и интерфейс пассажира подключаются отдельно.',
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    Text('Аккаунт: ${signedInUserId!}', textAlign: TextAlign.center),
+                    const SizedBox(height: 24),
+                    FilledButton(onPressed: signOut, child: const Text('Выйти')),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE')),
       body: SafeArea(

@@ -13,6 +13,8 @@ on:
       - pd_issue30_live_handler_inspect.py
       - pd_issue30_patch_live_onboarding_offline.py
       - test_pd_issue30_live_onboarding_patch.py
+      - pd_issue30_patch_live_dispatcher_offline.py
+      - test_pd_issue30_live_dispatcher_patch.py
       - pd_document_review.py
       - test_pd_document_review_synthetic.py
       - pd_issue30_stage_adapter.py
@@ -61,7 +63,7 @@ jobs:
             echo "BLOCKED: read-only API token unavailable; tests not run"
             exit 1
           fi
-          python -m unittest -v test_pd_issue30_live_onboarding_patch.py
+          python -m unittest -v test_pd_issue30_live_onboarding_patch.py test_pd_issue30_live_dispatcher_patch.py
 
   readonly-audit:
     name: PythonAnywhere GET-only source fingerprint

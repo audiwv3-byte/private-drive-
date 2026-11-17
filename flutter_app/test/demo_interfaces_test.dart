@@ -27,6 +27,11 @@ void main() {
     expect(find.byType(PassengerDemo), findsOneWidget);
     expect(find.text('Откуда'), findsOneWidget);
     expect(find.text('Куда'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-book-disabled')),
+      250,
+      scrollable: find.byKey(const Key('passenger-form')),
+    );
     expect(find.textContaining('Заказать поездку — недоступно'), findsOneWidget);
     final booking = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Заказать поездку — недоступно в демоверсии'),

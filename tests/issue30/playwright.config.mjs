@@ -16,6 +16,7 @@ export default defineConfig({
   },
   webServer:{
     command:'python3 -m http.server 8765 --bind 127.0.0.1 --directory .',
+    cwd:process.cwd(),
     url:'http://127.0.0.1:8765/tests/issue30/browser_fixture.html',
     timeout:15000,
     reuseExistingServer:false,

@@ -44,6 +44,7 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
+          flutter test --no-pub
           flutter analyze --no-fatal-infos
           flutter build ios --debug --no-codesign
 

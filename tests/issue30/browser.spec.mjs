@@ -82,7 +82,6 @@ test('first stage: main approval is disabled until every required document appro
   ]) {
     await item(page,label).getByRole('button',{name:'Одобрить',exact:true}).click();
     await expect(item(page,label).getByText('approved')).toBeVisible();
-    await page.evaluate(()=>window.pdIssue30Synthetic.loadOverview());
     if(side!=='car_interior') await expect(primary).toBeDisabled();
   }
   await expect(primary).toBeEnabled();
@@ -138,7 +137,6 @@ test('stage2 optional registration back does not block and first-stage reviews s
   for(const label of ['Техпаспорт — лицевая сторона','LTSA','Индивидуальная деятельность','Страховка','Фото пилота']){
     await item(page,label).getByRole('button',{name:'Одобрить',exact:true}).click();
   }
-  await page.evaluate(()=>window.pdIssue30Synthetic.loadOverview());
   await expect(primary).toBeEnabled();
 });
 

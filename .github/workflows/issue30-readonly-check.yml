@@ -21,6 +21,8 @@ on:
       - pd_issue30_patch_live_admin_html_offline.py
       - test_pd_issue30_live_admin_html_patch.py
       - miniapp/static/pd_issue30_admin_review.js
+      - miniapp/static/pd_issue30_admin_review.css
+      - 'tests/issue30/**'
       - pd_issue30_patch_live_onboarding_offline.py
       - test_pd_issue30_live_onboarding_patch.py
       - pd_issue30_patch_live_dispatcher_offline.py
@@ -105,3 +107,27 @@ jobs:
           python pd_issue30_live_handler_inspect.py
           python pd_issue30_live_runtime_structure_probe.py
           python pd_issue30_live_admin_html_probe.py
+
+  browser-synthetic:
+    name: Isolated Chromium dispatcher UI (no production access)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install free browser test runner
+        run: npm install --no-save --package-lock=false @playwright/test@1.55.1
+      - name: Install test-only Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test localhost synthetic dispatcher in Chromium
+        run: npx playwright test --config tests/issue30/playwright.config.mjs
+      - name: Retain failure evidence (no personal data)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue30-synthetic-browser-failures
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 3

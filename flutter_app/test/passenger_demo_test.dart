@@ -36,6 +36,15 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('passenger-swap')));
     await tester.tap(find.byKey(const Key('passenger-swap')));
     await tester.pump();
+    // Scroll upward: ListView may dispose the A field after tapping swap.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-from')),
+      -180,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
     expect(
       tester.widget<TextField>(find.byKey(const Key('passenger-from')))
           .controller!.text,

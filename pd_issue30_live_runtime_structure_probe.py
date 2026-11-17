@@ -37,7 +37,9 @@ for path in FILES:
                 path=="miniapp_server.py" and f.name in ("auth","registered_passenger","protect_private_information")):
             print("FUNC",path,f.name,"location",f.lineno,f.end_lineno,
                   "decorators",[ast.unparse(d) for d in f.decorator_list])
-            if path=="Euro_Baltic_Transfer.py" and f.name=="db":\n                print("DB_AST", ast.unparse(f)[:900])\n            for n in ast.walk(f):
+            if path=="Euro_Baltic_Transfer.py" and f.name=="db":
+                print("DB_AST", ast.unparse(f)[:900])
+            for n in ast.walk(f):
                 if isinstance(n,ast.Call):
                     callee=ast.unparse(n.func)
                     if any(k in callee for k in ("commit","rollback","close","connect","is_admin","auth")):

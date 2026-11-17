@@ -53,6 +53,7 @@ mainBtn.addEventListener("click",async()=>{
    reason.textContent="Решение сохранено на синтетическом стенде";
  }catch(e){ reason.textContent=e.message; await loadOverview(); }
 });
+document.getElementById("document-review-host").addEventListener("pd-issue30-review-updated",()=>loadOverview());
 await mountIssue30Review(document.getElementById("document-review-host"), id, token);
 await loadOverview();
 window.pdIssue30Synthetic={loadOverview,required};

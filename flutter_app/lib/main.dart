@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'demo_interfaces.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 
@@ -287,6 +288,18 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       'Отправка SMS и email выключена.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: gold),
+                    ),
+                  ),
+                if (apiBaseUrl.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: OutlinedButton(
+                      key: const Key('open-offline-demo'),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const PrivateDriveDemo()),
+                      ),
+                      child: const Text('Посмотреть тестовые интерфейсы'),
                     ),
                   ),
               ],

@@ -8,6 +8,8 @@ on:
     paths:
       - .github/workflows/issue30-readonly-check.yml
       - pd_issue30_readonly_audit.py
+      - pd_issue30_connection.py
+      - test_pd_issue30_connection_lifecycle.py
       - pd_issue30_rc_build.py
       - test_pd_issue30_rc_manifest.py
       - pd_issue30_live_ast_probe.py
@@ -62,7 +64,7 @@ jobs:
       - name: Validate opt-in admin UI JavaScript syntax
         run: node --input-type=module --check < miniapp/static/pd_issue30_admin_review.js
       - name: Run isolated tests
-        run: python -m unittest -v test_pd_document_review_synthetic.py test_pd_issue30_stage_adapter.py test_pd_issue30_decision_bridge.py test_pd_issue30_document_storage_guard.py test_pd_issue30_flask_integration.py test_pd_issue30_release_readiness_offline.py
+        run: python -m unittest -v test_pd_document_review_synthetic.py test_pd_issue30_stage_adapter.py test_pd_issue30_decision_bridge.py test_pd_issue30_document_storage_guard.py test_pd_issue30_flask_integration.py test_pd_issue30_release_readiness_offline.py test_pd_issue30_connection_lifecycle.py
   live-patch-synthetic:
     name: Verified live-source patch in isolated Flask/SQLite
     runs-on: ubuntu-latest

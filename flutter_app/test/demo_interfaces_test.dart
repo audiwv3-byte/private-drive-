@@ -43,9 +43,9 @@ void main() {
         matching: find.byType(Scrollable),
       ).first,
     );
-    expect(find.textContaining('Заказать поездку — недоступно'), findsOneWidget);
+    expect(find.text('Создать тестовую заявку · без сервера'), findsOneWidget);
     final booking = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Заказать поездку — недоступно в демоверсии'),
+      find.widgetWithText(FilledButton, 'Создать тестовую заявку · без сервера'),
     );
     expect(booking.onPressed, isNull);
     expect(find.byType(PilotDemo), findsNothing);

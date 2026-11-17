@@ -12,6 +12,8 @@ import hashlib
 import sqlite3
 from datetime import datetime, timezone
 
+from pd_issue30_connection import managed_core_db
+
 SIDES = (
     "license_front", "license_back", "registration_front", "registration_back",
     "ltsa", "activity", "insurance", "portrait",
@@ -212,7 +214,7 @@ def register(app, core, auth):
     @app.get("/api/admin/driver-applications/<int:applicant>/document-reviews")
     def pd_document_review_list(applicant):
         require_admin()
-        with core.db(core.USERS_DB) as conn:
+        with managed_core_db(core) as conn:
             # Do not create DB tables in GET; migration must run first.
             return jsonify(documents=states(conn, applicant))
 
@@ -222,7 +224,7 @@ def register(app, core, auth):
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
             raise ReviewError("Неверные данные решения")
-        with core.db(core.USERS_DB) as conn:
+        with managed_core_db(core) as conn:
             result = decide(
                 conn, applicant=applicant, side=side, reviewer_id=reviewer_id,
                 action=payload.get("status"),

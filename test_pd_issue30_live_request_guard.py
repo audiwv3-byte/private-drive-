@@ -56,7 +56,7 @@ class RequestGuardIntegrationTests(unittest.TestCase):
     @staticmethod
     def signed_test_session(*, user_id=1001, auth_date=1700000000, secret_token="SYNTHETIC_TEST_SECRET"):
         fields={"auth_date":str(auth_date),"user":json.dumps({"id":user_id},separators=(",",":"))}
-        check_string="\\n".join(k+"="+v for k,v in sorted(fields.items()))
+        check_string="\n".join(k+"="+v for k,v in sorted(fields.items()))
         secret=hmac.new(b"WebAppData",secret_token.encode(),hashlib.sha256).digest()
         fields["hash"]=hmac.new(secret,check_string.encode(),hashlib.sha256).hexdigest()
         return urllib.parse.urlencode(fields),secret_token

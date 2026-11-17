@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-ios-unsigned:
@@ -27,6 +27,25 @@ jobs:
           flutter create --platforms=ios --org=lt.privatedrive --project-name=private_drive private_drive_ios_build
           cp flutter_app/lib/main.dart private_drive_ios_build/lib/main.dart
           rm -f private_drive_ios_build/test/widget_test.dart
+      - name: Set PRIVATE DRIVE iOS metadata
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("private_drive_ios_build")
+          plist = root / "ios/Runner/Info.plist"
+          p = plist.read_text()
+          assert "<string>Private Drive</string>" in p
+          p = p.replace("<string>Private Drive</string>", "<string>PRIVATE DRIVE</string>")
+          p = p.replace("<string>private_drive</string>", "<string>PRIVATE DRIVE</string>")
+          plist.write_text(p)
+          pubspec = root / "pubspec.yaml"
+          t = pubspec.read_text()
+          assert "version: 1.0.0+1" in t
+          pubspec.write_text(t.replace("version: 1.0.0+1", "version: 0.1.0+1"))
+          proj = (root / "ios/Runner.xcodeproj/project.pbxproj").read_text()
+          assert "PRODUCT_BUNDLE_IDENTIFIER = lt.privatedrive.privateDrive;" in proj
+          assert "version: 0.1.0+1" in pubspec.read_text()
+          PY
       # Export the genuine Flutter-created Xcode scaffold; later commit only reviewed sources.
       - name: Archive generated iOS scaffold for source review
         run: |
@@ -66,3 +85,28 @@ jobs:
           path: private_drive_ios_build/build/ios/iphoneos/Runner.app
           if-no-files-found: error
           retention-days: 7
+      - name: Commit reviewed iOS sources to isolated feature branch
+        if: success() && github.ref == 'refs/heads/feature/flutter-independent-auth'
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "feature/flutter-independent-auth"
+          mkdir -p flutter_app/ios
+          rsync -a \
+            --exclude 'Flutter/ephemeral/' \
+            --exclude 'Flutter/Generated.xcconfig' \
+            --exclude 'Flutter/flutter_export_environment.sh' \
+            --exclude 'Runner/GeneratedPluginRegistrant.*' \
+            private_drive_ios_build/ios/ flutter_app/ios/
+          cp private_drive_ios_build/pubspec.yaml flutter_app/pubspec.yaml
+          cp private_drive_ios_build/analysis_options.yaml flutter_app/analysis_options.yaml
+          rm -rf flutter_app/ios/Flutter/ephemeral
+          rm -f flutter_app/ios/Flutter/Generated.xcconfig flutter_app/ios/Flutter/flutter_export_environment.sh
+          git add flutter_app/ios flutter_app/pubspec.yaml flutter_app/analysis_options.yaml
+          if git diff --cached --quiet; then
+            echo "Reviewed iOS sources already committed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(ios): commit permanent PRIVATE DRIVE unsigned iOS project"
+          git push origin HEAD:refs/heads/feature/flutter-independent-auth

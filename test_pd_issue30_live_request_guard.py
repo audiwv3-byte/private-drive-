@@ -5,6 +5,9 @@ patched ONLY IN MEMORY and registered on an in-memory Flask app. No production
 URLs are called by the test client, no real users/documents/DB are touched.
 """
 import hashlib
+import hmac
+import json
+import urllib.parse
 import os
 import types
 import unittest
@@ -32,6 +35,7 @@ class RequestGuardIntegrationTests(unittest.TestCase):
         namespace={"__name__":"issue30_request_guard_synthetic"}
         exec(compile(self.patched,"<verified-patched-guard>", "exec"),namespace)
         namespace["register_request_guard"](self.app)
+        self.verify_telegram_user=namespace["verify_telegram_user"]
         @self.app.post("/api/admin/driver-applications/<int:applicant>/documents/<side>/replace")
         def fake_replace(applicant, side):
             return jsonify(applicant=applicant,side=side)
@@ -47,6 +51,36 @@ class RequestGuardIntegrationTests(unittest.TestCase):
         @self.app.post("/api/stripe/webhook")
         def fake_webhook():
             return jsonify(route="stripe")
+
+
+    @staticmethod
+    def signed_test_session(*, user_id=1001, auth_date=1700000000, secret_token="SYNTHETIC_TEST_SECRET"):
+        fields={"auth_date":str(auth_date),"user":json.dumps({"id":user_id},separators=(",",":"))}
+        check_string="\\n".join(k+"="+v for k,v in sorted(fields.items()))
+        secret=hmac.new(b"WebAppData",secret_token.encode(),hashlib.sha256).digest()
+        fields["hash"]=hmac.new(secret,check_string.encode(),hashlib.sha256).hexdigest()
+        return urllib.parse.urlencode(fields),secret_token
+
+    def test_telegram_real_signature_accepts_synthetic_valid_identity(self):
+        signed,secret=self.signed_test_session()
+        result=self.verify_telegram_user(signed,secret,max_age=3600,now=1700000100)
+        self.assertEqual(result[0],1001)
+
+    def test_telegram_modified_user_rejected(self):
+        signed,secret=self.signed_test_session()
+        signed=signed.replace("%22id%22%3A1001","%22id%22%3A9001")
+        with self.assertRaises(PermissionError):
+            self.verify_telegram_user(signed,secret,max_age=3600,now=1700000100)
+
+    def test_telegram_expired_synthetic_session_rejected(self):
+        signed,secret=self.signed_test_session()
+        with self.assertRaises(PermissionError):
+            self.verify_telegram_user(signed,secret,max_age=100,now=1700000200)
+
+    def test_telegram_wrong_secret_rejected(self):
+        signed,_=self.signed_test_session()
+        with self.assertRaises(PermissionError):
+            self.verify_telegram_user(signed,"DIFFERENT_SYNTHETIC_SECRET",max_age=3600,now=1700000100)
 
     def test_source_sha_pinned(self):
         self.assertEqual(hashlib.sha256(self.original).hexdigest(),patch.EXPECTED_SHA256)

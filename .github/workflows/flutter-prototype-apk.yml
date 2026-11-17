@@ -1,0 +1,41 @@
+name: PRIVATE DRIVE Flutter prototype APK
+
+on:
+  push:
+    branches:
+      - feature/flutter-independent-auth
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-prototype-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create isolated Android Flutter scaffold
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
+          cp flutter_app/lib/main.dart private_drive_build/lib/main.dart
+      - name: Analyze and build debug APK (no production secrets)
+        working-directory: private_drive_build
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter build apk --debug
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-android-debug-apk
+          path: private_drive_build/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

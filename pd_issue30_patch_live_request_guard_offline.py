@@ -14,10 +14,6 @@ EXPECTED_SHA256="f1dfb0d78e3799ed0a5569986bcb811dfb71c9f8fc5504336d6365abc9789d2
 class RequestGuardPatchMismatch(RuntimeError):
     pass
 
-LEGACY_ANCHOR=(
-    "        if request.path == '/api/driver/application' and request.mimetype == 'multipart/form-data':\n"
-    "            return\n"
-)
 # Exact path shape, no wildcard for unrelated admin routes.
 NEW_EXCEPTION=(
     "        if (request.method == 'POST' and request.mimetype == 'multipart/form-data'\n"
@@ -33,9 +29,21 @@ def patch_source(raw):
     if type(raw) is not bytes or hashlib.sha256(raw).hexdigest()!=EXPECTED_SHA256:
         raise RequestGuardPatchMismatch("Deployed request guard fingerprint changed")
     original=raw.decode("utf-8")
-    if original.count(LEGACY_ANCHOR)!=1:
-        raise RequestGuardPatchMismatch("Unexpected live multipart guard")
-    changed=original.replace(LEGACY_ANCHOR,LEGACY_ANCHOR+NEW_EXCEPTION,1)
+    tree=ast.parse(original)
+    matches=[n for n in ast.walk(tree) if isinstance(n,ast.If)
+             and "/api/driver/application" in ast.unparse(n.test)
+             and "multipart/form-data" in ast.unparse(n.test)
+             and len(n.body)==1 and isinstance(n.body[0],ast.Return)]
+    if len(matches)!=1:
+        raise RequestGuardPatchMismatch("Unexpected deployed multipart guard AST")
+    n=matches[0]
+    indentation=original.splitlines()[n.lineno-1].split("if ",1)[0]
+    if len(indentation)!=8:
+        raise RequestGuardPatchMismatch("Unexpected nested guard indentation")
+    lines=original.splitlines(keepends=True)
+    # Insert after the original pilot exception, keeping it intact.
+    lines.insert(n.end_lineno,NEW_EXCEPTION)
+    changed="".join(lines)
     original_tree=ast.parse(original)
     new_tree=ast.parse(changed)
     def signature(tree):

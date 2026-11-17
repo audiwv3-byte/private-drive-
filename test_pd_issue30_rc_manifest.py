@@ -16,8 +16,8 @@ class ReleaseCandidateManifestTests(unittest.TestCase):
         manifest=rc.build_manifest(self.sources,Path(rc.__file__).parent)
         self.assertEqual(manifest["release_status"],"STAGING_ONLY_NOT_AUTHORIZED_FOR_PRODUCTION")
         self.assertTrue(all(manifest["contract_checks"].values()))
-        self.assertEqual(len(manifest["source_files"]),3)
-        self.assertEqual(len(manifest["repository_components"]),12)
+        self.assertEqual(len(manifest["source_files"]),4)
+        self.assertEqual(len(manifest["repository_components"]),13)
         self.assertEqual(manifest["schema_migration_sequence"],
                          ["pd_document_review.ensure_tables","pd_issue30_document_storage_guard.ensure_tables"])
         self.assertNotIn("Token",json.dumps(manifest))

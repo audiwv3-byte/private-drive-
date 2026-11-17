@@ -31,7 +31,7 @@ void main() {
       scrollable: find.descendant(
         of: find.byKey(const Key('passenger-form')),
         matching: find.byType(Scrollable),
-      ),
+      ).first,
     );
     expect(find.text('Откуда'), findsOneWidget);
     expect(find.text('Куда'), findsOneWidget);
@@ -41,7 +41,7 @@ void main() {
       scrollable: find.descendant(
         of: find.byKey(const Key('passenger-form')),
         matching: find.byType(Scrollable),
-      ),
+      ).first,
     );
     expect(find.textContaining('Заказать поездку — недоступно'), findsOneWidget);
     final booking = tester.widget<FilledButton>(

@@ -61,7 +61,10 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('service-meet-sign')),
       220,
-      scrollable: find.byKey(const Key('passenger-form')),
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ),
     );
     await tester.tap(find.byKey(const Key('service-meet-sign')));
     await tester.pump();
@@ -74,7 +77,10 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('payment-PayPal')),
       220,
-      scrollable: find.byKey(const Key('passenger-form')),
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ),
     );
     await tester.tap(find.byKey(const Key('payment-PayPal')));
     await tester.pump();
@@ -89,7 +95,10 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-book-disabled')),
       220,
-      scrollable: find.byKey(const Key('passenger-form')),
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ),
     );
     expect(
       tester.widget<FilledButton>(find.byKey(const Key('passenger-book-disabled')))

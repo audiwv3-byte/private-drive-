@@ -77,7 +77,7 @@ jobs:
             echo "BLOCKED: read-only API token unavailable; tests not run"
             exit 1
           fi
-          python -m unittest -v test_pd_issue30_live_onboarding_patch.py test_pd_issue30_live_dispatcher_patch.py test_pd_issue30_admin_review_routes.py test_pd_issue30_live_core_db_contract.py test_pd_issue30_live_wsgi_patch.py
+          python -m unittest -v test_pd_issue30_live_onboarding_patch.py test_pd_issue30_live_dispatcher_patch.py test_pd_issue30_admin_review_routes.py test_pd_issue30_live_core_db_contract.py test_pd_issue30_live_wsgi_patch.py test_pd_issue30_live_admin_html_patch.py
 
   readonly-audit:
     name: PythonAnywhere GET-only source fingerprint

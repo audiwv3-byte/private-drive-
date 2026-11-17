@@ -146,6 +146,32 @@ test('API access denied gives visible error and keeps gate closed',async({page})
   await expect(page.getByRole('button',{name:'Одобрить заявку'})).toBeDisabled();
 });
 
+
+test('protected image preview uses signed-header-shaped session and displays denial',async({page})=>{
+  const state=await launch(page);
+  await item(page,'Права — лицевая сторона').getByRole('button',{name:'Просмотреть'}).click();
+  await expect(page.locator('#document-review-host [role=status]')).toContainText('Документ недоступен');
+  expect(state.seenAuth.every(x=>x==='SYNTHETIC_BROWSER_TOKEN_DO_NOT_USE_IN_PRODUCTION')).toBeTruthy();
+  await expect(page.getByRole('button',{name:'Одобрить заявку'})).toBeDisabled();
+});
+
+test('failed replacement keeps previous review and presents conflict to dispatcher',async({page})=>{
+  const state=await launch(page);
+  const row=item(page,'Права — лицевая сторона');
+  await row.getByRole('button',{name:'Одобрить',exact:true}).click();
+  await expect(row.getByText('approved')).toBeVisible();
+  const saved=state.documents.license_front.sha256;
+  state.rejectNext=true;
+  await row.locator('input[type=file]').setInputFiles({
+    name:'synthetic-conflict.jpg',mimeType:'image/jpeg',buffer:Buffer.from([0xff,0xd8,0xff,0xd9])
+  });
+  await row.getByRole('button',{name:'Заменить документ'}).click();
+  await expect(page.locator('#document-review-host [role=status]')).toContainText('Файл уже изменён');
+  expect(state.replaceCount).toBe(0);
+  expect(state.documents.license_front.sha256).toBe(saved);
+  expect(state.documents.license_front.status).toBe('approved');
+});
+
 for(const width of [390,320]){
   test('mobile '+width+'px: documents fit viewport and controls usable',async({page})=>{
     await page.setViewportSize({width,height:844});

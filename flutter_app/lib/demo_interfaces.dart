@@ -136,7 +136,6 @@ class _PilotDemoState extends State<PilotDemo> {
   StreamSubscription<Position>? _gps;
   StreamSubscription<LatLng>? _synthetic;
   LatLng? _position;
-  bool _following = true;
   bool _gpsEnabled = false;
   String _gpsMessage = 'GPS выключен';
   int stage = 0;
@@ -192,7 +191,9 @@ class _PilotDemoState extends State<PilotDemo> {
       _position = value;
       _gpsMessage = 'GPS активен · только на устройстве';
     });
-    if (_following && widget.enableMapTiles) _map.move(value, _map.camera.zoom);
+    // Follow each incoming GPS fix, even after previous map gestures.
+    // A one-shot recenter must never permanently disable camera following.
+    if (widget.enableMapTiles) _map.move(value, _map.camera.zoom);
   }
 
   Future<void> _enableGps() async {
@@ -288,14 +289,9 @@ class _PilotDemoState extends State<PilotDemo> {
             FlutterMap(
               key: const Key('pilot-map-surface'),
               mapController: _map,
-              options: MapOptions(
+              options: const MapOptions(
                 initialCenter: vilnius,
                 initialZoom: 14,
-                onPositionChanged: (camera, hasGesture) {
-                  if (hasGesture && _following && mounted) {
-                    setState(() => _following = false);
-                  }
-                },
               ),
               children: [
                 TileLayer(
@@ -382,7 +378,6 @@ class _PilotDemoState extends State<PilotDemo> {
                             heroTag: 'pilot-center',
                             tooltip: 'Центрировать карту',
                             onPressed: () {
-                              setState(() => _following = true);
                               if (widget.enableMapTiles) {
                                 _map.move(_position!, _map.camera.zoom);
                               }

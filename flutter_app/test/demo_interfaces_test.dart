@@ -8,6 +8,12 @@ import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/main.dart';
 
 void main() {
+  test('Waze uses native app scheme rather than an embedded web URL', () {
+    expect(privateDriveWazeAppUri.scheme, 'waze');
+    expect(privateDriveWazeAppUri.hasAuthority, isFalse);
+    expect(privateDriveWazeAppUri.toString(), 'waze://');
+  });
+
   testWidgets('Offline entry opens passenger preview; booking stays disabled',
       (tester) async {
     expect(apiBaseUrl, isEmpty);

@@ -38,6 +38,9 @@ void main() {
     ), isFalse);
     expect(store.assignPilot(), isTrue);
     expect(store.assignPilot(), isFalse);
+    expect(store.advancePilot(), isFalse);
+    expect(store.acceptAssignedPilot(), isTrue);
+    expect(store.acceptAssignedPilot(), isFalse);
     expect(store.advancePilot(), isTrue);
     expect(store.status, DemoTripStatus.approaching);
     expect(store.togglePause(), isTrue);
@@ -82,7 +85,7 @@ void main() {
     expect(find.text('Вильнюс → Каунас'), findsOneWidget);
     await tester.tap(find.byKey(const Key('demo-dispatch-assign')));
     await tester.pump();
-    expect(find.text('Пилот назначен · ожидает выезда'), findsOneWidget);
+    expect(find.text('Пилот назначен · ожидает принятия'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('open-pilot-preview')));
     await tester.pumpAndSettle();
@@ -94,7 +97,13 @@ void main() {
     expect(find.byKey(const Key('pilot-power-toggle')), findsNothing);
     expect(find.text('Диспетчер'), findsNothing);
     expect(find.text('Откуда'), findsNothing);
+    expect(find.byKey(const Key('pilot-assigned-offer')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-assigned-route')), findsOneWidget);
     expect(find.text('К пассажиру'), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byKey(const Key('pilot-next-trip'))).onPressed, isNull);
+    await tester.tap(find.byKey(const Key('pilot-accept-assigned')));
+    await tester.pump();
+    expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
 
     await tester.tap(find.byKey(const Key('pilot-next-trip')));
     await tester.pump();

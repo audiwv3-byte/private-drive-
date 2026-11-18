@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -38,6 +39,93 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _routeLoading = false;
   String _routeInfo = '';
   int _routeRequest = 0;
+  Timer? _addressTimer;
+  int _addressGeneration = 0;
+  String? _editingAddress;
+  List<String> _addressSuggestions = const [];
+  final Map<String, LatLng> _resolvedAddresses = {};
+  double? _routeKm;
+
+  LatLng? _resolve(String address) =>
+      _resolvedAddresses[address.trim()] ?? _places[address.trim()];
+
+  void _addressChanged(String side) {
+    _addressTimer?.cancel();
+    final query = (side == 'from' ? _from.text : _to.text).trim();
+    setState(() {
+      _route = '';
+      _editingAddress = side;
+      _addressSuggestions = _places.keys
+        .where((x) => x.toLowerCase().contains(query.toLowerCase()))
+        .take(5).toList();
+    });
+    ++_addressGeneration;
+    if (query.length < 3 || !widget.enableMapTiles) return;
+    final current = _addressGeneration;
+    _addressTimer = Timer(const Duration(milliseconds: 450), () async {
+      HttpClient? client;
+      try {
+        client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+        final uri = Uri.https('photon.komoot.io', '/api/', {
+          'q': query, 'limit': '5', 'lang': 'en',
+        });
+        final req = await client.getUrl(uri).timeout(const Duration(seconds: 6));
+        final res = await req.close().timeout(const Duration(seconds: 6));
+        if (res.statusCode != 200) return;
+        final payload = jsonDecode(await utf8.decoder.bind(res).join()
+          .timeout(const Duration(seconds: 6))) as Map<String, dynamic>;
+        final found = <String>[];
+        for (final raw in (payload['features'] as List<dynamic>? ?? const [])) {
+          final feature = raw as Map<String, dynamic>;
+          final p = feature['properties'] as Map<String, dynamic>? ?? {};
+          final geometry = feature['geometry'] as Map<String, dynamic>? ?? {};
+          final coords = geometry['coordinates'] as List<dynamic>?;
+          if (coords == null || coords.length < 2) continue;
+          final name = [p['name'],p['street'],p['housenumber'],p['city'],p['country']]
+            .whereType<String>().where((v)=>v.trim().isNotEmpty).toSet().join(', ');
+          if (name.isEmpty) continue;
+          _resolvedAddresses[name] = LatLng((coords[1] as num).toDouble(),
+            (coords[0] as num).toDouble());
+          found.add(name);
+        }
+        if (mounted && current == _addressGeneration && _editingAddress == side) {
+          setState(() => _addressSuggestions = found);
+        }
+      } catch (_) {
+        // Local city suggestions remain usable without external search.
+      } finally {
+        client?.close(force: true);
+      }
+    });
+  }
+
+  void _selectAddress(String value, String side) {
+    setState(() {
+      (side == 'from' ? _from : _to).text = value;
+      _editingAddress = null;
+      _addressSuggestions = const [];
+      _route = '';
+    });
+    _addressTimer?.cancel();
+    ++_addressGeneration;
+    _updateRoadPreview();
+  }
+
+  Widget _addressSuggestionsWidget(String side) {
+    if (_editingAddress != side || _addressSuggestions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(children: [
+      for (var i = 0; i < _addressSuggestions.length; i++)
+        ListTile(
+          key: Key('passenger-$side-suggestion-$i'),
+          dense: true,
+          leading: const Icon(Icons.place_outlined),
+          title: Text(_addressSuggestions[i], maxLines: 2),
+          onTap: () => _selectAddress(_addressSuggestions[i], side),
+        ),
+    ]);
+  }
 
 
   @override
@@ -112,11 +200,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
   /// Failure is displayed explicitly; never pretend a straight line is a road.
   Future<void> _updateRoadPreview() async {
     final request = ++_routeRequest;
-    final start = _places[_from.text.trim()];
-    final finish = _places[_to.text.trim()];
+    final start = _resolve(_from.text);
+    final finish = _resolve(_to.text);
     if (start == null || finish == null || !widget.enableMapTiles) {
       if (mounted) setState(() {
         _roadPoints = const [];
+        _routeKm = null;
         _routeLoading = false;
         _routeInfo = start == null || finish == null
             ? 'Для своего адреса требуется подключение поиска адресов.'
@@ -156,6 +245,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
         _roadPoints = points;
         _routeLoading = false;
         final km = ((route['distance'] as num).toDouble() / 1000).round();
+        _routeKm = (route['distance'] as num).toDouble() / 1000;
         _routeInfo = 'Дорожный маршрут · около $km км · демо';
       });
     } catch (_) {
@@ -163,6 +253,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       setState(() {
         _roadPoints = const [];
         _routeLoading = false;
+        _routeKm = null;
         _routeInfo = 'Дорожный маршрут временно недоступен.';
       });
     } finally {
@@ -202,6 +293,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void dispose() {
     widget.tripStore?.removeListener(_onTripChanged);
     _routeRequest++;
+    _addressTimer?.cancel();
     _from.dispose();
     _to.dispose();
     super.dispose();
@@ -391,18 +483,19 @@ class _PassengerDemoState extends State<PassengerDemo> {
             TextField(
               key: const Key('passenger-from'),
               controller: _from,
-              onChanged: (_) { setState(() => _route = ''); _updateRoadPreview(); },
+              onChanged: (_) { _addressChanged('from'); _updateRoadPreview(); },
               decoration: const InputDecoration(
                 labelText: 'Откуда', prefixIcon: Icon(Icons.trip_origin),
               ),
             ),
+            _addressSuggestionsWidget('from'),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     key: const Key('passenger-to'),
                     controller: _to,
-                    onChanged: (_) => setState(() => _route = ''),
+                    onChanged: (_) { _addressChanged('to'); _updateRoadPreview(); },
                     decoration: const InputDecoration(
                       labelText: 'Куда', prefixIcon: Icon(Icons.location_on_outlined),
                     ),
@@ -424,6 +517,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 ),
               ],
             ),
+            _addressSuggestionsWidget('to'),
+            const Text('Адресные подсказки запрашиваются у внешнего сервиса Photon. '
+              'Не вводи конфиденциальные адреса в демоверсии.',
+              style: TextStyle(fontSize: 11)),
             const SizedBox(height: 12),
             Row(
               children: [

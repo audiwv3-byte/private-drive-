@@ -210,8 +210,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
-                const SizedBox(height: 32),
-                const PrivateDriveBrandLogo(size: 176),
+                const SizedBox(height: 16),
+                const PrivateDriveBrandLogo(size: 132),
                 const SizedBox(height: 18),
                 const Text('Добро пожаловать',
                     textAlign: TextAlign.center,
@@ -226,7 +226,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
                 SegmentedButton<bool>(
                   segments: const [
                     ButtonSegment(value: false, label: Text('Телефон')),

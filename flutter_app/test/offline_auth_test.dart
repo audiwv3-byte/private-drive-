@@ -23,8 +23,8 @@ void main() {
     await tester.pumpWidget(const PrivateDriveApp());
     expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
     expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
-    expect(find.textContaining('0.2.11'), findsOneWidget);
-    expect(find.textContaining('2026111811'), findsOneWidget);
+    expect(find.textContaining('0.2.12'), findsOneWidget);
+    expect(find.textContaining('2026111812'), findsOneWidget);
     expect(find.byIcon(Icons.local_taxi_outlined), findsNothing);
   });
 

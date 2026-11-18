@@ -55,6 +55,49 @@ void main() {
     expect(store.trip!.services, contains('Музыка в дорогу'));
   });
 
+  testWidgets('Pilot can decline assigned order and dispatcher can reassign',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    expect(store.create(
+      from: 'Вильнюс',
+      to: 'Аэропорт Вильнюса',
+      paymentMethod: 'PayPal',
+      departure: DateTime(2026, 11, 18, 14),
+      services: const [],
+    ), isTrue);
+    expect(store.assignPilot(), isTrue);
+
+    await tester.pumpWidget(MaterialApp(
+      home: PilotDemo(enableMapTiles: false, tripStore: store),
+    ));
+    expect(find.byKey(const Key('pilot-assigned-offer')), findsOneWidget);
+    expect(find.text('Вильнюс → Аэропорт Вильнюса'), findsOneWidget);
+    expect(find.byKey(const Key('pilot-passenger-chat')), findsNothing);
+    expect(tester.widget<FilledButton>(
+      find.byKey(const Key('pilot-next-trip')),
+    ).onPressed, isNull);
+
+    await tester.tap(find.byKey(const Key('pilot-decline-assigned')));
+    await tester.pump();
+    expect(store.status, DemoTripStatus.requested);
+    expect(store.pilotAccepted, isFalse);
+    expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
+    expect(store.advancePilot(), isFalse);
+    expect(store.assignPilot(), isTrue);
+    await tester.pump();
+    expect(find.byKey(const Key('pilot-assigned-offer')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('pilot-accept-assigned')));
+    await tester.pump();
+    expect(store.pilotAccepted, isTrue);
+    expect(store.status, DemoTripStatus.assigned);
+    expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
+    expect(tester.widget<FilledButton>(
+      find.byKey(const Key('pilot-next-trip')),
+    ).onPressed, isNotNull);
+  });
+
   testWidgets('Passenger and pilot share exactly one offline demo trip',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(

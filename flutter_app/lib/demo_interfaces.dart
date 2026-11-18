@@ -11,6 +11,7 @@ import 'remote_sync_demo.dart';
 export 'passenger_demo.dart' show PassengerDemo;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
 /// Standalone offline simulator. Each launch creates one isolated trip store.
@@ -196,6 +197,28 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         },
       ),
     ));
+  }
+
+  /// Opens Waze itself, without inventing a precise passenger coordinate.
+  /// The demo currently stores place names rather than verified street points.
+  Future<void> _openWaze() async {
+    try {
+      final opened = await launchUrl(
+        Uri.https('waze.com', '/ul'),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть Waze. Проверь установку приложения.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть Waze. Проверь установку приложения.')),
+        );
+      }
+    }
   }
 
   void _showCallDemo() {
@@ -486,6 +509,24 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     tooltip: 'Назад',
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back),
+                  ),
+                ),
+                Positioned(
+                  top: 64,
+                  left: 12,
+                  child: OutlinedButton(
+                    key: const Key('pilot-open-waze'),
+                    onPressed: _openWaze,
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: const Color(0x660E1624),
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0x99DDC184)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10,
+                      ),
+                    ),
+                    child: const Text('Waze',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
                 Positioned(

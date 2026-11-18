@@ -11,6 +11,7 @@ void main() {
     await tester.pumpWidget(
       const MaterialApp(home: PrivateDriveDemo(enableMapTiles: false)),
     );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('open-pilot-preview')));
     await tester.tap(find.byKey(const Key('open-pilot-preview')));
     await tester.pumpAndSettle();

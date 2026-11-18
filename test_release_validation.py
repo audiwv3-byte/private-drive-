@@ -98,7 +98,8 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     assert forbidden_status.status_code in (401,403), ('Unexpected authorization response',forbidden_status.status_code,forbidden_status.get_data(as_text=True))
     assert core.order_find(oid)['status']==r['status'],'Unauthorized status attempt modified order'
     print('PASS synthetic cross-passenger order listing and status mutation denial')
-    check(call('/api/payment/'+str(oid),uid=103),403)
+    foreign_payment=call('/api/payment/'+str(oid),uid=103)
+    assert foreign_payment.status_code in (401,403), ('Foreign payment data exposed',foreign_payment.status_code,foreign_payment.get_data(as_text=True))
     print('PASS route, pet pricing, map validation, passengers, luggage, stop and duplicate prevention')
     check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=999),200)
     check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=999),400)

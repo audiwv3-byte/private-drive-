@@ -242,7 +242,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       return !_roundTrip && a == 'вильнюс' && b == 'каунас' ? 90 : null;
     }
     if (_rideType != 'Трансфер') return null;
-    if (_roundTrip) return a == 'вильнюс' && b == 'каунас' ? 190 : null;
+    if (_roundTrip) return a == 'вильнюс' && b == 'каунас' ? 200 : null;
     return _transferFares['$a|$b'];
   }
 
@@ -484,7 +484,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 'Фиксированные тарифы Sedan без скидки: '
                 'Вильнюс → Каунас 130 €, обратно 90 €, '
                 'Вильнюс ↔ аэропорт Вильнюса 40 €. '
-                'Вильнюс — Каунас туда и обратно 190 €. '
+                'Вильнюс — Каунас туда и обратно 200 €. '
                 'Другие маршруты — по тарифной таблице или по запросу.',
                 key: Key('passenger-transfer-tariffs'),
                 style: TextStyle(fontSize: 12),

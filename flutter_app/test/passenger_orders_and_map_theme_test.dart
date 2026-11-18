@@ -86,6 +86,26 @@ void main() {
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
   });
 
+  testWidgets('Passenger sees only real fresh pilot GPS for an active order',
+      (tester) async {
+    final store = makeOrder();
+    addTearDown(store.dispose);
+    await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+      enableMapTiles: false, tripStore: store,
+    )));
+    expect(find.text('Местоположение пилота пока недоступно'),
+        findsOneWidget);
+    store.setPilotOnline(true);
+    store.updatePilotLocation(54.6872, 25.2797);
+    await tester.pump();
+    expect(find.text('Местоположение пилота · GPS обновляется'),
+        findsOneWidget);
+    store.setPilotOnline(false);
+    await tester.pump();
+    expect(find.text('Местоположение пилота пока недоступно'),
+        findsOneWidget);
+  });
+
   testWidgets('Pilot can switch day and night without leaving map',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: PilotDemo(

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'passenger_demo.dart';
+import 'pilot_cabin.dart';
 import 'demo_trip_store.dart';
 import 'remote_sync_demo.dart';
 export 'passenger_demo.dart' show PassengerDemo;
@@ -100,7 +101,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                     FilledButton.icon(
                       key: const Key('open-pilot-preview'),
                       onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => PilotDemo(
+                        MaterialPageRoute(builder: (_) => PilotCabin(
                           enableMapTiles: widget.enableMapTiles,
                           tripStore: _trip,
                         ))),

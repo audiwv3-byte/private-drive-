@@ -156,7 +156,6 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _position;
   LatLng? _displayPosition;
   double _headingDegrees = 0;
-  final List<String> _demoChatMessages = <String>[];
   bool _incomingOffer = false;
   bool _nextAccepted = false;
 
@@ -189,11 +188,10 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (!_hasAssignedPassenger) return;
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => PilotPassengerChatDemo(
-        messages: _demoChatMessages,
+        messages: widget.tripStore!.pilotChatMessages,
         onSend: (text) {
           if (!_hasAssignedPassenger) return;
-          _demoChatMessages.add(text);
-          if (mounted) setState(() {});
+          widget.tripStore!.addPilotChatMessage(text);
         },
       ),
     ));

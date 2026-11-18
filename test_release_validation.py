@@ -88,7 +88,8 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     oid=first['order_id'];r=core.order_find(oid)
     assert repeat['order_id']==oid and repeat['replayed']
     assert (r['passengers'],r['luggage'],r['stop_address'],r['price'])==(3,'2 чемодана','Trakai','107.80')
-    # IDOR regression: a second synthetic passenger must never see or mutate passenger A's order.
+    # IDOR regression: two independently registered synthetic passengers.
+    check(call('/api/register',{'name':'Test Passenger B','phone':'+37060000003'},uid=103),200)
     own_orders=check(call('/api/orders',uid=101),200)['orders']
     other_orders=check(call('/api/orders',uid=103),200)['orders']
     assert any(int(item['id'])==oid for item in own_orders),'Owner cannot see their own order'

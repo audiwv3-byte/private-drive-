@@ -116,7 +116,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 final track = tracks[i];
                 if (track is String) {
                   _favoriteTracks[i].text =
-                      track.substring(0, track.length.clamp(0, 100));
+                      track.substring(0, track.length > 100 ? 100 : track.length);
                 }
               }
             }
@@ -142,7 +142,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             }
             if (wishes is String) {
               _tripWishes.text =
-                  wishes.substring(0, wishes.length.clamp(0, 500));
+                  wishes.substring(0, wishes.length > 500 ? 500 : wishes.length);
             }
           });
         }

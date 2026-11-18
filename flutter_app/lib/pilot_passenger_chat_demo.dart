@@ -52,26 +52,28 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
               ),
             ),
             Expanded(
-              child: ListView.builder(
+              child: ListView(
                 key: const Key('pilot-chat-messages'),
                 padding: const EdgeInsets.all(16),
-                itemCount: widget.messages.length,
-                itemBuilder: (context, index) => Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3A3020),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                children: [
+                  for (final message in widget.messages)
+                    Align(
+                      alignment: Alignment.centerRight,
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text(widget.messages[index]),
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3A3020),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Text(message),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                ],
               ),
             ),
             SizedBox(

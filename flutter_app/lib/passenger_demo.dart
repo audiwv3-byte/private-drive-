@@ -7,6 +7,7 @@ import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
 import 'company_info.dart';
 import 'passenger_orders_demo.dart';
+import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
@@ -14,10 +15,12 @@ import 'package:latlong2/latlong.dart' show LatLng;
 /// Map tiles are the only possible network activity; there is no orders API,
 /// geocoding, payment SDK, charge or persistent booking in this screen.
 class PassengerDemo extends StatefulWidget {
-  const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore});
+  const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
+      this.preferencesStorage});
 
   final bool enableMapTiles;
   final DemoTripStore? tripStore;
+  final PassengerPreferencesStorage? preferencesStorage;
 
   @override
   State<PassengerDemo> createState() => _PassengerDemoState();
@@ -56,6 +59,108 @@ class _PassengerDemoState extends State<PassengerDemo> {
   String? _editingAddress;
   List<String> _addressSuggestions = const [];
   final Map<String, LatLng> _resolvedAddresses = {};
+  late final PassengerPreferencesStorage _preferencesStorage =
+      widget.preferencesStorage ?? DevicePassengerPreferencesStorage();
+  bool _preferencesReady = false;
+  bool _restoringPreferences = false;
+  String? _lastPreferencesSnapshot;
+  Future<void> _pendingPreferencesWrite = Future<void>.value();
+
+  Map<String, dynamic> _preferencesSnapshot() => {
+    'version': 1,
+    'radio': _radioStation,
+    'tracks': _favoriteTracks.map((c) => c.text).toList(),
+    'temperature': _cabinTemperature,
+    'meetSign': _meetSign, 'pets': _pets, 'soberDriver': _soberDriver,
+    'music': _music, 'flowers': _flowers, 'coffee': _coffee,
+    'water': _water, 'quietRide': _quietRide, 'luggageHelp': _luggageHelp,
+    'wishes': _tripWishes.text,
+  };
+
+  void _savePreferences() {
+    if (!_preferencesReady || _restoringPreferences) return;
+    final snapshot = jsonEncode(_preferencesSnapshot());
+    if (snapshot == _lastPreferencesSnapshot) return;
+    _lastPreferencesSnapshot = snapshot;
+    _pendingPreferencesWrite = _pendingPreferencesWrite.then((_) async {
+      try {
+        await _preferencesStorage.write(snapshot);
+      } catch (_) {
+        // Offline demo remains usable without storage.
+      }
+    });
+  }
+
+  Future<void> _restorePreferences() async {
+    String? saved;
+    try {
+      saved = await _preferencesStorage.read();
+    } catch (_) {
+      // Local storage may be unavailable in a test environment.
+    }
+    if (!mounted) return;
+    _restoringPreferences = true;
+    if (saved != null) {
+      try {
+        final data = jsonDecode(saved);
+        if (data is Map<String, dynamic> && data['version'] == 1) {
+          final radio = data['radio'];
+          final tracks = data['tracks'];
+          final temperature = data['temperature'];
+          final wishes = data['wishes'];
+          setState(() {
+            _radioStation = radio is String && _vilniusRadio.contains(radio)
+                ? radio : 'Без радио';
+            if (tracks is List && tracks.length == 3) {
+              for (var i = 0; i < 3; i++) {
+                final track = tracks[i];
+                if (track is String) {
+                  _favoriteTracks[i].text =
+                      track.substring(0, track.length.clamp(0, 100));
+                }
+              }
+            }
+            if (temperature is num && temperature.isFinite &&
+                temperature >= 18 && temperature <= 26 &&
+                temperature == temperature.roundToDouble()) {
+              _cabinTemperature = temperature.toDouble();
+            }
+            _meetSign = data['meetSign'] == true;
+            _pets = data['pets'] == true;
+            _soberDriver = data['soberDriver'] == true;
+            _flowers = data['flowers'] == true;
+            _coffee = data['coffee'] == true;
+            _water = data['water'] == true;
+            _quietRide = data['quietRide'] == true;
+            _luggageHelp = data['luggageHelp'] == true;
+            _music = data['music'] == true;
+            if (_quietRide) {
+              _music = false;
+              _radioStation = 'Без радио';
+            } else if (_radioStation != 'Без радио') {
+              _music = true;
+            }
+            if (wishes is String) {
+              _tripWishes.text =
+                  wishes.substring(0, wishes.length.clamp(0, 500));
+            }
+          });
+        }
+      } catch (_) {
+        // Reject malformed snapshots without blocking the passenger screen.
+      }
+    }
+    _restoringPreferences = false;
+    _preferencesReady = true;
+    _lastPreferencesSnapshot = jsonEncode(_preferencesSnapshot());
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _savePreferences();
+  }
+
 
   LatLng? _resolve(String address) =>
       _resolvedAddresses[address.trim()] ?? _places[address.trim()];
@@ -147,6 +252,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void initState() {
     super.initState();
     widget.tripStore?.addListener(_onTripChanged);
+    _tripWishes.addListener(_savePreferences);
+    for (final track in _favoriteTracks) {
+      track.addListener(_savePreferences);
+    }
+    unawaited(_restorePreferences());
     if (widget.tripStore != null) {
       _gpsFreshnessTimer = Timer.periodic(const Duration(seconds: 15), (_) {
         if (mounted && widget.tripStore?.pilotLastSeen != null) {
@@ -370,8 +480,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _gpsFreshnessTimer?.cancel();
     _from.dispose();
     _to.dispose();
+    _tripWishes.removeListener(_savePreferences);
     _tripWishes.dispose();
     for (final track in _favoriteTracks) {
+      track.removeListener(_savePreferences);
       track.dispose();
     }
     super.dispose();
@@ -799,7 +911,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   style: TextStyle(fontWeight: FontWeight.bold)),
               ),
               DropdownButtonFormField<String>(
-                key: const Key('passenger-radio-station'),
+                key: ValueKey('passenger-radio-station-$_radioStation'),
                 initialValue: _radioStation,
                 isExpanded: true,
                 decoration: const InputDecoration(
@@ -831,7 +943,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   ),
                 ),
               DropdownButtonFormField<double?>(
-                key: const Key('passenger-cabin-temperature'),
+                key: ValueKey('passenger-cabin-temperature-$_cabinTemperature'),
                 initialValue: _cabinTemperature,
                 decoration: const InputDecoration(
                   labelText: 'Желаемая температура в салоне',

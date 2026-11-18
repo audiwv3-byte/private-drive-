@@ -259,6 +259,45 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   static const stages = ['К пассажиру', 'В путь', 'Завершить'];
   static const labels = ['Нет активной поездки', 'Едем к пассажиру', 'Поездка выполняется'];
   static const vilnius = LatLng(54.6872, 25.2797);
+  // These are city landmarks, NOT verified passenger pickup addresses.
+  static const _demoCityCenters = <String, LatLng>{
+    'вильнюс': LatLng(54.6872, 25.2797),
+    'каунас': LatLng(54.8985, 23.9036),
+    'клайпеда': LatLng(55.7033, 21.1443),
+    'паланга': LatLng(55.9175, 21.0686),
+    'варшава': LatLng(52.2297, 21.0122),
+    'аэропорт вильнюса': LatLng(54.6341, 25.2858),
+  };
+
+  bool get _approachingPassenger =>
+      widget.tripStore?.status == DemoTripStatus.approaching;
+
+  String? get _pickupAddress => _approachingPassenger
+      ? widget.tripStore?.trip?.from : null;
+
+  LatLng? get _pickupPreviewPoint {
+    final place = _pickupAddress?.trim().toLowerCase();
+    return place == null ? null : _demoCityCenters[place];
+  }
+
+  void _focusPickupPreview() {
+    final point = _pickupPreviewPoint;
+    if (!mounted || !widget.enableMapTiles || point == null) return;
+    // A city-centre hint is a visual preview, not a street navigation route.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_approachingPassenger) return;
+      final pilot = _displayPosition;
+      if (pilot == null) {
+        _map.move(point, 13);
+      } else {
+        _map.fitCamera(CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints([pilot, point]),
+          padding: const EdgeInsets.all(90),
+        ));
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -425,7 +464,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
 
   void advance() {
     if (widget.tripStore != null) {
-      widget.tripStore!.advancePilot();
+      final changed = widget.tripStore!.advancePilot();
+      if (changed && _approachingPassenger) _focusPickupPreview();
       return;
     }
     setState(() {
@@ -469,6 +509,33 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   userAgentPackageName: 'lt.privatedrive.privateDrive',
                   maxNativeZoom: 19,
                 ),
+                // Preview line only; never advertise a straight line as roads.
+                if (_approachingPassenger &&
+                    _pickupPreviewPoint != null &&
+                    _displayPosition != null)
+                  PolylineLayer(polylines: [
+                    Polyline(
+                      points: [_displayPosition!, _pickupPreviewPoint!],
+                      strokeWidth: 3,
+                      color: const Color(0xFFDDC184),
+                      pattern: const StrokePattern.dotted(),
+                    ),
+                  ]),
+                if (_approachingPassenger && _pickupPreviewPoint != null)
+                  MarkerLayer(markers: [
+                    Marker(
+                      point: _pickupPreviewPoint!,
+                      width: 52,
+                      height: 54,
+                      child: const Icon(
+                        Icons.location_on,
+                        key: Key('pilot-pickup-preview-pin'),
+                        size: 48,
+                        color: Color(0xFFDDC184),
+                        shadows: [Shadow(color: Colors.black, blurRadius: 5)],
+                      ),
+                    ),
+                  ]),
                 if (_displayPosition != null)
                   MarkerLayer(markers: [
                     Marker(
@@ -605,6 +672,29 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           children: [
                             Text(_tripLabel,
                                 key: const Key('pilot-trip-state')),
+                            if (_approachingPassenger) ...[
+                              const SizedBox(height: 6),
+                              Text('Подача: ${_pickupAddress ?? "адрес не указан"}',
+                                  key: const Key('pilot-pickup-address'),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Color(0xFFDDC184),
+                                    fontWeight: FontWeight.w700,
+                                  )),
+                              Text(
+                                _pickupPreviewPoint != null
+                                  ? 'Метка обозначает только центр города · '
+                                    'точный адрес подачи не указан'
+                                  : 'Точка подачи не определена · '
+                                    'требуется геокодирование адреса',
+                                key: const Key('pilot-pickup-accuracy'),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                             if (widget.showAssignedOffer &&
                                 widget.tripStore?.status == DemoTripStatus.assigned &&
                                 widget.tripStore?.pilotAccepted == false)

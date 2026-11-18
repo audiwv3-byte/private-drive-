@@ -56,7 +56,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
   String? _editingAddress;
   List<String> _addressSuggestions = const [];
   final Map<String, LatLng> _resolvedAddresses = {};
-  double? _routeKm;
 
   LatLng? _resolve(String address) =>
       _resolvedAddresses[address.trim()] ?? _places[address.trim()];
@@ -66,7 +65,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final query = (side == 'from' ? _from.text : _to.text).trim();
     setState(() {
       _route = '';
-      _routeKm = null;
       _roadPoints = const [];
       _routeInfo = '';
       _editingAddress = side;
@@ -120,7 +118,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _editingAddress = null;
       _addressSuggestions = const [];
       _route = '';
-      _routeKm = null;
       _roadPoints = const [];
       _routeInfo = '';
     });
@@ -277,7 +274,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
     if (start == null || finish == null || !widget.enableMapTiles) {
       if (mounted) setState(() {
         _roadPoints = const [];
-        _routeKm = null;
         _routeLoading = false;
         _routeInfo = start == null || finish == null
             ? 'Для своего адреса требуется подключение поиска адресов.'
@@ -288,7 +284,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
     setState(() {
       _routeLoading = true;
       _roadPoints = const [];
-      _routeKm = null;
       _routeInfo = 'Построение дорожного маршрута · демо…';
     });
     HttpClient? client;
@@ -318,7 +313,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
         _roadPoints = points;
         _routeLoading = false;
         final km = ((route['distance'] as num).toDouble() / 1000).round();
-        _routeKm = (route['distance'] as num).toDouble() / 1000;
         _routeInfo = 'Дорожный маршрут · около $km км · демо';
       });
     } catch (_) {
@@ -326,7 +320,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
       setState(() {
         _roadPoints = const [];
         _routeLoading = false;
-        _routeKm = null;
         _routeInfo = 'Дорожный маршрут временно недоступен.';
       });
     } finally {
@@ -663,7 +656,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       _from.text = _to.text;
                       _to.text = previous;
                       _route = '';
-                      _routeKm = null;
                       _roadPoints = const [];
                       _routeInfo = '';
                     });

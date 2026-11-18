@@ -160,6 +160,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('route-kaunas')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();
 

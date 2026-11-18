@@ -40,6 +40,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _music = false;
   bool _flowers = false;
   bool _coffee = false;
+  bool _nightMap = false;
   bool _water = false;
   bool _quietRide = false;
   bool _luggageHelp = false;
@@ -428,7 +429,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
               height: 195,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: widget.enableMapTiles
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    widget.enableMapTiles
                     ? KeyedSubtree(
                         key: ValueKey('passenger-route-map-${_from.text}-${_to.text}'),
                         child: FlutterMap(
@@ -438,9 +442,20 @@ class _PassengerDemoState extends State<PassengerDemo> {
                           initialZoom: mapZoom,
                         ),
                         children: [
-                          TileLayer(
-                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'lt.privatedrive.privateDrive',
+                          ColorFiltered(
+                            colorFilter: _nightMap
+                                ? const ColorFilter.matrix(<double>[
+                                    -0.78, 0, 0, 0, 211,
+                                    0, -0.78, 0, 0, 211,
+                                    0, 0, -0.78, 0, 211,
+                                    0, 0, 0, 1, 0,
+                                  ])
+                                : const ColorFilter.mode(
+                                    Colors.transparent, BlendMode.dst),
+                            child: TileLayer(
+                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'lt.privatedrive.privateDrive',
+                            ),
                           ),
                           if (_roadPoints.isNotEmpty)
                             PolylineLayer(
@@ -467,6 +482,24 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         color: Color(0xFF27332F),
                         child: Center(child: Text('Карта · офлайн-тест')),
                       ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Material(
+                        color: const Color(0xE8172535),
+                        borderRadius: BorderRadius.circular(12),
+                        child: IconButton(
+                          key: const Key('passenger-map-day-night'),
+                          tooltip: _nightMap ? 'Дневная карта' : 'Ночная карта',
+                          icon: Icon(_nightMap ? Icons.wb_sunny_outlined
+                              : Icons.dark_mode_outlined,
+                              color: const Color(0xFFDDC184), size: 20),
+                          onPressed: () => setState(() => _nightMap = !_nightMap),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (_routeInfo.isNotEmpty)

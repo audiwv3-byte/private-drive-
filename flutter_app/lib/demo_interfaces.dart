@@ -10,6 +10,7 @@ import 'pilot_cabin.dart';
 import 'pilot_passenger_chat_demo.dart';
 import 'demo_trip_store.dart';
 import 'demo_dispatcher_cabinet.dart';
+import 'company_info.dart';
 import 'remote_sync_demo.dart';
 export 'passenger_demo.dart' show PassengerDemo;
 import 'package:flutter_map/flutter_map.dart';
@@ -97,6 +98,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                       onPressed: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => DemoDispatcherCabinet(
                           tripStore: _trip,
+                          enableMapTiles: widget.enableMapTiles,
                         ))),
                       icon: const Icon(Icons.support_agent),
                       label: const Text('Кабинет диспетчера · демо'),
@@ -108,6 +110,15 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                         MaterialPageRoute(builder: (_) => const RemoteSyncDemo())),
                       icon: const Icon(Icons.sync_alt),
                       label: const Text('Тестовая связь между устройствами'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      key: const Key('open-company-info'),
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(
+                          builder: (_) => const CompanyInfoPage())),
+                      icon: const Icon(Icons.info_outline),
+                      label: const Text('О компании · Контакты · Соглашение'),
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(

@@ -24,7 +24,7 @@ void main() {
     expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
     expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
     expect(find.textContaining('0.2.16'), findsOneWidget);
-    expect(find.textContaining('2026111815'), findsOneWidget);
+    expect(find.textContaining('2026111816'), findsOneWidget);
     expect(find.byIcon(Icons.local_taxi_outlined), findsNothing);
   });
 

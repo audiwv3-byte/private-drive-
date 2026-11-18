@@ -1,8 +1,25 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/main.dart';
+import 'package:private_drive/brand_logo.dart';
 
 void main() {
+  testWidgets('Approved PD logo and upgraded version are visible on startup',
+      (tester) async {
+    final bytes = base64Decode(privateDriveLogoBase64);
+    expect(bytes.length, greaterThan(3000));
+    expect(String.fromCharCodes(bytes.sublist(0, 4)), 'RIFF');
+    expect(String.fromCharCodes(bytes.sublist(8, 12)), 'WEBP');
+
+    await tester.pumpWidget(const PrivateDriveApp());
+    expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
+    expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
+    expect(find.textContaining('0.2.0'), findsOneWidget);
+    expect(find.textContaining('20261118'), findsOneWidget);
+    expect(find.byIcon(Icons.local_taxi_outlined), findsNothing);
+  });
+
   testWidgets('Offline preview blocks real OTP requests', (tester) async {
     expect(apiBaseUrl, isEmpty,
         reason: 'Unsigned CI must not connect to production or paid SMS.');

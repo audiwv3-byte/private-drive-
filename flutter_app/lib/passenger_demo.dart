@@ -40,6 +40,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _music = false;
   bool _flowers = false;
   bool _coffee = false;
+  bool _water = false;
+  bool _quietRide = false;
+  bool _luggageHelp = false;
   List<LatLng> _roadPoints = const [];
   bool _routeLoading = false;
   String _routeInfo = '';
@@ -164,6 +167,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
         if (_music) 'Музыка в дорогу',
         if (_flowers) 'Цветы',
         if (_coffee) 'Кофе',
+        if (_water) 'Питьевая вода',
+        if (_quietRide) 'Тихая поездка',
+        if (_luggageHelp) 'Помощь с багажом',
         if (_tripWishes.text.trim().isNotEmpty)
           'Пожелания пассажира: ${_tripWishes.text.trim()}',
       ],
@@ -580,7 +586,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 initiallyExpanded: true,
                 leading: const Icon(Icons.tune),
                 title: const Text('Личные настройки пассажира для поездки'),
-                subtitle: const Text('Цветы, кофе и индивидуальные пожелания'),
+                subtitle: const Text('Цветы, кофе, вода, комфорт и пожелания'),
                 childrenPadding: const EdgeInsets.symmetric(horizontal: 12),
                 children: [
               CheckboxListTile(
@@ -613,7 +619,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Музыка в дорогу · бесплатно'),
                 value: _music,
-                onChanged: (v) => setState(() => _music = v ?? false),
+                onChanged: (v) => setState(() {
+                  _music = v ?? false;
+                  if (_music) _quietRide = false;
+                }),
               ),
               CheckboxListTile(
                 key: const Key('service-flowers'),
@@ -630,6 +639,33 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 title: const Text('Кофе · стоимость по запросу'),
                 value: _coffee,
                 onChanged: (v) => setState(() => _coffee = v ?? false),
+              ),
+              CheckboxListTile(
+                key: const Key('service-water'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Питьевая вода · стоимость уточняется'),
+                value: _water,
+                onChanged: (v) => setState(() => _water = v ?? false),
+              ),
+              CheckboxListTile(
+                key: const Key('service-quiet-ride'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Тихая поездка · без музыки и разговоров'),
+                value: _quietRide,
+                onChanged: (v) => setState(() {
+                  _quietRide = v ?? false;
+                  if (_quietRide) _music = false;
+                }),
+              ),
+              CheckboxListTile(
+                key: const Key('service-luggage-help'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Помощь с багажом'),
+                value: _luggageHelp,
+                onChanged: (v) => setState(() => _luggageHelp = v ?? false),
               ),
               TextField(
                 key: const Key('passenger-trip-wishes'),

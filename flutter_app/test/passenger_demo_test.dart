@@ -151,6 +151,34 @@ void main() {
     expect(find.textContaining('Стоимость по запросу'), findsOneWidget);
   });
 
+  testWidgets('Changing route clears old fixed transfer fare',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PassengerDemo(enableMapTiles: false),
+    ));
+    final list = find.descendant(
+      of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable),
+    ).first;
+    await tester.scrollUntilVisible(find.byKey(const Key('route-kaunas')),
+        160, scrollable: list);
+    await tester.tap(find.byKey(const Key('route-kaunas')));
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-price-preview')),
+      220, scrollable: list);
+    expect(find.text('Предварительная стоимость: 130 €'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-to')), -200, scrollable: list);
+    await tester.enterText(find.byKey(const Key('passenger-to')), 'Тракай');
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-price-preview')),
+      220, scrollable: list);
+    expect(find.text('Предварительная стоимость: 130 €'), findsNothing);
+    expect(find.textContaining('Стоимость по запросу'), findsOneWidget);
+  });
+
   testWidgets('Services and payment change preview, never create a booking',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(

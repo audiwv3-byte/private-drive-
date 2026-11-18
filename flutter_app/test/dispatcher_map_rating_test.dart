@@ -73,6 +73,7 @@ void main() {
     expect(find.byKey(const Key('dispatcher-pilots-tab')), findsOneWidget);
     expect(find.textContaining('Не на линии'), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(const Key('dispatcher-tab-3')));
     await tester.tap(find.byKey(const Key('dispatcher-tab-3')));
     await tester.pump();
     expect(find.byKey(const Key('dispatcher-passengers-tab')), findsOneWidget);
@@ -118,7 +119,7 @@ void main() {
     await tester.tap(find.text('Соглашение'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('company-terms-tab')), findsOneWidget);
-    expect(find.textContaining('не является окончательной'), findsWidgets);
+    expect(find.textContaining('Не является окончательной'), findsWidgets);
     await tester.tap(find.text('Конфиденциальность'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('company-privacy-tab')), findsOneWidget);

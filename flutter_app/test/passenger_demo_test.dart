@@ -168,7 +168,8 @@ void main() {
         .onPressed!();
     await tester.pump();
     await tester.scrollUntilVisible(
-      find.byKey(const Key('passenger-round-trip')), 160, scrollable: list);
+      // Round-trip switch is above the popular-route chips in the ListView.
+      find.byKey(const Key('passenger-round-trip')), -160, scrollable: list);
     tester.widget<SwitchListTile>(find.byKey(const Key('passenger-round-trip')))
         .onChanged!(true);
     await tester.pump();

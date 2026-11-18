@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'pilot_offer_tone.dart';
 import 'brand_logo.dart';
 import 'pilot_cockpit_overlay.dart';
 import 'demo_interfaces.dart' show PilotDemo;
@@ -15,10 +15,13 @@ class PilotCabin extends StatefulWidget {
     super.key,
     this.enableMapTiles = true,
     this.tripStore,
+    this.onOfferAlert,
   });
 
   final bool enableMapTiles;
   final DemoTripStore? tripStore;
+  /// Test-only hook to verify alert repetition without device audio.
+  final VoidCallback? onOfferAlert;
 
   @override
   State<PilotCabin> createState() => _PilotCabinState();
@@ -29,6 +32,16 @@ class _PilotCabinState extends State<PilotCabin> {
   OverlayEntry? _cockpitEntry;
   Timer? _offerAlert;
   bool _hasAnnouncedOffer = false;
+  final PilotOfferTone _offerTone = PilotOfferTone();
+
+  void _playOfferTone() {
+    final callback = widget.onOfferAlert;
+    if (callback != null) {
+      callback();
+    } else {
+      unawaited(_offerTone.play());
+    }
+  }
 
   bool get _pendingOffer => _onLine &&
       widget.tripStore?.status == DemoTripStatus.assigned &&
@@ -44,16 +57,17 @@ class _PilotCabinState extends State<PilotCabin> {
     if (!_pendingOffer) {
       _offerAlert?.cancel();
       _offerAlert = null;
+      _offerTone.stop();
       _hasAnnouncedOffer = false;
       return;
     }
     if (_hasAnnouncedOffer) return;
     _hasAnnouncedOffer = true;
-    SystemSound.play(SystemSoundType.alert);
+    _playOfferTone();
     _offerAlert?.cancel();
     _offerAlert = Timer.periodic(const Duration(seconds: 4), (_) {
       if (_pendingOffer) {
-        SystemSound.play(SystemSoundType.alert);
+        _playOfferTone();
       } else {
         _offerAlert?.cancel();
         _offerAlert = null;
@@ -77,6 +91,7 @@ class _PilotCabinState extends State<PilotCabin> {
   void _hideCockpitOverlay() {
     _offerAlert?.cancel();
     _offerAlert = null;
+    _offerTone.stop();
     _hasAnnouncedOffer = false;
     _cockpitEntry?.remove();
     _cockpitEntry?.dispose();
@@ -87,6 +102,7 @@ class _PilotCabinState extends State<PilotCabin> {
   void dispose() {
     widget.tripStore?.removeListener(_syncOfferSound);
     _hideCockpitOverlay();
+    _offerTone.dispose();
     super.dispose();
   }
 

@@ -86,7 +86,12 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-pilot-preview')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pilot-power-toggle')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-map-surface')), findsNothing);
+    await tester.tap(find.byKey(const Key('pilot-power-toggle')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('pilot-map-surface')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-power-toggle')), findsNothing);
     expect(find.text('Диспетчер'), findsNothing);
     expect(find.text('Откуда'), findsNothing);
     expect(find.text('К пассажиру'), findsOneWidget);
@@ -112,6 +117,13 @@ void main() {
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('exit-pilot-preview')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pilot-power-toggle')), findsOneWidget);
+    expect(find.text('На линии · демо'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('pilot-power-toggle')));
+    await tester.pump();
+    expect(find.text('Не на линии · демо'), findsOneWidget);
+    await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
     await tester.tap(find.byKey(const Key('open-passenger-preview')));

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'passenger_demo.dart';
@@ -148,6 +149,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   StreamSubscription<LatLng>? _synthetic;
   LatLng? _position;
   LatLng? _displayPosition;
+  double _headingDegrees = 0;
   late final AnimationController _cameraAnimation = AnimationController(
     vsync: this, duration: const Duration(milliseconds: 600),
   )..addListener(_animatePosition);
@@ -214,12 +216,32 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (widget.enableMapTiles) _map.move(current, _map.camera.zoom);
   }
 
-  void _onPosition(LatLng value) {
+  void _onPosition(LatLng value, {double? sensorHeading, double? speed}) {
     if (!mounted || !value.latitude.isFinite || !value.longitude.isFinite ||
         value.latitude.abs() > 90 || value.longitude.abs() > 180) return;
     final previous = _displayPosition;
+    final previousFix = _position;
+    // The location icon points north by default. Rotate it clockwise to the
+    // vehicle's course rather than leaving it fixed when heading south/west.
+    // Ignore heading jitter while standing still.
+    double? course;
+    if (speed != null && speed >= 1.5 &&
+        sensorHeading != null && sensorHeading.isFinite &&
+        sensorHeading >= 0 && sensorHeading < 360) {
+      course = sensorHeading;
+    } else if (previousFix != null &&
+        Geolocator.distanceBetween(
+          previousFix.latitude, previousFix.longitude,
+          value.latitude, value.longitude,
+        ) >= 5) {
+      course = Geolocator.bearingBetween(
+        previousFix.latitude, previousFix.longitude,
+        value.latitude, value.longitude,
+      );
+    }
     setState(() {
       _position = value;
+      if (course != null) _headingDegrees = (course + 360) % 360;
       _gpsMessage = 'GPS активен · только на устройстве';
     });
     // First GPS fix centers immediately; later fixes interpolate both the
@@ -273,7 +295,11 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
           distanceFilter: 5,
         ),
       ).listen(
-        (p) => _onPosition(LatLng(p.latitude, p.longitude)),
+        (p) => _onPosition(
+          LatLng(p.latitude, p.longitude),
+          sensorHeading: p.heading,
+          speed: p.speed,
+        ),
         onError: (Object error) {
           if (mounted) setState(() => _gpsMessage = 'GPS недоступен');
         },
@@ -293,6 +319,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     _animationTarget = null;
     setState(() {
       _displayPosition = null;
+      _headingDegrees = 0;
       _gpsEnabled = false;
       _gpsMessage = 'GPS выключен';
       _position = null;
@@ -351,15 +378,19 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                       point: _displayPosition!,
                       width: 48,
                       height: 48,
-                      child: const Icon(
-                        Icons.navigation,
-                        key: Key('pilot-location-marker'),
-                        size: 40,
-                        color: Color(0xFF00CCFF),
-                        shadows: [
-                          Shadow(color: Colors.black, blurRadius: 9),
-                          Shadow(color: Colors.white, blurRadius: 3),
-                        ],
+                      child: Transform.rotate(
+                        key: const Key('pilot-location-heading'),
+                        angle: _headingDegrees * math.pi / 180,
+                        child: const Icon(
+                          Icons.navigation,
+                          key: Key('pilot-location-marker'),
+                          size: 40,
+                          color: Color(0xFF00CCFF),
+                          shadows: [
+                            Shadow(color: Colors.black, blurRadius: 9),
+                            Shadow(color: Colors.white, blurRadius: 3),
+                          ],
+                        ),
                       ),
                     ),
                   ]),

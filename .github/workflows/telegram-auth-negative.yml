@@ -6,6 +6,11 @@ on:
       - pd_request_security.py
       - test_telegram_auth_negative.py
       - .github/workflows/telegram-auth-negative.yml
+  pull_request:
+    paths:
+      - pd_request_security.py
+      - test_telegram_auth_negative.py
+      - .github/workflows/telegram-auth-negative.yml
   workflow_dispatch:
 permissions:
   contents: read

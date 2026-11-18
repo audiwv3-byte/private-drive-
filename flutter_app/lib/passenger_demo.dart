@@ -64,6 +64,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _preferencesReady = false;
   bool _restoringPreferences = false;
   String? _lastPreferencesSnapshot;
+  String? _queuedPreferencesSnapshot;
   Future<void> _pendingPreferencesWrite = Future<void>.value();
 
   Map<String, dynamic> _preferencesSnapshot() => {
@@ -80,13 +81,19 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void _savePreferences() {
     if (!_preferencesReady || _restoringPreferences) return;
     final snapshot = jsonEncode(_preferencesSnapshot());
-    if (snapshot == _lastPreferencesSnapshot) return;
-    _lastPreferencesSnapshot = snapshot;
+    if (snapshot == _lastPreferencesSnapshot ||
+        snapshot == _queuedPreferencesSnapshot) return;
+    _queuedPreferencesSnapshot = snapshot;
     _pendingPreferencesWrite = _pendingPreferencesWrite.then((_) async {
       try {
         await _preferencesStorage.write(snapshot);
+        _lastPreferencesSnapshot = snapshot;
       } catch (_) {
-        // Offline demo remains usable without storage.
+        // Keep the previous confirmed snapshot so a later edit can retry.
+      } finally {
+        if (_queuedPreferencesSnapshot == snapshot) {
+          _queuedPreferencesSnapshot = null;
+        }
       }
     });
   }

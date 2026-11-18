@@ -88,6 +88,14 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     oid=first['order_id'];r=core.order_find(oid)
     assert repeat['order_id']==oid and repeat['replayed']
     assert (r['passengers'],r['luggage'],r['stop_address'],r['price'])==(3,'2 чемодана','Trakai','107.80')
+    # IDOR regression: a second synthetic passenger must never see or mutate passenger A's order.
+    own_orders=check(call('/api/orders',uid=101),200)['orders']
+    other_orders=check(call('/api/orders',uid=103),200)['orders']
+    assert any(int(item['id'])==oid for item in own_orders),'Owner cannot see their own order'
+    assert all(int(item['id'])!=oid for item in other_orders),'Foreign order leaked through passenger listing'
+    check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=103),403)
+    assert core.order_find(oid)['status']==r['status'],'Unauthorized status attempt modified order'
+    print('PASS synthetic cross-passenger order listing and status mutation denial')
     check(call('/api/payment/'+str(oid),uid=103),403)
     print('PASS route, pet pricing, map validation, passengers, luggage, stop and duplicate prevention')
     check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=999),200)

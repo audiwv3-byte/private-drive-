@@ -33,9 +33,77 @@ class PrivateDriveDemo extends StatefulWidget {
 
 class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
   final DemoTripStore _trip = DemoTripStore();
+  StreamSubscription<Position>? _pilotLocationStream;
+  bool _startingLocation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _trip.addListener(_onPilotShiftChanged);
+  }
+
+  Future<void> _requestPilotLocation() async {
+    if (!widget.enableMapTiles) return;
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (!mounted) return;
+      if (_trip.pilotOnline) _onPilotShiftChanged();
+    } catch (_) {
+      // Android permissions are controlled by the user, not by demo code.
+    }
+  }
+
+  void _onPilotShiftChanged() {
+    if (!_trip.pilotOnline) {
+      _pilotLocationStream?.cancel();
+      _pilotLocationStream = null;
+      return;
+    }
+    if (_pilotLocationStream == null && !_startingLocation &&
+        widget.enableMapTiles) {
+      unawaited(_startPilotLocation());
+    }
+  }
+
+  Future<void> _startPilotLocation() async {
+    if (_startingLocation || !mounted || !_trip.pilotOnline) return;
+    _startingLocation = true;
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (!mounted || !_trip.pilotOnline ||
+          permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) return;
+      _pilotLocationStream = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high, distanceFilter: 5,
+        ),
+      ).listen((position) {
+        if (mounted && _trip.pilotOnline) {
+          _trip.updatePilotLocation(position.latitude, position.longitude);
+        }
+      }, onError: (Object _) {
+        _pilotLocationStream?.cancel();
+        _pilotLocationStream = null;
+      });
+    } catch (_) {
+      // Never invent a GPS fix when Android location is unavailable.
+    } finally {
+      _startingLocation = false;
+    }
+  }
 
   @override
   void dispose() {
+    _trip.removeListener(_onPilotShiftChanged);
+    _pilotLocationStream?.cancel();
     _trip.dispose();
     super.dispose();
   }
@@ -123,11 +191,17 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                     const SizedBox(height: 12),
                     FilledButton.icon(
                       key: const Key('open-pilot-preview'),
-                      onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => PilotCabin(
+                      onPressed: () async {
+                        // Request the normal Android foreground location
+                        // permission on entering the pilot role.
+                        await _requestPilotLocation();
+                        if (!context.mounted) return;
+                        Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => PilotCabin(
                           enableMapTiles: widget.enableMapTiles,
                           tripStore: _trip,
-                        ))),
+                        )));
+                      },
                       icon: const Icon(Icons.navigation_outlined),
                       label: const Text('Кабина пилота'),
                     ),

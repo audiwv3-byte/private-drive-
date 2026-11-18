@@ -63,6 +63,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final query = (side == 'from' ? _from.text : _to.text).trim();
     setState(() {
       _route = '';
+      _routeKm = null;
+      _roadPoints = const [];
+      _routeInfo = '';
       _editingAddress = side;
       _addressSuggestions = _places.keys
         .where((x) => x.toLowerCase().contains(query.toLowerCase()))
@@ -327,8 +330,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
   @override
   Widget build(BuildContext context) {
     const gold = Color(0xFFDDC184);
-    final start = _places[_from.text.trim()];
-    final finish = _places[_to.text.trim()];
+    final start = _resolve(_from.text);
+    final finish = _resolve(_to.text);
+    final store = widget.tripStore;
+    final lastFix = store?.pilotLastSeen;
+    final showPilot = store != null && store.isActive &&
+        store.pilotOnline && store.pilotLatitude != null &&
+        store.pilotLongitude != null && lastFix != null &&
+        !lastFix.isAfter(DateTime.now()) &&
+        DateTime.now().difference(lastFix) < const Duration(minutes: 2);
+    final pilotPosition = showPilot
+        ? LatLng(store.pilotLatitude!, store.pilotLongitude!)
+        : null;
     final price = _pricePreview;
     final startMap = start != null && finish != null
         ? LatLng((start.latitude + finish.latitude) / 2,
@@ -351,6 +364,22 @@ class _PassengerDemoState extends State<PassengerDemo> {
           width: 48,
           height: 48,
           child: const Icon(Icons.location_on, color: Colors.redAccent, size: 34),
+        ),
+      if (pilotPosition != null)
+        Marker(
+          point: pilotPosition,
+          width: 52,
+          height: 52,
+          child: const Icon(
+            Icons.directions_car_filled,
+            key: Key('passenger-pilot-map-marker'),
+            color: Color(0xFF172B3F),
+            size: 38,
+            shadows: [
+              Shadow(color: Color(0xFFDDC184), blurRadius: 9),
+              Shadow(color: Colors.black, blurRadius: 4),
+            ],
+          ),
         ),
     ];
 
@@ -502,6 +531,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 ),
               ),
             ),
+            if (store != null && store.isActive)
+              Text(
+                pilotPosition != null
+                    ? 'Местоположение пилота · GPS обновляется'
+                    : 'Местоположение пилота пока недоступно',
+                key: const Key('passenger-pilot-location-status'),
+                style: const TextStyle(fontSize: 12),
+              ),
             if (_routeInfo.isNotEmpty)
               Text(_routeInfo, key: const Key('passenger-route-info'),
                   style: const TextStyle(fontSize: 12)),

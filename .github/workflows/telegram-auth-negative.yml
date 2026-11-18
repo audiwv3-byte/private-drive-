@@ -1,0 +1,24 @@
+name: PRIVATE DRIVE Telegram auth negative regression
+on:
+  push:
+    branches: [test/telegram-auth-negative-20261118]
+    paths:
+      - pd_request_security.py
+      - test_telegram_auth_negative.py
+      - .github/workflows/telegram-auth-negative.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  telegram-auth-negative:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile isolated tests
+        run: python -m py_compile pd_request_security.py test_telegram_auth_negative.py
+      - name: Run synthetic signed and rejected initData cases
+        run: python -m unittest -v test_telegram_auth_negative

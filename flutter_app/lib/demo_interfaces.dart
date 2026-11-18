@@ -41,11 +41,14 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
   final SharedPreferencesAsync _orderPrefs = SharedPreferencesAsync();
   static const _orderKey = 'pd_offline_demo_order_v1';
   Future<void> _saveQueue = Future<void>.value();
+  String? _lastSavedSnapshot;
 
   Future<void> _restoreOrder() async {
     try {
       final saved = await _orderPrefs.getString(_orderKey);
-      if (mounted && saved != null) _trip.restorePersistedJson(saved);
+      if (mounted && saved != null && _trip.restorePersistedJson(saved)) {
+        _lastSavedSnapshot = saved;
+      }
     } catch (_) {
       // Failed local storage must not prevent opening the demo.
     } finally {
@@ -58,7 +61,8 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
 
   void _persistOrder() {
     final snapshot = _trip.toPersistedJson();
-    if (snapshot == null) return;
+    if (snapshot == null || snapshot == _lastSavedSnapshot) return;
+    _lastSavedSnapshot = snapshot;
     _saveQueue = _saveQueue.then((_) async {
       try {
         await _orderPrefs.setString(_orderKey, snapshot);

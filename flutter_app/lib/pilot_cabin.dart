@@ -102,6 +102,7 @@ class _PilotCabinState extends State<PilotCabin> {
   void dispose() {
     widget.tripStore?.removeListener(_syncOfferSound);
     _hideCockpitOverlay();
+    widget.tripStore?.setPilotOnline(false);
     _offerTone.dispose();
     super.dispose();
   }
@@ -120,10 +121,12 @@ class _PilotCabinState extends State<PilotCabin> {
   void _toggleLine() {
     if (_onLine) {
       setState(() => _onLine = false);
+      widget.tripStore?.setPilotOnline(false);
       _hideCockpitOverlay();
       return;
     }
     setState(() => _onLine = true);
+    widget.tripStore?.setPilotOnline(true);
     _openMap();
     WidgetsBinding.instance.addPostFrameCallback((_) => _showCockpitOverlay());
   }

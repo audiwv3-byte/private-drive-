@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 /// In-memory simulated trip. Never talks to production APIs or payments.
@@ -228,6 +230,92 @@ class DemoTripStore extends ChangeNotifier {
     _paused = !_paused;
     notifyListeners();
     return true;
+  }
+
+
+  /// JSON contains only the simulated order, status and demo messages.
+  /// Pilot GPS and sign-in credentials are deliberately never persisted.
+  String? toPersistedJson() {
+    final trip = _trip;
+    final status = _status;
+    if (trip == null || status == null) return null;
+    return jsonEncode({
+      'version': 1,
+      'from': trip.from,
+      'to': trip.to,
+      'paymentMethod': trip.paymentMethod,
+      'departure': trip.departure.toIso8601String(),
+      'rideType': trip.rideType,
+      'roundTrip': trip.roundTrip,
+      'services': trip.services,
+      'status': status.name,
+      'paused': _paused,
+      'pilotAccepted': _pilotAccepted,
+      'tripRating': _tripRating,
+      'serviceRating': _serviceRating,
+      'pilotChatMessages': _pilotChatMessages,
+      'passengerChatMessages': _passengerChatMessages,
+    });
+  }
+
+  /// Return false for invalid/obsolete snapshots without changing the store.
+  bool restorePersistedJson(String raw) {
+    if (_disposed || _trip != null) return false;
+    try {
+      final data = jsonDecode(raw);
+      if (data is! Map<String, dynamic> || data['version'] != 1) {
+        return false;
+      }
+      final from = data['from'];
+      final to = data['to'];
+      final payment = data['paymentMethod'];
+      final departure = data['departure'];
+      final rideType = data['rideType'];
+      final roundTrip = data['roundTrip'];
+      final services = data['services'];
+      final statusName = data['status'];
+      if (from is! String || from.trim().isEmpty ||
+          to is! String || to.trim().isEmpty ||
+          from.trim().toLowerCase() == to.trim().toLowerCase() ||
+          payment is! String || departure is! String ||
+          rideType is! String || roundTrip is! bool ||
+          services is! List || services.any((v) => v is! String) ||
+          statusName is! String) return false;
+      final status = DemoTripStatus.values.where((s) => s.name == statusName);
+      if (status.isEmpty) return false;
+      final parsedDate = DateTime.tryParse(departure);
+      if (parsedDate == null) return false;
+      final pilotMessages = data['pilotChatMessages'];
+      final passengerMessages = data['passengerChatMessages'];
+      if (pilotMessages is! List || passengerMessages is! List ||
+          pilotMessages.any((v) => v is! String || v.length > 500) ||
+          passengerMessages.any((v) => v is! String || v.length > 500)) {
+        return false;
+      }
+      final tripRating = data['tripRating'];
+      final serviceRating = data['serviceRating'];
+      if ((tripRating != null && (tripRating is! int || tripRating < 1 || tripRating > 5)) ||
+          (serviceRating != null && (serviceRating is! int || serviceRating < 1 || serviceRating > 5))) return false;
+      _trip = DemoTrip(from: from.trim(), to: to.trim(),
+        paymentMethod: payment, departure: parsedDate, rideType: rideType,
+        roundTrip: roundTrip, services: List<String>.unmodifiable(services.cast<String>()));
+      _status = status.first;
+      _paused = data['paused'] == true &&
+          (_status == DemoTripStatus.approaching || _status == DemoTripStatus.underway);
+      _pilotAccepted = data['pilotAccepted'] == true &&
+          (_status == DemoTripStatus.assigned ||
+           _status == DemoTripStatus.approaching ||
+           _status == DemoTripStatus.underway ||
+           _status == DemoTripStatus.finished);
+      _tripRating = tripRating as int?;
+      _serviceRating = serviceRating as int?;
+      _pilotChatMessages..clear()..addAll(pilotMessages.cast<String>());
+      _passengerChatMessages..clear()..addAll(passengerMessages.cast<String>());
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

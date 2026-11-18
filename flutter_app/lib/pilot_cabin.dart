@@ -132,7 +132,7 @@ class _PilotCabinState extends State<PilotCabin> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const PrivateDriveBrandLogo(size: 86),
+                  const PrivateDriveBrandLogo(size: 86, circular: true),
                   const SizedBox(height: 12),
                   const Text(
                     'КАБИНЕТ ПИЛОТА',

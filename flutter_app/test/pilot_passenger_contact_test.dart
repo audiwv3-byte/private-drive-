@@ -80,4 +80,80 @@ void main() {
     expect(find.byKey(const Key('pilot-passenger-chat')), findsNothing);
     expect(find.byKey(const Key('pilot-passenger-call')), findsNothing);
   });
+  testWidgets('Underway pilot hears a local next order and can queue it',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    store.create(
+      from: 'Вильнюс',
+      to: 'Каунас',
+      paymentMethod: 'Карта',
+      departure: DateTime(2026, 11, 18),
+      services: const [],
+    );
+    store.assignPilot();
+    var alertCount = 0;
+
+    await tester.pumpWidget(MaterialApp(
+      home: PilotDemo(
+        enableMapTiles: false,
+        tripStore: store,
+        onIncomingSound: () => alertCount++,
+      ),
+    ));
+    // Incoming offers are available only during an existing active journey.
+    expect(find.byKey(const Key('pilot-simulate-offer')), findsNothing);
+    store.advancePilot(); // On the way to pickup
+    await tester.pump();
+    expect(find.byKey(const Key('pilot-simulate-offer')), findsNothing);
+    store.advancePilot(); // Passenger is onboard
+    await tester.pump();
+    expect(find.byKey(const Key('pilot-simulate-offer')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('pilot-simulate-offer')));
+    await tester.pump();
+    expect(alertCount, 1);
+    expect(find.byKey(const Key('pilot-next-offer')), findsOneWidget);
+    expect(find.text('Вильнюс → Аэропорт Вильнюса'), findsOneWidget);
+    expect(find.byKey(const Key('pilot-accept-next')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-decline-next')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('pilot-accept-next')));
+    await tester.pump();
+    expect(find.byKey(const Key('pilot-next-offer')), findsNothing);
+    expect(find.text('Следующий заказ принят · демо'), findsOneWidget);
+    expect(store.status, DemoTripStatus.underway);
+    expect(find.byKey(const Key('pilot-simulate-offer')), findsNothing);
+  });
+
+  testWidgets('Declined next-trip demo offer does not interrupt current trip',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    store.create(
+      from: 'Вильнюс',
+      to: 'Каунас',
+      paymentMethod: 'Карта',
+      departure: DateTime(2026, 11, 18),
+      services: const [],
+    );
+    store.assignPilot();
+    store.advancePilot();
+    store.advancePilot();
+    await tester.pumpWidget(MaterialApp(
+      home: PilotDemo(
+        enableMapTiles: false,
+        tripStore: store,
+        onIncomingSound: () {},
+      ),
+    ));
+    await tester.tap(find.byKey(const Key('pilot-simulate-offer')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('pilot-decline-next')));
+    await tester.pump();
+    expect(store.status, DemoTripStatus.underway);
+    expect(find.byKey(const Key('pilot-next-offer')), findsNothing);
+    expect(find.byKey(const Key('pilot-simulate-offer')), findsOneWidget);
+  });
+
 }

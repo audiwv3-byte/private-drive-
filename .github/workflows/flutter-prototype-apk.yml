@@ -26,16 +26,18 @@ jobs:
         run: |
           flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
           cp -R flutter_app/lib/. private_drive_build/lib/
-          # Decode the approved logo from the source tree; no external network.
+          cp -R flutter_app/assets private_drive_build/assets
+          # The exact, approved 1254px lossless asset is used by Flutter,
+          # the Android launcher, and the native launch background.
           python3 - <<'PY'
-          import base64
           from pathlib import Path
-          import re
-          source = Path("flutter_app/lib/brand_logo.dart").read_text()
-          match = re.search(r"const privateDriveLogoBase64 = '([A-Za-z0-9+/=]+)';", source)
-          assert match, "approved logo asset is missing"
-          data = base64.b64decode(match.group(1), validate=True)
-          assert data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+          import hashlib
+          source = Path("flutter_app/assets/brand/private_drive_logo.webp")
+          data = source.read_bytes()
+          expected = "550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f"
+          assert hashlib.sha256(data).hexdigest() == expected, "approved logo hash mismatch"
+          assert data[:4] == b"RIFF" and data[8:16] == b"WEBPVP8L"
+          assert len(data) > 1000000, "approved full resolution asset missing"
           android = Path("private_drive_build/android/app/src/main")
           drawable = android / "res/drawable-nodpi"
           drawable.mkdir(parents=True, exist_ok=True)
@@ -115,7 +117,13 @@ jobs:
           assert apk.is_file() and apk.stat().st_size > 1000000
           with ZipFile(apk) as z:
               entries = z.namelist()
-              assert any("private_drive_logo" in name and name.endswith(".webp") for name in entries), "brand logo missing from APK"
+              copies = [name for name in entries if "private_drive_logo" in name and name.endswith(".webp")]
+              assert len(copies) >= 2, f"expected native and Flutter copies: {copies}"
+              from hashlib import sha256
+              expected = "550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f"
+              for name in copies:
+                  assert sha256(z.read(name)).hexdigest() == expected, f"incorrect logo in {name}"
+              print("Verified original approved logo in APK:", copies)
           info = subprocess.check_output(["flutter", "--version"], text=True).strip().splitlines()[0]
           print("Verified branded APK:", apk.stat().st_size, "bytes", info)
           PY

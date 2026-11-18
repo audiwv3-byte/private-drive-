@@ -13,6 +13,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();
+    expect(find.text('Предварительная стоимость: 130 €'), findsOneWidget);
+    expect(find.byKey(const Key('passenger-price-preview')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-to')),
       180,
@@ -69,6 +71,32 @@ void main() {
     );
     expect(find.text('Диспетчер'), findsNothing);
     expect(find.text('К пассажиру'), findsNothing);
+  });
+
+  testWidgets('Fixed route price changes only with priced services',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PassengerDemo(enableMapTiles: false),
+    ));
+    await tester.tap(find.byKey(const Key('route-kaunas')));
+    await tester.pump();
+    expect(find.text('Предварительная стоимость: 130 €'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('service-meet-sign')), 180,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
+    await tester.tap(find.byKey(const Key('service-meet-sign')));
+    await tester.pump();
+    expect(find.text('Предварительная стоимость: 145 €'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('service-pets')));
+    await tester.tap(find.byKey(const Key('service-pets')));
+    await tester.pump();
+    expect(find.textContaining('Стоимость по запросу'), findsOneWidget);
   });
 
   testWidgets('Services and payment change preview, never create a booking',

@@ -179,6 +179,8 @@ void main() {
     );
     final book = find.byKey(const Key('passenger-book-disabled'));
     expect(tester.widget<FilledButton>(book).onPressed, isNotNull);
+    await tester.ensureVisible(book);
+    await tester.pump();
     await tester.tap(book);
     await tester.pump();
     expect(find.text('Заявка создана · ожидает назначения'), findsOneWidget);

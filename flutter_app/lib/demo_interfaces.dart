@@ -14,7 +14,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
-/// Deep-link to the native Waze app. No HTTPS browser fallback.\nfinal Uri privateDriveWazeAppUri = Uri.parse('waze://');\n\n/// Standalone offline simulator. Each launch creates one isolated trip store.
+/// Deep-link to the native Waze app. No HTTPS browser fallback.
+final Uri privateDriveWazeAppUri = Uri.parse('waze://');
+
+/// Standalone offline simulator. Each launch creates one isolated trip store.
 class PrivateDriveDemo extends StatefulWidget {
   const PrivateDriveDemo({super.key, this.enableMapTiles = true});
 

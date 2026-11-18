@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -167,6 +169,72 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _position;
   LatLng? _displayPosition;
   double _headingDegrees = 0;
+  List<LatLng> _pickupRoadPoints = const [];
+  bool _pickupRouteAttempted = false;
+  String _pickupRoutingInfo = '';
+  int _pickupRouteGeneration = 0;
+
+  Future<void> _loadPickupRoadRoute() async {
+    if (!mounted || !_approachingPassenger || _pickupRouteAttempted) return;
+    final from = _position;
+    final to = _pickupPreviewPoint;
+    if (from == null || to == null || !widget.enableMapTiles ||
+        !widget.loadMapTiles) return;
+    _pickupRouteAttempted = true;
+    final generation = ++_pickupRouteGeneration;
+    setState(() {
+      _pickupRoutingInfo = 'Построение маршрута по дорогам…';
+    });
+    HttpClient? client;
+    try {
+      client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 5);
+      final uri = Uri.https('router.project-osrm.org',
+        '/route/v1/driving/${from.longitude},${from.latitude};'
+        '${to.longitude},${to.latitude}',
+        {'overview': 'full', 'geometries': 'geojson'});
+      final request = await client.getUrl(uri)
+          .timeout(const Duration(seconds: 7));
+      final response = await request.close()
+          .timeout(const Duration(seconds: 7));
+      if (response.statusCode != 200) {
+        throw const HttpException('Routing unavailable');
+      }
+      final decoded = jsonDecode(await utf8.decoder.bind(response).join()
+          .timeout(const Duration(seconds: 7))) as Map<String, dynamic>;
+      final routes = decoded['routes'] as List<dynamic>?;
+      if (routes == null || routes.isEmpty) {
+        throw const FormatException('No road route');
+      }
+      final coordinates =
+          ((routes.first as Map<String, dynamic>)['geometry']
+            as Map<String, dynamic>)['coordinates'] as List<dynamic>;
+      final points = coordinates.map((raw) {
+        final pair = raw as List<dynamic>;
+        return LatLng((pair[1] as num).toDouble(),
+          (pair[0] as num).toDouble());
+      }).toList(growable: false);
+      if (!mounted || generation != _pickupRouteGeneration ||
+          !_approachingPassenger || points.length < 2) return;
+      setState(() {
+        _pickupRoadPoints = points;
+        _pickupRoutingInfo = 'Дорожный маршрут · демонстрационный сервис';
+      });
+      _map.fitCamera(CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints([from, to]),
+        padding: const EdgeInsets.all(72),
+      ));
+    } catch (_) {
+      if (mounted && generation == _pickupRouteGeneration &&
+          _approachingPassenger) {
+        setState(() => _pickupRoutingInfo =
+          'Дорожный маршрут недоступен · проверь интернет и GPS');
+      }
+    } finally {
+      client?.close(force: true);
+    }
+  }
+
   bool _incomingOffer = false;
   bool _nextAccepted = false;
 
@@ -384,6 +452,10 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
       if (course != null) _headingDegrees = (course + 360) % 360;
       _gpsMessage = 'GPS активен · только на устройстве';
     });
+    widget.tripStore?.updatePilotLocation(value.latitude, value.longitude);
+    if (_approachingPassenger && !_pickupRouteAttempted) {
+      unawaited(_loadPickupRoadRoute());
+    }
     // First GPS fix centers immediately; later fixes interpolate both the
     // navigation marker and camera. A new fix starts at the current animation
     // position rather than jumping to the previous target.
@@ -469,7 +541,15 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   void advance() {
     if (widget.tripStore != null) {
       final changed = widget.tripStore!.advancePilot();
-      if (changed && _approachingPassenger) _focusPickupPreview();
+      if (changed && _approachingPassenger) {
+        _pickupRouteAttempted = false;
+        _pickupRoadPoints = const [];
+        _focusPickupPreview();
+        unawaited(_loadPickupRoadRoute());
+      } else if (changed) {
+        ++_pickupRouteGeneration;
+        _pickupRoadPoints = const [];
+      }
       return;
     }
     setState(() {
@@ -513,18 +593,17 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   userAgentPackageName: 'lt.privatedrive.privateDrive',
                   maxNativeZoom: 19,
                 ),
-                // Preview line only; never advertise a straight line as roads.
-                if (_approachingPassenger &&
-                    _pickupPreviewPoint != null &&
-                    _displayPosition != null)
-                  PolylineLayer(polylines: [
-                    Polyline(
-                      points: [_displayPosition!, _pickupPreviewPoint!],
-                      strokeWidth: 3,
-                      color: const Color(0xFFDDC184),
-                      pattern: const StrokePattern.dotted(),
-                    ),
-                  ]),
+                if (_approachingPassenger && _pickupRoadPoints.isNotEmpty)
+                  PolylineLayer(
+                    key: const Key('pilot-road-route'),
+                    polylines: [
+                      Polyline(
+                        points: _pickupRoadPoints,
+                        strokeWidth: 5,
+                        color: const Color(0xFFDDC184),
+                      ),
+                    ],
+                  ),
                 if (_approachingPassenger && _pickupPreviewPoint != null)
                   MarkerLayer(markers: [
                     Marker(
@@ -677,6 +756,12 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                             Text(_tripLabel,
                                 key: const Key('pilot-trip-state')),
                             if (_approachingPassenger) ...[
+                              if (_pickupRoutingInfo.isNotEmpty)
+                                Text(_pickupRoutingInfo,
+                                  key: const Key('pilot-routing-status'),
+                                  style: const TextStyle(
+                                    fontSize: 11, color: Colors.white70)),
+
                               const SizedBox(height: 6),
                               Text('Подача: ${_pickupAddress ?? "адрес не указан"}',
                                   key: const Key('pilot-pickup-address'),

@@ -179,9 +179,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Заявка создана · ожидает назначения'), findsOneWidget);
     expect(find.text('Вильнюс → Каунас'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('demo-dispatch-assign')));
+    expect(find.byKey(const Key('demo-dispatch-assign')), findsNothing);
+    await tester.tap(find.byKey(const Key('open-dispatcher-preview')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dispatcher-cabinet')), findsOneWidget);
+    expect(find.byKey(const Key('dispatcher-order-card')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('dispatcher-assign-pilot')));
     await tester.pump();
-    expect(find.text('Пилот назначен · ожидает принятия'), findsOneWidget);
+    expect(find.text('Пилот назначен · ожидает принятия'), findsWidgets);
+    expect(find.byKey(const Key('dispatcher-assign-pilot')), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('open-pilot-preview')));
     await tester.pumpAndSettle();

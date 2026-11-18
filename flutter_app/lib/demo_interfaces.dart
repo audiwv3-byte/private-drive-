@@ -459,10 +459,26 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   void initState() {
     super.initState();
     widget.tripStore?.addListener(_onTripChanged);
+    if (widget.tripStore?.pilotOnline == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _onTripChanged();
+      });
+    }
   }
 
   void _onTripChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final store = widget.tripStore;
+    final lat = store?.pilotLatitude;
+    final lng = store?.pilotLongitude;
+    if (store?.pilotOnline == true && lat != null && lng != null &&
+        (_position == null ||
+         _position!.latitude != lat || _position!.longitude != lng)) {
+      _gpsEnabled = true;
+      _onPosition(LatLng(lat, lng), publishToStore: false);
+    } else {
+      setState(() {});
+    }
   }
 
   String get _tripLabel => widget.tripStore?.statusLabel ??
@@ -509,7 +525,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (widget.enableMapTiles) _map.move(current, _map.camera.zoom);
   }
 
-  void _onPosition(LatLng value, {double? sensorHeading, double? speed}) {
+  void _onPosition(LatLng value, {double? sensorHeading, double? speed,
+      bool publishToStore = true}) {
     if (!mounted || !value.latitude.isFinite || !value.longitude.isFinite ||
         value.latitude.abs() > 90 || value.longitude.abs() > 180) return;
     final previous = _displayPosition;
@@ -537,7 +554,9 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
       if (course != null) _headingDegrees = (course + 360) % 360;
       _gpsMessage = 'GPS активен · только на устройстве';
     });
-    widget.tripStore?.updatePilotLocation(value.latitude, value.longitude);
+    if (publishToStore) {
+      widget.tripStore?.updatePilotLocation(value.latitude, value.longitude);
+    }
     if (_approachingPassenger && !_pickupRouteAttempted) {
       unawaited(_loadPickupRoadRoute());
     }
@@ -776,7 +795,13 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   right: 12,
                   child: Chip(
                     key: const Key('pilot-gps-status'),
-                    label: Text(_gpsMessage),
+                    label: Text(widget.tripStore != null
+                      ? (widget.tripStore!.pilotLatitude != null
+                        ? 'GPS активен · демо'
+                        : (widget.tripStore!.pilotOnline
+                            ? 'GPS: ожидание разрешения/координат'
+                            : 'GPS выключен · не на линии'))
+                      : _gpsMessage),
                   ),
                 ),
                 if (_displayPosition != null && !widget.enableMapTiles)
@@ -785,10 +810,11 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                         color: Color(0xFF00CCFF),
                         shadows: [Shadow(color: Colors.black, blurRadius: 8)]),
                   ),
-                Positioned(
-                  top: 60,
-                  right: 12,
-                  child: Column(
+                if (widget.tripStore == null)
+                  Positioned(
+                    top: 60,
+                    right: 12,
+                    child: Column(
                     children: [
                       if (!_gpsEnabled)
                         FloatingActionButton.small(

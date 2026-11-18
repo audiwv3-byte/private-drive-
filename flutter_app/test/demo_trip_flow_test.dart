@@ -158,6 +158,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(
       home: PrivateDriveDemo(enableMapTiles: false),
     ));
+    await tester.pumpAndSettle();
     expect(find.text('Нет тестового заказа'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('open-passenger-preview')));

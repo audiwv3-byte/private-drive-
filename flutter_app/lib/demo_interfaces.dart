@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'passenger_demo.dart';
 import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
@@ -22,7 +23,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 /// Deep-link to the native Waze app. No HTTPS browser fallback.
 final Uri privateDriveWazeAppUri = Uri.parse('waze://');
 
-/// Standalone offline simulator. Each launch creates one isolated trip store.
+/// Standalone offline simulator with an on-device persisted demo order.
 class PrivateDriveDemo extends StatefulWidget {
   const PrivateDriveDemo({super.key, this.enableMapTiles = true});
 
@@ -36,11 +37,42 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
   final DemoTripStore _trip = DemoTripStore();
   StreamSubscription<Position>? _pilotLocationStream;
   bool _startingLocation = false;
+  bool _restoringOrder = true;
+  final SharedPreferencesAsync _orderPrefs = SharedPreferencesAsync();
+  static const _orderKey = 'pd_offline_demo_order_v1';
+  Future<void> _saveQueue = Future<void>.value();
+
+  Future<void> _restoreOrder() async {
+    try {
+      final saved = await _orderPrefs.getString(_orderKey);
+      if (mounted && saved != null) _trip.restorePersistedJson(saved);
+    } catch (_) {
+      // Failed local storage must not prevent opening the demo.
+    } finally {
+      if (mounted) {
+        _trip.addListener(_persistOrder);
+        setState(() => _restoringOrder = false);
+      }
+    }
+  }
+
+  void _persistOrder() {
+    final snapshot = _trip.toPersistedJson();
+    if (snapshot == null) return;
+    _saveQueue = _saveQueue.then((_) async {
+      try {
+        await _orderPrefs.setString(_orderKey, snapshot);
+      } catch (_) {
+        // Demo stays functional even without device storage.
+      }
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     _trip.addListener(_onPilotShiftChanged);
+    unawaited(_restoreOrder());
   }
 
   Future<void> _requestPilotLocation() async {
@@ -104,6 +136,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
   @override
   void dispose() {
     _trip.removeListener(_onPilotShiftChanged);
+    _trip.removeListener(_persistOrder);
     _pilotLocationStream?.cancel();
     _trip.dispose();
     super.dispose();
@@ -111,6 +144,10 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
 
   @override
   Widget build(BuildContext context) {
+    if (_restoringOrder) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator(
+        key: Key('demo-order-restoring'))));
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE · Демоверсия')),
       body: SafeArea(
@@ -130,7 +167,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                         style: TextStyle(fontSize: 22)),
                     const SizedBox(height: 12),
                     const Text(
-                      'Все заявки и назначения существуют только в памяти. '
+                      'Тестовые заявки сохраняются на этом устройстве. '
                       'Нет реальных заказов, платежей и сервера.',
                       textAlign: TextAlign.center,
                     ),

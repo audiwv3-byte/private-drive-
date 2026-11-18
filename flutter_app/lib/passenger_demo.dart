@@ -37,6 +37,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _pets = false;
   bool _soberDriver = false;
   bool _music = false;
+  bool _flowers = false;
+  bool _coffee = false;
   List<LatLng> _roadPoints = const [];
   bool _routeLoading = false;
   String _routeInfo = '';
@@ -159,6 +161,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
         if (_pets) 'Животные',
         if (_soberDriver) 'Трезвый водитель',
         if (_music) 'Музыка в дорогу',
+        if (_flowers) 'Цветы',
+        if (_coffee) 'Кофе',
       ],
     );
   }
@@ -193,7 +197,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   }
 
   int? get _pricePreview {
-    if (_pets || _soberDriver) return null;
+    if (_pets || _soberDriver || _flowers || _coffee) return null;
     final fixed = _fixedPrice;
     if (fixed != null) return fixed + (_meetSign ? 15 : 0);
     final km = _routeKm;
@@ -597,6 +601,22 @@ class _PassengerDemoState extends State<PassengerDemo> {
               title: const Text('Музыка в дорогу · бесплатно'),
               value: _music,
               onChanged: (v) => setState(() => _music = v ?? false),
+            ),
+            CheckboxListTile(
+              key: const Key('service-flowers'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Цветы · стоимость по запросу'),
+              value: _flowers,
+              onChanged: (v) => setState(() => _flowers = v ?? false),
+            ),
+            CheckboxListTile(
+              key: const Key('service-coffee'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Кофе · стоимость по запросу'),
+              value: _coffee,
+              onChanged: (v) => setState(() => _coffee = v ?? false),
             ),
             const SizedBox(height: 12),
             const Text('Способ оплаты · только выбор', style: TextStyle(fontWeight: FontWeight.bold)),

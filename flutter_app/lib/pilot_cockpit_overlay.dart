@@ -71,7 +71,7 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const PrivateDriveBrandLogo(size: 27),
+                                const PrivateDriveBrandLogo(size: 27, circular: true),
                                 const SizedBox(width: 7),
                                 const Flexible(
                                   child: Text('Сегодня · 0,00 €',

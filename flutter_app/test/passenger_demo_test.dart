@@ -11,6 +11,8 @@ void main() {
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
     expect(find.byKey(const Key('route-kaunas')), findsOneWidget);
 
+    await tester.ensureVisible(find.byKey(const Key('route-kaunas')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();
     await tester.scrollUntilVisible(
@@ -76,6 +78,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(
       home: PassengerDemo(enableMapTiles: false),
     ));
+    await tester.ensureVisible(find.byKey(const Key('route-kaunas')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();
     await tester.scrollUntilVisible(

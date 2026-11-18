@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'passenger_demo.dart';
+import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
 import 'pilot_passenger_chat_demo.dart';
 import 'demo_trip_store.dart';
@@ -161,6 +162,17 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                       label: const Text('Пассажир'),
                     ),
                     const SizedBox(height: 12),
+                    if (_trip.trip != null) ...[
+                      OutlinedButton.icon(
+                        key: const Key('open-my-orders'),
+                        onPressed: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) =>
+                            PassengerOrdersDemo(tripStore: _trip))),
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: const Text('Мои заказы · управление'),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     FilledButton.icon(
                       key: const Key('open-dispatcher-preview'),
                       onPressed: () => Navigator.push(context,
@@ -357,7 +369,11 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (!_hasAssignedPassenger) return;
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => PilotPassengerChatDemo(
-        messages: widget.tripStore!.pilotChatMessages,
+        messages: [
+          ...widget.tripStore!.pilotChatMessages,
+          ...widget.tripStore!.passengerChatMessages.map(
+            (message) => 'Пассажир: $message'),
+        ],
         onSend: (text) {
           if (!_hasAssignedPassenger) return;
           widget.tripStore!.addPilotChatMessage(text);

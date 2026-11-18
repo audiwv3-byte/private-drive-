@@ -142,10 +142,11 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
               ),
               if (point != null) MarkerLayer(markers: [
                 Marker(
-                  point: point, width: 48, height: 48,
-                  child: const Icon(Icons.directions_car,
+                  point: point, width: 64, height: 64,
+                  child: const CustomPaint(
                     key: Key('dispatcher-pilot-marker'),
-                    color: gold, size: 40),
+                    painter: _GoldPilotArrowPainter(),
+                  ),
                 ),
               ]),
               const RichAttributionWidget(attributions: [
@@ -216,4 +217,50 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
       ],
     );
   }
+}
+
+
+/// High-contrast approved marker B: gold navigation arrow with a thick
+/// near-black outline, visible on both light and dark map tiles.
+/// The dispatcher demo has no trustworthy heading data, so the arrow
+/// deliberately points north rather than inventing a driving direction.
+class _GoldPilotArrowPainter extends CustomPainter {
+  const _GoldPilotArrowPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final halo = Paint()
+      ..color = const Color(0xD9000000)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, size.shortestSide * 0.47, halo);
+    canvas.drawCircle(center, size.shortestSide * 0.415,
+        Paint()..color = const Color(0xFFFFDF87));
+    canvas.drawCircle(center, size.shortestSide * 0.36,
+        Paint()..color = const Color(0xFF15191E));
+
+    final arrow = Path()
+      ..moveTo(size.width * 0.50, size.height * 0.10)
+      ..lineTo(size.width * 0.81, size.height * 0.81)
+      ..lineTo(size.width * 0.50, size.height * 0.64)
+      ..lineTo(size.width * 0.19, size.height * 0.81)
+      ..close();
+    canvas.drawPath(arrow, Paint()
+      ..color = const Color(0xFF05080C)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.shortestSide * 0.105
+      ..strokeJoin = StrokeJoin.round);
+    canvas.drawPath(arrow, Paint()..color = const Color(0xFFF2BC35));
+    canvas.drawLine(
+      Offset(size.width * 0.50, size.height * 0.22),
+      Offset(size.width * 0.50, size.height * 0.57),
+      Paint()
+        ..color = const Color(0xFFFFEDAD)
+        ..strokeWidth = size.shortestSide * 0.035
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _GoldPilotArrowPainter oldDelegate) => false;
 }

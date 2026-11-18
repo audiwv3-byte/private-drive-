@@ -904,7 +904,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                               Text(
                                 _pickupPreviewPoint != null
                                   ? 'Метка обозначает только центр города · '
-                                    'точный адрес не указан'
+                                    '${_approachingPassenger ? 'точный адрес подачи не указан' : 'точный адрес назначения не указан'}'
                                   : 'Точка подачи не определена · '
                                     'требуется геокодирование адреса',
                                 key: const Key('pilot-pickup-accuracy'),

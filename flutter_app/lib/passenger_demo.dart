@@ -49,6 +49,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   String _routeInfo = '';
   int _routeRequest = 0;
   Timer? _addressTimer;
+  Timer? _gpsFreshnessTimer;
   int _addressGeneration = 0;
   String? _editingAddress;
   List<String> _addressSuggestions = const [];
@@ -117,6 +118,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _editingAddress = null;
       _addressSuggestions = const [];
       _route = '';
+      _routeKm = null;
+      _roadPoints = const [];
+      _routeInfo = '';
     });
     _addressTimer?.cancel();
     ++_addressGeneration;
@@ -144,6 +148,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void initState() {
     super.initState();
     widget.tripStore?.addListener(_onTripChanged);
+    if (widget.tripStore != null) {
+      _gpsFreshnessTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+        if (mounted && widget.tripStore?.pilotLastSeen != null) {
+          setState(() {}); // Hide stale pilot fixes even without new GPS events.
+        }
+      });
+    }
   }
 
   void _onTripChanged() {
@@ -243,6 +254,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     setState(() {
       _routeLoading = true;
       _roadPoints = const [];
+      _routeKm = null;
       _routeInfo = 'Построение дорожного маршрута · демо…';
     });
     HttpClient? client;
@@ -321,6 +333,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     widget.tripStore?.removeListener(_onTripChanged);
     _routeRequest++;
     _addressTimer?.cancel();
+    _gpsFreshnessTimer?.cancel();
     _from.dispose();
     _to.dispose();
     _tripWishes.dispose();
@@ -613,6 +626,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       _from.text = _to.text;
                       _to.text = previous;
                       _route = '';
+                      _routeKm = null;
+                      _roadPoints = const [];
+                      _routeInfo = '';
                     });
                     _updateRoadPreview();
                   },

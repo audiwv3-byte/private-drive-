@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'demo_interfaces.dart' show PilotDemo;
 import 'demo_trip_store.dart';
+import 'vilnius_evening_backdrop.dart';
 
 /// The pilot's offline demo shift control lives in the cabin, never on the map.
 /// This state is local to the demo and does not change real driver availability.
@@ -47,7 +48,11 @@ class _PilotCabinState extends State<PilotCabin> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE · Кабинет пилота')),
-      body: SafeArea(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (!_onLine) const VilniusEveningBackdrop(),
+          SafeArea(
         child: Center(
           child: SingleChildScrollView(
             child: Padding(
@@ -190,6 +195,8 @@ class _PilotCabinState extends State<PilotCabin> {
             ),
           ),
         ),
+          ),
+        ],
       ),
     );
   }

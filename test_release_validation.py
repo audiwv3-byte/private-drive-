@@ -88,7 +88,18 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     oid=first['order_id'];r=core.order_find(oid)
     assert repeat['order_id']==oid and repeat['replayed']
     assert (r['passengers'],r['luggage'],r['stop_address'],r['price'])==(3,'2 чемодана','Trakai','107.80')
-    check(call('/api/payment/'+str(oid),uid=103),403)
+    # IDOR regression: two independently registered synthetic passengers.
+    check(call('/api/register',{'name':'Test Passenger B','phone':'+37060000003'},uid=103),200)
+    own_orders=check(call('/api/orders',uid=101),200)['orders']
+    other_orders=check(call('/api/orders',uid=103),200)['orders']
+    assert any(int(item['id'])==oid for item in own_orders),'Owner cannot see their own order'
+    assert all(int(item['id'])!=oid for item in other_orders),'Foreign order leaked through passenger listing'
+    forbidden_status=call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=103)
+    assert forbidden_status.status_code in (401,403), ('Unexpected authorization response',forbidden_status.status_code,forbidden_status.get_data(as_text=True))
+    assert core.order_find(oid)['status']==r['status'],'Unauthorized status attempt modified order'
+    print('PASS synthetic cross-passenger order listing and status mutation denial')
+    foreign_payment=call('/api/payment/'+str(oid),uid=103)
+    assert foreign_payment.status_code in (401,403), ('Foreign payment data exposed',foreign_payment.status_code,foreign_payment.get_data(as_text=True))
     print('PASS route, pet pricing, map validation, passengers, luggage, stop and duplicate prevention')
     check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=999),200)
     check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=999),400)

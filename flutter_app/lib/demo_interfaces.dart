@@ -7,6 +7,7 @@ import 'passenger_demo.dart';
 import 'pilot_cabin.dart';
 import 'pilot_passenger_chat_demo.dart';
 import 'demo_trip_store.dart';
+import 'demo_dispatcher_cabinet.dart';
 import 'remote_sync_demo.dart';
 export 'passenger_demo.dart' show PassengerDemo;
 import 'package:flutter_map/flutter_map.dart';
@@ -73,14 +74,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                             Text('${_trip.trip!.from} → ${_trip.trip!.to}',
                                 key: const Key('shared-trip-route'),
                                 textAlign: TextAlign.center),
-                          const SizedBox(height: 8),
-                          if (_trip.status == DemoTripStatus.requested)
-                            OutlinedButton.icon(
-                              key: const Key('demo-dispatch-assign'),
-                              icon: const Icon(Icons.assignment_ind_outlined),
-                              onPressed: _trip.assignPilot,
-                              label: const Text('Демо-диспетчер: назначить пилота'),
-                            ),
+
                         ],
                       ),
                     ),
@@ -94,6 +88,16 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                         ))),
                       icon: const Icon(Icons.person_outline),
                       label: const Text('Пассажир'),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      key: const Key('open-dispatcher-preview'),
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => DemoDispatcherCabinet(
+                          tripStore: _trip,
+                        ))),
+                      icon: const Icon(Icons.support_agent),
+                      label: const Text('Кабинет диспетчера · демо'),
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(

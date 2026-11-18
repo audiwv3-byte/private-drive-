@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -239,7 +241,7 @@ class _GoldPilotArrowPainter extends CustomPainter {
     canvas.drawCircle(center, size.shortestSide * 0.36,
         Paint()..color = const Color(0xFF15191E));
 
-    final arrow = Path()
+    final arrow = ui.Path()
       ..moveTo(size.width * 0.50, size.height * 0.10)
       ..lineTo(size.width * 0.81, size.height * 0.81)
       ..lineTo(size.width * 0.50, size.height * 0.64)

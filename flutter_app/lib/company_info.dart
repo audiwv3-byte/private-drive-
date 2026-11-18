@@ -65,13 +65,12 @@ class CompanyInfoPage extends StatelessWidget {
               onTap: () => _launch(context, Uri(
                 scheme: 'mailto', path: 'eurobaltictransfer@gmail.com')),
             ),
-            ListTile(
-              key: const Key('company-telegram-support'),
-              leading: const Icon(Icons.chat_outlined),
-              title: const Text('@EuroBalticTransferBot'),
-              subtitle: const Text('Связь через Telegram-бота'),
-              onTap: () => _launch(context,
-                Uri.parse('https://t.me/EuroBalticTransferBot')),
+            const ListTile(
+              key: Key('company-telegram-support'),
+              leading: Icon(Icons.forum_outlined),
+              title: Text('Чат PRIVATE DRIVE'),
+              subtitle: Text('Ссылка группового чата ещё не подтверждена · '
+                'временная связь через email и Telegram-канал'),
             ),
             ListTile(
               key: const Key('company-telegram-channel'),
@@ -81,8 +80,7 @@ class CompanyInfoPage extends StatelessWidget {
               onTap: () => _launch(context,
                 Uri.parse('https://t.me/PrivateDriveTransfer')),
             ),
-            _paragraph('Ссылка на отдельный групповой чат PRIVATE DRIVE '
-              'ещё не подтверждена. Непроверенная ссылка не публикуется.'),
+
             ListTile(
               key: const Key('company-website'),
               leading: const Icon(Icons.language),
@@ -115,7 +113,8 @@ class CompanyInfoPage extends StatelessWidget {
               'подтверждения заявки уполномоченным диспетчером '
               'и принятия назначенным пилотом.'),
             _paragraph('4. Контактная поддержка: '
-              'eurobaltictransfer@gmail.com или @EuroBalticTransferBot.'),
+              'eurobaltictransfer@gmail.com. Ссылка на групповой чат '
+              'PRIVATE DRIVE будет добавлена после подтверждения.'),
             _paragraph('5. Условия возврата, ответственность сторон, '
               'порядок претензий и обязательная потребительская '
               'информация должны быть дополнены и юридически '

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'passenger_demo.dart';
 import 'pilot_cabin.dart';
+import 'pilot_passenger_chat_demo.dart';
 import 'demo_trip_store.dart';
 import 'remote_sync_demo.dart';
 export 'passenger_demo.dart' show PassengerDemo;
@@ -151,6 +152,45 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _position;
   LatLng? _displayPosition;
   double _headingDegrees = 0;
+  final List<String> _demoChatMessages = <String>[];
+  bool get _hasAssignedPassenger => widget.tripStore != null &&
+      (widget.tripStore!.status == DemoTripStatus.assigned ||
+       widget.tripStore!.status == DemoTripStatus.approaching ||
+       widget.tripStore!.status == DemoTripStatus.underway);
+
+  void _openPassengerChat() {
+    if (!_hasAssignedPassenger) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => PilotPassengerChatDemo(
+        messages: _demoChatMessages,
+        onSend: (text) {
+          if (!_hasAssignedPassenger) return;
+          _demoChatMessages.add(text);
+          if (mounted) setState(() {});
+        },
+      ),
+    ));
+  }
+
+  void _showCallDemo() {
+    if (!_hasAssignedPassenger) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Позвонить пассажиру'),
+        content: const Text(
+          'Это локальная демоверсия. Подтверждённого номера пассажира нет. '
+          'Реальный звонок не выполняется.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Понятно'),
+          ),
+        ],
+      ),
+    );
+  }
   late final AnimationController _cameraAnimation = AnimationController(
     vsync: this, duration: const Duration(milliseconds: 600),
   )..addListener(_animatePosition);
@@ -492,6 +532,36 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                             Text(_tripLabel,
                                 key: const Key('pilot-trip-state')),
                             const SizedBox(height: 10),
+                            if (_hasAssignedPassenger) ...[
+                              const Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text('Связь с пассажиром · демо'),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      key: const Key('pilot-passenger-chat'),
+                                      onPressed: _openPassengerChat,
+                                      icon: const Icon(Icons.chat_bubble_outline),
+                                      label: const Text('Написать'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      key: const Key('pilot-passenger-call'),
+                                      onPressed: _showCallDemo,
+                                      icon: const Icon(Icons.call_outlined),
+                                      label: const Text('Позвонить'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+
                             Row(
                               children: [
                                 Expanded(

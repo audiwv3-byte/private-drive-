@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/demo_interfaces.dart';
@@ -116,6 +117,48 @@ void main() {
     expect(find.byKey(const Key('pilot-center-map')), findsNothing);
     expect(find.text('Администратор'), findsNothing);
     expect(find.text('Диспетчер'), findsNothing);
+  });
+
+  testWidgets('Pilot camera follows successive GPS fixes, including after pan',
+      (tester) async {
+    final positions = StreamController<LatLng>.broadcast(sync: true);
+    final map = MapController();
+    addTearDown(positions.close);
+    addTearDown(map.dispose);
+    await tester.pumpWidget(MaterialApp(
+      home: PilotDemo(
+        positions: positions.stream,
+        mapController: map,
+        loadMapTiles: false,
+      ),
+    ));
+    await tester.tap(find.byKey(const Key('pilot-enable-gps')));
+    await tester.pump();
+
+    const first = LatLng(54.6872, 25.2797);
+    const second = LatLng(54.7002, 25.3007);
+    const third = LatLng(54.7202, 25.3207);
+    positions.add(first);
+    await tester.pump();
+    expect(map.camera.center.latitude, closeTo(first.latitude, 0.0001));
+    expect(map.camera.center.longitude, closeTo(first.longitude, 0.0001));
+
+    // Panning should not silently disable GPS follow on later fixes.
+    await tester.drag(find.byKey(const Key('pilot-map-surface')),
+        const Offset(70, 25));
+    await tester.pumpAndSettle();
+    positions.add(second);
+    await tester.pump();
+    expect(map.camera.center.latitude, closeTo(second.latitude, 0.0001));
+    expect(map.camera.center.longitude, closeTo(second.longitude, 0.0001));
+
+    // Explicit recenter is not a one-time-only follow setting.
+    await tester.tap(find.byKey(const Key('pilot-center-map')));
+    await tester.pump();
+    positions.add(third);
+    await tester.pump();
+    expect(map.camera.center.latitude, closeTo(third.latitude, 0.0001));
+    expect(map.camera.center.longitude, closeTo(third.longitude, 0.0001));
   });
 
 }

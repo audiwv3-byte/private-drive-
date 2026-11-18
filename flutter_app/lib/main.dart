@@ -52,7 +52,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     key: const Key('native-language-switcher'),
     mainAxisAlignment: MainAxisAlignment.end,
     children: [
-      for (final entry in const [('RU', '🇷🇺'), ('LT', '🇱🇹'), ('EN', '🇬🇧')])
+      for (final entry in const [['RU', '🇷🇺'], ['LT', '🇱🇹'], ['EN', '🇬🇧']])
         Padding(
           padding: const EdgeInsets.only(left: 4),
           child: ChoiceChip(
@@ -274,7 +274,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     maxLength: 6,
                     onChanged: (_) => setState(() {}),
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: tr('Код подтверждения',
                         'Patvirtinimo kodas', 'Verification code'),
                       border: OutlineInputBorder(),

@@ -93,6 +93,14 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: PassengerDemo(
       enableMapTiles: false, tripStore: store,
     )));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-pilot-location-status')),
+      160,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
     expect(find.text('Местоположение пилота пока недоступно'),
         findsOneWidget);
     store.setPilotOnline(true);

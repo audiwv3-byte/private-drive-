@@ -191,6 +191,8 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('open-pilot-preview')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('open-pilot-preview')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pilot-power-toggle')), findsOneWidget);

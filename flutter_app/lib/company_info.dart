@@ -65,12 +65,13 @@ class CompanyInfoPage extends StatelessWidget {
               onTap: () => _launch(context, Uri(
                 scheme: 'mailto', path: 'eurobaltictransfer@gmail.com')),
             ),
-            const ListTile(
-              key: Key('company-telegram-support'),
-              leading: Icon(Icons.forum_outlined),
-              title: Text('Чат PRIVATE DRIVE'),
-              subtitle: Text('Ссылка группового чата ещё не подтверждена · '
-                'временная связь через email и Telegram-канал'),
+            ListTile(
+              key: const Key('company-telegram-support'),
+              leading: const Icon(Icons.forum_outlined),
+              title: const Text('Чат поддержки PRIVATE DRIVE'),
+              subtitle: const Text('Telegram @PrivatDraiv · контакт из прежнего Mini App'),
+              onTap: () => _launch(context,
+                Uri.parse('https://t.me/PrivatDraiv')),
             ),
             ListTile(
               key: const Key('company-telegram-channel'),

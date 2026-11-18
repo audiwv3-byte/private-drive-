@@ -28,6 +28,7 @@ void main() {
       services: const [],
     ), isTrue);
     expect(store.assignPilot(), isTrue);
+    expect(store.acceptAssignedPilot(), isTrue);
 
     await tester.pumpWidget(MaterialApp(
       home: PilotDemo(enableMapTiles: false, tripStore: store),
@@ -77,6 +78,7 @@ void main() {
       services: const [],
     );
     store.assignPilot();
+    store.acceptAssignedPilot();
     store.advancePilot();
     store.advancePilot();
     store.advancePilot();

@@ -11,7 +11,14 @@ void main() {
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
     expect(find.byKey(const Key('route-kaunas')), findsOneWidget);
 
-    await tester.ensureVisible(find.byKey(const Key('route-kaunas')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('route-kaunas')),
+      160,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
     await tester.pump();
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();
@@ -78,7 +85,14 @@ void main() {
     await tester.pumpWidget(const MaterialApp(
       home: PassengerDemo(enableMapTiles: false),
     ));
-    await tester.ensureVisible(find.byKey(const Key('route-kaunas')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('route-kaunas')),
+      160,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
     await tester.pump();
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();

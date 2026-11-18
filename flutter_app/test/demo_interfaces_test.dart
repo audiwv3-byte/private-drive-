@@ -142,6 +142,9 @@ void main() {
     await tester.pump();
     expect(map.camera.center.latitude, closeTo(first.latitude, 0.0001));
     expect(map.camera.center.longitude, closeTo(first.longitude, 0.0001));
+    final marker = tester.widget<Icon>(
+        find.byKey(const Key('pilot-location-marker')));
+    expect(marker.color, const Color(0xFF00CCFF));
 
     // Panning should not silently disable GPS follow on later fixes.
     await tester.drag(find.byKey(const Key('pilot-map-surface')),
@@ -149,6 +152,7 @@ void main() {
     await tester.pumpAndSettle();
     positions.add(second);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 650));
     expect(map.camera.center.latitude, closeTo(second.latitude, 0.0001));
     expect(map.camera.center.longitude, closeTo(second.longitude, 0.0001));
 
@@ -157,6 +161,7 @@ void main() {
     await tester.pump();
     positions.add(third);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 650));
     expect(map.camera.center.latitude, closeTo(third.latitude, 0.0001));
     expect(map.camera.center.longitude, closeTo(third.longitude, 0.0001));
   });

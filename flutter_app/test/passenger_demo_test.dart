@@ -13,8 +13,6 @@ void main() {
 
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();
-    expect(find.text('Предварительная стоимость: 130 €'), findsOneWidget);
-    expect(find.byKey(const Key('passenger-price-preview')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-to')),
       180,
@@ -80,6 +78,10 @@ void main() {
     ));
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-price-preview')), 220,
+      scrollable: find.byKey(const Key('passenger-form')),
+    );
     expect(find.text('Предварительная стоимость: 130 €'), findsOneWidget);
 
     await tester.scrollUntilVisible(
@@ -91,11 +93,19 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('service-meet-sign')));
     await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-price-preview')), 220,
+      scrollable: find.byKey(const Key('passenger-form')),
+    );
     expect(find.text('Предварительная стоимость: 145 €'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('service-pets')));
     await tester.tap(find.byKey(const Key('service-pets')));
     await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-price-preview')), 220,
+      scrollable: find.byKey(const Key('passenger-form')),
+    );
     expect(find.textContaining('Стоимость по запросу'), findsOneWidget);
   });
 

@@ -30,9 +30,10 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
     if (trip == null) return null;
     final from = trip.from.trim().toLowerCase();
     final to = trip.to.trim().toLowerCase();
-    if ((from == 'вильнюс' && to == 'каунас') ||
-        (from == 'каунас' && to == 'вильнюс')) {
-      return 130 + (trip.services.contains('Встреча с табличкой') ? 15 : 0);
+    if (trip.rideType == 'Трансфер' &&
+        from == 'вильнюс' && to == 'каунас') {
+      return (trip.roundTrip ? 190 : 130) +
+          (trip.services.contains('Встреча с табличкой') ? 15 : 0);
     }
     return null;
   }
@@ -149,7 +150,7 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text('${trip.from} → ${trip.to}',
+                            Text('${trip.rideType} · ${trip.from} → ${trip.to}',
                               key: const Key('pilot-global-route'),
                               textAlign: TextAlign.center,
                               style: const TextStyle(

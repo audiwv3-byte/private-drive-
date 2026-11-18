@@ -1,5 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/main.dart';
 import 'package:private_drive/brand_logo.dart';
@@ -7,16 +7,24 @@ import 'package:private_drive/brand_logo.dart';
 void main() {
   testWidgets('Approved PD logo and upgraded version are visible on startup',
       (tester) async {
-    final bytes = base64Decode(privateDriveLogoBase64);
-    expect(bytes.length, greaterThan(3000));
+    final asset = await rootBundle.load(privateDriveLogoAsset);
+    final bytes = asset.buffer.asUint8List();
+    expect(bytes.length, greaterThan(1000000),
+        reason: 'Lossless official 1254px logo must not be downsampled.');
     expect(String.fromCharCodes(bytes.sublist(0, 4)), 'RIFF');
     expect(String.fromCharCodes(bytes.sublist(8, 12)), 'WEBP');
+    expect(String.fromCharCodes(bytes.sublist(12, 16)), 'VP8L');
+    final width = 1 + ((bytes[21] | (bytes[22] << 8)) & 0x3fff);
+    final height = 1 +
+        (((bytes[22] >> 6) | (bytes[23] << 2) | (bytes[24] << 10)) & 0x3fff);
+    expect(width, 1254);
+    expect(height, 1254);
 
     await tester.pumpWidget(const PrivateDriveApp());
     expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
     expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
-    expect(find.textContaining('0.2.0'), findsOneWidget);
-    expect(find.textContaining('20261118'), findsOneWidget);
+    expect(find.textContaining('0.2.1'), findsOneWidget);
+    expect(find.textContaining('2026111801'), findsOneWidget);
     expect(find.byIcon(Icons.local_taxi_outlined), findsNothing);
   });
 

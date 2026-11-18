@@ -160,7 +160,14 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('route-kaunas')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('route-kaunas')),
+      160,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
     await tester.pump();
     await tester.tap(find.byKey(const Key('route-kaunas')));
     await tester.pump();

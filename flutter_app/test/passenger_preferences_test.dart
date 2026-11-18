@@ -7,12 +7,17 @@ import 'package:private_drive/passenger_preferences_storage.dart';
 
 class MemoryPassengerPreferences implements PassengerPreferencesStorage {
   String? saved;
+  bool failNextWrite = false;
 
   @override
   Future<String?> read() async => saved;
 
   @override
   Future<void> write(String json) async {
+    if (failNextWrite) {
+      failNextWrite = false;
+      throw StateError('Simulated unavailable local storage');
+    }
     saved = json;
   }
 }
@@ -106,6 +111,31 @@ void main() {
     expect(jsonDecode(storage.saved!)['radio'], 'M-1 · 106,8 FM');
     expect(jsonDecode(storage.saved!)['temperature'], 22.0);
     expect(jsonDecode(storage.saved!)['flowers'], isTrue);
+    expect(jsonDecode(storage.saved!)['coffee'], isTrue);
+    expect(jsonDecode(storage.saved!)['water'], isTrue);
+  });
+
+  testWidgets('A failed local write is retried on a later edit',
+      (tester) async {
+    final storage = MemoryPassengerPreferences()..failNextWrite = true;
+    await tester.pumpWidget(MaterialApp(
+      home: PassengerDemo(
+        enableMapTiles: false, preferencesStorage: storage),
+    ));
+    await tester.pumpAndSettle();
+    final list = find.descendant(
+      of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable),
+    ).first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('service-coffee')), 180, scrollable: list);
+    tester.widget<CheckboxListTile>(find.byKey(const Key('service-coffee')))
+        .onChanged!(true);
+    await tester.pumpAndSettle();
+    expect(storage.saved, isNull);
+    tester.widget<CheckboxListTile>(find.byKey(const Key('service-water')))
+        .onChanged!(true);
+    await tester.pumpAndSettle();
     expect(jsonDecode(storage.saved!)['coffee'], isTrue);
     expect(jsonDecode(storage.saved!)['water'], isTrue);
   });

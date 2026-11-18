@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
 import 'company_info.dart';
+import 'passenger_orders_demo.dart';
+import 'dart:math' as math;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
@@ -191,9 +193,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
   }
 
   int? get _pricePreview {
-    final base = _fixedPrice;
-    if (base == null || _pets || _soberDriver) return null;
-    return base + (_meetSign ? 15 : 0);
+    if (_pets || _soberDriver) return null;
+    final fixed = _fixedPrice;
+    if (fixed != null) return fixed + (_meetSign ? 15 : 0);
+    final km = _routeKm;
+    if (km == null || !km.isFinite || km <= 0) return null;
+    // Indicative formula from legacy Euro_Baltic_Transfer.py defaults:
+    // BASE_FARE=8, RATE_PER_KM=0.9, MIN_FARE=25, ROUNDTRIP_FACTOR=2.
+    // These are defaults, NOT verified live taxi/transfer tariffs.
+    final base = math.max(25.0, 8.0 + 0.9 * km) *
+      (_roundTrip ? 2 : 1);
+    return base.round() + (_meetSign ? 15 : 0);
   }
 
   /// Public routing service is used only for a preview of preset city routes.
@@ -333,6 +343,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
       appBar: AppBar(
         title: const Text('PRIVATE DRIVE · Пассажир'),
         actions: [
+          if (widget.tripStore != null)
+            IconButton(
+              key: const Key('passenger-orders-button'),
+              tooltip: 'Мои заказы',
+              icon: const Icon(Icons.receipt_long_outlined),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => PassengerOrdersDemo(
+                  tripStore: widget.tripStore!))),
+            ),
           IconButton(
             key: const Key('passenger-company-info'),
             tooltip: 'Контакты и документы',
@@ -595,7 +614,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ),
             const SizedBox(height: 12),
             Text(
-              price != null ? 'Предварительная стоимость: $price €'
+              price != null ? (_fixedPrice != null
+                  ? 'Предварительная стоимость: $price €'
+                  : 'Ориентировочная стоимость: $price € · по старой формуле, требует подтверждения')
                   : _fixedPrice != null
                     ? 'Стоимость по запросу: дополнительные услуги требуют расчёта'
                     : 'Стоимость по запросу · фиксированная цена не установлена',
@@ -604,7 +625,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 color: gold, fontWeight: FontWeight.bold, fontSize: 16,
               ),
             ),
-            const Text('Демо-расчёт. Итоговая цена подтверждается до оплаты.',
+            const Text('Демо-расчёт по прежним коэффициентам. '
+              'Окончательная цена назначается диспетчером до оплаты.',
               style: TextStyle(fontSize: 12)),
             const SizedBox(height: 12),
             Text(
@@ -615,6 +637,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
             if (widget.tripStore != null) ...[
               Text(widget.tripStore!.statusLabel,
                   key: const Key('passenger-trip-status')),
+              if (widget.tripStore!.trip != null)
+                FilledButton.icon(
+                  key: const Key('passenger-manage-order'),
+                  onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => PassengerOrdersDemo(
+                      tripStore: widget.tripStore!))),
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('Управление заказом · сообщения'),
+                ),
               DemoRatingPanel(tripStore: widget.tripStore!),
             ],
             FilledButton(

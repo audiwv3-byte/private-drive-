@@ -26,6 +26,45 @@ jobs:
         run: |
           flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
           cp -R flutter_app/lib/. private_drive_build/lib/
+          # Decode the approved logo from the source tree; no external network.
+          python3 - <<'PY'
+          import base64
+          from pathlib import Path
+          import re
+          source = Path("flutter_app/lib/brand_logo.dart").read_text()
+          match = re.search(r"const privateDriveLogoBase64 = '([A-Za-z0-9+/=]+)';", source)
+          assert match, "approved logo asset is missing"
+          data = base64.b64decode(match.group(1), validate=True)
+          assert data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+          android = Path("private_drive_build/android/app/src/main")
+          drawable = android / "res/drawable-nodpi"
+          drawable.mkdir(parents=True, exist_ok=True)
+          (drawable / "private_drive_logo.webp").write_bytes(data)
+          # The Flutter entry screen uses exactly the same approved image.
+          assert len(data) >= 3000
+          launch = """<?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/black" />
+              <item>
+                  <bitmap android:gravity="center" android:src="@drawable/private_drive_logo" />
+              </item>
+          </layer-list>
+          """
+          for dirname in ("drawable", "drawable-v21"):
+              folder = android / f"res/{dirname}"
+              folder.mkdir(parents=True, exist_ok=True)
+              (folder / "launch_background.xml").write_text(launch)
+          manifest = android / "AndroidManifest.xml"
+          text = manifest.read_text()
+          assert 'android:icon="@mipmap/ic_launcher"' in text
+          text = text.replace('android:icon="@mipmap/ic_launcher"',
+                              'android:icon="@drawable/private_drive_logo"')
+          text = text.replace('android:label="private_drive"',
+                              'android:label="PRIVATE DRIVE"')
+          manifest.write_text(text)
+          assert '@drawable/private_drive_logo' in manifest.read_text()
+          print(f"Brand asset verified ({len(data)} bytes), Android icon and splash replaced")
+          PY
           cp -R flutter_app/test/. private_drive_build/test/
           cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
           cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
@@ -49,6 +88,19 @@ jobs:
           flutter analyze --no-fatal-infos
           flutter test
           flutter build apk --debug
+          # Prove that versionCode and logo shipped inside this exact APK.
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import subprocess
+          apk = Path("build/app/outputs/flutter-apk/app-debug.apk")
+          assert apk.is_file() and apk.stat().st_size > 1000000
+          with ZipFile(apk) as z:
+              entries = z.namelist()
+              assert any("private_drive_logo" in name and name.endswith(".webp") for name in entries), "brand logo missing from APK"
+          info = subprocess.check_output(["flutter", "--version"], text=True).strip().splitlines()[0]
+          print("Verified branded APK:", apk.stat().st_size, "bytes", info)
+          PY
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:

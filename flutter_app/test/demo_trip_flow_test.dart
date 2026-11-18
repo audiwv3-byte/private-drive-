@@ -4,6 +4,59 @@ import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/demo_trip_store.dart';
 
 void main() {
+  testWidgets('Pickup map shows a city-centre hint, never an invented address',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    expect(store.create(
+      from: 'Вильнюс', to: 'Каунас',
+      paymentMethod: 'Карта',
+      departure: DateTime(2026, 11, 18),
+      services: const [],
+    ), isTrue);
+    expect(store.assignPilot(), isTrue);
+    expect(store.acceptAssignedPilot(), isTrue);
+    await tester.pumpWidget(MaterialApp(
+      home: PilotDemo(
+        enableMapTiles: true,
+        loadMapTiles: false,
+        tripStore: store,
+      ),
+    ));
+    expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsNothing);
+    await tester.tap(find.byKey(const Key('pilot-next-trip')));
+    await tester.pump();
+    expect(store.status, DemoTripStatus.approaching);
+    expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsOneWidget);
+    expect(find.text('Подача: Вильнюс'), findsOneWidget);
+    expect(find.textContaining('точный адрес подачи не указан'), findsOneWidget);
+  });
+
+  testWidgets('Unknown pickup address shows warning, no fictitious marker',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    expect(store.create(
+      from: 'Пример улицы 123', to: 'Каунас',
+      paymentMethod: 'Карта',
+      departure: DateTime(2026, 11, 18),
+      services: const [],
+    ), isTrue);
+    expect(store.assignPilot(), isTrue);
+    expect(store.acceptAssignedPilot(), isTrue);
+    await tester.pumpWidget(MaterialApp(
+      home: PilotDemo(
+        enableMapTiles: true,
+        loadMapTiles: false,
+        tripStore: store,
+      ),
+    ));
+    await tester.tap(find.byKey(const Key('pilot-next-trip')));
+    await tester.pump();
+    expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsNothing);
+    expect(find.textContaining('требуется геокодирование адреса'), findsOneWidget);
+  });
+
   test('Local trip state transitions require explicit assignment and valid route', () {
     final store = DemoTripStore();
     addTearDown(store.dispose);

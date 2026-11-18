@@ -68,8 +68,10 @@ class _DemoRatingPanelState extends State<DemoRatingPanel> {
           FilledButton(
             key: const Key('passenger-submit-rating'),
             onPressed: _tripStars > 0 && _serviceStars > 0
-              ? () => store.rateFinishedTrip(
-                  tripStars: _tripStars, serviceStars: _serviceStars)
+              ? () => setState(() {
+                  store.rateFinishedTrip(
+                    tripStars: _tripStars, serviceStars: _serviceStars);
+                })
               : null,
             child: const Text('Отправить оценку · демо'),
           ),

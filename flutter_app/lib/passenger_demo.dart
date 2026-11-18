@@ -244,8 +244,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: widget.enableMapTiles
-                    ? FlutterMap(
-                        key: ValueKey('passenger-map-${_from.text}-${_to.text}'),
+                    ? KeyedSubtree(
+                        key: ValueKey('passenger-route-map-${_from.text}-${_to.text}'),
+                        child: FlutterMap(
+                        key: const Key('passenger-map'),
                         options: MapOptions(
                           initialCenter: startMap,
                           initialZoom: mapZoom,
@@ -273,6 +275,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             ],
                           ),
                         ],
+                        ),
                       )
                     : const ColoredBox(
                         key: Key('passenger-map'),

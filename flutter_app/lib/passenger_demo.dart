@@ -206,7 +206,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   }
 
   int? get _pricePreview {
-    if (_pets || _soberDriver || _flowers || _coffee) return null;
+    if (_pets || _soberDriver || _flowers || _coffee || _water) return null;
     final fixed = _fixedPrice;
     if (fixed != null) return fixed + (_meetSign ? 15 : 0);
     final km = _routeKm;

@@ -133,6 +133,7 @@ class PilotDemo extends StatefulWidget {
     this.mapController,
     this.loadMapTiles = true,
     this.onIncomingSound,
+    this.showAssignedOffer = true,
   });
 
   final bool enableMapTiles;
@@ -145,6 +146,8 @@ class PilotDemo extends StatefulWidget {
   final bool loadMapTiles;
   /// Test hook; production demo uses a local device notification sound.
   final VoidCallback? onIncomingSound;
+  /// The premium cockpit renders this offer in the root overlay instead.
+  final bool showAssignedOffer;
 
   @override
   State<PilotDemo> createState() => _PilotDemoState();
@@ -598,7 +601,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           children: [
                             Text(_tripLabel,
                                 key: const Key('pilot-trip-state')),
-                            if (widget.tripStore?.status == DemoTripStatus.assigned &&
+                            if (widget.showAssignedOffer &&
+                                widget.tripStore?.status == DemoTripStatus.assigned &&
                                 widget.tripStore?.pilotAccepted == false)
                               Container(
                                 key: const Key('pilot-assigned-offer'),

@@ -27,6 +27,7 @@ class PassengerDemo extends StatefulWidget {
 class _PassengerDemoState extends State<PassengerDemo> {
   final _from = TextEditingController();
   final _to = TextEditingController();
+  final _tripWishes = TextEditingController();
   DateTime? _date;
   TimeOfDay? _time;
   String _route = '';
@@ -163,6 +164,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
         if (_music) 'Музыка в дорогу',
         if (_flowers) 'Цветы',
         if (_coffee) 'Кофе',
+        if (_tripWishes.text.trim().isNotEmpty)
+          'Пожелания пассажира: ${_tripWishes.text.trim()}',
       ],
     );
   }
@@ -310,6 +313,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _addressTimer?.cancel();
     _from.dispose();
     _to.dispose();
+    _tripWishes.dispose();
     super.dispose();
   }
 
@@ -626,6 +630,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 title: const Text('Кофе · стоимость по запросу'),
                 value: _coffee,
                 onChanged: (v) => setState(() => _coffee = v ?? false),
+              ),
+              TextField(
+                key: const Key('passenger-trip-wishes'),
+                controller: _tripWishes,
+                maxLength: 500,
+                maxLines: 3,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Другие пожелания к поездке',
+                  hintText: 'Например, вода без газа, тишина или помощь с багажом',
+                  border: OutlineInputBorder(),
+                ),
               ),
                 ],
               ),

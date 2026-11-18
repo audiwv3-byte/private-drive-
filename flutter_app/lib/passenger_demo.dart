@@ -86,6 +86,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     'Каунас': LatLng(54.8985, 23.9036),
     'Клайпеда': LatLng(55.7033, 21.1443),
     'Паланга': LatLng(55.9175, 21.0686),
+    'Тракай': LatLng(54.6389, 24.9342),
     'Варшава': LatLng(52.2297, 21.0122),
     'Аэропорт Вильнюса': LatLng(54.6341, 25.2858),
   };
@@ -284,7 +285,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
               const Text(
                 'Фиксированный трансфер Вильнюс → Каунас: '
                 '130 € в одну сторону, 190 € туда и обратно. '
-                'Другие направления — цена по запросу. '
+                'Клайпеда, Варшава, Тракай и Паланга — цена по запросу, '
+                'до подтверждения заявки. '
                 'Без промежуточных остановок.',
                 key: Key('passenger-transfer-tariffs'),
                 style: TextStyle(fontSize: 12),
@@ -366,6 +368,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   key: const Key('route-warsaw'),
                   label: const Text('Вильнюс — Варшава'),
                   onPressed: () => _chooseRoute('Вильнюс — Варшава', 'Вильнюс', 'Варшава'),
+                ),
+                ActionChip(
+                  key: const Key('route-klaipeda'),
+                  label: const Text('Вильнюс — Клайпеда'),
+                  onPressed: () => _chooseRoute(
+                    'Вильнюс — Клайпеда', 'Вильнюс', 'Клайпеда'),
+                ),
+                ActionChip(
+                  key: const Key('route-trakai'),
+                  label: const Text('Вильнюс — Тракай'),
+                  onPressed: () => _chooseRoute(
+                    'Вильнюс — Тракай', 'Вильнюс', 'Тракай'),
                 ),
                 ActionChip(
                   key: const Key('route-palanga'),

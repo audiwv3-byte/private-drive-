@@ -26,9 +26,55 @@ class DemoTripStore extends ChangeNotifier {
   bool _paused = false;
   bool _pilotAccepted = false;
   bool _disposed = false;
+  bool _pilotOnline = false;
+  double? _pilotLatitude;
+  double? _pilotLongitude;
+  DateTime? _pilotLastSeen;
+  int? _tripRating;
+  int? _serviceRating;
   final List<String> _pilotChatMessages = <String>[];
 
   DemoTrip? get trip => _trip;
+  bool get pilotOnline => _pilotOnline;
+  double? get pilotLatitude => _pilotLatitude;
+  double? get pilotLongitude => _pilotLongitude;
+  DateTime? get pilotLastSeen => _pilotLastSeen;
+  int? get tripRating => _tripRating;
+  int? get serviceRating => _serviceRating;
+
+  /// Session-local state. Never invent extra pilots or publish GPS to a server.
+  void setPilotOnline(bool value) {
+    if (_disposed || _pilotOnline == value) return;
+    _pilotOnline = value;
+    if (!value) {
+      _pilotLatitude = null;
+      _pilotLongitude = null;
+      _pilotLastSeen = null;
+    }
+    notifyListeners();
+  }
+
+  void updatePilotLocation(double latitude, double longitude) {
+    if (_disposed || !_pilotOnline ||
+        !latitude.isFinite || !longitude.isFinite ||
+        latitude.abs() > 90 || longitude.abs() > 180) return;
+    _pilotLatitude = latitude;
+    _pilotLongitude = longitude;
+    _pilotLastSeen = DateTime.now();
+    notifyListeners();
+  }
+
+  bool rateFinishedTrip({required int tripStars, required int serviceStars}) {
+    if (_disposed || _status != DemoTripStatus.finished ||
+        _trip == null || _tripRating != null || _serviceRating != null ||
+        tripStars < 1 || tripStars > 5 ||
+        serviceStars < 1 || serviceStars > 5) return false;
+    _tripRating = tripStars;
+    _serviceRating = serviceStars;
+    notifyListeners();
+    return true;
+  }
+
   List<String> get pilotChatMessages => List.unmodifiable(_pilotChatMessages);
 
   bool addPilotChatMessage(String value) {
@@ -84,6 +130,8 @@ class DemoTripStore extends ChangeNotifier {
     _pilotChatMessages.clear();
     _paused = false;
     _pilotAccepted = false;
+    _tripRating = null;
+    _serviceRating = null;
     notifyListeners();
     return true;
   }

@@ -180,9 +180,10 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   }
 
   bool get _hasAssignedPassenger => widget.tripStore != null &&
-      (widget.tripStore!.status == DemoTripStatus.assigned ||
+      (widget.tripStore!.pilotAccepted &&
+       (widget.tripStore!.status == DemoTripStatus.assigned ||
        widget.tripStore!.status == DemoTripStatus.approaching ||
-       widget.tripStore!.status == DemoTripStatus.underway);
+       widget.tripStore!.status == DemoTripStatus.underway));
 
   void _openPassengerChat() {
     if (!_hasAssignedPassenger) return;
@@ -256,7 +257,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     final store = widget.tripStore;
     if (store == null) return !paused;
     return !store.paused &&
-      (store.status == DemoTripStatus.assigned ||
+      ((store.status == DemoTripStatus.assigned && store.pilotAccepted) ||
        store.status == DemoTripStatus.approaching ||
        store.status == DemoTripStatus.underway);
   }
@@ -556,6 +557,51 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           children: [
                             Text(_tripLabel,
                                 key: const Key('pilot-trip-state')),
+                            if (widget.tripStore?.status == DemoTripStatus.assigned &&
+                                widget.tripStore?.pilotAccepted == false)
+                              Container(
+                                key: const Key('pilot-assigned-offer'),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF22252A),
+                                  border: Border.all(color: const Color(0xFFDDC184)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Новый назначенный заказ · демо',
+                                      style: TextStyle(
+                                        color: Color(0xFFDDC184),
+                                        fontWeight: FontWeight.bold,
+                                      )),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${widget.tripStore!.trip!.from} → ${widget.tripStore!.trip!.to}',
+                                      key: const Key('pilot-assigned-route'),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(children: [
+                                      Expanded(
+                                        child: FilledButton(
+                                          key: const Key('pilot-accept-assigned'),
+                                          onPressed: widget.tripStore!.acceptAssignedPilot,
+                                          child: const Text('Принять'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          key: const Key('pilot-decline-assigned'),
+                                          onPressed: widget.tripStore!.declineAssignedPilot,
+                                          child: const Text('Отклонить'),
+                                        ),
+                                      ),
+                                    ]),
+                                  ],
+                                ),
+                              ),
                             const SizedBox(height: 10),
                             if (_isUnderway && !_incomingOffer && !_nextAccepted)
                               OutlinedButton.icon(

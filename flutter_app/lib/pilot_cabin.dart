@@ -50,7 +50,16 @@ class _PilotCabinState extends State<PilotCabin> {
   @override
   void initState() {
     super.initState();
+    _onLine = widget.tripStore?.pilotOnline ?? false;
     widget.tripStore?.addListener(_syncOfferSound);
+    if (_onLine) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _openMap();
+          _showCockpitOverlay();
+        }
+      });
+    }
   }
 
   void _syncOfferSound() {
@@ -102,7 +111,7 @@ class _PilotCabinState extends State<PilotCabin> {
   void dispose() {
     widget.tripStore?.removeListener(_syncOfferSound);
     _hideCockpitOverlay();
-    widget.tripStore?.setPilotOnline(false);
+    // Leaving this screen is not the same as ending a shift.
     _offerTone.dispose();
     super.dispose();
   }

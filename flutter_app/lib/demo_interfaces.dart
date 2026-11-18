@@ -764,14 +764,23 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                       child: Transform.rotate(
                         key: const Key('pilot-location-heading'),
                         angle: _headingDegrees * math.pi / 180,
-                        child: const Icon(
-                          Icons.navigation,
-                          key: Key('pilot-location-marker'),
-                          size: 40,
-                          color: Color(0xFF172B3F),
-                          shadows: [
-                            Shadow(color: Colors.black, blurRadius: 9),
-                            Shadow(color: Colors.white, blurRadius: 3),
+                        child: const Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Icon(
+                              Icons.directions_car_filled,
+                              size: 46,
+                              color: Color(0xFFFFDC91),
+                              shadows: [
+                                Shadow(color: Colors.black, blurRadius: 9),
+                              ],
+                            ),
+                            Icon(
+                              Icons.directions_car_filled,
+                              key: Key('pilot-location-marker'),
+                              size: 36,
+                              color: Color(0xFF172B3F),
+                            ),
                           ],
                         ),
                       ),
@@ -823,7 +832,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   ),
                 ),
                 Positioned(
-                  top: 60,
+                  top: 120,
                   left: 12,
                   child: Material(
                     color: const Color(0xE8172535),

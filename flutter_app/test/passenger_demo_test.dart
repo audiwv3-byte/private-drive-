@@ -148,7 +148,9 @@ void main() {
         matching: find.byType(Scrollable),
       ).first,
     );
-    expect(find.textContaining('Стоимость по запросу'), findsOneWidget);
+    expect(find.text('Расчётная часть: 145 € · дополнительные услуги по запросу'),
+        findsOneWidget);
+    expect(find.text('Предварительная стоимость: 145 €'), findsNothing);
   });
 
   testWidgets('Approved Vilnius–Kaunas return transfer costs 200 EUR',
@@ -174,6 +176,65 @@ void main() {
       find.byKey(const Key('passenger-price-preview')), 220, scrollable: list);
     expect(find.text('Предварительная стоимость: 200 €'), findsOneWidget);
     expect(find.text('Предварительная стоимость: 190 €'), findsNothing);
+  });
+
+  testWidgets('Sober driver doubles the base fare and meet sign adds 15 EUR',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PassengerDemo(enableMapTiles: false),
+    ));
+    final list = find.descendant(
+      of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable),
+    ).first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('route-kaunas')), 160, scrollable: list);
+    tester.widget<ActionChip>(find.byKey(const Key('route-kaunas')))
+        .onPressed!();
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('service-sober')), 180, scrollable: list);
+    tester.widget<CheckboxListTile>(find.byKey(const Key('service-sober')))
+        .onChanged!(true);
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-price-preview')), 220, scrollable: list);
+    expect(find.text('Предварительная стоимость: 260 €'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('service-meet-sign')), -180, scrollable: list);
+    tester.widget<CheckboxListTile>(find.byKey(const Key('service-meet-sign')))
+        .onChanged!(true);
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-price-preview')), 220, scrollable: list);
+    expect(find.text('Предварительная стоимость: 275 €'), findsOneWidget);
+  });
+
+  testWidgets('Unpriced coffee keeps approved amount visible, not final',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PassengerDemo(enableMapTiles: false),
+    ));
+    final list = find.descendant(
+      of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable),
+    ).first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('route-airport')), 160, scrollable: list);
+    tester.widget<ActionChip>(find.byKey(const Key('route-airport')))
+        .onPressed!();
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('service-coffee')), 180, scrollable: list);
+    tester.widget<CheckboxListTile>(find.byKey(const Key('service-coffee')))
+        .onChanged!(true);
+    await tester.pump();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-price-preview')), 220, scrollable: list);
+    expect(find.text('Расчётная часть: 40 € · дополнительные услуги по запросу'),
+        findsOneWidget);
+    expect(find.text('Предварительная стоимость: 40 €'), findsNothing);
   });
 
   testWidgets('Changing route clears old fixed transfer fare',

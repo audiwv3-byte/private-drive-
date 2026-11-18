@@ -51,21 +51,15 @@ void main() {
     expect(find.textContaining('сервер авторизации не подключён'), findsOneWidget);
   });
 
-  testWidgets('Phone and email switch without sending OTP', (tester) async {
+  testWidgets('Only phone sign-in is offered and no OTP is sent offline',
+      (tester) async {
     await tester.pumpWidget(const PrivateDriveApp());
     expect(find.text('Телефон в формате +370...'), findsOneWidget);
-
-    await tester.tap(find.text('Email'));
-    await tester.pump();
-
-    expect(find.text('Email'), findsWidgets);
-    expect(find.text('Телефон в формате +370...'), findsNothing);
+    expect(find.text('Email'), findsNothing);
+    expect(find.byType(SegmentedButton<bool>), findsNothing);
     expect(find.text('Получить код'), findsOneWidget);
-    expect(
-      tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Получить код'),
-      ).onPressed,
-      isNull,
-    );
+    expect(tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Получить код'),
+    ).onPressed, isNull);
   });
 }

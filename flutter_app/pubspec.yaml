@@ -63,6 +63,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/private_drive_logo.webp
+    - assets/brand/vilnius_cathedral_user_photo.webp
 
   # To add assets to your application, add an assets section, like this:
   # assets:

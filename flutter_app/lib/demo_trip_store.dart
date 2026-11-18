@@ -25,8 +25,21 @@ class DemoTripStore extends ChangeNotifier {
   DemoTripStatus? _status;
   bool _paused = false;
   bool _disposed = false;
+  final List<String> _pilotChatMessages = <String>[];
 
   DemoTrip? get trip => _trip;
+  List<String> get pilotChatMessages => List.unmodifiable(_pilotChatMessages);
+
+  bool addPilotChatMessage(String value) {
+    final message = value.trim();
+    if (_disposed || message.isEmpty || message.length > 500 ||
+        (_status != DemoTripStatus.assigned &&
+         _status != DemoTripStatus.approaching &&
+         _status != DemoTripStatus.underway)) return false;
+    _pilotChatMessages.add(message);
+    notifyListeners();
+    return true;
+  }
   DemoTripStatus? get status => _status;
   bool get paused => _paused;
   bool get isActive => _status != null && _status != DemoTripStatus.finished;
@@ -63,6 +76,7 @@ class DemoTripStore extends ChangeNotifier {
       services: List.unmodifiable(services),
     );
     _status = DemoTripStatus.requested;
+    _pilotChatMessages.clear();
     _paused = false;
     notifyListeners();
     return true;

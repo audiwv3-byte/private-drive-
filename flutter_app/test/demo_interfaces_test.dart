@@ -57,6 +57,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: PilotDemo(enableMapTiles: false)));
     expect(find.byKey(const Key('pilot-map-surface')), findsOneWidget);
     expect(find.text('GPS выключен'), findsOneWidget);
+    expect(find.byKey(const Key('pilot-open-waze')), findsOneWidget);
+    expect(find.text('Waze'), findsOneWidget);
     expect(find.text('Нет активной поездки'), findsOneWidget);
     expect(find.text('К пассажиру'), findsOneWidget);
     expect(find.text('Откуда'), findsNothing);

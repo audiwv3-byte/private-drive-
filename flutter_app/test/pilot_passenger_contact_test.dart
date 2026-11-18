@@ -51,12 +51,18 @@ void main() {
     await tester.tap(find.byKey(const Key('pilot-chat-send')));
     await tester.pump();
     expect(find.text('Жду у входа'), findsOneWidget);
+    expect(store.pilotChatMessages, contains('Жду у входа'));
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(PilotPassengerChatDemo), findsNothing);
     expect(find.byKey(const Key('pilot-passenger-chat')), findsOneWidget);
+    expect(store.pilotChatMessages, contains('Жду у входа'));
     await tester.tap(find.byKey(const Key('pilot-passenger-chat')));
     await tester.pumpAndSettle();
+    expect(find.byType(PilotPassengerChatDemo), findsOneWidget);
+    expect(tester.widget<PilotPassengerChatDemo>(
+      find.byType(PilotPassengerChatDemo),
+    ).messages, contains('Жду у входа'));
     expect(find.text('Жду у входа'), findsOneWidget);
   });
 

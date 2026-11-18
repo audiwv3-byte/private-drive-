@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'passenger_demo.dart';
 import 'pilot_cabin.dart';
 import 'pilot_passenger_chat_demo.dart';
@@ -130,6 +131,7 @@ class PilotDemo extends StatefulWidget {
     this.tripStore,
     this.mapController,
     this.loadMapTiles = true,
+    this.onIncomingSound,
   });
 
   final bool enableMapTiles;
@@ -140,6 +142,8 @@ class PilotDemo extends StatefulWidget {
   final MapController? mapController;
   /// Avoid network requests when exercising the real map camera in widget tests.
   final bool loadMapTiles;
+  /// Test hook; production demo uses a local device notification sound.
+  final VoidCallback? onIncomingSound;
 
   @override
   State<PilotDemo> createState() => _PilotDemoState();
@@ -153,6 +157,29 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _displayPosition;
   double _headingDegrees = 0;
   final List<String> _demoChatMessages = <String>[];
+  bool _incomingOffer = false;
+  bool _nextAccepted = false;
+
+  bool get _isUnderway => widget.tripStore?.status == DemoTripStatus.underway;
+
+  void _simulateNewOffer() {
+    if (!_isUnderway || _incomingOffer || _nextAccepted) return;
+    setState(() => _incomingOffer = true);
+    if (widget.onIncomingSound != null) {
+      widget.onIncomingSound!();
+    } else {
+      SystemSound.play(SystemSoundType.alert);
+    }
+  }
+
+  void _respondToOffer(bool accept) {
+    if (!_isUnderway || !_incomingOffer) return;
+    setState(() {
+      _incomingOffer = false;
+      if (accept) _nextAccepted = true;
+    });
+  }
+
   bool get _hasAssignedPassenger => widget.tripStore != null &&
       (widget.tripStore!.status == DemoTripStatus.assigned ||
        widget.tripStore!.status == DemoTripStatus.approaching ||
@@ -531,6 +558,69 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           children: [
                             Text(_tripLabel,
                                 key: const Key('pilot-trip-state')),
+                            const SizedBox(height: 10),
+                            if (_isUnderway && !_incomingOffer && !_nextAccepted)
+                              OutlinedButton.icon(
+                                key: const Key('pilot-simulate-offer'),
+                                onPressed: _simulateNewOffer,
+                                icon: const Icon(Icons.notifications_active_outlined),
+                                label: const Text('Сымитировать новый заказ'),
+                              ),
+                            if (_isUnderway && _incomingOffer)
+                              Container(
+                                key: const Key('pilot-next-offer'),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF232323),
+                                  border: Border.all(color: const Color(0xFFDDC184)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      'Новый заказ · демо',
+                                      style: TextStyle(
+                                        color: Color(0xFFDDC184),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const Text('Вильнюс → Аэропорт Вильнюса'),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: FilledButton(
+                                            key: const Key('pilot-accept-next'),
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor: const Color(0xFF15844B),
+                                            ),
+                                            onPressed: () => _respondToOffer(true),
+                                            child: const Text('Принять следующий'),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            key: const Key('pilot-decline-next'),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor: const Color(0xFFFF6972),
+                                            ),
+                                            onPressed: () => _respondToOffer(false),
+                                            child: const Text('Пропустить'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (_nextAccepted)
+                              const Text(
+                                'Следующий заказ принят · демо',
+                                key: Key('pilot-next-queued-status'),
+                                style: TextStyle(color: Color(0xFF34E88A)),
+                              ),
                             const SizedBox(height: 10),
                             if (_hasAssignedPassenger) ...[
                               const Align(

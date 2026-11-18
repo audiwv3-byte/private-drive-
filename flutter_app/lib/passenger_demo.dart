@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -27,6 +30,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _pets = false;
   bool _soberDriver = false;
   bool _music = false;
+  List<LatLng> _roadPoints = const [];
+  bool _routeLoading = false;
+  String _routeInfo = '';
+  int _routeRequest = 0;
 
 
   @override
@@ -77,12 +84,90 @@ class _PassengerDemoState extends State<PassengerDemo> {
     'Аэропорт Вильнюса': LatLng(54.6341, 25.2858),
   };
 
+  /// Only an agreed fixed price is shown. Other routes remain quote-only.
+  int? get _fixedPrice {
+    final a = _from.text.trim().toLowerCase();
+    final b = _to.text.trim().toLowerCase();
+    if ((a == 'вильнюс' && b == 'каунас') ||
+        (a == 'каунас' && b == 'вильнюс')) return 130;
+    return null;
+  }
+
+  int? get _pricePreview {
+    final base = _fixedPrice;
+    if (base == null || _pets || _soberDriver) return null;
+    return base + (_meetSign ? 15 : 0);
+  }
+
+  /// Public routing service is used only for a preview of preset city routes.
+  /// Failure is displayed explicitly; never pretend a straight line is a road.
+  Future<void> _updateRoadPreview() async {
+    final request = ++_routeRequest;
+    final start = _places[_from.text.trim()];
+    final finish = _places[_to.text.trim()];
+    if (start == null || finish == null || !widget.enableMapTiles) {
+      if (mounted) setState(() {
+        _roadPoints = const [];
+        _routeLoading = false;
+        _routeInfo = start == null || finish == null
+            ? 'Для своего адреса требуется подключение поиска адресов.'
+            : '';
+      });
+      return;
+    }
+    setState(() {
+      _routeLoading = true;
+      _roadPoints = const [];
+      _routeInfo = 'Построение дорожного маршрута · демо…';
+    });
+    HttpClient? client;
+    try {
+      client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
+      final uri = Uri.https('router.project-osrm.org',
+          '/route/v1/driving/${start.longitude},${start.latitude};${finish.longitude},${finish.latitude}',
+          {'overview': 'full', 'geometries': 'geojson'});
+      final response = await (await client.getUrl(uri).timeout(
+        const Duration(seconds: 8))).close().timeout(
+        const Duration(seconds: 8));
+      if (response.statusCode != 200) throw const HttpException('Routing unavailable');
+      final decoded = jsonDecode(await utf8.decoder.bind(response).join()
+          .timeout(const Duration(seconds: 8))) as Map<String, dynamic>;
+      final routes = decoded['routes'] as List<dynamic>?;
+      if (routes == null || routes.isEmpty) throw const FormatException('No road route');
+      final route = routes.first as Map<String, dynamic>;
+      final coordinates = (route['geometry'] as Map<String, dynamic>)['coordinates']
+          as List<dynamic>;
+      final points = coordinates.map((raw) {
+        final p = raw as List<dynamic>;
+        return LatLng((p[1] as num).toDouble(), (p[0] as num).toDouble());
+      }).toList(growable: false);
+      if (points.length < 2) throw const FormatException('Empty road route');
+      if (!mounted || request != _routeRequest) return;
+      setState(() {
+        _roadPoints = points;
+        _routeLoading = false;
+        final km = ((route['distance'] as num).toDouble() / 1000).round();
+        _routeInfo = 'Дорожный маршрут · около $km км · демо';
+      });
+    } catch (_) {
+      if (!mounted || request != _routeRequest) return;
+      setState(() {
+        _roadPoints = const [];
+        _routeLoading = false;
+        _routeInfo = 'Дорожный маршрут временно недоступен.';
+      });
+    } finally {
+      client?.close(force: true);
+    }
+  }
+
   void _chooseRoute(String route, String from, String to) {
     setState(() {
       _route = route;
       _from.text = from;
       _to.text = to;
     });
+    _updateRoadPreview();
   }
 
   Future<void> _pickDate() async {
@@ -107,6 +192,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   @override
   void dispose() {
     widget.tripStore?.removeListener(_onTripChanged);
+    _routeRequest++;
     _from.dispose();
     _to.dispose();
     super.dispose();
@@ -117,6 +203,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
     const gold = Color(0xFFDDC184);
     final start = _places[_from.text.trim()];
     final finish = _places[_to.text.trim()];
+    final price = _pricePreview;
+    final startMap = start != null && finish != null
+        ? LatLng((start.latitude + finish.latitude) / 2,
+            (start.longitude + finish.longitude) / 2)
+        : start ?? const LatLng(54.6872, 25.2797);
+    final mapZoom = start != null && finish != null
+        ? (start.longitude - finish.longitude).abs() > 2 ? 6.3 : 8.2
+        : 10.0;
     final mapMarkers = <Marker>[
       if (start != null)
         Marker(
@@ -151,16 +245,27 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 borderRadius: BorderRadius.circular(12),
                 child: widget.enableMapTiles
                     ? FlutterMap(
-                        key: const Key('passenger-map'),
-                        options: const MapOptions(
-                          initialCenter: LatLng(54.6872, 25.2797),
-                          initialZoom: 10,
+                        key: ValueKey('passenger-map-${_from.text}-${_to.text}'),
+                        options: MapOptions(
+                          initialCenter: startMap,
+                          initialZoom: mapZoom,
                         ),
                         children: [
                           TileLayer(
                             urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'lt.privatedrive.privateDrive',
                           ),
+                          if (_roadPoints.isNotEmpty)
+                            PolylineLayer(
+                              key: const Key('passenger-road-route'),
+                              polylines: [
+                                Polyline(
+                                  points: _roadPoints,
+                                  color: gold,
+                                  strokeWidth: 5,
+                                ),
+                              ],
+                            ),
                           MarkerLayer(markers: mapMarkers),
                           const RichAttributionWidget(
                             attributions: [
@@ -176,6 +281,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       ),
               ),
             ),
+            if (_routeInfo.isNotEmpty)
+              Text(_routeInfo, key: const Key('passenger-route-info'),
+                  style: const TextStyle(fontSize: 12)),
+            if (_routeLoading)
+              const LinearProgressIndicator(key: Key('passenger-route-loading')),
             const SizedBox(height: 12),
             const Text('Популярные направления'),
             Wrap(
@@ -206,7 +316,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             TextField(
               key: const Key('passenger-from'),
               controller: _from,
-              onChanged: (_) => setState(() => _route = ''),
+              onChanged: (_) { setState(() => _route = ''); _updateRoadPreview(); },
               decoration: const InputDecoration(
                 labelText: 'Откуда', prefixIcon: Icon(Icons.trip_origin),
               ),
@@ -226,12 +336,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 IconButton(
                   key: const Key('passenger-swap'),
                   tooltip: 'Поменять А и Б',
-                  onPressed: () => setState(() {
-                    final previous = _from.text;
-                    _from.text = _to.text;
-                    _to.text = previous;
-                    _route = '';
-                  }),
+                  onPressed: () {
+                    setState(() {
+                      final previous = _from.text;
+                      _from.text = _to.text;
+                      _to.text = previous;
+                      _route = '';
+                    });
+                    _updateRoadPreview();
+                  },
                   icon: const Icon(Icons.swap_vert),
                 ),
               ],
@@ -308,6 +421,19 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   ),
               ],
             ),
+            const SizedBox(height: 12),
+            Text(
+              price != null ? 'Предварительная стоимость: $price €'
+                  : _fixedPrice != null
+                    ? 'Стоимость по запросу: дополнительные услуги требуют расчёта'
+                    : 'Стоимость по запросу · фиксированная цена не установлена',
+              key: const Key('passenger-price-preview'),
+              style: const TextStyle(
+                color: gold, fontWeight: FontWeight.bold, fontSize: 16,
+              ),
+            ),
+            const Text('Демо-расчёт. Итоговая цена подтверждается до оплаты.',
+              style: TextStyle(fontSize: 12)),
             const SizedBox(height: 12),
             Text(
               'Выбрано: ${_route.isNotEmpty ? _route : 'свой маршрут'} · $_payment',

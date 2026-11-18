@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 /// In-memory simulated trip. Never talks to production APIs or payments.
 /// A single store instance is shared by demo screens in one app session.
-enum DemoTripStatus { requested, assigned, approaching, underway, finished }
+enum DemoTripStatus { requested, assigned, approaching, underway, finished, cancelled }
 
 class DemoTrip {
   const DemoTrip({
@@ -37,6 +37,7 @@ class DemoTripStore extends ChangeNotifier {
   int? _tripRating;
   int? _serviceRating;
   final List<String> _pilotChatMessages = <String>[];
+  final List<String> _passengerChatMessages = <String>[];
 
   DemoTrip? get trip => _trip;
   bool get pilotOnline => _pilotOnline;
@@ -80,6 +81,7 @@ class DemoTripStore extends ChangeNotifier {
   }
 
   List<String> get pilotChatMessages => List.unmodifiable(_pilotChatMessages);
+  List<String> get passengerChatMessages => List.unmodifiable(_passengerChatMessages);
 
   bool addPilotChatMessage(String value) {
     final message = value.trim();
@@ -92,10 +94,24 @@ class DemoTripStore extends ChangeNotifier {
     notifyListeners();
     return true;
   }
+
+  bool addPassengerChatMessage(String value) {
+    final message = value.trim();
+    if (_disposed || message.isEmpty || message.length > 500 ||
+        !_pilotAccepted ||
+        (_status != DemoTripStatus.assigned &&
+         _status != DemoTripStatus.approaching &&
+         _status != DemoTripStatus.underway)) return false;
+    _passengerChatMessages.add(message);
+    notifyListeners();
+    return true;
+  }
   DemoTripStatus? get status => _status;
   bool get paused => _paused;
   bool get pilotAccepted => _pilotAccepted;
-  bool get isActive => _status != null && _status != DemoTripStatus.finished;
+  bool get isActive => _status != null &&
+      _status != DemoTripStatus.finished &&
+      _status != DemoTripStatus.cancelled;
 
   String get statusLabel => switch (_status) {
     null => 'Нет тестового заказа',
@@ -110,6 +126,7 @@ class DemoTripStore extends ChangeNotifier {
         ? 'Остановка · демо'
         : 'Поездка выполняется',
     DemoTripStatus.finished => 'Поездка завершена · демо',
+    DemoTripStatus.cancelled => 'Заказ отменён пассажиром · демо',
   };
 
   bool create({
@@ -136,6 +153,7 @@ class DemoTripStore extends ChangeNotifier {
     );
     _status = DemoTripStatus.requested;
     _pilotChatMessages.clear();
+    _passengerChatMessages.clear();
     _paused = false;
     _pilotAccepted = false;
     _tripRating = null;
@@ -144,7 +162,23 @@ class DemoTripStore extends ChangeNotifier {
     return true;
   }
 
-  bool assignPilot() {
+  /// Passenger can cancel only before pilot starts travelling to pickup.
+  bool cancelByPassenger() {
+    if (_disposed || _trip == null ||
+        (_status != DemoTripStatus.requested &&
+         _status != DemoTripStatus.assigned)) return false;
+    _status = DemoTripStatus.cancelled;
+    _pilotAccepted = false;
+    _paused = false;
+    notifyListeners();
+    return true;
+  }
+
+  bool get canPassengerCancel =>
+      _status == DemoTripStatus.requested ||
+      _status == DemoTripStatus.assigned;
+
+    bool assignPilot() {
     if (_disposed || _status != DemoTripStatus.requested) return false;
     _status = DemoTripStatus.assigned;
     _pilotAccepted = false;

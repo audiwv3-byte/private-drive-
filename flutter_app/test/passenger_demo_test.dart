@@ -112,8 +112,10 @@ void main() {
         matching: find.byType(Scrollable),
       ).first,
     );
+    await tester.ensureVisible(find.byKey(const Key('service-meet-sign')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('service-meet-sign')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')), 220,
       scrollable: find.descendant(

@@ -28,13 +28,19 @@ void main() {
     expect(find.text('PRIVATE DRIVE'), findsWidgets);
     expect(find.text('Независимый вход без Telegram'), findsOneWidget);
     expect(find.text('Получить код'), findsOneWidget);
-    expect(find.textContaining('сервер авторизации не подключён'), findsOneWidget);
 
     final button = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Получить код'),
     );
     expect(button.onPressed, isNull,
         reason: 'No network request must be possible without a test API.');
+    // The explanatory banner is below the fold on compact Android screens.
+    await tester.scrollUntilVisible(
+      find.textContaining('сервер авторизации не подключён'),
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.textContaining('сервер авторизации не подключён'), findsOneWidget);
   });
 
   testWidgets('Phone and email switch without sending OTP', (tester) async {

@@ -142,11 +142,17 @@ class PilotDemo extends StatefulWidget {
   State<PilotDemo> createState() => _PilotDemoState();
 }
 
-class _PilotDemoState extends State<PilotDemo> {
+class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMixin {
   late final MapController _map = widget.mapController ?? MapController();
   StreamSubscription<Position>? _gps;
   StreamSubscription<LatLng>? _synthetic;
   LatLng? _position;
+  LatLng? _displayPosition;
+  late final AnimationController _cameraAnimation = AnimationController(
+    vsync: this, duration: const Duration(milliseconds: 600),
+  )..addListener(_animatePosition);
+  LatLng? _animationStart;
+  LatLng? _animationTarget;
   bool _gpsEnabled = false;
   String _gpsMessage = 'GPS выключен';
   int stage = 0;
@@ -195,16 +201,39 @@ class _PilotDemoState extends State<PilotDemo> {
   }
 
 
+  void _animatePosition() {
+    if (!mounted || _animationStart == null || _animationTarget == null) return;
+    final progress = Curves.easeOutCubic.transform(_cameraAnimation.value);
+    final from = _animationStart!;
+    final to = _animationTarget!;
+    final current = LatLng(
+      from.latitude + (to.latitude - from.latitude) * progress,
+      from.longitude + (to.longitude - from.longitude) * progress,
+    );
+    setState(() => _displayPosition = current);
+    if (widget.enableMapTiles) _map.move(current, _map.camera.zoom);
+  }
+
   void _onPosition(LatLng value) {
     if (!mounted || !value.latitude.isFinite || !value.longitude.isFinite ||
         value.latitude.abs() > 90 || value.longitude.abs() > 180) return;
+    final previous = _displayPosition;
     setState(() {
       _position = value;
       _gpsMessage = 'GPS активен · только на устройстве';
     });
-    // Follow each incoming GPS fix, even after previous map gestures.
-    // A one-shot recenter must never permanently disable camera following.
-    if (widget.enableMapTiles) _map.move(value, _map.camera.zoom);
+    // First GPS fix centers immediately; later fixes interpolate both the
+    // navigation marker and camera. A new fix starts at the current animation
+    // position rather than jumping to the previous target.
+    if (previous == null) {
+      setState(() => _displayPosition = value);
+      if (widget.enableMapTiles) _map.move(value, _map.camera.zoom);
+      return;
+    }
+    _cameraAnimation.stop();
+    _animationStart = previous;
+    _animationTarget = value;
+    _cameraAnimation.forward(from: 0);
   }
 
   Future<void> _enableGps() async {
@@ -259,7 +288,11 @@ class _PilotDemoState extends State<PilotDemo> {
     _gps = null;
     _synthetic?.cancel();
     _synthetic = null;
+    _cameraAnimation.stop();
+    _animationStart = null;
+    _animationTarget = null;
     setState(() {
+      _displayPosition = null;
       _gpsEnabled = false;
       _gpsMessage = 'GPS выключен';
       _position = null;
@@ -286,6 +319,7 @@ class _PilotDemoState extends State<PilotDemo> {
     widget.tripStore?.removeListener(_onTripChanged);
     _gps?.cancel();
     _synthetic?.cancel();
+    _cameraAnimation.dispose();
     if (widget.mapController == null) _map.dispose();
     super.dispose();
   }
@@ -311,14 +345,22 @@ class _PilotDemoState extends State<PilotDemo> {
                   userAgentPackageName: 'lt.privatedrive.privateDrive',
                   maxNativeZoom: 19,
                 ),
-                if (_position != null)
+                if (_displayPosition != null)
                   MarkerLayer(markers: [
                     Marker(
-                      point: _position!,
+                      point: _displayPosition!,
                       width: 48,
                       height: 48,
-                      child: const Icon(Icons.navigation, size: 38,
-                          color: Color(0xFFDDC184)),
+                      child: const Icon(
+                        Icons.navigation,
+                        key: Key('pilot-location-marker'),
+                        size: 40,
+                        color: Color(0xFF00CCFF),
+                        shadows: [
+                          Shadow(color: Colors.black, blurRadius: 9),
+                          Shadow(color: Colors.white, blurRadius: 3),
+                        ],
+                      ),
                     ),
                   ]),
                 const RichAttributionWidget(
@@ -356,10 +398,11 @@ class _PilotDemoState extends State<PilotDemo> {
                     label: Text(_gpsMessage),
                   ),
                 ),
-                if (_position != null && !widget.enableMapTiles)
+                if (_displayPosition != null && !widget.enableMapTiles)
                   const Center(
                     child: Icon(Icons.navigation, size: 44,
-                        color: Color(0xFFDDC184)),
+                        color: Color(0xFF00CCFF),
+                        shadows: [Shadow(color: Colors.black, blurRadius: 8)]),
                   ),
                 Positioned(
                   top: 60,

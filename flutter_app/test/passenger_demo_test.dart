@@ -160,7 +160,9 @@ void main() {
         matching: find.byType(Scrollable),
       ).first,
     );
-    await tester.tap(find.byKey(const Key('service-meet-sign')));
+    tester.widget<CheckboxListTile>(
+      find.byKey(const Key('service-meet-sign')),
+    ).onChanged!(true);
     await tester.pump();
     expect(
       tester.widget<CheckboxListTile>(find.byKey(const Key('service-meet-sign')))

@@ -54,6 +54,18 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                     Text(store.statusLabel,
                       key: const Key('passenger-order-status')),
                     Text('Оплата: ${trip.paymentMethod}'),
+                    if (trip.estimatedFareEur != null)
+                      Text(
+                        trip.extrasRequireQuote
+                            ? 'Расчётная часть: ${trip.estimatedFareEur} € · дополнительные услуги по запросу'
+                            : 'Предварительная стоимость: ${trip.estimatedFareEur} €',
+                        key: const Key('passenger-order-price'),
+                      )
+                    else
+                      const Text(
+                        'Стоимость по запросу · диспетчер подтвердит цену до оплаты',
+                        key: Key('passenger-order-price'),
+                      ),
                     if (store.canPassengerCancel)
                       OutlinedButton.icon(
                         key: const Key('passenger-cancel-order'),

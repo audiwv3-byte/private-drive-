@@ -17,8 +17,13 @@ void main() {
       services: const [],
     ), isTrue);
 
+    var alertCount = 0;
     await tester.pumpWidget(MaterialApp(
-      home: PilotCabin(enableMapTiles: false, tripStore: store),
+      home: PilotCabin(
+        enableMapTiles: false,
+        tripStore: store,
+        onOfferAlert: () => alertCount++,
+      ),
     ));
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
     await tester.tap(find.byKey(const Key('pilot-power-toggle')));
@@ -39,13 +44,18 @@ void main() {
     expect(find.byKey(const Key('pilot-cockpit-earnings-toggle')), findsOneWidget);
     expect(store.assignPilot(), isTrue);
     await tester.pump();
+    expect(alertCount, 1);
     expect(find.byKey(const Key('pilot-global-offer')), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+    expect(alertCount, 2, reason: 'Alert should repeat while pilot has not answered');
     expect(find.text('Стоимость · 130 €'), findsOneWidget);
     expect(find.textContaining('Доход пилота · требуется тариф'), findsOneWidget);
     await tester.tap(find.byKey(const Key('pilot-global-accept')));
     await tester.pump();
     expect(store.pilotAccepted, isTrue);
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
+    await tester.pump(const Duration(seconds: 8));
+    expect(alertCount, 2, reason: 'Accept must stop the repeating alarm');
     Navigator.of(tester.element(find.text('Другой экран пилота'))).pop();
     await tester.pumpAndSettle();
     expect(find.byType(PilotDemo), findsOneWidget);

@@ -162,7 +162,9 @@ void main() {
     ).first;
     await tester.scrollUntilVisible(find.byKey(const Key('route-kaunas')),
         160, scrollable: list);
-    await tester.tap(find.byKey(const Key('route-kaunas')));
+    // The chip can be partially covered by the scrolling viewport in tests.
+    tester.widget<ActionChip>(find.byKey(const Key('route-kaunas')))
+        .onPressed!();
     await tester.pump();
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')),

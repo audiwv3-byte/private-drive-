@@ -10,6 +10,8 @@ class DemoTrip {
     required this.to,
     required this.paymentMethod,
     required this.departure,
+    this.rideType = 'Трансфер',
+    this.roundTrip = false,
     required this.services,
   });
 
@@ -17,6 +19,8 @@ class DemoTrip {
   final String to;
   final String paymentMethod;
   final DateTime departure;
+  final String rideType;
+  final bool roundTrip;
   final List<String> services;
 }
 
@@ -114,6 +118,8 @@ class DemoTripStore extends ChangeNotifier {
     required String paymentMethod,
     required DateTime departure,
     required List<String> services,
+    String rideType = 'Трансфер',
+    bool roundTrip = false,
   }) {
     final a = from.trim();
     final b = to.trim();
@@ -124,6 +130,8 @@ class DemoTripStore extends ChangeNotifier {
       to: b,
       paymentMethod: paymentMethod,
       departure: departure,
+      rideType: rideType,
+      roundTrip: roundTrip,
       services: List.unmodifiable(services),
     );
     _status = DemoTripStatus.requested;

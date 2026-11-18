@@ -60,12 +60,30 @@ jobs:
           text = text.replace('android:icon="@mipmap/ic_launcher"',
                               'android:icon="@drawable/private_drive_logo"')
           text = text.replace('android:label="private_drive"',
-                              'android:label="PRIVATE DRIVE"')
+                              'android:label="PRIVATE DRIVE DEMO"')
           manifest.write_text(text)
           assert '@drawable/private_drive_logo' in manifest.read_text()
           print(f"Brand asset verified ({len(data)} bytes), Android icon and splash replaced")
           PY
           cp -R flutter_app/test/. private_drive_build/test/
+          # Isolate test app from any future production package and keep its
+          # PUBLIC demo-only debug signature stable across GitHub Action runs.
+          mkdir -p "$HOME/.android"
+          base64 --decode flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+          keytool -list -storetype JKS -keystore "$HOME/.android/debug.keystore" -storepass android -alias AndroidDebugKey >/dev/null
+          python3 - <<'PY'
+          from pathlib import Path
+          app = Path("private_drive_build/android/app/build.gradle.kts")
+          data = app.read_text()
+          original = 'applicationId = "lt.privatedrive.private_drive"'
+          assert original in data, "expected generated package ID"
+          data = data.replace(original,
+              'applicationId = "lt.privatedrive.private_drive.demo"')
+          app.write_text(data)
+          assert 'applicationId = "lt.privatedrive.private_drive.demo"' in app.read_text()
+          print("Isolated package ID: lt.privatedrive.private_drive.demo")
+          PY
           cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
           cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
           rm -f private_drive_build/test/widget_test.dart

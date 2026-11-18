@@ -60,16 +60,22 @@ void main() {
       find.byKey(const Key('service-water'))).value, isTrue);
 
     await tester.scrollUntilVisible(
-      find.byKey(const Key('passenger-favorite-track-0')),
+      find.byKey(const ValueKey('passenger-radio-station-M-1 · 106,8 FM')),
       190, scrollable: list);
+    final radio = tester.widget<DropdownButtonFormField<String>>(
+      find.byKey(const ValueKey('passenger-radio-station-M-1 · 106,8 FM')));
+    expect(radio.initialValue, 'M-1 · 106,8 FM');
     for (var i = 0; i < 3; i++) {
+      await tester.scrollUntilVisible(
+        find.byKey(Key('passenger-favorite-track-$i')),
+        190, scrollable: list);
       final field = tester.widget<TextField>(
         find.byKey(Key('passenger-favorite-track-$i')));
       expect(field.controller!.text, 'Track ${['one', 'two', 'three'][i]}');
     }
-    final radio = tester.widget<DropdownButtonFormField<String>>(
-      find.byKey(const ValueKey('passenger-radio-station-M-1 · 106,8 FM')));
-    expect(radio.initialValue, 'M-1 · 106,8 FM');
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('passenger-cabin-temperature-22.0')),
+      190, scrollable: list);
     final temperature = tester.widget<DropdownButtonFormField<double?>>(
       find.byKey(const ValueKey('passenger-cabin-temperature-22.0')));
     expect(temperature.initialValue, 22.0);
@@ -114,8 +120,6 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-form')), findsOneWidget);
-    expect(jsonDecode(
-      jsonEncode({'version': 1}))['version'], 1);
     // No user-facing crash or synthetic booking created on invalid input.
   });
 }

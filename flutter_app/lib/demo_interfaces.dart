@@ -38,14 +38,23 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
   StreamSubscription<Position>? _pilotLocationStream;
   bool _startingLocation = false;
   bool _restoringOrder = true;
-  final SharedPreferencesAsync _orderPrefs = SharedPreferencesAsync();
+  SharedPreferencesAsync? _orderPrefs;
+
+  SharedPreferencesAsync? _openOrderPrefs() {
+    try {
+      return SharedPreferencesAsync();
+    } catch (_) {
+      // Unsupported storage must not crash the offline demo or widget tests.
+      return null;
+    }
+  }
   static const _orderKey = 'pd_offline_demo_order_v1';
   Future<void> _saveQueue = Future<void>.value();
   String? _lastSavedSnapshot;
 
   Future<void> _restoreOrder() async {
     try {
-      final saved = await _orderPrefs.getString(_orderKey);
+      final saved = await _orderPrefs?.getString(_orderKey);
       if (mounted && saved != null && _trip.restorePersistedJson(saved)) {
         _lastSavedSnapshot = saved;
       }
@@ -65,7 +74,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
     _lastSavedSnapshot = snapshot;
     _saveQueue = _saveQueue.then((_) async {
       try {
-        await _orderPrefs.setString(_orderKey, snapshot);
+        await _orderPrefs?.setString(_orderKey, snapshot);
       } catch (_) {
         // Demo stays functional even without device storage.
       }
@@ -75,6 +84,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
   @override
   void initState() {
     super.initState();
+    _orderPrefs = _openOrderPrefs();
     _trip.addListener(_onPilotShiftChanged);
     unawaited(_restoreOrder());
   }

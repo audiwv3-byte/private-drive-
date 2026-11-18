@@ -43,6 +43,27 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   final destination = TextEditingController();
   final code = TextEditingController();
   bool busy = false;
+  String language = 'RU';
+
+  String tr(String ru, String lt, String en) =>
+      language == 'LT' ? lt : language == 'EN' ? en : ru;
+
+  Widget languageSwitcher() => Row(
+    key: const Key('native-language-switcher'),
+    mainAxisAlignment: MainAxisAlignment.end,
+    children: [
+      for (final entry in const [('RU', '🇷🇺'), ('LT', '🇱🇹'), ('EN', '🇬🇧')])
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: ChoiceChip(
+            key: Key('native-language-${entry[0]}'),
+            label: Text('${entry[1]} ${entry[0]}'),
+            selected: language == entry[0],
+            onSelected: (_) => setState(() => language = entry[0]),
+          ),
+        ),
+    ],
+  );
   String? challengeId;
   String message = '';
   String? sessionToken;
@@ -170,7 +191,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         DateTime.now().isBefore(sessionExpiry!);
     if (active) {
       return Scaffold(
-        appBar: AppBar(title: const Text('PRIVATE DRIVE')),
+        appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [languageSwitcher()]),
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -182,16 +203,18 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   children: [
                     const Icon(Icons.verified_user_outlined, color: gold, size: 64),
                     const SizedBox(height: 20),
-                    const Text('Вход выполнен',
+                    Text(tr('Вход выполнен', 'Prisijungta', 'Signed in'),
                         style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    const Text('Аккаунт подтверждён. Это тестовый экран авторизации. '
-                        'Кабина пилота и интерфейс пассажира подключаются отдельно.',
+                    Text(tr('Аккаунт подтверждён. Это тестовый экран авторизации. Кабина пилота и интерфейс пассажира подключаются отдельно.',
+                            'Paskyra patvirtinta. Tai bandomasis prisijungimo ekranas.',
+                            'Account verified. This is a demo sign-in screen.'),
                         textAlign: TextAlign.center),
                     const SizedBox(height: 16),
                     Text('Аккаунт: ${signedInUserId!}', textAlign: TextAlign.center),
                     const SizedBox(height: 24),
-                    FilledButton(onPressed: signOut, child: const Text('Выйти')),
+                    FilledButton(onPressed: signOut,
+                      child: Text(tr('Выйти', 'Atsijungti', 'Sign out'))),
                   ],
                 ),
               ),
@@ -201,7 +224,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('PRIVATE DRIVE')),
+      appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [languageSwitcher()]),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -212,15 +235,17 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                 const SizedBox(height: 16),
                 const PrivateDriveBrandLogo(size: 132),
                 const SizedBox(height: 18),
-                const Text('Добро пожаловать',
+                Text(tr('Добро пожаловать', 'Sveiki atvykę', 'Welcome'),
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 12),
-                const Text('Независимый вход без Telegram',
+                Text(tr('Независимый вход без Telegram',
+                    'Nepriklausomas prisijungimas be Telegram',
+                    'Independent sign-in without Telegram'),
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
-                  'Версия 0.2.15 · сборка 2026111815 · ДЕМО',
+                  'Версия 0.2.16 · сборка 2026111816 · ДЕМО',
                   key: Key('app-demo-version'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),
@@ -231,7 +256,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   enabled: !busy && challengeId == null,
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    labelText: 'Телефон в формате +370...',
+                    labelText: tr('Телефон в формате +370...',
+                      'Telefono numeris +370...', 'Phone number +370...'),
                     border: const OutlineInputBorder(),
                   ),
                 ),
@@ -239,7 +265,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                 if (challengeId == null)
                   FilledButton(
                     onPressed: busy || apiBaseUrl.isEmpty ? null : requestCode,
-                    child: const Text('Получить код'),
+                    child: Text(tr('Получить код', 'Gauti kodą', 'Get code')),
                   )
                 else ...[
                   TextField(
@@ -249,14 +275,15 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     onChanged: (_) => setState(() {}),
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'Код подтверждения',
+                      labelText: tr('Код подтверждения',
+                        'Patvirtinimo kodas', 'Verification code'),
                       border: OutlineInputBorder(),
                     ),
                   ),
                   FilledButton(
                     onPressed: busy || !RegExp(r'^\d{6}$').hasMatch(code.text.trim())
                         ? null : verifyCode,
-                    child: const Text('Подтвердить'),
+                    child: Text(tr('Подтвердить', 'Patvirtinti', 'Verify')),
                   ),
                   TextButton(
                     onPressed: busy ? null : () => setState(() {
@@ -264,7 +291,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       code.clear();
                       message = '';
                     }),
-                    child: const Text('Изменить контакт'),
+                    child: Text(tr('Изменить контакт', 'Keisti kontaktą', 'Change contact')),
                   ),
                 ],
                 if (busy) const Center(child: CircularProgressIndicator()),
@@ -292,7 +319,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                         context,
                         MaterialPageRoute(builder: (_) => const PrivateDriveDemo()),
                       ),
-                      child: const Text('Посмотреть тестовые интерфейсы'),
+                      child: Text(tr('Посмотреть тестовые интерфейсы',
+                          'Atidaryti bandomąsias sąsajas', 'Open demo interfaces')),
                     ),
                   ),
               ],

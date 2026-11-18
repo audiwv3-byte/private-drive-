@@ -228,6 +228,7 @@ class PilotDemo extends StatefulWidget {
     this.loadMapTiles = true,
     this.onIncomingSound,
     this.showAssignedOffer = true,
+    this.testRoadPoints,
   });
 
   final bool enableMapTiles;
@@ -242,6 +243,8 @@ class PilotDemo extends StatefulWidget {
   final VoidCallback? onIncomingSound;
   /// The premium cockpit renders this offer in the root overlay instead.
   final bool showAssignedOffer;
+  /// Synthetic route fixture for widget tests only; never used by app UI.
+  final List<LatLng>? testRoadPoints;
 
   @override
   State<PilotDemo> createState() => _PilotDemoState();
@@ -254,13 +257,13 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _position;
   LatLng? _displayPosition;
   double _headingDegrees = 0;
-  List<LatLng> _pickupRoadPoints = const [];
+  late List<LatLng> _pickupRoadPoints = widget.testRoadPoints ?? const [];
   bool _pickupRouteAttempted = false;
   String _pickupRoutingInfo = '';
   int _pickupRouteGeneration = 0;
 
   Future<void> _loadPickupRoadRoute() async {
-    if (!mounted || !_approachingPassenger || _pickupRouteAttempted) return;
+    if (!mounted || !_navigatingActiveTrip || _pickupRouteAttempted) return;
     final from = _position;
     final to = _pickupPreviewPoint;
     if (from == null || to == null || !widget.enableMapTiles ||
@@ -300,7 +303,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
           (pair[0] as num).toDouble());
       }).toList(growable: false);
       if (!mounted || generation != _pickupRouteGeneration ||
-          !_approachingPassenger || points.length < 2) return;
+          !_navigatingActiveTrip || points.length < 2) return;
       setState(() {
         _pickupRoadPoints = points;
         _pickupRoutingInfo = 'Дорожный маршрут · демонстрационный сервис';
@@ -311,7 +314,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
       ));
     } catch (_) {
       if (mounted && generation == _pickupRouteGeneration &&
-          _approachingPassenger) {
+          _navigatingActiveTrip) {
         setState(() => _pickupRoutingInfo =
           'Дорожный маршрут недоступен · проверь интернет и GPS');
       }
@@ -423,14 +426,22 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     'клайпеда': LatLng(55.7033, 21.1443),
     'паланга': LatLng(55.9175, 21.0686),
     'варшава': LatLng(52.2297, 21.0122),
+    'тракай': LatLng(54.6389, 24.9342),
     'аэропорт вильнюса': LatLng(54.6341, 25.2858),
   };
 
   bool get _approachingPassenger =>
       widget.tripStore?.status == DemoTripStatus.approaching;
 
-  String? get _pickupAddress => _approachingPassenger
-      ? widget.tripStore?.trip?.from : null;
+  bool get _navigatingActiveTrip =>
+      widget.tripStore?.status == DemoTripStatus.approaching ||
+      widget.tripStore?.status == DemoTripStatus.underway;
+
+  String? get _pickupAddress => _navigatingActiveTrip
+      ? (_approachingPassenger
+          ? widget.tripStore?.trip?.from
+          : widget.tripStore?.trip?.to)
+      : null;
 
   LatLng? get _pickupPreviewPoint {
     final place = _pickupAddress?.trim().toLowerCase();
@@ -557,7 +568,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (publishToStore) {
       widget.tripStore?.updatePilotLocation(value.latitude, value.longitude);
     }
-    if (_approachingPassenger && !_pickupRouteAttempted) {
+    if (_navigatingActiveTrip && !_pickupRouteAttempted) {
       unawaited(_loadPickupRoadRoute());
     }
     // First GPS fix centers immediately; later fixes interpolate both the
@@ -650,9 +661,18 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         _pickupRoadPoints = const [];
         _focusPickupPreview();
         unawaited(_loadPickupRoadRoute());
-      } else if (changed) {
+      } else if (changed && _isUnderway) {
+        // New phase of the SAME trip: target changes from pickup to drop-off.
+        // Keep the current polyline on screen while the new road route loads.
+        ++_pickupRouteGeneration;
+        _pickupRouteAttempted = false;
+        _pickupRoutingInfo = 'Маршрут к месту назначения обновляется…';
+        unawaited(_loadPickupRoadRoute());
+      } else if (changed && widget.tripStore?.status ==
+          DemoTripStatus.finished) {
         ++_pickupRouteGeneration;
         _pickupRoadPoints = const [];
+        _pickupRoutingInfo = '';
       }
       return;
     }
@@ -697,7 +717,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   userAgentPackageName: 'lt.privatedrive.privateDrive',
                   maxNativeZoom: 19,
                 ),
-                if (_approachingPassenger && _pickupRoadPoints.isNotEmpty)
+                if (_navigatingActiveTrip && _pickupRoadPoints.isNotEmpty)
                   PolylineLayer(
                     key: const Key('pilot-road-route'),
                     polylines: [
@@ -708,7 +728,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                       ),
                     ],
                   ),
-                if (_approachingPassenger && _pickupPreviewPoint != null)
+                if (_navigatingActiveTrip && _pickupPreviewPoint != null)
                   MarkerLayer(markers: [
                     Marker(
                       point: _pickupPreviewPoint!,
@@ -866,7 +886,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           children: [
                             Text(_tripLabel,
                                 key: const Key('pilot-trip-state')),
-                            if (_approachingPassenger) ...[
+                            if (_navigatingActiveTrip) ...[
                               if (_pickupRoutingInfo.isNotEmpty)
                                 Text(_pickupRoutingInfo,
                                   key: const Key('pilot-routing-status'),
@@ -874,7 +894,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                     fontSize: 11, color: Colors.white70)),
 
                               const SizedBox(height: 6),
-                              Text('Подача: ${_pickupAddress ?? "адрес не указан"}',
+                              Text('${_approachingPassenger ? 'Подача' : 'Назначение'}: ${_pickupAddress ?? "адрес не указан"}',
                                   key: const Key('pilot-pickup-address'),
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
@@ -884,7 +904,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                               Text(
                                 _pickupPreviewPoint != null
                                   ? 'Метка обозначает только центр города · '
-                                    'точный адрес подачи не указан'
+                                    'точный адрес не указан'
                                   : 'Точка подачи не определена · '
                                     'требуется геокодирование адреса',
                                 key: const Key('pilot-pickup-accuracy'),

@@ -246,10 +246,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
     return _transferFares['$a|$b'];
   }
 
+  // Only approved amounts enter the preview. Unpriced requests never
+  // silently become free and never erase the known fare.
+  bool get _requiresCustomQuote => _pets || _flowers || _coffee || _water;
+
   int? get _pricePreview {
-    if (_pets || _soberDriver || _flowers || _coffee || _water) return null;
     final fixed = _fixedPrice;
-    return fixed == null ? null : fixed + (_meetSign ? 15 : 0);
+    if (fixed == null) return null;
+    // Sober driver: approved double base fare; meet-and-greet stays +15 EUR.
+    return fixed * (_soberDriver ? 2 : 1) + (_meetSign ? 15 : 0);
   }
 
   // Vilnius FM frequencies (no playback, preference only).
@@ -724,7 +729,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('service-sober'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Трезвый водитель · цена по запросу'),
+                title: const Text('Трезвый водитель · ×2 к тарифу'),
                 value: _soberDriver,
                 onChanged: (v) => setState(() => _soberDriver = v ?? false),
               ),
@@ -872,12 +877,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ),
             const SizedBox(height: 12),
             Text(
-              price != null ? (_fixedPrice != null
-                  ? 'Предварительная стоимость: $price €'
-                  : 'Предварительная стоимость: $price €')
-                  : _fixedPrice != null
-                    ? 'Стоимость по запросу: дополнительные услуги требуют расчёта'
-                    : 'Стоимость по запросу · фиксированная цена не установлена',
+              price == null
+                  ? 'Стоимость по запросу · фиксированная цена не установлена'
+                  : _requiresCustomQuote
+                      ? 'Расчётная часть: $price € · дополнительные услуги по запросу'
+                      : 'Предварительная стоимость: $price €',
               key: const Key('passenger-price-preview'),
               style: const TextStyle(
                 color: gold, fontWeight: FontWeight.bold, fontSize: 16,

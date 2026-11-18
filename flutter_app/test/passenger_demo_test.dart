@@ -80,12 +80,15 @@ void main() {
     await tester.pump();
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')), 220,
-      scrollable: find.byKey(const Key('passenger-form')),
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
     );
     expect(find.text('Предварительная стоимость: 130 €'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.byKey(const Key('service-meet-sign')), 180,
+      find.byKey(const Key('service-meet-sign')), -180,
       scrollable: find.descendant(
         of: find.byKey(const Key('passenger-form')),
         matching: find.byType(Scrollable),
@@ -95,16 +98,28 @@ void main() {
     await tester.pump();
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')), 220,
-      scrollable: find.byKey(const Key('passenger-form')),
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
     );
     expect(find.text('Предварительная стоимость: 145 €'), findsOneWidget);
 
-    await tester.ensureVisible(find.byKey(const Key('service-pets')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('service-pets')), -180,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
     await tester.tap(find.byKey(const Key('service-pets')));
     await tester.pump();
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')), 220,
-      scrollable: find.byKey(const Key('passenger-form')),
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
     );
     expect(find.textContaining('Стоимость по запросу'), findsOneWidget);
   });

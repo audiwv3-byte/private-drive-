@@ -257,6 +257,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _position;
   LatLng? _displayPosition;
   double _headingDegrees = 0;
+  bool _nightMap = false;
   late List<LatLng> _pickupRoadPoints = widget.testRoadPoints ?? const [];
   bool _pickupRouteAttempted = false;
   String _pickupRoutingInfo = '';
@@ -712,11 +713,22 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
               ),
               children: [
                 if (widget.loadMapTiles)
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'lt.privatedrive.privateDrive',
-                  maxNativeZoom: 19,
-                ),
+                  ColorFiltered(
+                    colorFilter: _nightMap
+                        ? const ColorFilter.matrix(<double>[
+                            -0.78, 0, 0, 0, 211,
+                            0, -0.78, 0, 0, 211,
+                            0, 0, -0.78, 0, 211,
+                            0, 0, 0, 1, 0,
+                          ])
+                        : const ColorFilter.mode(
+                            Colors.transparent, BlendMode.dst),
+                    child: TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'lt.privatedrive.privateDrive',
+                      maxNativeZoom: 19,
+                    ),
+                  ),
                 if (_navigatingActiveTrip && _pickupRoadPoints.isNotEmpty)
                   PolylineLayer(
                     key: const Key('pilot-road-route'),
@@ -756,7 +768,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           Icons.navigation,
                           key: Key('pilot-location-marker'),
                           size: 40,
-                          color: Color(0xFF00CCFF),
+                          color: Color(0xFF172B3F),
                           shadows: [
                             Shadow(color: Colors.black, blurRadius: 9),
                             Shadow(color: Colors.white, blurRadius: 3),
@@ -808,6 +820,22 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     ),
                     child: const Text('Waze',
                       style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                Positioned(
+                  top: 60,
+                  left: 12,
+                  child: Material(
+                    color: const Color(0xE8172535),
+                    borderRadius: BorderRadius.circular(14),
+                    child: IconButton(
+                      key: const Key('pilot-map-day-night'),
+                      tooltip: _nightMap ? 'Дневная карта' : 'Ночная карта',
+                      icon: Icon(_nightMap ? Icons.wb_sunny_outlined
+                        : Icons.dark_mode_outlined,
+                        color: const Color(0xFFDDC184), size: 22),
+                      onPressed: () => setState(() => _nightMap = !_nightMap),
+                    ),
                   ),
                 ),
                 Positioned(

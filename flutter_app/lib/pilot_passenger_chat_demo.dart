@@ -120,7 +120,7 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
                   IconButton.filled(
                     key: const Key('pilot-chat-send'),
                     tooltip: 'Отправить в демочат',
-                    onPressed: _draft.text.trim().isEmpty ? null : _send,
+                    onPressed: () => _send(),
                     icon: const Icon(Icons.send),
                   ),
                 ],

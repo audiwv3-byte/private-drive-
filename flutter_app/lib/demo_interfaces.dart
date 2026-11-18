@@ -120,19 +120,30 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
 /// Pilot-only foreground map; all trip controls change local demo state only.
 /// In widget tests [enableMapTiles] is false: there are no tile HTTP requests.
 class PilotDemo extends StatefulWidget {
-  const PilotDemo({super.key, this.enableMapTiles = true, this.positions, this.tripStore});
+  const PilotDemo({
+    super.key,
+    this.enableMapTiles = true,
+    this.positions,
+    this.tripStore,
+    this.mapController,
+    this.loadMapTiles = true,
+  });
 
   final bool enableMapTiles;
   /// Synthetic stream for deterministic tests; never enabled by production.
   final Stream<LatLng>? positions;
   final DemoTripStore? tripStore;
+  /// Test-only injection; normal pilots use an internally owned controller.
+  final MapController? mapController;
+  /// Avoid network requests when exercising the real map camera in widget tests.
+  final bool loadMapTiles;
 
   @override
   State<PilotDemo> createState() => _PilotDemoState();
 }
 
 class _PilotDemoState extends State<PilotDemo> {
-  final MapController _map = MapController();
+  late final MapController _map = widget.mapController ?? MapController();
   StreamSubscription<Position>? _gps;
   StreamSubscription<LatLng>? _synthetic;
   LatLng? _position;
@@ -275,7 +286,7 @@ class _PilotDemoState extends State<PilotDemo> {
     widget.tripStore?.removeListener(_onTripChanged);
     _gps?.cancel();
     _synthetic?.cancel();
-    _map.dispose();
+    if (widget.mapController == null) _map.dispose();
     super.dispose();
   }
 
@@ -294,6 +305,7 @@ class _PilotDemoState extends State<PilotDemo> {
                 initialZoom: 14,
               ),
               children: [
+                if (widget.loadMapTiles)
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'lt.privatedrive.privateDrive',

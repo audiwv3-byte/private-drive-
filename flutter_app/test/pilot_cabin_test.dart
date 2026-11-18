@@ -24,6 +24,7 @@ void main() {
     await tester.tap(find.byKey(const Key('pilot-power-toggle')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pilot-cockpit-earnings-toggle')), findsOneWidget);
+    expect(find.byKey(const Key('private-drive-round-logo')), findsWidgets);
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
     await tester.tap(find.byKey(const Key('pilot-cockpit-earnings-toggle')));
     await tester.pump();
@@ -57,6 +58,8 @@ void main() {
     );
 
     expect(find.byKey(const Key('pilot-power-toggle')), findsOneWidget);
+    expect(find.byKey(const Key('private-drive-round-logo')), findsOneWidget);
+    expect(find.byType(ClipOval), findsWidgets);
     expect(find.text('Не на линии · демо'), findsOneWidget);
     expect(find.text('ВЫЙТИ НА ЛИНИЮ'), findsOneWidget);
     expect(find.byKey(const Key('pilot-offline-vilnius-background')), findsOneWidget);

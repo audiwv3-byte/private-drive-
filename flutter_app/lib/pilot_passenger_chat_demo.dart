@@ -18,6 +18,13 @@ class PilotPassengerChatDemo extends StatefulWidget {
 
 class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
   final _draft = TextEditingController();
+  late final List<String> _visibleMessages;
+
+  @override
+  void initState() {
+    super.initState();
+    _visibleMessages = List<String>.of(widget.messages);
+  }
 
   @override
   void dispose() {
@@ -30,7 +37,7 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
     if (value.isEmpty) return;
     widget.onSend(value);
     _draft.clear();
-    setState(() {});
+    setState(() => _visibleMessages.add(value));
   }
 
   @override
@@ -56,7 +63,7 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
                 key: const Key('pilot-chat-messages'),
                 padding: const EdgeInsets.all(16),
                 children: [
-                  for (final message in widget.messages)
+                  for (final message in _visibleMessages)
                     Align(
                       alignment: Alignment.centerRight,
                       child: Padding(

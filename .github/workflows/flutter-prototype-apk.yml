@@ -26,6 +26,7 @@ jobs:
         run: |
           flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
           cp -R flutter_app/lib/. private_drive_build/lib/
+          cp -R flutter_app/test/. private_drive_build/test/
           cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
           cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
           rm -f private_drive_build/test/widget_test.dart
@@ -46,6 +47,7 @@ jobs:
         run: |
           flutter pub get
           flutter analyze --no-fatal-infos
+          flutter test
           flutter build apk --debug
       - name: Upload test APK
         uses: actions/upload-artifact@v4

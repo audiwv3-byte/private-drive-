@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'demo_interfaces.dart';
+import 'brand_logo.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 
@@ -210,7 +211,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
               padding: const EdgeInsets.all(24),
               children: [
                 const SizedBox(height: 32),
-                const Icon(Icons.local_taxi_outlined, color: gold, size: 72),
+                const PrivateDriveBrandLogo(size: 176),
                 const SizedBox(height: 18),
                 const Text('Добро пожаловать',
                     textAlign: TextAlign.center,
@@ -218,6 +219,13 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                 const SizedBox(height: 12),
                 const Text('Независимый вход без Telegram',
                     textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                const Text(
+                  'Версия 0.2.0 · сборка 20261118 · ДЕМО',
+                  key: Key('app-demo-version'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: gold),
+                ),
                 const SizedBox(height: 32),
                 SegmentedButton<bool>(
                   segments: const [

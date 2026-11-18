@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
+import 'demo_rating_panel.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
@@ -443,9 +444,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-summary'),
             ),
             const SizedBox(height: 12),
-            if (widget.tripStore != null)
+            if (widget.tripStore != null) ...[
               Text(widget.tripStore!.statusLabel,
                   key: const Key('passenger-trip-status')),
+              DemoRatingPanel(tripStore: widget.tripStore!),
+            ],
             FilledButton(
               key: const Key('passenger-book-disabled'),
               onPressed: _canCreateLocalTrip ? _createLocalTrip : null,

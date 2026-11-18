@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
+import 'company_info.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
@@ -230,7 +231,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('PRIVATE DRIVE · Пассажир')),
+      appBar: AppBar(
+        title: const Text('PRIVATE DRIVE · Пассажир'),
+        actions: [
+          IconButton(
+            key: const Key('passenger-company-info'),
+            tooltip: 'Контакты и документы',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => const CompanyInfoPage())),
+            icon: const Icon(Icons.info_outline),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           key: const Key('passenger-form'),

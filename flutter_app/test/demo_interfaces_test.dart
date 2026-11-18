@@ -164,6 +164,28 @@ void main() {
     await tester.pump(const Duration(milliseconds: 650));
     expect(map.camera.center.latitude, closeTo(third.latitude, 0.0001));
     expect(map.camera.center.longitude, closeTo(third.longitude, 0.0001));
+
+    // A southbound pilot arrow points south, rather than always north.
+    const south = LatLng(54.7002, 25.3207);
+    positions.add(south);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 650));
+    final southHeading = tester.widget<Transform>(
+      find.byKey(const Key('pilot-location-heading')),
+    );
+    // The direction icon rotates 180° for southbound movement.
+    expect(southHeading.transform.entry(0, 0), closeTo(-1, 0.01));
+
+    // Heading changes with the next GPS fix rather than staying backward.
+    const east = LatLng(54.7002, 25.3407);
+    positions.add(east);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 650));
+    final eastHeading = tester.widget<Transform>(
+      find.byKey(const Key('pilot-location-heading')),
+    );
+    expect(eastHeading.transform.entry(0, 0), closeTo(0, 0.02));
+    expect(eastHeading.transform.entry(1, 0), closeTo(1, 0.02));
   });
 
 }

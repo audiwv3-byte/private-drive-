@@ -1,6 +1,6 @@
 name: PRIVATE DRIVE - pilot and dispatcher status guard regression
 on:
-  push:
+  pull_request:
     branches: [fix/pilot-dispatch-status-guard-20261116]
     paths:
       - .github/workflows/pilot-status-guard-tests.yml
@@ -8,8 +8,17 @@ on:
       - test_release_validation.py
       - miniapp_server.py
       - pd_trip_runtime_v4.py
+  push:
+    branches: [fix/status-guard-ci-readonly-20261118]
+    paths:
+      - .github/workflows/pilot-status-guard-tests.yml
+      - test_pilot_status_guard.py
+      - test_release_validation.py
+      - miniapp_server.py
+      - pd_trip_runtime_v4.py
+  workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -38,16 +47,14 @@ jobs:
             echo 'STATUS_GUARD_RELEASE_FAILED' > reports/status_guard_release.txt
             tail -n 12 /tmp/pd_guard_release.log >> reports/status_guard_release.txt
           fi
-      - name: Persist reports in isolated branch
+      - name: Upload test reports without repository writes
         if: always()
-        run: |
-          if [ -d reports ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add reports/status_guard_unit.txt reports/status_guard_release.txt
-            git commit -m "test: status guard regression results" || true
-            git push origin HEAD:fix/pilot-dispatch-status-guard-20261116
-          fi
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-guard-test-reports
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Enforce both gates
         run: |
           grep -q '^STATUS_GUARD_UNIT_PASSED$' reports/status_guard_unit.txt

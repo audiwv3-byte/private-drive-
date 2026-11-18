@@ -42,7 +42,6 @@ class NativeSignInScreen extends StatefulWidget {
 class _NativeSignInScreenState extends State<NativeSignInScreen> {
   final destination = TextEditingController();
   final code = TextEditingController();
-  bool byEmail = false;
   bool busy = false;
   String? challengeId;
   String message = '';
@@ -91,7 +90,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     });
     try {
       final result = await post('/native-auth/request-code', {
-        'channel': byEmail ? 'email' : 'phone',
+        'channel': 'phone',
         'destination': destination.text.trim(),
       });
       final id = result['challenge_id'];
@@ -227,26 +226,12 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   style: TextStyle(fontSize: 12, color: gold),
                 ),
                 const SizedBox(height: 20),
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: false, label: Text('Телефон')),
-                    ButtonSegment(value: true, label: Text('Email')),
-                  ],
-                  selected: {byEmail},
-                  onSelectionChanged: busy ? null : (v) => setState(() {
-                    byEmail = v.first;
-                    challengeId = null;
-                    code.clear();
-                    message = '';
-                  }),
-                ),
-                const SizedBox(height: 16),
                 TextField(
                   controller: destination,
                   enabled: !busy && challengeId == null,
-                  keyboardType: byEmail ? TextInputType.emailAddress : TextInputType.phone,
+                  keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    labelText: byEmail ? 'Email' : 'Телефон в формате +370...',
+                    labelText: 'Телефон в формате +370...',
                     border: const OutlineInputBorder(),
                   ),
                 ),
@@ -293,7 +278,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     padding: EdgeInsets.only(top: 20),
                     child: Text(
                       'Тестовая сборка: сервер авторизации не подключён. '
-                      'Отправка SMS и email выключена.',
+                      'Отправка SMS выключена.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: gold),
                     ),

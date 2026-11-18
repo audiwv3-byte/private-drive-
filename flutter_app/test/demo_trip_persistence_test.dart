@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/demo_trip_store.dart';
 
@@ -10,6 +12,8 @@ void main() {
       departure: DateTime(2026, 11, 20, 14, 30),
       services: const ['Встреча с табличкой'],
       roundTrip: true,
+      estimatedFareEur: 215,
+      extrasRequireQuote: true,
     ), isTrue);
     return store;
   }
@@ -28,6 +32,8 @@ void main() {
     expect(after.trip!.from, 'Вильнюс');
     expect(after.trip!.to, 'Каунас');
     expect(after.trip!.roundTrip, isTrue);
+    expect(after.trip!.estimatedFareEur, 215);
+    expect(after.trip!.extrasRequireQuote, isTrue);
     expect(after.trip!.services, contains('Встреча с табличкой'));
     expect(after.status, DemoTripStatus.assigned);
     expect(after.pilotAccepted, isTrue);
@@ -56,6 +62,30 @@ void main() {
     expect(store.restorePersistedJson('broken'), isFalse);
     expect(store.restorePersistedJson('{"version":2}'), isFalse);
     expect(store.trip, isNull);
+  });
+
+  test('Legacy saved orders without fare fields remain readable', () {
+    final original = newOrder();
+    final data = jsonDecode(original.toPersistedJson()!) as Map<String, dynamic>;
+    original.dispose();
+    data.remove('estimatedFareEur');
+    data.remove('extrasRequireQuote');
+    final restored = DemoTripStore();
+    addTearDown(restored.dispose);
+    expect(restored.restorePersistedJson(jsonEncode(data)), isTrue);
+    expect(restored.trip!.estimatedFareEur, isNull);
+    expect(restored.trip!.extrasRequireQuote, isFalse);
+  });
+
+  test('Invalid fare estimate is rejected when restoring an order', () {
+    final original = newOrder();
+    final data = jsonDecode(original.toPersistedJson()!) as Map<String, dynamic>;
+    original.dispose();
+    data['estimatedFareEur'] = -5;
+    final restored = DemoTripStore();
+    addTearDown(restored.dispose);
+    expect(restored.restorePersistedJson(jsonEncode(data)), isFalse);
+    expect(restored.trip, isNull);
   });
 
   test('Private pilot GPS is not persisted', () {

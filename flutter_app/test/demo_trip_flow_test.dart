@@ -140,13 +140,14 @@ void main() {
     expect(find.byKey(const Key('pilot-power-toggle')), findsNothing);
     expect(find.text('Диспетчер'), findsNothing);
     expect(find.text('Откуда'), findsNothing);
-    expect(find.byKey(const Key('pilot-assigned-offer')), findsOneWidget);
-    expect(find.byKey(const Key('pilot-assigned-route')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-global-offer')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-global-route')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
     expect(find.text('К пассажиру'), findsOneWidget);
     expect(tester.widget<FilledButton>(find.byKey(const Key('pilot-next-trip'))).onPressed, isNull);
-    await tester.tap(find.byKey(const Key('pilot-accept-assigned')));
+    await tester.tap(find.byKey(const Key('pilot-global-accept')));
     await tester.pump();
-    expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
+    expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
 
     await tester.tap(find.byKey(const Key('pilot-next-trip')));
     await tester.pump();

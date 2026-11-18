@@ -100,6 +100,7 @@ void main() {
       services: const [],
     );
     store.assignPilot();
+    store.acceptAssignedPilot();
     var alertCount = 0;
 
     await tester.pumpWidget(MaterialApp(
@@ -146,6 +147,7 @@ void main() {
       services: const [],
     );
     store.assignPilot();
+    store.acceptAssignedPilot();
     store.advancePilot();
     store.advancePilot();
     await tester.pumpWidget(MaterialApp(

@@ -28,6 +28,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
   TimeOfDay? _time;
   String _route = '';
   String _payment = 'Карта';
+  String _rideType = 'Трансфер';
+  bool _roundTrip = false;
   bool _meetSign = false;
   bool _pets = false;
   bool _soberDriver = false;
@@ -60,6 +62,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
       to: _to.text,
       paymentMethod: _payment,
       departure: departure,
+      rideType: _rideType,
+      roundTrip: _roundTrip,
       services: [
         if (_meetSign) 'Встреча с табличкой',
         if (_pets) 'Животные',
@@ -88,10 +92,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
   /// Only an agreed fixed price is shown. Other routes remain quote-only.
   int? get _fixedPrice {
+    if (_rideType != 'Трансфер') return null;
     final a = _from.text.trim().toLowerCase();
     final b = _to.text.trim().toLowerCase();
-    if ((a == 'вильнюс' && b == 'каунас') ||
-        (a == 'каунас' && b == 'вильнюс')) return 130;
+    if (a == 'вильнюс' && b == 'каунас') {
+      return _roundTrip ? 190 : 130;
+    }
     return null;
   }
 
@@ -251,6 +257,45 @@ class _PassengerDemoState extends State<PassengerDemo> {
             const Text('Тестовый заказ поездки', style: TextStyle(fontSize: 22)),
             const SizedBox(height: 6),
             const Text('Демонстрация. Не отправляет заказы и не списывает деньги.'),
+            const SizedBox(height: 12),
+            const Text('Тип поездки', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            SegmentedButton<String>(
+              key: const Key('passenger-ride-type'),
+              segments: const [
+                ButtonSegment(value: 'Такси', label: Text('Такси'),
+                  icon: Icon(Icons.local_taxi_outlined)),
+                ButtonSegment(value: 'Трансфер', label: Text('Трансфер'),
+                  icon: Icon(Icons.airport_shuttle_outlined)),
+              ],
+              selected: {_rideType},
+              onSelectionChanged: (v) => setState(() {
+                _rideType = v.first;
+                if (_rideType != 'Трансфер') _roundTrip = false;
+              }),
+            ),
+            if (_rideType == 'Трансфер') ...[
+              SwitchListTile(
+                key: const Key('passenger-round-trip'),
+                title: const Text('Туда и обратно'),
+                value: _roundTrip,
+                onChanged: (v) => setState(() => _roundTrip = v),
+              ),
+              const Text(
+                'Фиксированный трансфер Вильнюс → Каунас: '
+                '130 € в одну сторону, 190 € туда и обратно. '
+                'Другие направления — цена по запросу. '
+                'Без промежуточных остановок.',
+                key: Key('passenger-transfer-tariffs'),
+                style: TextStyle(fontSize: 12),
+              ),
+            ] else
+              const Text(
+                'Такси: стоимость рассчитывается отдельно '
+                'и подтверждается до оплаты.',
+                key: Key('passenger-taxi-tariffs'),
+                style: TextStyle(fontSize: 12),
+              ),
             const SizedBox(height: 12),
             SizedBox(
               height: 195,
@@ -452,7 +497,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               style: TextStyle(fontSize: 12)),
             const SizedBox(height: 12),
             Text(
-              'Выбрано: ${_route.isNotEmpty ? _route : 'свой маршрут'} · $_payment',
+              'Выбрано: $_rideType · ${_route.isNotEmpty ? _route : 'свой маршрут'} · $_payment',
               key: const Key('passenger-summary'),
             ),
             const SizedBox(height: 12),

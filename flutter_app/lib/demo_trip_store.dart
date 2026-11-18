@@ -24,6 +24,7 @@ class DemoTripStore extends ChangeNotifier {
   DemoTrip? _trip;
   DemoTripStatus? _status;
   bool _paused = false;
+  bool _pilotAccepted = false;
   bool _disposed = false;
   final List<String> _pilotChatMessages = <String>[];
 
@@ -42,12 +43,15 @@ class DemoTripStore extends ChangeNotifier {
   }
   DemoTripStatus? get status => _status;
   bool get paused => _paused;
+  bool get pilotAccepted => _pilotAccepted;
   bool get isActive => _status != null && _status != DemoTripStatus.finished;
 
   String get statusLabel => switch (_status) {
     null => 'Нет тестового заказа',
     DemoTripStatus.requested => 'Заявка создана · ожидает назначения',
-    DemoTripStatus.assigned => 'Пилот назначен · ожидает выезда',
+    DemoTripStatus.assigned => _pilotAccepted
+        ? 'Заказ принят · пилот готов к выезду'
+        : 'Пилот назначен · ожидает принятия',
     DemoTripStatus.approaching => _paused
         ? 'Остановка · демо'
         : 'Пилот едет к пассажиру',
@@ -78,6 +82,7 @@ class DemoTripStore extends ChangeNotifier {
     _status = DemoTripStatus.requested;
     _pilotChatMessages.clear();
     _paused = false;
+    _pilotAccepted = false;
     notifyListeners();
     return true;
   }
@@ -85,12 +90,34 @@ class DemoTripStore extends ChangeNotifier {
   bool assignPilot() {
     if (_disposed || _status != DemoTripStatus.requested) return false;
     _status = DemoTripStatus.assigned;
+    _pilotAccepted = false;
+    notifyListeners();
+    return true;
+  }
+
+  /// A pilot must explicitly accept a dispatcher-assigned offline demo trip.
+  bool acceptAssignedPilot() {
+    if (_disposed || _status != DemoTripStatus.assigned || _pilotAccepted) {
+      return false;
+    }
+    _pilotAccepted = true;
+    notifyListeners();
+    return true;
+  }
+
+  /// Declining releases the assignment; the demo dispatcher can reassign.
+  bool declineAssignedPilot() {
+    if (_disposed || _status != DemoTripStatus.assigned || _pilotAccepted) {
+      return false;
+    }
+    _status = DemoTripStatus.requested;
+    _pilotAccepted = false;
     notifyListeners();
     return true;
   }
 
   bool advancePilot() {
-    if (_disposed || _paused) return false;
+    if (_disposed || _paused || !_pilotAccepted) return false;
     final next = switch (_status) {
       DemoTripStatus.assigned => DemoTripStatus.approaching,
       DemoTripStatus.approaching => DemoTripStatus.underway,

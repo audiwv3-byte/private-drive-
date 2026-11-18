@@ -174,6 +174,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
       departure: departure,
       rideType: _rideType,
       roundTrip: _roundTrip,
+      estimatedFareEur: _pricePreview,
+      extrasRequireQuote: _requiresCustomQuote,
       services: [
         if (_meetSign) 'Встреча с табличкой',
         if (_pets) 'Животные',

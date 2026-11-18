@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/demo_trip_store.dart';
 import 'package:private_drive/passenger_orders_demo.dart';
 import 'package:private_drive/demo_interfaces.dart';
+import 'package:private_drive/passenger_demo.dart';
 
 DemoTripStore makeOrder() {
   final store = DemoTripStore();
@@ -69,6 +70,20 @@ void main() {
     await tester.tap(find.byKey(const Key('passenger-chat-send')));
     await tester.pump();
     expect(store.passengerChatMessages, ['Вижу автомобиль']);
+  });
+
+  testWidgets('Passenger can switch map day and night in offline preview',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PassengerDemo(enableMapTiles: false),
+    ));
+    expect(find.byKey(const Key('passenger-map')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-map-day-night')), findsOneWidget);
+    expect(find.byTooltip('Ночная карта'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('passenger-map-day-night')));
+    await tester.pump();
+    expect(find.byTooltip('Дневная карта'), findsOneWidget);
+    expect(find.byKey(const Key('passenger-map')), findsOneWidget);
   });
 
   testWidgets('Pilot can switch day and night without leaving map',

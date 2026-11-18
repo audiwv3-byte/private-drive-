@@ -7,7 +7,6 @@ import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
 import 'company_info.dart';
 import 'passenger_orders_demo.dart';
-import 'dart:math' as math;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
@@ -28,6 +27,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
   final _from = TextEditingController();
   final _to = TextEditingController();
   final _tripWishes = TextEditingController();
+  final _favoriteTracks = List.generate(3, (_) => TextEditingController());
+  String _radioStation = 'Без радио';
+  double? _cabinTemperature;
   DateTime? _date;
   TimeOfDay? _time;
   String _route = '';
@@ -180,6 +182,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
         if (_pets) 'Животные',
         if (_soberDriver) 'Трезвый водитель',
         if (_music) 'Музыка в дорогу',
+        if (_radioStation != 'Без радио') 'Радио: $_radioStation',
+        for (var i = 0; i < _favoriteTracks.length; i++)
+          if (_favoriteTracks[i].text.trim().isNotEmpty)
+            'Любимый трек ${i + 1}: ${_favoriteTracks[i].text.trim()}',
+        if (_cabinTemperature != null)
+          'Желаемая температура салона: ${_cabinTemperature!.toStringAsFixed(0)} °C',
         if (_flowers) 'Цветы',
         if (_coffee) 'Кофе',
         if (_water) 'Питьевая вода',
@@ -209,30 +217,56 @@ class _PassengerDemoState extends State<PassengerDemo> {
     'Аэропорт Вильнюса': LatLng(54.6341, 25.2858),
   };
 
-  /// Only an agreed fixed price is shown. Other routes remain quote-only.
+  // Approved one-way Sedan tariffs, without 10% discount.
+  static const _transferFares = <String, int>{
+    'вильнюс|аэропорт вильнюса': 40,
+    'аэропорт вильнюса|вильнюс': 40,
+    'вильнюс|каунас': 130,
+    'каунас|вильнюс': 90,
+    'вильнюс|клайпеда': 230,
+    'вильнюс|паневежис': 120,
+    'вильнюс|кедайняй': 130,
+    'вильнюс|шяуляй': 200,
+    'вильнюс|мариямполе': 130,
+    'вильнюс|алитус': 100,
+    'вильнюс|друскининкай': 120,
+    'вильнюс|бирштонас': 90,
+    'вильнюс|утена': 115,
+    'вильнюс|кибартай': 160,
+    'вильнюс|панямуне': 200,
+    'вильнюс|рига': 250,
+    'вильнюс|варшава': 400,
+  };
+
   int? get _fixedPrice {
-    if (_rideType != 'Трансфер') return null;
     final a = _from.text.trim().toLowerCase();
     final b = _to.text.trim().toLowerCase();
-    if (a == 'вильнюс' && b == 'каунас') {
-      return _roundTrip ? 190 : 130;
+    if (_rideType == 'Такси') {
+      return !_roundTrip && a == 'вильнюс' && b == 'каунас' ? 90 : null;
     }
-    return null;
+    if (_rideType != 'Трансфер') return null;
+    if (_roundTrip) return a == 'вильнюс' && b == 'каунас' ? 190 : null;
+    return _transferFares['$a|$b'];
   }
 
   int? get _pricePreview {
     if (_pets || _soberDriver || _flowers || _coffee || _water) return null;
     final fixed = _fixedPrice;
-    if (fixed != null) return fixed + (_meetSign ? 15 : 0);
-    final km = _routeKm;
-    if (km == null || !km.isFinite || km <= 0) return null;
-    // Indicative formula from legacy Euro_Baltic_Transfer.py defaults:
-    // BASE_FARE=8, RATE_PER_KM=0.9, MIN_FARE=25, ROUNDTRIP_FACTOR=2.
-    // These are defaults, NOT verified live taxi/transfer tariffs.
-    final base = math.max(25.0, 8.0 + 0.9 * km) *
-      (_roundTrip ? 2 : 1);
-    return base.round() + (_meetSign ? 15 : 0);
+    return fixed == null ? null : fixed + (_meetSign ? 15 : 0);
   }
+
+  // Vilnius FM frequencies (no playback, preference only).
+  static const _vilniusRadio = <String>[
+    'Без радио',
+    'M-1 · 106,8 FM',
+    'M-1 Plius · 106,2 FM',
+    'Radiocentras · 89,6 FM',
+    'Power Hit Radio · 95,9 FM',
+    'ZIP FM · 100,1 FM',
+    'Lietus · 103,1 FM',
+    'Relax FM · 96,4 FM',
+    'LRT RADIJAS · 89,0 FM',
+  ];
 
   /// Public routing service is used only for a preview of preset city routes.
   /// Failure is displayed explicitly; never pretend a straight line is a road.
@@ -337,6 +371,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _from.dispose();
     _to.dispose();
     _tripWishes.dispose();
+    for (final track in _favoriteTracks) {
+      track.dispose();
+    }
     super.dispose();
   }
 
@@ -451,18 +488,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 onChanged: (v) => setState(() => _roundTrip = v),
               ),
               const Text(
-                'Фиксированный трансфер Вильнюс → Каунас: '
-                '130 € в одну сторону, 190 € туда и обратно. '
-                'Клайпеда, Варшава, Тракай и Паланга — цена по запросу, '
-                'до подтверждения заявки. '
-                'Без промежуточных остановок.',
+                'Фиксированные тарифы Sedan без скидки: '
+                'Вильнюс → Каунас 130 €, обратно 90 €, '
+                'Вильнюс ↔ аэропорт Вильнюса 40 €. '
+                'Вильнюс — Каунас туда и обратно 190 €. '
+                'Другие маршруты — по тарифной таблице или по запросу.',
                 key: Key('passenger-transfer-tariffs'),
                 style: TextStyle(fontSize: 12),
               ),
             ] else
               const Text(
-                'Такси: стоимость рассчитывается отдельно '
-                'и подтверждается до оплаты.',
+                'Такси: Вильнюс → Каунас 90 €. '
+                'Остальные направления — по запросу.',
                 key: Key('passenger-taxi-tariffs'),
                 style: TextStyle(fontSize: 12),
               ),
@@ -708,6 +745,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 onChanged: (v) => setState(() {
                   _music = v ?? false;
                   if (_music) _quietRide = false;
+                   if (!_music) _radioStation = 'Без радио';
                 }),
               ),
               CheckboxListTile(
@@ -742,7 +780,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 value: _quietRide,
                 onChanged: (v) => setState(() {
                   _quietRide = v ?? false;
-                  if (_quietRide) _music = false;
+                  if (_quietRide) {
+                     _music = false;
+                     _radioStation = 'Без радио';
+                   }
                 }),
               ),
               CheckboxListTile(
@@ -753,6 +794,61 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 value: _luggageHelp,
                 onChanged: (v) => setState(() => _luggageHelp = v ?? false),
               ),
+              const Padding(
+                padding: EdgeInsets.only(top: 12, bottom: 8),
+                child: Text('Комфорт и музыка в дороге',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              DropdownButtonFormField<String>(
+                key: const Key('passenger-radio-station'),
+                initialValue: _radioStation,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Радиостанция · FM-частоты Вильнюса',
+                  border: OutlineInputBorder(),
+                ),
+                items: _vilniusRadio.map((station) =>
+                  DropdownMenuItem(value: station, child: Text(station))).toList(),
+                onChanged: (station) => setState(() {
+                  _radioStation = station ?? 'Без радио';
+                  if (_radioStation != 'Без радио') {
+                    _music = true;
+                    _quietRide = false;
+                  }
+                }),
+              ),
+              const SizedBox(height: 8),
+              for (var i = 0; i < _favoriteTracks.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TextField(
+                    key: Key('passenger-favorite-track-$i'),
+                    controller: _favoriteTracks[i],
+                    maxLength: 100,
+                    decoration: InputDecoration(
+                      labelText: 'Любимый трек ${i + 1} · исполнитель и название',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              DropdownButtonFormField<double?>(
+                key: const Key('passenger-cabin-temperature'),
+                initialValue: _cabinTemperature,
+                decoration: const InputDecoration(
+                  labelText: 'Желаемая температура в салоне',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem<double?>(
+                    value: null, child: Text('На усмотрение пилота')),
+                  for (var temp = 18; temp <= 26; temp++)
+                    DropdownMenuItem<double?>(
+                      value: temp.toDouble(), child: Text('$temp °C')),
+                ],
+                onChanged: (temperature) =>
+                  setState(() => _cabinTemperature = temperature),
+              ),
+              const SizedBox(height: 12),
               TextField(
                 key: const Key('passenger-trip-wishes'),
                 controller: _tripWishes,
@@ -786,7 +882,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             Text(
               price != null ? (_fixedPrice != null
                   ? 'Предварительная стоимость: $price €'
-                  : 'Ориентировочная стоимость: $price € · по старой формуле, требует подтверждения')
+                  : 'Предварительная стоимость: $price €')
                   : _fixedPrice != null
                     ? 'Стоимость по запросу: дополнительные услуги требуют расчёта'
                     : 'Стоимость по запросу · фиксированная цена не установлена',
@@ -795,7 +891,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 color: gold, fontWeight: FontWeight.bold, fontSize: 16,
               ),
             ),
-            const Text('Демо-расчёт по прежним коэффициентам. '
+            const Text('Предпросмотр согласованных тарифов. '
               'Окончательная цена назначается диспетчером до оплаты.',
               style: TextStyle(fontSize: 12)),
             const SizedBox(height: 12),

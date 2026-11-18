@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'brand_logo.dart';
+import 'pilot_cockpit_overlay.dart';
 import 'demo_interfaces.dart' show PilotDemo;
 import 'demo_trip_store.dart';
 import 'vilnius_evening_backdrop.dart';
@@ -21,12 +26,77 @@ class PilotCabin extends StatefulWidget {
 
 class _PilotCabinState extends State<PilotCabin> {
   bool _onLine = false;
+  OverlayEntry? _cockpitEntry;
+  Timer? _offerAlert;
+  bool _hasAnnouncedOffer = false;
+
+  bool get _pendingOffer => _onLine &&
+      widget.tripStore?.status == DemoTripStatus.assigned &&
+      widget.tripStore?.pilotAccepted == false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.tripStore?.addListener(_syncOfferSound);
+  }
+
+  void _syncOfferSound() {
+    if (!_pendingOffer) {
+      _offerAlert?.cancel();
+      _offerAlert = null;
+      _hasAnnouncedOffer = false;
+      return;
+    }
+    if (_hasAnnouncedOffer) return;
+    _hasAnnouncedOffer = true;
+    SystemSound.play(SystemSoundType.alert);
+    _offerAlert?.cancel();
+    _offerAlert = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (_pendingOffer) {
+        SystemSound.play(SystemSoundType.alert);
+      } else {
+        _offerAlert?.cancel();
+        _offerAlert = null;
+      }
+    });
+  }
+
+  void _showCockpitOverlay() {
+    if (!_onLine || !mounted || _cockpitEntry != null) return;
+    _cockpitEntry = OverlayEntry(
+      builder: (_) => PilotCockpitOverlay(
+        tripStore: widget.tripStore,
+        onAccept: () => widget.tripStore?.acceptAssignedPilot(),
+        onDecline: () => widget.tripStore?.declineAssignedPilot(),
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(_cockpitEntry!);
+    _syncOfferSound();
+  }
+
+  void _hideCockpitOverlay() {
+    _offerAlert?.cancel();
+    _offerAlert = null;
+    _hasAnnouncedOffer = false;
+    _cockpitEntry?.remove();
+    _cockpitEntry?.dispose();
+    _cockpitEntry = null;
+  }
+
+  @override
+  void dispose() {
+    widget.tripStore?.removeListener(_syncOfferSound);
+    _hideCockpitOverlay();
+    super.dispose();
+  }
+
 
   void _openMap() {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => PilotDemo(
         enableMapTiles: widget.enableMapTiles,
         tripStore: widget.tripStore,
+        showAssignedOffer: false,
       ),
     ));
   }
@@ -34,10 +104,12 @@ class _PilotCabinState extends State<PilotCabin> {
   void _toggleLine() {
     if (_onLine) {
       setState(() => _onLine = false);
+      _hideCockpitOverlay();
       return;
     }
     setState(() => _onLine = true);
     _openMap();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showCockpitOverlay());
   }
 
   @override
@@ -60,6 +132,8 @@ class _PilotCabinState extends State<PilotCabin> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  const PrivateDriveBrandLogo(size: 86),
+                  const SizedBox(height: 12),
                   const Text(
                     'КАБИНЕТ ПИЛОТА',
                     style: TextStyle(

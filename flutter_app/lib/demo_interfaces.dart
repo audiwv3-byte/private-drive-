@@ -14,7 +14,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
-/// Standalone offline simulator. Each launch creates one isolated trip store.
+/// Deep-link to the native Waze app. No HTTPS browser fallback.\nfinal Uri privateDriveWazeAppUri = Uri.parse('waze://');\n\n/// Standalone offline simulator. Each launch creates one isolated trip store.
 class PrivateDriveDemo extends StatefulWidget {
   const PrivateDriveDemo({super.key, this.enableMapTiles = true});
 
@@ -202,23 +202,24 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     ));
   }
 
-  /// Opens Waze itself, without inventing a precise passenger coordinate.
-  /// The demo currently stores place names rather than verified street points.
+  /// Launch Waze as a separate Android application (never in an in-app
+  /// browser or WebView). Do not fallback to HTTPS: that may open inside PD.
+  /// The demo has no verified destination coordinates yet.
   Future<void> _openWaze() async {
     try {
       final opened = await launchUrl(
-        Uri.https('waze.com', '/ul'),
+        privateDriveWazeAppUri,
         mode: LaunchMode.externalApplication,
       );
       if (!opened && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть Waze. Проверь установку приложения.')),
+          const SnackBar(content: Text('Установи Waze: открыть его отдельно не удалось.')),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть Waze. Проверь установку приложения.')),
+          const SnackBar(content: Text('Установи Waze: открыть его отдельно не удалось.')),
         );
       }
     }

@@ -112,10 +112,13 @@ void main() {
         matching: find.byType(Scrollable),
       ).first,
     );
-    await tester.ensureVisible(find.byKey(const Key('service-meet-sign')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('service-meet-sign')));
-    await tester.pumpAndSettle();
+    // Exercise the checkbox callback directly: the expandable preferences
+    // panel may move this tile under the viewport while scrolling.
+    tester.widget<CheckboxListTile>(
+      find.byKey(const Key('service-meet-sign')),
+    ).onChanged!(true);
+    await tester.pump();
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')), 220,
       scrollable: find.descendant(

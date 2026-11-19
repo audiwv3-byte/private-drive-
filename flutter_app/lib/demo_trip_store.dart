@@ -17,7 +17,6 @@ class DemoTrip {
     this.advanceBooking = false,
     this.estimatedFareEur,
     this.estimatedFareCents,
-    this.advanceBooking = false,
     this.extrasRequireQuote = false,
     required this.services,
   });
@@ -33,8 +32,6 @@ class DemoTrip {
   final int? estimatedFareEur;
   /// Taxi prices use exact cents; transfer prices remain whole euros.
   final int? estimatedFareCents;
-  /// Scheduled/prebooked trips are never payable with cash.
-  final bool advanceBooking;
   /// True when additional selected services still require dispatcher pricing.
   final bool extrasRequireQuote;
   final List<String> services;
@@ -275,7 +272,6 @@ class DemoTripStore extends ChangeNotifier {
     bool advanceBooking = false,
     int? estimatedFareEur,
     int? estimatedFareCents,
-    bool advanceBooking = false,
     bool extrasRequireQuote = false,
   }) {
     final a = from.trim();
@@ -286,7 +282,6 @@ class DemoTripStore extends ChangeNotifier {
         (estimatedFareCents < 0 || estimatedFareCents > 100000000)) return false;
     if (!['Карта', 'PayPal', 'Банковский перевод',
       'Криптовалюта', 'Наличные'].contains(paymentMethod)) return false;
-    if (advanceBooking && paymentMethod == 'Наличные') return false;
     if (paymentMethod == 'Наличные' &&
         (advanceBooking ||
          departure.isAfter(DateTime.now().add(const Duration(minutes: 10))))) {
@@ -305,7 +300,6 @@ class DemoTripStore extends ChangeNotifier {
       advanceBooking: advanceBooking,
       estimatedFareEur: estimatedFareEur,
       estimatedFareCents: estimatedFareCents,
-      advanceBooking: advanceBooking,
       extrasRequireQuote: extrasRequireQuote,
       services: List.unmodifiable(services),
     );
@@ -418,7 +412,6 @@ class DemoTripStore extends ChangeNotifier {
       'advanceBooking': trip.advanceBooking,
       'estimatedFareEur': trip.estimatedFareEur,
       'estimatedFareCents': trip.estimatedFareCents,
-      'advanceBooking': trip.advanceBooking,
       'extrasRequireQuote': trip.extrasRequireQuote,
       'services': trip.services,
       'status': status.name,
@@ -454,7 +447,6 @@ class DemoTripStore extends ChangeNotifier {
       final services = data['services'];
       final estimatedFareEur = data['estimatedFareEur'];
       final estimatedFareCents = data['estimatedFareCents'];
-      final advanceBooking = data['advanceBooking'] ?? false;
       final extrasRequireQuote = data['extrasRequireQuote'];
       final statusName = data['status'];
       final arrivalAtRaw = data['arrivalAt'];
@@ -487,8 +479,6 @@ class DemoTripStore extends ChangeNotifier {
           (estimatedFareCents != null &&
               (estimatedFareCents is! int || estimatedFareCents < 0 ||
                estimatedFareCents > 100000000)) ||
-          advanceBooking is! bool ||
-          (advanceBooking && payment == 'Наличные') ||
           (extrasRequireQuote != null && extrasRequireQuote is! bool)) {
         return false;
       }
@@ -549,7 +539,6 @@ class DemoTripStore extends ChangeNotifier {
         roundTrip: roundTrip, advanceBooking: advanceBooking,
         estimatedFareEur: estimatedFareEur as int?,
         estimatedFareCents: estimatedFareCents as int?,
-        advanceBooking: advanceBooking,
         extrasRequireQuote: extrasRequireQuote == true,
         services: List<String>.unmodifiable(services.cast<String>()));
       _status = status.first;

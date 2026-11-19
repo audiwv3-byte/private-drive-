@@ -936,7 +936,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   children: [
                     widget.enableMapTiles
                     ? KeyedSubtree(
-                        key: ValueKey('passenger-route-map-${_from.text}-${_to.text}-$_tileRetry'),
+                        key: const ValueKey('passenger-route-map-persistent-controller'),
                         child: FlutterMap(
                         key: const Key('passenger-map'),
                         mapController: _passengerMapController,
@@ -949,7 +949,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                               : const Color(0xFFE0EAF0),
                         ),
                         children: [
-                          ColorFiltered(
+                          KeyedSubtree(
+                            key: ValueKey('passenger-raster-tile-generation-$mapGeneration'),
+                            child: ColorFiltered(
                             key: const Key('passenger-map-night-filter'),
                             colorFilter: _nightMap
                                 ? const ColorFilter.matrix(<double>[
@@ -999,6 +1001,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                 });
                               });
                             },
+                            ),
                             ),
                           ),
                           if (_roadPoints.isNotEmpty)

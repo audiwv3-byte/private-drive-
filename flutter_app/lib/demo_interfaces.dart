@@ -15,6 +15,7 @@ import 'pilot_payment_settings.dart';
 import 'pilot_offer_tone.dart';
 import 'pd_slide_to_confirm.dart';
 import 'pilot_passenger_chat_demo.dart';
+import 'isolated_trip_chat.dart';
 import 'message_voice.dart';
 import 'demo_trip_store.dart';
 import 'demo_dispatcher_cabinet.dart';
@@ -935,6 +936,23 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
             title: Text(pdLabel(context, 'Статус поездки')),
             subtitle: Text(pdLabel(context, _tripLabel)),
             onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            key: const Key('pilot-drawer-remote-chat'),
+            leading: const Icon(Icons.chat_outlined),
+            title: const Text('Сообщения между устройствами · тест'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Тестовый чат пилота')),
+                  body: const SafeArea(child: SingleChildScrollView(
+                    padding: EdgeInsets.all(16),
+                    child: IsolatedTripChat(expectedRole: 'pilot'),
+                  )),
+                ),
+              ));
+            },
           ),
           ListTile(
             key: const Key('pilot-drawer-sounds'),

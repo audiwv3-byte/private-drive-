@@ -192,7 +192,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                       animation: _trip,
                       builder: (context, _) => Column(
                         children: [
-                          Text(_trip.statusLabel,
+                          Text(pdLabel(context, _trip.statusLabel),
                               key: const Key('shared-trip-status'),
                               textAlign: TextAlign.center),
                           if (_trip.trip != null)
@@ -465,7 +465,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Позвонить пассажиру'),
+        title: Text(pdLabel(context, 'Позвонить пассажиру')),
         content: const Text(
           'Это локальная демоверсия. Подтверждённого номера пассажира нет. '
           'Реальный звонок не выполняется.',
@@ -473,7 +473,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Понятно'),
+            child: Text(pdLabel(context, 'Понятно')),
           ),
         ],
       ),
@@ -907,7 +907,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     children: [
                       const Icon(Icons.map_outlined, color: Colors.white,
                           size: 38),
-                      const Text('Карта пилота не загрузилась',
+                      Text(pdLabel(context, 'Карта пилота не загрузилась'),
                         key: Key('pilot-map-load-error'),
                         style: TextStyle(color: Colors.white)),
                       TextButton.icon(
@@ -918,7 +918,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           _pilotTilesFailed = false;
                         }),
                         icon: const Icon(Icons.refresh),
-                        label: const Text('Повторить загрузку карты'),
+                        label: Text(pdLabel(context, 'Повторить загрузку карты')),
                       ),
                     ],
                   ),
@@ -933,7 +933,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   left: 12,
                   child: IconButton.filledTonal(
                     key: const Key('exit-pilot-preview'),
-                    tooltip: 'Назад',
+                    tooltip: pdLabel(context, 'Назад'),
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back),
                   ),
@@ -964,7 +964,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     borderRadius: BorderRadius.circular(14),
                     child: IconButton(
                       key: const Key('pilot-map-day-night'),
-                      tooltip: _nightMap ? 'Дневная карта' : 'Ночная карта',
+                      tooltip: pdLabel(context, _nightMap ? 'Дневная карта' : 'Ночная карта'),
                       icon: Icon(_nightMap ? Icons.wb_sunny_outlined
                         : Icons.dark_mode_outlined,
                         color: const Color(0xFFDDC184), size: 22),
@@ -1006,7 +1006,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                         FloatingActionButton.small(
                           key: const Key('pilot-enable-gps'),
                           heroTag: 'pilot-gps',
-                          tooltip: 'Включить GPS',
+                          tooltip: pdLabel(context, 'Включить GPS'),
                           onPressed: _enableGps,
                           child: const Icon(Icons.my_location),
                         )
@@ -1014,7 +1014,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                         FloatingActionButton.small(
                           key: const Key('pilot-disable-gps'),
                           heroTag: 'pilot-stop-gps',
-                          tooltip: 'Выключить GPS',
+                          tooltip: pdLabel(context, 'Выключить GPS'),
                           onPressed: _stopGps,
                           child: const Icon(Icons.location_off),
                         ),
@@ -1024,7 +1024,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           child: FloatingActionButton.small(
                             key: const Key('pilot-center-map'),
                             heroTag: 'pilot-center',
-                            tooltip: 'Центрировать карту',
+                            tooltip: pdLabel(context, 'Центрировать карту'),
                             onPressed: () {
                               if (widget.enableMapTiles) {
                                 _map.move(_position!, _map.camera.zoom);
@@ -1050,7 +1050,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(_tripLabel,
+                            Text(pdLabel(context, _tripLabel),
                                 key: const Key('pilot-trip-state')),
                             if (_navigatingActiveTrip) ...[
                               if (_pickupRoutingInfo.isNotEmpty)
@@ -1095,7 +1095,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Text('Новый назначенный заказ · демо',
+                                    Text(pdLabel(context, 'Новый назначенный заказ · демо'),
                                       style: TextStyle(
                                         color: Color(0xFFDDC184),
                                         fontWeight: FontWeight.bold,
@@ -1112,7 +1112,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                         child: FilledButton(
                                           key: const Key('pilot-accept-assigned'),
                                           onPressed: widget.tripStore!.acceptAssignedPilot,
-                                          child: const Text('Принять'),
+                                          child: Text(pdLabel(context, 'Принять')),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -1120,7 +1120,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                         child: OutlinedButton(
                                           key: const Key('pilot-decline-assigned'),
                                           onPressed: widget.tripStore!.declineAssignedPilot,
-                                          child: const Text('Отклонить'),
+                                          child: Text(pdLabel(context, 'Отклонить')),
                                         ),
                                       ),
                                     ]),
@@ -1133,7 +1133,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                 key: const Key('pilot-simulate-offer'),
                                 onPressed: _simulateNewOffer,
                                 icon: const Icon(Icons.notifications_active_outlined),
-                                label: const Text('Сымитировать новый заказ'),
+                                label: Text(pdLabel(context, 'Сымитировать новый заказ')),
                               ),
                             if (_isUnderway && _incomingOffer)
                               Container(
@@ -1165,7 +1165,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                               backgroundColor: const Color(0xFF15844B),
                                             ),
                                             onPressed: () => _respondToOffer(true),
-                                            child: const Text('Принять следующий'),
+                                            child: Text(pdLabel(context, 'Принять следующий')),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -1176,7 +1176,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                               foregroundColor: const Color(0xFFFF6972),
                                             ),
                                             onPressed: () => _respondToOffer(false),
-                                            child: const Text('Пропустить'),
+                                            child: Text(pdLabel(context, 'Пропустить')),
                                           ),
                                         ),
                                       ],
@@ -1204,7 +1204,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                       key: const Key('pilot-passenger-chat'),
                                       onPressed: _openPassengerChat,
                                       icon: const Icon(Icons.chat_bubble_outline),
-                                      label: const Text('Написать'),
+                                      label: Text(pdLabel(context, 'Написать')),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -1213,7 +1213,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                       key: const Key('pilot-passenger-call'),
                                       onPressed: _showCallDemo,
                                       icon: const Icon(Icons.call_outlined),
-                                      label: const Text('Позвонить'),
+                                      label: Text(pdLabel(context, 'Позвонить')),
                                     ),
                                   ),
                                 ],
@@ -1227,7 +1227,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                   child: FilledButton(
                                     key: const Key('pilot-next-trip'),
                                     onPressed: _canAdvance ? advance : null,
-                                    child: Text(_actionText),
+                                    child: Text(pdLabel(context, _actionText)),
                                   ),
                                 ),
                                 const SizedBox(width: 8),

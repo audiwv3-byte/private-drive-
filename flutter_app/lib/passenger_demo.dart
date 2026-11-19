@@ -754,10 +754,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             key: const Key('passenger-map-tiles'),
                             urlTemplate: _nightMap
                                 ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                                : 'https://a.basemaps.cartocdn.com/voyager/{z}/{x}/{y}.png',
+                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             fallbackUrl: _nightMap
                                 ? 'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                : null,
                             userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
                             errorTileCallback: (tile, error, stackTrace) {
                               WidgetsBinding.instance.addPostFrameCallback((_) {

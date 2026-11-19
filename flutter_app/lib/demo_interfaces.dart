@@ -321,6 +321,9 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _displayPosition;
   double _headingDegrees = 0;
   bool _nightMap = false;
+  int _pilotTileErrors = 0;
+  bool _pilotTilesFailed = false;
+  int _pilotTileRetry = 0;
   late List<LatLng> _pickupRoadPoints = widget.testRoadPoints ?? const [];
   bool _pickupRouteAttempted = false;
   String _pickupRoutingInfo = '';
@@ -770,7 +773,9 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         fit: StackFit.expand,
         children: [
           if (widget.enableMapTiles)
-            FlutterMap(
+            KeyedSubtree(
+              key: ValueKey('pilot-map-retry-$_pilotTileRetry'),
+              child: FlutterMap(
               key: const Key('pilot-map-surface'),
               mapController: _map,
               options: MapOptions(
@@ -792,6 +797,15 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                       : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'lt.privatedrive.private_drive.demo',
                     maxNativeZoom: 19,
+                    errorTileCallback: (tile, error, stackTrace) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted || _pilotTilesFailed) return;
+                        setState(() {
+                          _pilotTileErrors++;
+                          if (_pilotTileErrors >= 3) _pilotTilesFailed = true;
+                        });
+                      });
+                    },
                   ),
                 if (_navigatingActiveTrip && _pickupRoadPoints.isNotEmpty)
                   PolylineLayer(
@@ -857,12 +871,42 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   ],
                 ),
               ],
+            ),
             )
           else
             const RepaintBoundary(
               child: CustomPaint(
                 key: Key('pilot-map-surface'),
                 painter: DemoMapPainter(),
+              ),
+            ),
+          if (widget.enableMapTiles && widget.loadMapTiles &&
+              _pilotTilesFailed)
+            Positioned.fill(
+              child: ColoredBox(
+                color: const Color(0xD9172535),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.map_outlined, color: Colors.white,
+                          size: 38),
+                      const Text('Карта пилота не загрузилась',
+                        key: Key('pilot-map-load-error'),
+                        style: TextStyle(color: Colors.white)),
+                      TextButton.icon(
+                        key: const Key('pilot-map-retry'),
+                        onPressed: () => setState(() {
+                          _pilotTileRetry++;
+                          _pilotTileErrors = 0;
+                          _pilotTilesFailed = false;
+                        }),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Повторить загрузку карты'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           SafeArea(

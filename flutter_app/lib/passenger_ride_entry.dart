@@ -28,7 +28,8 @@ class PassengerRideEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Пассажир')}')),
+    appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Пассажир')}'),
+      actions: const [PdLanguageMenu()]),
     body: Stack(fit: StackFit.expand, children: [
       const VilniusEveningBackdrop(),
       SafeArea(child: Center(child: ConstrainedBox(

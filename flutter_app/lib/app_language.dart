@@ -58,19 +58,30 @@ class PdLanguageMenu extends StatelessWidget {
     return PopupMenuButton<String>(
       key: const Key('passenger-global-language-menu'),
       tooltip: pdTr(context, 'Язык приложения', 'Programėlės kalba', 'App language'),
-      icon: const Icon(Icons.language),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Text(
+          switch (selected) {
+            'LT' => '🇱🇹 LT',
+            'EN' => '🇬🇧 EN',
+            _ => '🇷🇺 RU',
+          },
+          key: const Key('passenger-language-flag'),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        ),
+      ),
       initialValue: selected,
       onSelected: pdLanguage.set,
       itemBuilder: (context) => const [
         PopupMenuItem<String>(
           key: Key('passenger-select-language-RU'),
-          value: 'RU', child: Text('Русский · RU')),
+          value: 'RU', child: Text('🇷🇺 RU')),
         PopupMenuItem<String>(
           key: Key('passenger-select-language-LT'),
-          value: 'LT', child: Text('Lietuvių · LT')),
+          value: 'LT', child: Text('🇱🇹 LT')),
         PopupMenuItem<String>(
           key: Key('passenger-select-language-EN'),
-          value: 'EN', child: Text('English · EN')),
+          value: 'EN', child: Text('🇬🇧 EN')),
       ],
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
 import 'demo_trip_store.dart';
+import 'app_language.dart';
 
 /// In-app root overlay: follows the pilot while any pilot route is open.
 /// Displays only local synthetic data; does not receive production jobs.
@@ -74,8 +75,8 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                               children: [
                                 const PrivateDriveBrandLogo(size: 27, circular: true),
                                 const SizedBox(width: 7),
-                                const Flexible(
-                                  child: Text('Сегодня · 0,00 €',
+                                Flexible(
+                                  child: Text(pdLabel(context, 'Сегодня · 0,00 €'),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -92,19 +93,19 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                             ),
                             if (_expanded) ...[
                               const SizedBox(height: 8),
-                              const Text('За неделю · 0,00 € · демо',
+                              Text(pdLabel(context, 'За неделю · 0,00 € · демо'),
                                 style: TextStyle(fontSize: 12)),
-                              const Text('Баланс · нет подключённых выплат',
+                              Text(pdLabel(context, 'Баланс · нет подключённых выплат'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(fontSize: 12)),
                               Text(
                                 fare == null
-                                  ? 'Стоимость заказа · по запросу'
-                                  : 'Стоимость заказа · $fare €',
+                                  ? pdLabel(context, 'Стоимость заказа · по запросу')
+                                  : '${pdLabel(context, 'Стоимость заказа')} · $fare €',
                                 style: const TextStyle(
                                   fontSize: 12, color: gold),
                               ),
-                              const Text('Доход пилота · комиссия не настроена',
+                              Text(pdLabel(context, 'Доход пилота · комиссия не настроена'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(fontSize: 11)),
                             ],
@@ -136,13 +137,13 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Row(
+                            Row(
                               children: [
-                                Icon(Icons.notifications_active, color: gold),
-                                SizedBox(width: 8),
+                                const Icon(Icons.notifications_active, color: gold),
+                                const SizedBox(width: 8),
                                 Expanded(
-                                  child: Text('Входящий заказ · демо',
-                                    style: TextStyle(
+                                  child: Text(pdLabel(context, 'Входящий заказ · демо'),
+                                    style: const TextStyle(
                                       color: gold,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 17)),
@@ -150,18 +151,18 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Text('${trip.rideType} · ${trip.from} → ${trip.to}',
+                            Text('${pdLabel(context, trip.rideType)} · ${trip.from} → ${trip.to}',
                               key: const Key('pilot-global-route'),
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700, fontSize: 17)),
                             const SizedBox(height: 7),
                             Text(fare == null
-                              ? 'Стоимость · по запросу'
-                              : 'Стоимость · $fare €'),
-                            const Text('Доход пилота · требуется тариф комиссии',
+                              ? pdLabel(context, 'Стоимость · по запросу')
+                              : '${pdLabel(context, 'Стоимость')} · $fare €'),
+                            Text(pdLabel(context, 'Доход пилота · требуется тариф комиссии'),
                               style: TextStyle(color: gold, fontSize: 12)),
-                            Text('Оплата · ${trip.paymentMethod}',
+                            Text('${pdLabel(context, 'Оплата')} · ${pdLabel(context, trip.paymentMethod)}',
                               style: const TextStyle(fontSize: 12)),
                             const SizedBox(height: 12),
                             Row(
@@ -172,7 +173,7 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                                     style: FilledButton.styleFrom(
                                       backgroundColor: const Color(0xFF126B40)),
                                     onPressed: widget.onAccept,
-                                    child: const Text('Принять'),
+                                    child: Text(pdLabel(context, 'Принять')),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -180,7 +181,7 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                                   child: OutlinedButton(
                                     key: const Key('pilot-global-decline'),
                                     onPressed: widget.onDecline,
-                                    child: const Text('Отклонить'),
+                                    child: Text(pdLabel(context, 'Отклонить')),
                                   ),
                                 ),
                               ],

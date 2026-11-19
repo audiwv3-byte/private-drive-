@@ -101,7 +101,7 @@ void main() {
     for (var i = 0; i < 3; i++) {
       final panel = find.byKey(Key('dispatcher-archived-chat-$i'));
       await tester.scrollUntilVisible(panel, 160,
-          scrollable: find.byKey(const Key('dispatcher-cabinet')));
+          scrollable: find.byType(Scrollable).first);
       expect(panel, findsOneWidget);
       await tester.tap(find.descendant(
           of: panel, matching: find.byType(ExpansionTile)));

@@ -61,6 +61,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _coffee = false;
   bool _nightMap = false;
   String _menuSection = 'booking';
+  bool _followPilot = true;
+  LatLng? _lastPilotCameraFix;
   final DraggableScrollableController _passengerSheetController = DraggableScrollableController();
   late final MapController _passengerMapController = widget.passengerMapController ?? MapController();
   bool _findingPassenger = false;
@@ -445,6 +447,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
   void _onTripChanged() {
     if (!mounted) return;
+    _scheduleFollowPilot();
     final messages = widget.tripStore?.pilotChatMessages ?? const <String>[];
     if (messages.length > _knownPilotMessageCount) {
       if (widget.onIncomingMessageVoice != null) {
@@ -468,6 +471,28 @@ class _PassengerDemoState extends State<PassengerDemo> {
     }
     _knownPilotMessageCount = messages.length;
     setState(() {});
+  }
+
+  /// Camera follows verified fresh pilot fixes, not synthetic city centres.
+  /// Never reset the user's route or selected pickup point while following.
+  void _scheduleFollowPilot() {
+    final store = widget.tripStore;
+    final seen = store?.pilotLastSeen;
+    if (!widget.enableMapTiles || !_followPilot || store == null ||
+        !store.isActive || !store.pilotOnline || seen == null ||
+        DateTime.now().difference(seen) >= const Duration(minutes: 2) ||
+        store.pilotLatitude == null || store.pilotLongitude == null) return;
+    final point = LatLng(store.pilotLatitude!, store.pilotLongitude!);
+    if (_lastPilotCameraFix == point) return;
+    _lastPilotCameraFix = point;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_followPilot || !widget.enableMapTiles) return;
+      try {
+        _passengerMapController.move(point, _passengerMapController.camera.zoom);
+      } catch (_) {
+        // Map may not be attached when navigating to another screen.
+      }
+    });
   }
 
   void _openOrders() {
@@ -784,6 +809,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final pilotPosition = showPilot
         ? LatLng(store.pilotLatitude!, store.pilotLongitude!)
         : null;
+    if (pilotPosition != null) _scheduleFollowPilot();
     final price = _pricePreview;
     final startMap = start != null && finish != null
         ? LatLng((start.latitude + finish.latitude) / 2,
@@ -991,6 +1017,31 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         ),
                       ),
                     ),
+                    if (pilotPosition != null)
+                      Positioned(
+                        top: 64,
+                        right: 8,
+                        child: Material(
+                          color: const Color(0xF0172535),
+                          borderRadius: BorderRadius.circular(12),
+                          child: IconButton(
+                            key: const Key('passenger-follow-pilot'),
+                            tooltip: _followPilot
+                              ? 'Остановить слежение за пилотом'
+                              : 'Следить за пилотом',
+                            icon: Icon(_followPilot
+                              ? Icons.gps_fixed : Icons.gps_not_fixed,
+                              color: const Color(0xFFDDC184)),
+                            onPressed: () {
+                              setState(() {
+                                _followPilot = !_followPilot;
+                                _lastPilotCameraFix = null;
+                              });
+                              if (_followPilot) _scheduleFollowPilot();
+                            },
+                          ),
+                        ),
+                      ),
                     Positioned(
                       top: 8,
                       right: 8,

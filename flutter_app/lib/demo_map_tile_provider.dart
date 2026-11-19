@@ -12,7 +12,7 @@ import 'package:flutter_map/flutter_map.dart';
 /// Production needs a licensed provider and compatible persistent caching.
 class DemoDirectNetworkTileProvider extends TileProvider {
   DemoDirectNetworkTileProvider()
-      : super(headers: const {
+      : super(headers: <String, String>{
           'User-Agent': 'PRIVATE DRIVE demo Android visual QA',
           'Accept': 'image/png,image/*',
         });

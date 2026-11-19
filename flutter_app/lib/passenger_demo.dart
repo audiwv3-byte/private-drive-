@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'permissions_onboarding.dart';
 import 'app_language.dart';
 import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
@@ -728,6 +729,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
               leading: const Icon(Icons.language),
               title: Text(pdTr(context, 'Язык', 'Kalba', 'Language')),
               trailing: const PdLanguageMenu(),
+            ),
+            ListTile(
+              key: const Key('passenger-permissions-settings'),
+              leading: const Icon(Icons.location_on_outlined),
+              title: Text(pdTr(context, 'Разрешения приложения',
+                'Programėlės leidimai', 'App permissions')),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const PdPermissionSettingsPage()));
+              },
             ),
             ListTile(
               key: const Key('passenger-drawer-info'),

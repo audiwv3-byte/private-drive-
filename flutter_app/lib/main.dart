@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'demo_interfaces.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
+import 'permissions_onboarding.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 
@@ -32,7 +33,7 @@ class PrivateDriveApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFF111111),
       ),
-      home: const NativeSignInScreen(),
+      home: const PdPermissionsFirstLaunch(child: NativeSignInScreen()),
       ),
     );
   }
@@ -179,7 +180,22 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         DateTime.now().isBefore(sessionExpiry!);
     if (active) {
       return Scaffold(
-        appBar: AppBar(title: const Text('PRIVATE DRIVE')),
+        appBar: AppBar(
+          title: const Text('PRIVATE DRIVE'),
+          actions: [
+            IconButton(
+              key: const Key('native-permission-settings'),
+              tooltip: 'Разрешения приложения',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PdPermissionSettingsPage(),
+                ),
+              ),
+            ),
+          ],
+        ),
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -212,7 +228,22 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('PRIVATE DRIVE')),
+      appBar: AppBar(
+          title: const Text('PRIVATE DRIVE'),
+          actions: [
+            IconButton(
+              key: const Key('native-permission-settings'),
+              tooltip: 'Разрешения приложения',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PdPermissionSettingsPage(),
+                ),
+              ),
+            ),
+          ],
+        ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

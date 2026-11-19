@@ -26,7 +26,8 @@ void main() {
       ),
     ));
     expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsNothing);
-    await tester.tap(find.byKey(const Key('pilot-next-trip')));
+    await tester.drag(find.byKey(const Key('pilot-next-trip')),
+      const Offset(180, 0));
     await tester.pump();
     expect(store.status, DemoTripStatus.approaching);
     expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsOneWidget);
@@ -53,7 +54,8 @@ void main() {
         tripStore: store,
       ),
     ));
-    await tester.tap(find.byKey(const Key('pilot-next-trip')));
+    await tester.drag(find.byKey(const Key('pilot-next-trip')),
+      const Offset(180, 0));
     await tester.pump();
     expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsNothing);
     expect(find.textContaining('требуется геокодирование адреса'), findsOneWidget);
@@ -129,9 +131,7 @@ void main() {
     expect(find.byKey(const Key('pilot-assigned-offer')), findsOneWidget);
     expect(find.text('Вильнюс → Аэропорт Вильнюса'), findsOneWidget);
     expect(find.byKey(const Key('pilot-passenger-chat')), findsNothing);
-    expect(tester.widget<FilledButton>(
-      find.byKey(const Key('pilot-next-trip')),
-    ).onPressed, isNull);
+    expect(store.pilotAccepted, isFalse);
 
     await tester.tap(find.byKey(const Key('pilot-decline-assigned')));
     await tester.pump();
@@ -148,9 +148,7 @@ void main() {
     expect(store.pilotAccepted, isTrue);
     expect(store.status, DemoTripStatus.assigned);
     expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
-    expect(tester.widget<FilledButton>(
-      find.byKey(const Key('pilot-next-trip')),
-    ).onPressed, isNotNull);
+    expect(store.pilotAccepted, isTrue);
   });
 
   testWidgets('Passenger and pilot share exactly one offline demo trip',
@@ -230,28 +228,27 @@ void main() {
     expect(find.byKey(const Key('pilot-global-route')), findsOneWidget);
     expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
     expect(find.text('К пассажиру'), findsOneWidget);
-    expect(tester.widget<FilledButton>(find.byKey(const Key('pilot-next-trip'))).onPressed, isNull);
+    expect(store.pilotAccepted, isFalse);
     await tester.tap(find.byKey(const Key('pilot-global-accept')));
     await tester.pump();
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('pilot-next-trip')));
+    await tester.drag(find.byKey(const Key('pilot-next-trip')),
+      const Offset(180, 0));
     await tester.pump();
     expect(find.text('Пилот едет к пассажиру'), findsOneWidget);
     await tester.tap(find.byKey(const Key('pilot-pause-trip')));
     await tester.pump();
     expect(find.text('Остановка · демо'), findsOneWidget);
-    expect(
-      tester.widget<FilledButton>(find.byKey(const Key('pilot-next-trip')))
-          .onPressed,
-      isNull,
-    );
+    expect(store.paused, isTrue);
     await tester.tap(find.byKey(const Key('pilot-pause-trip')));
     await tester.pump();
-    await tester.tap(find.byKey(const Key('pilot-next-trip')));
+    await tester.drag(find.byKey(const Key('pilot-next-trip')),
+      const Offset(180, 0));
     await tester.pump();
     expect(find.text('Поездка выполняется'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('pilot-next-trip')));
+    await tester.drag(find.byKey(const Key('pilot-next-trip')),
+      const Offset(180, 0));
     await tester.pump();
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
 

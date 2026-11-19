@@ -519,6 +519,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       from: _from.text,
       to: _to.text,
       paymentMethod: _payment,
+      advanceBooking: _isAdvanceBooking,
       departure: departure,
       rideType: _rideType,
       roundTrip: _roundTrip,
@@ -551,11 +552,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
     );
   }
 
+  bool get _isAdvanceBooking => _taxiAdvanceBooking || _date != null || _time != null;
+
+  bool get _cashBlockedForAdvance =>
+      _isAdvanceBooking && _payment == 'Наличные';
+
   bool get _canCreateLocalTrip {
     final store = widget.tripStore;
     final a = _from.text.trim();
     final b = _to.text.trim();
-    return store != null && !store.isActive && a.isNotEmpty &&
+    return store != null && !store.isActive && !_cashBlockedForAdvance &&
+        a.isNotEmpty &&
         b.isNotEmpty && a.toLowerCase() != b.toLowerCase();
   }
 
@@ -1492,6 +1499,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   ),
               ],
             ),
+            if (_cashBlockedForAdvance)
+              const Text(
+                'Предварительный заказ оплачивается только безналично. '
+                'Выбери карту, PayPal, банковский перевод или криптовалюту.',
+                key: Key('advance-cash-payment-blocked'),
+                style: TextStyle(color: Colors.orangeAccent),
+              ),
             const SizedBox(height: 12),
             ],
             Text(
@@ -1517,6 +1531,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
               style: const TextStyle(
                 color: gold, fontWeight: FontWeight.bold, fontSize: 16,
               ),
+            ),
+            const Text(
+              'Дополнительные остановки и изменение маршрута после заказа '
+              'согласуются с диспетчером отдельно. Доплата не списывается '
+              'автоматически и не меняет исходный способ оплаты.',
+              key: Key('route-adjustment-payment-note'),
+              style: TextStyle(fontSize: 12),
             ),
             Text(pdTr(context,
               'Предпросмотр согласованных тарифов. Окончательная цена назначается диспетчером до оплаты.',

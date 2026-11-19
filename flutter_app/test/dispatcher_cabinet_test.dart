@@ -8,7 +8,7 @@ void main() {
     final store = DemoTripStore();
     addTearDown(store.dispose);
     await tester.pumpWidget(MaterialApp(
-      home: DemoDispatcherCabinet(tripStore: store),
+      home: DemoDispatcherCabinet(initialTab: 0, tripStore: store),
     ));
     expect(find.byKey(const Key('dispatcher-empty')), findsOneWidget);
     expect(find.byKey(const Key('dispatcher-assign-pilot')), findsNothing);
@@ -54,7 +54,7 @@ void main() {
     expect(store.addPilotChatMessage('Я подъехал'), isTrue);
     expect(store.addPassengerChatMessage('Сейчас выйду'), isTrue);
     await tester.pumpWidget(MaterialApp(
-      home: DemoDispatcherCabinet(
+      home: DemoDispatcherCabinet(initialTab: 0, 
         tripStore: store, enableMapTiles: false,
       ),
     ));
@@ -99,7 +99,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(home: DemoDispatcherCabinet(
+    await tester.pumpWidget(MaterialApp(home: DemoDispatcherCabinet(initialTab: 0, 
       tripStore: store, enableMapTiles: false,
     )));
     await tester.pumpAndSettle();
@@ -127,7 +127,7 @@ void main() {
       services: const [],
     ), isTrue);
     await tester.pumpWidget(MaterialApp(
-      home: DemoDispatcherCabinet(tripStore: store),
+      home: DemoDispatcherCabinet(initialTab: 0, tripStore: store),
     ));
     await tester.tap(find.byKey(const Key('dispatcher-assign-pilot')));
     await tester.pump();

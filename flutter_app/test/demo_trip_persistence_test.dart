@@ -88,6 +88,47 @@ void main() {
     expect(restored.trip, isNull);
   });
 
+  test('Dispatcher chat archive survives app restart and a new order', () {
+    final store = newOrder();
+    expect(store.assignPilot(), isTrue);
+    expect(store.acceptAssignedPilot(), isTrue);
+    expect(store.addPilotChatMessage('У входа'), isTrue);
+    expect(store.addPassengerChatMessage('Выхожу'), isTrue);
+    expect(store.cancelByPassenger(), isTrue);
+    expect(store.create(
+      from: 'Каунас', to: 'Вильнюс',
+      paymentMethod: 'Карта',
+      departure: DateTime(2026, 11, 22),
+      services: const [],
+    ), isTrue);
+    expect(store.archivedChats, hasLength(1));
+    expect(store.archivedChats.single.pilotMessages, ['У входа']);
+    expect(store.archivedChats.single.passengerMessages, ['Выхожу']);
+    expect(store.pilotChatMessages, isEmpty);
+    final saved = store.toPersistedJson()!;
+    store.dispose();
+
+    final restored = DemoTripStore();
+    addTearDown(restored.dispose);
+    expect(restored.restorePersistedJson(saved), isTrue);
+    expect(restored.archivedChats, hasLength(1));
+    expect(restored.archivedChats.single.from, 'Вильнюс');
+    expect(restored.archivedChats.single.passengerMessages, ['Выхожу']);
+    expect(restored.trip!.from, 'Каунас');
+  });
+
+  test('Legacy chat snapshot without archives restores safely', () {
+    final before = newOrder();
+    final payload = jsonDecode(before.toPersistedJson()!)
+        as Map<String, dynamic>;
+    before.dispose();
+    payload.remove('archivedChats');
+    final restored = DemoTripStore();
+    addTearDown(restored.dispose);
+    expect(restored.restorePersistedJson(jsonEncode(payload)), isTrue);
+    expect(restored.archivedChats, isEmpty);
+  });
+
   test('Private pilot GPS is not persisted', () {
     final store = newOrder();
     addTearDown(store.dispose);

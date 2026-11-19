@@ -26,8 +26,8 @@ void main() {
       ),
     ));
     expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsNothing);
-    await tester.drag(find.byKey(const Key('pilot-next-trip')),
-      const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(store.status, DemoTripStatus.approaching);
     expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsOneWidget);
@@ -54,8 +54,8 @@ void main() {
         tripStore: store,
       ),
     ));
-    await tester.drag(find.byKey(const Key('pilot-next-trip')),
-      const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsNothing);
     expect(find.textContaining('требуется геокодирование адреса'), findsOneWidget);
@@ -229,12 +229,13 @@ void main() {
     expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
     expect(find.textContaining('Свайп вправо · К пассажиру'), findsOneWidget);
     expect(find.byKey(const Key('pilot-global-accept')), findsOneWidget);
-    await tester.drag(find.byKey(const Key('pilot-global-accept')), const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-global-accept-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-global-accept'))).width - 52), 0));
     await tester.pump();
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
 
-    await tester.drag(find.byKey(const Key('pilot-next-trip')),
-      const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(find.text('Пилот едет к пассажиру'), findsOneWidget);
     await tester.tap(find.byKey(const Key('pilot-pause-trip')));
@@ -243,12 +244,12 @@ void main() {
     expect(find.byKey(const Key('pilot-next-trip')), findsOneWidget);
     await tester.tap(find.byKey(const Key('pilot-pause-trip')));
     await tester.pump();
-    await tester.drag(find.byKey(const Key('pilot-next-trip')),
-      const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(find.text('Поездка выполняется'), findsOneWidget);
-    await tester.drag(find.byKey(const Key('pilot-next-trip')),
-      const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
 

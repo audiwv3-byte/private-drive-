@@ -575,7 +575,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   static const _transferFares = <String, int>{
     'вильнюс|аэропорт вильнюса': 40,
     'аэропорт вильнюса|вильнюс': 40,
-    'вильнюс|каунас': 130,
+    'вильнюс|каунас': 110,
     'каунас|вильнюс': 90,
     'вильнюс|клайпеда': 230,
     'вильнюс|паневежис': 120,
@@ -1129,14 +1129,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
               Text(
                 pdTr(context,
                   'Фиксированные тарифы Sedan без скидки: '
-                  'Вильнюс → Каунас 130 €, обратно 90 €, '
+                  'Вильнюс → Каунас 110 €, обратно 90 €, '
                   'Вильнюс ↔ аэропорт Вильнюса 40 €. '
                   'Вильнюс — Каунас туда и обратно 200 €. '
                   'Другие маршруты — по тарифной таблице или по запросу.',
-                  'Fiksuotos Sedan kainos be nuolaidos: Vilnius → Kaunas 130 €, '
+                  'Fiksuotos Sedan kainos be nuolaidos: Vilnius → Kaunas 110 €, '
                   'atgal 90 €, Vilnius ↔ Vilniaus oro uostas 40 €. '
                   'Vilnius–Kaunas į abi puses 200 €. Kiti maršrutai pagal kainoraštį arba užklausą.',
-                  'Fixed Sedan fares with no discount: Vilnius → Kaunas €130, '
+                  'Fixed Sedan fares with no discount: Vilnius → Kaunas €110, '
                   'return €90, Vilnius ↔ Vilnius Airport €40. '
                   'Vilnius–Kaunas round trip €200. Other routes per price list or on request.'),
                 key: const Key('passenger-transfer-tariffs'),

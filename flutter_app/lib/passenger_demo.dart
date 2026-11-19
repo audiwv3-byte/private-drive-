@@ -56,7 +56,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _roundTrip = false;
   bool _taxiOutsideCity = false;
   bool _taxiAdvanceBooking = false;
-  bool _taxiLargeVehicle = false;
   int? _roadDistanceMetres;
   bool _meetSign = false;
   bool _pets = false;
@@ -525,13 +524,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
       roundTrip: _roundTrip,
       estimatedFareEur: _rideType == 'Такси' ? null : _pricePreview,
       estimatedFareCents: _taxiPriceCents,
-      extrasRequireQuote: _requiresCustomQuote ||
-          (_rideType == 'Такси' && _taxiLargeVehicle),
+      extrasRequireQuote: _requiresCustomQuote,
       services: [
         if (_rideType == 'Такси' && _taxiAdvanceBooking)
           'Предварительное бронирование +3 €',
-        if (_rideType == 'Такси' && _taxiLargeVehicle)
-          'Многоместная машина +3 € · подтвердить наличие',
         if (_rideType == 'Такси' && _taxiOutsideCity)
           'Тариф за городом 0,79 €/км',
         if (_meetSign) 'Встреча с табличкой',
@@ -578,7 +574,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
     'вильнюс|аэропорт вильнюса': 40,
     'аэропорт вильнюса|вильнюс': 40,
     'вильнюс|каунас': 110,
-    'каунас|вильнюс': 90,
     'вильнюс|клайпеда': 230,
     'вильнюс|паневежис': 120,
     'вильнюс|кедайняй': 130,
@@ -613,7 +608,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       cityMetres: _taxiOutsideCity ? 0 : _roadDistanceMetres!,
       outsideCityMetres: _taxiOutsideCity ? _roadDistanceMetres! : 0,
       advanceBooking: _taxiAdvanceBooking,
-      largeVehicle: _taxiLargeVehicle);
+      advanceBooking: _taxiAdvanceBooking);
     return base * (_soberDriver ? 2 : 1) + (_meetSign ? 1500 : 0);
   }
 
@@ -1131,15 +1126,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
               Text(
                 pdTr(context,
                   'Фиксированные тарифы Sedan без скидки: '
-                  'Вильнюс → Каунас 110 €, обратно 90 €, '
+                  'Вильнюс → Каунас 110 €, '
                   'Вильнюс ↔ аэропорт Вильнюса 40 €. '
                   'Вильнюс — Каунас туда и обратно 200 €. '
                   'Другие маршруты — по тарифной таблице или по запросу.',
                   'Fiksuotos Sedan kainos be nuolaidos: Vilnius → Kaunas 110 €, '
-                  'atgal 90 €, Vilnius ↔ Vilniaus oro uostas 40 €. '
+                  'Vilnius ↔ Vilniaus oro uostas 40 €. '
                   'Vilnius–Kaunas į abi puses 200 €. Kiti maršrutai pagal kainoraštį arba užklausą.',
                   'Fixed Sedan fares with no discount: Vilnius → Kaunas €110, '
-                  'return €90, Vilnius ↔ Vilnius Airport €40. '
+                  'Vilnius ↔ Vilnius Airport €40. '
                   'Vilnius–Kaunas round trip €200. Other routes per price list or on request.'),
                 key: const Key('passenger-transfer-tariffs'),
                 style: const TextStyle(fontSize: 12),
@@ -1165,13 +1160,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 title: const Text('Предварительное бронирование · +3 €'),
                 value: _taxiAdvanceBooking,
                 onChanged: (v) => setState(() => _taxiAdvanceBooking = v ?? false),
-              ),
-              CheckboxListTile(
-                key: const Key('taxi-large-vehicle'),
-                title: const Text('Более 4 пассажиров · +3 €'),
-                subtitle: const Text('Требуется подтверждение наличия многоместного авто'),
-                value: _taxiLargeVehicle,
-                onChanged: (v) => setState(() => _taxiLargeVehicle = v ?? false),
               ),
             ],
             const SizedBox(height: 12),
@@ -1515,8 +1503,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       'Price on request · no fixed fare available')
                   : _rideType == 'Такси'
                       ? 'Такси: ${PdTaxiFare.euros(taxiPrice!)}' +
-                          ((_requiresCustomQuote || _taxiLargeVehicle)
-                            ? ' · доп. услуги/авто требуют подтверждения' : '')
+                          (_requiresCustomQuote
+                            ? ' · доп. услуги требуют подтверждения' : '')
                       : _requiresCustomQuote
                       ? pdTr(context,
                           'Расчётная часть: $price € · дополнительные услуги по запросу',

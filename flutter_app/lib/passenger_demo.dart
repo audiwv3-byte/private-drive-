@@ -1482,7 +1482,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             Wrap(
               spacing: 8,
               children: [
-                for (final method in ['Карта', 'PayPal', 'Банковский перевод', 'Криптовалюта'])
+                for (final method in ['Карта', 'PayPal', 'Банковский перевод', 'Криптовалюта', 'Наличные'])
                   ChoiceChip(
                     key: Key('payment-$method'),
                     label: Text(method == 'Карта'

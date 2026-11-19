@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/demo_trip_store.dart';
 import 'package:private_drive/passenger_orders_demo.dart';
@@ -84,6 +85,27 @@ void main() {
     await tester.pump();
     expect(find.byTooltip('Дневная карта'), findsOneWidget);
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
+  });
+
+  testWidgets('Android passenger map uses unfiltered tiles in both themes',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PassengerDemo(enableMapTiles: true),
+    ));
+    final tileFinder = find.byKey(const Key('passenger-map-tiles'));
+    expect(tileFinder, findsOneWidget);
+    final day = tester.widget<TileLayer>(tileFinder);
+    expect(day.urlTemplate, contains('cartocdn.com/voyager'));
+    expect(day.fallbackUrl, contains('tile.openstreetmap.org'));
+    expect(find.ancestor(of: tileFinder, matching: find.byType(ColorFiltered)),
+        findsNothing);
+    tester.widget<IconButton>(find.byKey(
+        const Key('passenger-map-day-night'))).onPressed!();
+    await tester.pump();
+    final night = tester.widget<TileLayer>(tileFinder);
+    expect(night.urlTemplate, contains('cartocdn.com/dark_all'));
+    expect(find.ancestor(of: tileFinder, matching: find.byType(ColorFiltered)),
+        findsNothing);
   });
 
   testWidgets('Passenger sees only real fresh pilot GPS for an active order',

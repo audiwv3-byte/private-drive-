@@ -1455,8 +1455,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       drawer: Drawer(
         key: const Key('passenger-navigation-drawer'),
         backgroundColor: const Color(0xFF172033),
-        child: SafeArea(child: ListView(
-          padding: EdgeInsets.zero,
+        child: SafeArea(child: SingleChildScrollView(child: Column(
           children: [
             const SizedBox(height: 24),
             const CircleAvatar(
@@ -1551,7 +1550,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               },
             ),
           ],
-        )),
+        ))),
       ),
       appBar: AppBar(
         leadingWidth: Navigator.of(context).canPop() ? 104 : 56,

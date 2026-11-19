@@ -6,6 +6,7 @@ import 'demo_interfaces.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
 import 'permissions_onboarding.dart';
+import 'company_info.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 
@@ -50,6 +51,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   final destination = TextEditingController();
   final code = TextEditingController();
   bool busy = false;
+  bool _acknowledgedLegal = false;
   // Authentication belongs to the Russian-only shared/native shell.
   // Passenger language selection is available inside the passenger cabin.
   String tr(String ru, String lt, String en) => ru;
@@ -93,7 +95,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   }
 
   Future<void> requestCode() async {
-    if (busy) return;
+    if (busy || !_acknowledgedLegal) return;
     setState(() {
       busy = true;
       message = '';
@@ -280,10 +282,34 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     border: const OutlineInputBorder(),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
+                if (challengeId == null) ...[
+                  CheckboxListTile(
+                    key: const Key('native-legal-acknowledgement'),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: _acknowledgedLegal,
+                    onChanged: busy ? null : (v) =>
+                        setState(() => _acknowledgedLegal = v ?? false),
+                    title: const Text('Я ознакомился с условиями сервиса '
+                      'и политикой конфиденциальности'),
+                    subtitle: const Text(
+                      'Это подтверждение ознакомления, не согласие '
+                      'на рекламу или необязательное отслеживание.'),
+                  ),
+                  TextButton.icon(
+                    key: const Key('native-open-legal-documents'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const CompanyInfoPage())),
+                    icon: const Icon(Icons.gavel_outlined),
+                    label: const Text('Условия, конфиденциальность, отмена и возврат'),
+                  ),
+                ],
+                const SizedBox(height: 8),
                 if (challengeId == null)
                   FilledButton(
-                    onPressed: busy || apiBaseUrl.isEmpty ? null : requestCode,
+                    onPressed: busy || apiBaseUrl.isEmpty || !_acknowledgedLegal
+                        ? null : requestCode,
                     child: Text(tr('Получить код', 'Gauti kodą', 'Get code')),
                   )
                 else ...[

@@ -51,7 +51,8 @@ void main() {
     expect(alertCount, 2, reason: 'Alert should repeat while pilot has not answered');
     expect(find.text('Стоимость · 130 €'), findsOneWidget);
     expect(find.textContaining('Доход пилота · требуется тариф'), findsOneWidget);
-    await tester.drag(find.byKey(const Key('pilot-global-accept')), const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-global-accept-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-global-accept'))).width - 52), 0));
     await tester.pump();
     expect(store.pilotAccepted, isTrue);
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);

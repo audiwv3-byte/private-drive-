@@ -39,7 +39,7 @@ jobs:
               return body if raw else json.loads(body)
           # The fixed commit already triggered the regular Flutter APK workflow.
           # Poll its native GitHub API result without a paid browser.
-          target = 'f9a3a11817aedc5eafa4211f5a5e845eb99eee9a'
+          target = '6395f898eaf77cb8070bd29a58db9c5433be1123'
           run = None
           for _ in range(28):
               runs = fetch('/actions/workflows/flutter-prototype-apk.yml/runs?per_page=100')['workflow_runs']
@@ -48,9 +48,9 @@ jobs:
                   break
               time.sleep(20)
           lines = ['# PRIVATE DRIVE — test-branch CI diagnostic', '',
-                   'Source build: fixed commit f9a3a11', 'No production service accessed.', '']
+                   'Source build: fixed commit 6395f89', 'No production service accessed.', '']
           if run is None:
-              lines.append('Build for f9a3a11 not found among recent workflow runs.')
+              lines.append('Build for 6395f89 not found among recent workflow runs.')
           else:
               lines.extend(['Run: ' + run['html_url'],
                             'Run ID: ' + str(run['id']),
@@ -94,5 +94,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add flutter_app/CI_CHECK_REPORT.md
           git diff --cached --quiet && exit 0
-          git commit -m "ci: save Flutter APK verification for f9a3a11"
+          git commit -m "ci: save Flutter APK verification for 6395f89"
           git push origin HEAD:feature/flutter-independent-auth

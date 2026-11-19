@@ -69,7 +69,7 @@ void main() {
     await tester.drag(find.byKey(const Key('pilot-next-trip')), const Offset(180, 0));
     await tester.pump();
     expect(find.text('Едем к пассажиру'), findsOneWidget);
-    expect(find.text('В путь'), findsOneWidget);
+    expect(find.textContaining('Свайп вправо · В путь'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('pilot-pause-trip')));
     await tester.pump();

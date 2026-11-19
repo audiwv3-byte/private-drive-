@@ -282,7 +282,7 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
           key: const Key('dispatcher-fleet-status'),
           textAlign: TextAlign.center,
         ),
-        )),
+        ))),
     ]);
   }
 

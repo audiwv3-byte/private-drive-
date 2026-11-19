@@ -267,6 +267,21 @@ void main() {
     expect((map.camera.center.latitude - 54.7000).abs(), lessThan(0.001));
   });
 
+  testWidgets('Passenger uses lime pin instead of car for live pilot',
+      (tester) async {
+    final store = makeOrder();
+    addTearDown(store.dispose);
+    store.setPilotOnline(true);
+    store.updatePilotLocation(54.6872, 25.2797);
+    await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+      enableMapTiles: false, tripStore: store,
+    )));
+    final icon = tester.widget<Icon>(
+      find.byKey(const Key('passenger-pilot-map-marker')));
+    expect(icon.icon, Icons.location_on);
+    expect(icon.color, const Color(0xFFB6FF36));
+  });
+
   testWidgets('Pilot can switch day and night without leaving map',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: PilotDemo(

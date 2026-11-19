@@ -9,7 +9,6 @@ void main() {
       home: PassengerDemo(enableMapTiles: false),
     ));
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
-    expect(find.byKey(const Key('route-kaunas')), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('route-kaunas')),

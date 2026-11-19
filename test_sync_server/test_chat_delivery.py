@@ -9,7 +9,8 @@ import uuid
 from pathlib import Path
 from pd_demo_server import ApiServer, DemoStore
 
-TOKENS = {"passenger": "p" * 40, "pilot": "d" * 40, "dispatcher": "a" * 40}
+TOKENS = {"passenger": "p" * 40, "pilot": "d" * 40, "dispatcher": "a" * 40,
+          "passenger_other": "q" * 40}
 
 class ChatTests(unittest.TestCase):
     def setUp(self):
@@ -20,6 +21,9 @@ class ChatTests(unittest.TestCase):
             hashlib.sha256(token.encode()).digest(): (role, role + "_test")
             for role, token in TOKENS.items()
         }
+        # A second independent passenger session must never read another trip.
+        credentials[hashlib.sha256(TOKENS["passenger_other"].encode()).digest()] = (
+            "passenger", "passenger_other_test")
         self.server = ApiServer(("127.0.0.1", 0), self.store, credentials)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -106,6 +110,40 @@ class ChatTests(unittest.TestCase):
         self.assertEqual(self.req("GET", route, role="passenger")[0], 200)
         self.assertEqual(self.req("POST", route, role="passenger", data={
             "client_id": uuid.uuid4().hex, "text": "поздно"})[0], 409)
+
+    def test_two_real_http_sessions_exchange_and_isolate_other_passenger(self):
+        """HTTP sessions use separate bearer tokens, never shared widget memory."""
+        tid = self.assigned()
+        route = "/v1/trips/" + tid + "/messages"
+        other = TOKENS["passenger_other"]
+        self.assertEqual(self.req("GET", "/v1/me", role="pilot")[1]["role"], "pilot")
+        self.assertEqual(self.req("GET", "/v1/me", role="passenger")[1]["role"], "passenger")
+        self.assertEqual(self.req("GET", "/v1/current", role="pilot")[1]["trip"]["id"], tid)
+        self.assertEqual(self.req("GET", "/v1/current", role="passenger")[1]["trip"]["id"], tid)
+        self.assertIsNone(self.req("GET", "/v1/current", token=other)[1]["trip"])
+        self.assertEqual(self.req("GET", "/v1/trips/" + tid, token=other)[0], 404)
+        self.assertEqual(self.req("GET", route, token=other)[0], 404)
+        self.assertEqual(self.req("POST", route, token=other,
+            data={"client_id": uuid.uuid4().hex, "text": "чужой заказ"})[0], 404)
+
+        passenger_id = uuid.uuid4().hex
+        status, passenger_msg = self.req("POST", route, role="passenger",
+            data={"client_id": passenger_id, "text": "Где вы?"})
+        self.assertEqual(status, 201)
+        seq = passenger_msg["message"]["seq"]
+        self.assertEqual(self.req("GET", route + "?after=0", role="pilot")
+                         [1]["messages"], [passenger_msg["message"]])
+        status, pilot_msg = self.req("POST", route, role="pilot",
+            data={"client_id": uuid.uuid4().hex, "text": "Я подъезжаю"})
+        self.assertEqual(status, 201)
+        self.assertEqual(self.req("GET", route + "?after=" + str(seq),
+                                  role="passenger")[1]["messages"],
+                         [pilot_msg["message"]])
+        self.assertEqual(self.req("GET", route + "?after=" +
+                         str(pilot_msg["message"]["seq"]),
+                         role="passenger")[1]["messages"], [])
+        self.assertEqual(self.req("GET", route, token=other)[0], 404)
+        self.assertEqual(len(self.req("GET", route, role="pilot")[1]["messages"]), 2)
 
     def test_dispatcher_message_visible_to_owner_and_assigned_pilot(self):
         status, created = self.req("POST", "/v1/trips", data={"from": "A", "to": "B"})

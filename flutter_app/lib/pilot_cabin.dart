@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'pilot_offer_tone.dart';
 import 'brand_logo.dart';
+import 'app_language.dart';
 import 'pilot_cockpit_overlay.dart';
 import 'demo_interfaces.dart' show PilotDemo;
 import 'demo_trip_store.dart';
@@ -147,7 +148,7 @@ class _PilotCabinState extends State<PilotCabin> {
     final accent = _onLine ? green : red;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('PRIVATE DRIVE · Кабинет пилота')),
+      appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Кабина пилота')}')),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -170,9 +171,9 @@ class _PilotCabinState extends State<PilotCabin> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'КАБИНЕТ ПИЛОТА',
-                    style: TextStyle(
+                  Text(
+                    pdLabel(context, 'КАБИНЕТ ПИЛОТА'),
+                    style: const TextStyle(
                       color: Color(0xFFDDC184),
                       letterSpacing: 2,
                       fontWeight: FontWeight.w700,
@@ -181,14 +182,18 @@ class _PilotCabinState extends State<PilotCabin> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    _onLine ? 'На линии · демо' : 'Не на линии · демо',
+                    pdLabel(context,
+                      _onLine ? 'На линии · демо' : 'Не на линии · демо'),
                     key: const Key('pilot-line-status'),
                     style: TextStyle(color: accent, fontSize: 18),
                   ),
                   const SizedBox(height: 20),
                   Semantics(
                     button: true,
-                    label: _onLine ? 'Уйти с линии' : 'Выйти на линию',
+                    label: pdTr(context,
+                      _onLine ? 'Уйти с линии' : 'Выйти на линию',
+                      _onLine ? 'Atsijungti' : 'Prisijungti',
+                      _onLine ? 'Go offline' : 'Go online'),
                     child: InkWell(
                       key: const Key('pilot-power-toggle'),
                       customBorder: const CircleBorder(),
@@ -278,7 +283,7 @@ class _PilotCabinState extends State<PilotCabin> {
                   ),
                   const SizedBox(height: 28),
                   Text(
-                    _onLine ? 'УЙТИ С ЛИНИИ' : 'ВЫЙТИ НА ЛИНИЮ',
+                    pdLabel(context, _onLine ? 'УЙТИ С ЛИНИИ' : 'ВЫЙТИ НА ЛИНИЮ'),
                     key: const Key('pilot-power-caption'),
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
@@ -291,14 +296,14 @@ class _PilotCabinState extends State<PilotCabin> {
                       key: const Key('pilot-open-map'),
                       icon: const Icon(Icons.map_outlined),
                       onPressed: _openMap,
-                      label: const Text('Открыть карту'),
+                      label: Text(pdLabel(context, 'Открыть карту')),
                     ),
                   ],
                   const SizedBox(height: 28),
-                  const Text(
-                    'Тестовый режим. Статус линии не отправляется на сервер.',
+                  Text(
+                    pdLabel(context, 'Тестовый режим. Статус линии не отправляется на сервер.'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ],
               ),

@@ -33,9 +33,9 @@ void main() {
     await tester.pumpAndSettle();
     // Opening a different role menu and returning from Android pause must
     // never switch the pilot offline or discard an existing GPS fix.
-    await tester.binding.handleAppLifecycleStateChanged(
+    tester.binding.handleAppLifecycleStateChanged(
       AppLifecycleState.inactive);
-    await tester.binding.handleAppLifecycleStateChanged(
+    tester.binding.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed);
     await tester.pump();
     await tester.tap(find.byKey(const Key('dispatcher-open-drawer')));

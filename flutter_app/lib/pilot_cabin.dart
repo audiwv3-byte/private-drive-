@@ -160,8 +160,6 @@ class _PilotCabinState extends State<PilotCabin> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const PrivateDriveBrandLogo(size: 86, circular: true),
-                  const SizedBox(height: 12),
                   const Text(
                     'КАБИНЕТ ПИЛОТА',
                     style: TextStyle(
@@ -177,7 +175,17 @@ class _PilotCabinState extends State<PilotCabin> {
                     key: const Key('pilot-line-status'),
                     style: TextStyle(color: accent, fontSize: 18),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 14),
+                  const SizedBox(
+                    key: Key('pilot-line-transparent-logo'),
+                    width: 112,
+                    height: 112,
+                    child: PrivateDriveBrandLogo(
+                      size: 112,
+                      transparentBackground: true,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   Semantics(
                     button: true,
                     label: _onLine ? 'Уйти с линии' : 'Выйти на линию',

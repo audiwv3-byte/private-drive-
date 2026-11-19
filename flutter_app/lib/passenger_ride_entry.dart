@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'passenger_demo.dart';
+import 'vilnius_evening_backdrop.dart';
 
 /// The first screen after choosing the passenger role.
 /// Taxi and transfer are separate entry choices, not a control inside booking.
@@ -27,7 +28,9 @@ class PassengerRideEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('PRIVATE DRIVE · Пассажир')),
-    body: SafeArea(child: Center(child: ConstrainedBox(
+    body: Stack(fit: StackFit.expand, children: [
+      const VilniusEveningBackdrop(),
+      SafeArea(child: Center(child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 460),
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -50,7 +53,7 @@ class PassengerRideEntry extends StatelessWidget {
             const SizedBox(height: 12),
             Card(child: ListTile(
               key: const Key('passenger-entry-transfer'),
-              leading: const Icon(Icons.airport_shuttle, size: 36),
+              leading: const Icon(Icons.directions_car_filled, size: 36),
               title: const Text('Трансфер'),
               subtitle: const Text('Междугородние поездки и аэропорты'),
               trailing: const Icon(Icons.chevron_right),
@@ -64,5 +67,6 @@ class PassengerRideEntry extends StatelessWidget {
         ),
       ),
     ))),
+    ]),
   );
 }

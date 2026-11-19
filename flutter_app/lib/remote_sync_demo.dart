@@ -7,7 +7,6 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import 'remote_sync_client.dart';
 import 'message_voice.dart';
 
-/// Opt-in, test-only native client. Credentials are never stored on disk.
 /// Returns the last *other-role* sender in a newly fetched message batch.
 /// The last message overall may be an echo of the current user's own reply.
 String? newestIncomingChatRole(
@@ -24,6 +23,7 @@ String? newestIncomingChatRole(
   return latest;
 }
 
+/// Opt-in, test-only native client. Credentials are never stored on disk.
 class RemoteSyncDemo extends StatefulWidget {
   const RemoteSyncDemo({super.key, this.gateway, this.enableMapTiles = true,
     this.pollInterval = const Duration(seconds: 3),

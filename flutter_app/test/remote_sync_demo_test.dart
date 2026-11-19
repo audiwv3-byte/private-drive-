@@ -39,7 +39,6 @@ class FakeGateway extends RemoteTripGateway {
       return {'trip': server.trip};
     }
     if (path.contains('/messages?after=')) {
-      if (role == 'dispatcher') throw StateError('Dispatcher chat denied');
       final after = int.parse(path.split('after=').last);
       return {'messages': server.messages.where((x) =>
         (x['seq'] as int) > after).toList()};
@@ -53,9 +52,11 @@ class FakeGateway extends RemoteTripGateway {
 
   @override
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> data) async {
-    if (path.endsWith('/messages') && role != 'dispatcher' &&
-        server.trip?['pilot'] == 'pilot_test' &&
-        ['assigned', 'approaching', 'underway'].contains(server.trip?['status'])) {
+    if (path.endsWith('/messages') &&
+        (role == 'dispatcher' || role == 'passenger' ||
+          (role == 'pilot' && server.trip?['pilot'] == 'pilot_test')) &&
+        ['requested', 'assigned', 'approaching', 'underway']
+            .contains(server.trip?['status'])) {
       final message = <String, dynamic>{
         'seq': server.messages.length + 1,
         'role': role,
@@ -243,7 +244,12 @@ void main() {
       enableMapTiles: false, pollInterval: interval,
     )));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('remote-chat-input')), findsNothing);
+    expect(find.byKey(const Key('remote-chat-input')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('remote-chat-input')),
+      'Диспетчер на связи');
+    await tester.tap(find.byKey(const Key('remote-chat-send')));
+    await tester.pumpAndSettle();
+    expect(server.messages.last['role'], 'dispatcher');
   });
 
   testWidgets('Remote chat announces only new opposite-role messages once',

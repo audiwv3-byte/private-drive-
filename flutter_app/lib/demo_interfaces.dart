@@ -1166,7 +1166,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                 if (_displayPosition != null && !widget.enableMapTiles)
                   const Center(
                     child: Icon(Icons.navigation, size: 44,
-                        color: Color(0xFF00CCFF),
+                        color: Color(0xFFB6FF36),
                         shadows: [Shadow(color: Colors.black, blurRadius: 8)]),
                   ),
                 if (widget.tripStore == null)

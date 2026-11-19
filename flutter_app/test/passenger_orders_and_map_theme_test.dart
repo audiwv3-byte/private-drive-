@@ -111,7 +111,7 @@ void main() {
     expect(find.text('ДЕНЬ'), findsNothing);
     expect(find.text('НОЧЬ'), findsNothing);
     expect(find.ancestor(of: tileFinder, matching: find.byType(ColorFiltered)),
-        findsNothing);
+        findsOneWidget);
   });
 
   testWidgets('Map network error is visible and retry re-checks the server',

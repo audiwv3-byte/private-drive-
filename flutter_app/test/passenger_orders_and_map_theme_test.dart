@@ -274,8 +274,10 @@ void main() {
     store.setPilotOnline(true);
     store.updatePilotLocation(54.6872, 25.2797);
     await tester.pumpWidget(MaterialApp(home: PassengerDemo(
-      enableMapTiles: false, tripStore: store,
+      enableMapTiles: true, tripStore: store,
+      mapConnectivityCheck: () async => null,
     )));
+    await tester.pump();
     final icon = tester.widget<Icon>(
       find.byKey(const Key('passenger-pilot-map-marker')));
     expect(icon.icon, Icons.location_on);

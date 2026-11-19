@@ -5,9 +5,9 @@ import 'package:audioplayers/audioplayers.dart';
 
 /// Offline, original two-tone alert generated in memory as PCM WAV.
 /// Audio is sent to the media stream, not the often-silent Android UI alert.
-Uint8List createPilotOfferTone() {
+Uint8List createPilotOfferTone([int melody = 0]) {
   const sampleRate = 16000;
-  const durationMs = 1000;
+  const durationMs = 1350;
   const count = sampleRate * durationMs ~/ 1000;
   final bytes = Uint8List(44 + count * 2);
   final header = ByteData.sublistView(bytes);
@@ -34,18 +34,23 @@ Uint8List createPilotOfferTone() {
 
   for (var i = 0; i < count; i++) {
     final time = i / sampleRate;
-    final first = time >= 0.04 && time < 0.42;
-    final second = time >= 0.53 && time < 0.93;
-    if (!first && !second) continue;
-    final begin = first ? 0.04 : 0.53;
-    final end = first ? 0.42 : 0.93;
-    final edge = math.min(math.min(time - begin, end - time) / 0.03, 1.0)
+    // Three distinct, intentionally prominent original chimes.
+    final notes = switch (melody) {
+      1 => <double>[880, 1175, 1568, 1175],
+      2 => <double>[740, 988, 740, 1318],
+      _ => <double>[740, 980, 1180, 980],
+    };
+    final noteIndex = (time / 0.32).floor();
+    if (noteIndex < 0 || noteIndex >= notes.length) continue;
+    final inNote = time - noteIndex * 0.32;
+    if (inNote >= 0.29) continue;
+    final edge = math.min(math.min(inNote, 0.29 - inNote) / 0.018, 1.0)
         .clamp(0.0, 1.0);
-    final frequency = first ? 740.0 : 980.0;
-    final sound = 0.7 * math.sin(2 * math.pi * frequency * time) +
-        0.2 * math.sin(2 * math.pi * frequency * 1.5 * time);
-    header.setInt16(44 + i * 2, (sound * 29000 * edge).round(),
-        Endian.little);
+    final frequency = notes[noteIndex];
+    final sound = 0.78 * math.sin(2 * math.pi * frequency * time) +
+        0.16 * math.sin(2 * math.pi * frequency * 2 * time);
+    header.setInt16(44 + i * 2,
+        (sound * 28500 * edge).round(), Endian.little);
   }
   return bytes;
 }
@@ -54,9 +59,9 @@ class PilotOfferTone {
   AudioPlayer? _player;
   bool _closed = false;
   bool _busy = false;
-  static final Uint8List _data = createPilotOfferTone();
+  static final List<Uint8List> _melodies = List.generate(3, createPilotOfferTone);
 
-  Future<void> play() async {
+  Future<void> play({int melody = 0}) async {
     if (_closed || _busy) return;
     _busy = true;
     try {
@@ -64,7 +69,7 @@ class PilotOfferTone {
       await player.stop();
       if (_closed) return;
       await player.play(
-        BytesSource(_data, mimeType: 'audio/wav'),
+        BytesSource(_melodies[melody.clamp(0, 2)], mimeType: 'audio/wav'),
         volume: 1.0,
         mode: PlayerMode.mediaPlayer,
       );

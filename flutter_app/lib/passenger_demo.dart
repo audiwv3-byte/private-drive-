@@ -9,6 +9,7 @@ import 'company_info.dart';
 import 'passenger_orders_demo.dart';
 import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'demo_map_tile_provider.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
 /// Passenger preview: all trip, date, service and payment state stays in memory.
@@ -752,6 +753,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             // Do not wrap raster tiles in a transparent blend:
                             // some Android GPUs render that composition blank.
                             key: const Key('passenger-map-tiles'),
+                            tileProvider: demoTileProvider(),
                             urlTemplate: _nightMap
                                 ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
                                 : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',

@@ -66,7 +66,8 @@ void main() {
     expect(find.text('Администратор'), findsNothing);
     expect(find.text('Диспетчер'), findsNothing);
 
-    await tester.drag(find.byKey(const Key('pilot-next-trip')), const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(find.text('Едем к пассажиру'), findsOneWidget);
     expect(find.textContaining('Свайп вправо · В путь'), findsOneWidget);
@@ -78,10 +79,12 @@ void main() {
 
     await tester.tap(find.byKey(const Key('pilot-pause-trip')));
     await tester.pump();
-    await tester.drag(find.byKey(const Key('pilot-next-trip')), const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(find.text('Поездка выполняется'), findsOneWidget);
-    await tester.drag(find.byKey(const Key('pilot-next-trip')), const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(find.text('Нет активной поездки'), findsOneWidget);
   });

@@ -49,27 +49,9 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   final destination = TextEditingController();
   final code = TextEditingController();
   bool busy = false;
-  String get language => PdLanguageScope.of(context).value;
-
-  String tr(String ru, String lt, String en) =>
-      language == 'LT' ? lt : language == 'EN' ? en : ru;
-
-  Widget languageSwitcher() => Row(
-    key: const Key('native-language-switcher'),
-    mainAxisAlignment: MainAxisAlignment.end,
-    children: [
-      for (final entry in const [['RU', '🇷🇺'], ['LT', '🇱🇹'], ['EN', '🇬🇧']])
-        Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: ChoiceChip(
-            key: Key('native-language-${entry[0]}'),
-            label: Text('${entry[1]} ${entry[0]}'),
-            selected: language == entry[0],
-            onSelected: (_) => pdLanguage.set(entry[0]),
-          ),
-        ),
-    ],
-  );
+  // Authentication belongs to the Russian-only shared/native shell.
+  // Passenger language selection is available inside the passenger cabin.
+  String tr(String ru, String lt, String en) => ru;
   String? challengeId;
   String message = '';
   String? sessionToken;
@@ -197,7 +179,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         DateTime.now().isBefore(sessionExpiry!);
     if (active) {
       return Scaffold(
-        appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [languageSwitcher()]),
+        appBar: AppBar(title: const Text('PRIVATE DRIVE')),
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -230,7 +212,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [languageSwitcher()]),
+      appBar: AppBar(title: const Text('PRIVATE DRIVE')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

@@ -607,7 +607,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final base = PdTaxiFare.calculate(
       cityMetres: _taxiOutsideCity ? 0 : _roadDistanceMetres!,
       outsideCityMetres: _taxiOutsideCity ? _roadDistanceMetres! : 0,
-      advanceBooking: _taxiAdvanceBooking,
       advanceBooking: _taxiAdvanceBooking);
     return base * (_soberDriver ? 2 : 1) + (_meetSign ? 1500 : 0);
   }

@@ -103,6 +103,39 @@ jobs:
           print("Isolated package ID: lt.privatedrive.private_drive.demo")
           PY
           cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
+          # Sign-in-only transparency: preserve the original PD pixels, gold
+          # typography, car and frame. Remove only near-black RGB backdrop.
+          # Do not alter the native splash, launcher icon or cockpit logo.
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib
+          source = Path("flutter_app/assets/brand/private_drive_logo.webp")
+          assert hashlib.sha256(source.read_bytes()).hexdigest() == "550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f"
+          image = Image.open(source).convert("RGB")
+          rgba = image.convert("RGBA")
+          rgb = image.load()
+          px = rgba.load()
+          for y in range(image.height):
+              for x in range(image.width):
+                  red, green, blue = rgb[x, y]
+                  strength = max(red, green, blue)
+                  t = min(1.0, max(0.0, (strength - 25.0) / 70.0))
+                  opacity = round(255 * t * t * (3 - 2 * t))
+                  px[x, y] = (red, green, blue, opacity)
+          dest = Path("private_drive_build/assets/brand/private_drive_logo_transparent.png")
+          rgba.save(dest, format="PNG", optimize=True)
+          assert rgba.getpixel((0, 0))[3] == 0, "black backdrop must be transparent"
+          assert rgba.getpixel((image.width // 2, image.height // 2))[3] > 0, "gold artwork must remain visible"
+          pubspec = Path("private_drive_build/pubspec.yaml")
+          contents = pubspec.read_text()
+          marker = "    - assets/brand/private_drive_logo.webp"
+          assert contents.count(marker) == 1
+          pubspec.write_text(contents.replace(marker,
+              marker + "\\n    - assets/brand/private_drive_logo_transparent.png".replace("\\n", "\n")))
+          assert dest.stat().st_size > 10000
+          print(f"Original logo unchanged; sign-in transparency ready: {dest.stat().st_size} bytes")
+          PY
           cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
           rm -f private_drive_build/test/widget_test.dart
           python3 - <<'PY'

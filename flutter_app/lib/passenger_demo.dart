@@ -16,10 +16,13 @@ import 'package:latlong2/latlong.dart' show LatLng;
 /// geocoding, payment SDK, charge or persistent booking in this screen.
 class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
-      this.preferencesStorage, this.initialRideType = 'Трансфер'});
+      this.preferencesStorage, this.initialRideType = 'Трансфер',
+      this.mapConnectivityCheck});
 
   final bool enableMapTiles;
   final String initialRideType;
+  /// Test injection: null uses a real HTTPS tile request on Android.
+  final Future<String?> Function()? mapConnectivityCheck;
   final DemoTripStore? tripStore;
   final PassengerPreferencesStorage? preferencesStorage;
 
@@ -525,6 +528,21 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _checkingMapNetwork = true;
       _mapNetworkError = null;
     });
+    if (widget.mapConnectivityCheck != null) {
+      try {
+        final issue = await widget.mapConnectivityCheck!();
+        if (mounted) setState(() {
+          _mapNetworkError = issue;
+          if (issue == null) _mapTilesFailed = false;
+        });
+      } on Exception {
+        if (mounted) setState(() =>
+            _mapNetworkError = 'Тестовая проверка карты не удалась');
+      } finally {
+        if (mounted) setState(() => _checkingMapNetwork = false);
+      }
+      return;
+    }
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
     try {
       final uri = Uri.parse(

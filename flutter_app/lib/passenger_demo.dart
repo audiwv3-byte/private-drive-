@@ -48,6 +48,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _coffee = false;
   bool _nightMap = false;
   bool _mapTilesFailed = false;
+  String? _mapNetworkError;
+  bool _checkingMapNetwork = false;
   int _mapTileErrors = 0;
   int _tileRetry = 0;
   bool _water = false;
@@ -263,6 +265,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void initState() {
     super.initState();
     _rideType = widget.initialRideType == 'Такси' ? 'Такси' : 'Трансфер';
+    if (widget.enableMapTiles) {
+      unawaited(_checkMapNetwork());
+    }
     _knownPilotMessageCount = widget.tripStore?.pilotChatMessages.length ?? 0;
     widget.tripStore?.addListener(_onTripChanged);
     _tripWishes.addListener(_savePreferences);
@@ -512,6 +517,57 @@ class _PassengerDemoState extends State<PassengerDemo> {
     if (selected != null && mounted) setState(() => _time = selected);
   }
 
+  // Independent of flutter_map's image pipeline: surfaces DNS/TLS/HTTP errors
+  // that otherwise look like a blank map on some Android devices.
+  Future<void> _checkMapNetwork() async {
+    if (!widget.enableMapTiles || _checkingMapNetwork) return;
+    if (mounted) setState(() {
+      _checkingMapNetwork = true;
+      _mapNetworkError = null;
+    });
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+    try {
+      final uri = Uri.parse(
+        'https://a.basemaps.cartocdn.com/voyager/10/584/328.png');
+      final req = await client.getUrl(uri).timeout(const Duration(seconds: 7));
+      req.headers.set(HttpHeaders.userAgentHeader,
+          'PRIVATE DRIVE DEMO Android map diagnostic');
+      final response = await req.close().timeout(const Duration(seconds: 7));
+      if (response.statusCode != HttpStatus.ok ||
+          response.headers.contentType?.mimeType != 'image/png') {
+        throw HttpException('HTTP ${response.statusCode}', uri: uri);
+      }
+      // Fetch just the first chunk to establish an actual image body.
+      final first = await response.first.timeout(const Duration(seconds: 7));
+      if (first.isEmpty) throw const FormatException('Пустое изображение');
+      if (mounted) setState(() {
+        _mapNetworkError = null;
+        _mapTilesFailed = false;
+      });
+    } on Exception catch (error) {
+      if (mounted) setState(() {
+        _mapNetworkError = error is HttpException
+            ? 'HTTP-ошибка сервера карты: ${error.message}'
+            : error is TimeoutException
+                ? 'Сервер карты не ответил вовремя'
+                : 'Нет доступа к серверу карты: ${error.runtimeType}';
+      });
+    } finally {
+      client.close(force: true);
+      if (mounted) setState(() => _checkingMapNetwork = false);
+    }
+  }
+
+  void _retryMap() {
+    setState(() {
+      _mapTilesFailed = false;
+      _mapNetworkError = null;
+      _mapTileErrors = 0;
+      _tileRetry++;
+    });
+    unawaited(_checkMapNetwork());
+  }
+
   @override
   void dispose() {
     widget.tripStore?.removeListener(_onTripChanged);
@@ -721,7 +777,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         color: Color(0xFF27332F),
                         child: Center(child: Text('Карта · офлайн-тест')),
                       ),
-                    if (widget.enableMapTiles && _mapTilesFailed)
+                    if (widget.enableMapTiles &&
+                        (_mapTilesFailed || _mapNetworkError != null))
                       Positioned.fill(
                         child: ColoredBox(
                           color: const Color(0xF01A2A34),
@@ -734,15 +791,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                 const SizedBox(height: 8),
                                 const Text('Карта временно недоступна',
                                   key: Key('passenger-map-load-error')),
-                                const Text('Проверь интернет-соединение',
-                                  style: TextStyle(fontSize: 12)),
+                                Text(_mapNetworkError ??
+                                    'Не удалось показать тайлы карты',
+                                  key: const Key('passenger-map-error-details'),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 12)),
                                 TextButton.icon(
                                   key: const Key('passenger-map-retry'),
-                                  onPressed: () => setState(() {
-                                    _mapTilesFailed = false;
-                                    _mapTileErrors = 0;
-                                    _tileRetry++;
-                                  }),
+                                  onPressed: _retryMap,
                                   icon: const Icon(Icons.refresh),
                                   label: const Text('Повторить загрузку'),
                                 ),
@@ -750,6 +806,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             ),
                           ),
                         ),
+                      ),
+                    if (widget.enableMapTiles && _checkingMapNetwork &&
+                        !_mapTilesFailed)
+                      const Positioned(
+                        left: 8, bottom: 8,
+                        child: Text('Проверка сервера карты…',
+                          key: Key('passenger-map-checking'),
+                          style: TextStyle(color: Colors.white, fontSize: 11)),
                       ),
                     Positioned(
                       top: 8,

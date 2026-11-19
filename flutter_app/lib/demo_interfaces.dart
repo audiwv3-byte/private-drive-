@@ -36,10 +36,12 @@ class PrivateDriveDemo extends StatefulWidget {
   State<PrivateDriveDemo> createState() => _PrivateDriveDemoState();
 }
 
-class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
+class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBindingObserver {
   final DemoTripStore _trip = DemoTripStore();
   StreamSubscription<Position>? _pilotLocationStream;
+  Timer? _pilotGpsRetry;
   bool _startingLocation = false;
+  bool _appInForeground = true;
   bool _restoringOrder = true;
   SharedPreferencesAsync? _orderPrefs;
 
@@ -87,6 +89,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _orderPrefs = _openOrderPrefs();
     _trip.addListener(_onPilotShiftChanged);
     unawaited(_restoreOrder());
@@ -107,14 +110,35 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appInForeground = state == AppLifecycleState.resumed;
+    if (_appInForeground && _trip.pilotOnline) {
+      _onPilotShiftChanged();
+    }
+  }
+
+  void _schedulePilotGpsRetry() {
+    _pilotGpsRetry?.cancel();
+    if (!mounted || !_trip.pilotOnline || !widget.enableMapTiles) return;
+    _pilotGpsRetry = Timer(const Duration(seconds: 5), () {
+      _pilotGpsRetry = null;
+      if (mounted && _trip.pilotOnline && _appInForeground) {
+        _onPilotShiftChanged();
+      }
+    });
+  }
+
   void _onPilotShiftChanged() {
     if (!_trip.pilotOnline) {
+      _pilotGpsRetry?.cancel();
+      _pilotGpsRetry = null;
       _pilotLocationStream?.cancel();
       _pilotLocationStream = null;
       return;
     }
     if (_pilotLocationStream == null && !_startingLocation &&
-        widget.enableMapTiles) {
+        _pilotGpsRetry == null && _appInForeground && widget.enableMapTiles) {
       unawaited(_startPilotLocation());
     }
   }
@@ -139,12 +163,19 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
         if (mounted && _trip.pilotOnline) {
           _trip.updatePilotLocation(position.latitude, position.longitude);
         }
-      }, onError: (Object _) {
+      }, onError: (Object error) {
+        // Recover from temporary Android location-stream interruptions.
         _pilotLocationStream?.cancel();
         _pilotLocationStream = null;
+        debugPrint('PD_PILOT_GPS_STREAM_INTERRUPTED: ${error.runtimeType}');
+        _schedulePilotGpsRetry();
+      }, onDone: () {
+        _pilotLocationStream = null;
+        _schedulePilotGpsRetry();
       });
     } catch (_) {
       // Never invent a GPS fix when Android location is unavailable.
+      _schedulePilotGpsRetry();
     } finally {
       _startingLocation = false;
     }
@@ -152,6 +183,8 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pilotGpsRetry?.cancel();
     _trip.removeListener(_onPilotShiftChanged);
     _trip.removeListener(_persistOrder);
     _pilotLocationStream?.cancel();

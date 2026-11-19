@@ -15,6 +15,7 @@ class DemoTrip {
     this.rideType = 'Трансфер',
     this.roundTrip = false,
     this.estimatedFareEur,
+    this.estimatedFareCents,
     this.extrasRequireQuote = false,
     required this.services,
   });
@@ -27,6 +28,8 @@ class DemoTrip {
   final bool roundTrip;
   /// Approved known fare component only; null when no fixed fare exists.
   final int? estimatedFareEur;
+  /// Taxi prices use exact cents; transfer prices remain whole euros.
+  final int? estimatedFareCents;
   /// True when additional selected services still require dispatcher pricing.
   final bool extrasRequireQuote;
   final List<String> services;
@@ -254,12 +257,17 @@ class DemoTripStore extends ChangeNotifier {
     String rideType = 'Трансфер',
     bool roundTrip = false,
     int? estimatedFareEur,
+    int? estimatedFareCents,
     bool extrasRequireQuote = false,
   }) {
     final a = from.trim();
     final b = to.trim();
     if (estimatedFareEur != null &&
         (estimatedFareEur < 0 || estimatedFareEur > 1000000)) return false;
+    if (estimatedFareCents != null &&
+        (estimatedFareCents < 0 || estimatedFareCents > 100000000)) return false;
+    if (paymentMethod.toLowerCase().contains('налич') ||
+        paymentMethod.toLowerCase() == 'cash') return false;
     if (_disposed || isActive || a.isEmpty || b.isEmpty ||
         a.toLowerCase() == b.toLowerCase()) return false;
     _archivePreviousChat();
@@ -271,6 +279,7 @@ class DemoTripStore extends ChangeNotifier {
       rideType: rideType,
       roundTrip: roundTrip,
       estimatedFareEur: estimatedFareEur,
+      estimatedFareCents: estimatedFareCents,
       extrasRequireQuote: extrasRequireQuote,
       services: List.unmodifiable(services),
     );
@@ -379,6 +388,7 @@ class DemoTripStore extends ChangeNotifier {
       'rideType': trip.rideType,
       'roundTrip': trip.roundTrip,
       'estimatedFareEur': trip.estimatedFareEur,
+      'estimatedFareCents': trip.estimatedFareCents,
       'extrasRequireQuote': trip.extrasRequireQuote,
       'services': trip.services,
       'status': status.name,
@@ -412,6 +422,7 @@ class DemoTripStore extends ChangeNotifier {
       final roundTrip = data['roundTrip'];
       final services = data['services'];
       final estimatedFareEur = data['estimatedFareEur'];
+      final estimatedFareCents = data['estimatedFareCents'];
       final extrasRequireQuote = data['extrasRequireQuote'];
       final statusName = data['status'];
       final arrivalAtRaw = data['arrivalAt'];
@@ -429,13 +440,17 @@ class DemoTripStore extends ChangeNotifier {
       if (from is! String || from.trim().isEmpty ||
           to is! String || to.trim().isEmpty ||
           from.trim().toLowerCase() == to.trim().toLowerCase() ||
-          payment is! String || departure is! String ||
+          payment is! String || payment.toLowerCase().contains('налич') ||
+          payment.toLowerCase() == 'cash' || departure is! String ||
           rideType is! String || roundTrip is! bool ||
           services is! List || services.any((v) => v is! String) ||
           statusName is! String ||
           (estimatedFareEur != null &&
               (estimatedFareEur is! int || estimatedFareEur < 0 ||
                estimatedFareEur > 1000000)) ||
+          (estimatedFareCents != null &&
+              (estimatedFareCents is! int || estimatedFareCents < 0 ||
+               estimatedFareCents > 100000000)) ||
           (extrasRequireQuote != null && extrasRequireQuote is! bool)) {
         return false;
       }
@@ -495,6 +510,7 @@ class DemoTripStore extends ChangeNotifier {
         paymentMethod: payment, departure: parsedDate, rideType: rideType,
         roundTrip: roundTrip,
         estimatedFareEur: estimatedFareEur as int?,
+        estimatedFareCents: estimatedFareCents as int?,
         extrasRequireQuote: extrasRequireQuote == true,
         services: List<String>.unmodifiable(services.cast<String>()));
       _status = status.first;

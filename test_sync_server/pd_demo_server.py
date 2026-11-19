@@ -50,6 +50,17 @@ class DemoStore:
                 seq INTEGER PRIMARY KEY AUTOINCREMENT, trip_id TEXT NOT NULL,
                 actor TEXT NOT NULL, status TEXT NOT NULL, event TEXT NOT NULL,
                 version INTEGER NOT NULL, at TEXT NOT NULL)""")
+            self.db.execute("""CREATE TABLE IF NOT EXISTS trip_messages (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                trip_id TEXT NOT NULL,
+                sender TEXT NOT NULL,
+                role TEXT NOT NULL CHECK(role IN ('pilot','passenger')),
+                client_id TEXT NOT NULL,
+                body TEXT NOT NULL,
+                at TEXT NOT NULL,
+                UNIQUE(trip_id, sender, client_id),
+                FOREIGN KEY(trip_id) REFERENCES trips(id))""")
+            self.db.execute("CREATE INDEX IF NOT EXISTS idx_trip_messages_cursor ON trip_messages(trip_id,seq)")
 
     def close(self):
         with DB_LOCK:
@@ -163,6 +174,53 @@ class DemoStore:
                 "FROM events WHERE trip_id=? AND seq>? ORDER BY seq LIMIT 100",
                 (trip_id, after))]
 
+    def _chat_access(self, trip_id, role, actor):
+        # Dispatchers can manage trips but must never read private chat.
+        if role not in ("pilot", "passenger"):
+            raise TripError("forbidden", 403)
+        row = self._get(trip_id)
+        self._allowed(row, role, actor)
+        if row["pilot"] is None or row["status"] not in (
+            "assigned", "approaching", "underway"
+        ):
+            raise TripError("chat_unavailable", 409)
+        return row
+
+    def send_message(self, trip_id, role, actor, payload):
+        if not isinstance(payload, dict):
+            raise TripError("invalid_message")
+        body = payload.get("text")
+        client_id = payload.get("client_id")
+        if not isinstance(body, str) or not 1 <= len(body.strip()) <= 500 or (
+            len(body) > 500
+        ) or not isinstance(client_id, str) or not re.fullmatch(
+            r"[a-f0-9]{32}", client_id
+        ):
+            raise TripError("invalid_message")
+        with DB_LOCK, self.db:
+            self._chat_access(trip_id, role, actor)
+            self.db.execute(
+                "INSERT OR IGNORE INTO trip_messages"
+                "(trip_id,sender,role,client_id,body,at) VALUES(?,?,?,?,?,?)",
+                (trip_id, actor, role, client_id, body.strip(),
+                 datetime.now(timezone.utc).isoformat()))
+            row = self.db.execute(
+                "SELECT seq,role,body,at FROM trip_messages WHERE trip_id=? "
+                "AND sender=? AND client_id=?",
+                (trip_id, actor, client_id)).fetchone()
+            return dict(row)
+
+    def messages(self, trip_id, role, actor, after):
+        if type(after) is not int or not 0 <= after <= 2_147_483_647:
+            raise TripError("invalid_after")
+        with DB_LOCK:
+            self._chat_access(trip_id, role, actor)
+            return [dict(row) for row in self.db.execute(
+                "SELECT seq,role,body,at FROM trip_messages "
+                "WHERE trip_id=? AND seq>? ORDER BY seq LIMIT 100",
+                (trip_id, after))]
+
+
 
 class ApiServer(ThreadingHTTPServer):
     allow_reuse_address = True
@@ -221,7 +279,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 raise TripError("browser_origin_not_allowed", 403)
             role, actor = self._auth()
             path = urlsplit(self.path)
-            if path.query and not (method == "GET" and path.path.endswith("/events")):
+            if path.query and not (method == "GET" and (path.path.endswith("/events") or path.path.endswith("/messages"))):
                 raise TripError("invalid_query")
             parts = path.path.strip("/").split("/")
             if method == "GET" and parts == ["v1", "me"]:
@@ -251,6 +309,23 @@ class ApiHandler(BaseHTTPRequestHandler):
                         raise TripError("invalid_after")
                     self._reply(200, {"events": self.server.store.events(trip_id, role, actor, after)})
                     return
+                if len(parts) == 4 and parts[3] == "messages":
+                    if method == "GET":
+                        from urllib.parse import parse_qs
+                        parsed = parse_qs(path.query, keep_blank_values=True)
+                        if set(parsed) - {"after"} or any(len(v) != 1 for v in parsed.values()):
+                            raise TripError("invalid_after")
+                        try:
+                            after = int(parsed.get("after", ["0"])[0])
+                        except ValueError:
+                            raise TripError("invalid_after")
+                        self._reply(200, {"messages": self.server.store.messages(
+                            trip_id, role, actor, after)})
+                        return
+                    if method == "POST":
+                        self._reply(201, {"message": self.server.store.send_message(
+                            trip_id, role, actor, self._body())})
+                        return
                 if method == "POST" and len(parts) == 4 and parts[3] == "assign":
                     if role != "dispatcher":
                         raise TripError("forbidden", 403)

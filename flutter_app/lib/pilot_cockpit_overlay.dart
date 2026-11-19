@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
+import 'pd_slide_to_confirm.dart';
 import 'demo_trip_store.dart';
 import 'app_language.dart';
 
@@ -23,7 +24,6 @@ class PilotCockpitOverlay extends StatefulWidget {
 
 class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
   bool _expanded = false;
-  double _acceptSwipeTravel = 0;
   static const gold = Color(0xFFDDC184);
   static const background = Color(0xEE10151D);
 
@@ -169,40 +169,12 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: GestureDetector(
+                                  child: PdSlideToConfirm(
                                     key: const Key('pilot-global-accept'),
-                                    behavior: HitTestBehavior.opaque,
-                                    onHorizontalDragStart: (_) => _acceptSwipeTravel = 0,
-                                    onHorizontalDragUpdate: (details) {
-                                      _acceptSwipeTravel += details.delta.dx;
-                                    },
-                                    onHorizontalDragEnd: (_) {
-                                      if (_acceptSwipeTravel >= 95 &&
-                                          widget.tripStore?.status ==
-                                            DemoTripStatus.assigned &&
-                                          widget.tripStore?.pilotAccepted == false) {
-                                        widget.onAccept();
-                                      }
-                                      _acceptSwipeTravel = 0;
-                                    },
-                                    onHorizontalDragCancel: () =>
-                                        _acceptSwipeTravel = 0,
-                                    child: Container(
-                                      height: 48,
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF126B40),
-                                        borderRadius: BorderRadius.circular(12)),
-                                      child: const Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.swipe_right_alt, color: Colors.white),
-                                          SizedBox(width: 4),
-                                          Flexible(child: Text('Свайп · Принять',
-                                            style: TextStyle(color: Colors.white))),
-                                        ],
-                                      ),
-                                    ),
+                                    thumbKey: const Key('pilot-global-accept-handle'),
+                                    label: pdLabel(context, 'Принять'),
+                                    enabled: awaiting,
+                                    onConfirmed: widget.onAccept,
                                   ),
                                 ),
                                 const SizedBox(width: 8),

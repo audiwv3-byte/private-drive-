@@ -154,10 +154,17 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
                 if (status == DemoTripStatus.requested)
                   FilledButton.icon(
                     key: const Key('dispatcher-assign-pilot'),
-                    onPressed: widget.tripStore.assignPilot,
+                    onPressed: widget.tripStore.cashOrderNeedsOtherPilot
+                      ? null : widget.tripStore.assignPilot,
                     icon: const Icon(Icons.assignment_ind_outlined),
                     label: Text(pdLabel(context, 'Назначить тестового пилота')),
                   ),
+                if (status == DemoTripStatus.requested &&
+                    widget.tripStore.cashOrderNeedsOtherPilot)
+                  const Text('Пилот отключил наличные. Назначь пилота, '
+                    'который принимает наличные, либо предложи клиенту '
+                    'изменить способ оплаты.',
+                    key: Key('dispatcher-cash-ineligible')),
                 if (status == DemoTripStatus.assigned &&
                     !widget.tripStore.pilotAccepted)
                   Text(pdLabel(context, 'Назначено пилоту · ожидает принятия')),

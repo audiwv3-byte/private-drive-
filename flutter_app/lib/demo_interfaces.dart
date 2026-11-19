@@ -537,6 +537,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   int stage = 0;
   bool paused = false;
   Timer? _waitingTicker;
+  Timer? _pickupWaitingTicker;
   DateTime? _waitingStartedAt;
   Duration _waitingElapsed = Duration.zero;
   DemoTrip? _waitingTripId;
@@ -630,6 +631,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     _seenPassengerMessageCount =
         widget.tripStore?.passengerChatMessages.length ?? 0;
     widget.tripStore?.addListener(_onTripChanged);
+    _syncPickupWaitingTicker();
     if (widget.tripStore?.pilotOnline == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _onTripChanged();
@@ -637,8 +639,38 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     }
   }
 
+  void _syncPickupWaitingTicker() {
+    final waiting = widget.tripStore?.isWaitingAtPickup == true;
+    if (waiting && _pickupWaitingTicker == null) {
+      _pickupWaitingTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else if (!waiting) {
+      _pickupWaitingTicker?.cancel();
+      _pickupWaitingTicker = null;
+    }
+  }
+
+  String get _pickupWaitingText {
+    final store = widget.tripStore!;
+    final elapsed = store.pickupWaitingElapsed();
+    final seconds = elapsed.inSeconds;
+    final clock = '${(seconds ~/ 60).toString().padLeft(2, '0')}:'
+        '${(seconds % 60).toString().padLeft(2, '0')}';
+    final freeLeft = DemoTripStore.freePickupWaiting - elapsed;
+    if (freeLeft > Duration.zero) {
+      final left = (freeLeft.inMilliseconds + 999) ~/ 1000;
+      return 'Ожидание $clock · бесплатно ещё '
+          '${(left ~/ 60).toString().padLeft(2, '0')}:'
+          '${(left % 60).toString().padLeft(2, '0')}';
+    }
+    return 'Платное ожидание $clock · +${store.pickupWaitingFeeLabel()} '
+        '(0,30 €/мин)';
+  }
+
   void _onTripChanged() {
     if (!mounted) return;
+    _syncPickupWaitingTicker();
     final store = widget.tripStore;
     final count = store?.passengerChatMessages.length ?? 0;
     if (count > _seenPassengerMessageCount) {
@@ -872,6 +904,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   @override
   void dispose() {
     _waitingTicker?.cancel();
+    _pickupWaitingTicker?.cancel();
     widget.tripStore?.removeListener(_onTripChanged);
     _gps?.cancel();
     _synthetic?.cancel();
@@ -1421,6 +1454,25 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                               const SizedBox(height: 10),
                             ],
 
+                            if (widget.tripStore?.status ==
+                                DemoTripStatus.approaching &&
+                                widget.tripStore?.pilotAccepted == true &&
+                                widget.tripStore?.arrivalAt == null)
+                              FilledButton.icon(
+                                key: const Key('pilot-arrived-at-pickup'),
+                                onPressed: () => widget.tripStore!.markArrived(),
+                                icon: const Icon(Icons.pin_drop_outlined),
+                                label: const Text('Прибыл · 3 минуты бесплатно'),
+                              ),
+                            if (widget.tripStore?.arrivalAt != null)
+                              Text(
+                                _pickupWaitingText,
+                                key: const Key('pilot-pickup-waiting-meter'),
+                                style: const TextStyle(
+                                  color: Color(0xFFDDC184),
+                                  fontWeight: FontWeight.bold),
+                              ),
+                            const SizedBox(height: 4),
                             if ((widget.tripStore?.paused ?? paused) ||
                                 _waitingElapsed > Duration.zero)
                               Text('Платное ожидание · $_waitingClock · учёт времени',

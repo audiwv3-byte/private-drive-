@@ -74,6 +74,25 @@ void main() {
     expect(store.passengerChatMessages, ['Вижу автомобиль']);
   });
 
+  testWidgets('Passenger menu opens from the top left without fake features',
+      (tester) async {
+    final store = makeOrder();
+    addTearDown(store.dispose);
+    await tester.pumpWidget(MaterialApp(
+      home: PassengerDemo(enableMapTiles: false, tripStore: store),
+    ));
+    await tester.tap(find.byKey(const Key('passenger-open-drawer')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('passenger-navigation-drawer')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-drawer-history')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-drawer-language')), findsOneWidget);
+    expect(tester.widget<ListTile>(
+      find.byKey(const Key('passenger-drawer-profile'))).enabled, isFalse);
+    await tester.tap(find.byKey(const Key('passenger-drawer-history')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('passenger-order-card')), findsOneWidget);
+  });
+
   testWidgets('Passenger can switch map day and night in offline preview',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(

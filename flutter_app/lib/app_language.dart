@@ -63,6 +63,57 @@ String pdLabel(BuildContext context, String ru) {
 }
 
 const Map<String, List<String>> _labels = {
+  'Нет тестового заказа': ['Nėra bandomojo užsakymo', 'No demo booking'],
+  'Заявка создана · ожидает назначения':
+      ['Užsakymas sukurtas · laukiama priskyrimo', 'Booking created · awaiting assignment'],
+  'Заказ принят · пилот готов к выезду':
+      ['Užsakymas priimtas · vairuotojas pasiruošęs', 'Booking accepted · pilot ready'],
+  'Пилот назначен · ожидает принятия':
+      ['Vairuotojas paskirtas · laukiama priėmimo', 'Pilot assigned · awaiting acceptance'],
+  'Остановка · демо': ['Sustojimas · demo', 'Stop · demo'],
+  'Пилот едет к пассажиру': ['Vairuotojas važiuoja pas keleivį', 'Pilot driving to passenger'],
+  'Поездка выполняется': ['Kelionė vyksta', 'Trip in progress'],
+  'Заказ отменён пассажиром · демо':
+      ['Keleivis atšaukė užsakymą · demo', 'Passenger cancelled booking · demo'],
+  'Карта пилота не загрузилась':
+      ['Nepavyko įkelti vairuotojo žemėlapio', 'Pilot map did not load'],
+  'Повторить загрузку карты':
+      ['Iš naujo įkelti žemėlapį', 'Reload map'],
+  'Включить GPS': ['Įjungti GPS', 'Enable GPS'],
+  'Выключить GPS': ['Išjungti GPS', 'Disable GPS'],
+  'Центрировать карту': ['Centruoti žemėlapį', 'Center map'],
+  'Назад': ['Atgal', 'Back'],
+  'Новый назначенный заказ · демо':
+      ['Naujas priskirtas užsakymas · demo', 'New assigned booking · demo'],
+  'Принять': ['Priimti', 'Accept'],
+  'Отклонить': ['Atmesti', 'Decline'],
+  'Сымитировать новый заказ': ['Sukurti bandomąjį užsakymą', 'Simulate new booking'],
+  'Принять следующий': ['Priimti kitą', 'Accept next'],
+  'Пропустить': ['Praleisti', 'Skip'],
+  'Связь с пассажиром · демо':
+      ['Ryšys su keleiviu · demo', 'Passenger contact · demo'],
+  'Написать': ['Rašyti', 'Message'],
+  'Позвонить': ['Skambinti', 'Call'],
+  'Позвонить пассажиру': ['Skambinti keleiviui', 'Call passenger'],
+  'Понятно': ['Supratau', 'OK'],
+  'Установи Waze: открыть его отдельно не удалось.':
+      ['Įdiek Waze: nepavyko atidaryti programėlės.',
+       'Install Waze: could not open the app.'],
+  'PRIVATE DRIVE · Информация': ['PRIVATE DRIVE · Informacija', 'PRIVATE DRIVE · Information'],
+  'Связаться с нами': ['Susisiekite su mumis', 'Contact us'],
+  'Электронная почта': ['El. paštas', 'Email'],
+  'Чат поддержки PRIVATE DRIVE':
+      ['PRIVATE DRIVE pagalbos pokalbis', 'PRIVATE DRIVE support chat'],
+  'Официальный Telegram-канал':
+      ['Oficialus Telegram kanalas', 'Official Telegram channel'],
+  'Сайт PRIVATE DRIVE': ['PRIVATE DRIVE svetainė', 'PRIVATE DRIVE website'],
+  'Пользовательское соглашение · проект':
+      ['Naudojimo sąlygos · projektas', 'Terms of service · draft'],
+  'Политика конфиденциальности · проект':
+      ['Privatumo politika · projektas', 'Privacy policy · draft'],
+  'Оценка пассажира ещё не получена':
+      ['Keleivio įvertinimas dar negautas', 'Passenger rating pending'],
+  'Отправить': ['Siųsti', 'Send'],
   'Заказы': ['Užsakymai', 'Bookings'],
   'Карта': ['Žemėlapis', 'Map'],
   'Пилоты': ['Vairuotojai', 'Pilots'],

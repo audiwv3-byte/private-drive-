@@ -76,7 +76,20 @@ class PdLanguageMenu extends StatelessWidget {
   }
 }
 
+/// Only passenger-owned routes opt into translated UI.
+/// Pilot, dispatcher, authentication and shared demo tools remain Russian.
+class PdPassengerLanguageScope extends InheritedWidget {
+  const PdPassengerLanguageScope({super.key, required super.child});
+
+  static bool enabled(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<PdPassengerLanguageScope>() != null;
+
+  @override
+  bool updateShouldNotify(PdPassengerLanguageScope oldWidget) => false;
+}
+
 String pdTr(BuildContext context, String ru, String lt, String en) {
+  if (!PdPassengerLanguageScope.enabled(context)) return ru;
   final language = PdLanguageScope.of(context).value;
   return language == 'LT' ? lt : language == 'EN' ? en : ru;
 }
@@ -84,6 +97,7 @@ String pdTr(BuildContext context, String ru, String lt, String en) {
 /// Common UI labels used across pilot, passenger and dispatcher routes.
 /// The business identifiers and fare-routing strings remain in Russian.
 String pdLabel(BuildContext context, String ru) {
+  if (!PdPassengerLanguageScope.enabled(context)) return ru;
   final language = PdLanguageScope.of(context).value;
   if (language == 'RU') return ru;
   final translations = _labels[ru];

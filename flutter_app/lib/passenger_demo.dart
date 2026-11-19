@@ -813,6 +813,190 @@ class _PassengerDemoState extends State<PassengerDemo> {
         ),
     ];
 
+    Widget passengerMap() => SizedBox.expand(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    widget.enableMapTiles
+                    ? KeyedSubtree(
+                        key: const ValueKey('passenger-route-map-persistent-controller'),
+                        child: FlutterMap(
+                        key: const Key('passenger-map'),
+                        mapController: _passengerMapController,
+                        options: MapOptions(
+                          onTap: (_, point) => _usePickupPoint(point),
+                          initialCenter: startMap,
+                          initialZoom: mapZoom,
+                          backgroundColor: _nightMap
+                              ? const Color(0xFF101B2B)
+                              : const Color(0xFFE0EAF0),
+                        ),
+                        children: [
+                          KeyedSubtree(
+                            key: ValueKey('passenger-raster-tile-generation-$mapGeneration'),
+                            child: ColorFiltered(
+                            key: const Key('passenger-map-night-filter'),
+                            colorFilter: _nightMap
+                                ? const ColorFilter.matrix(<double>[
+                                    -0.65, 0, 0, 0, 170,
+                                    0, -0.65, 0, 0, 170,
+                                    0, 0, -0.65, 0, 170,
+                                    0, 0, 0, 1, 0,
+                                  ])
+                                : const ColorFilter.matrix(<double>[
+                                    1, 0, 0, 0, 0,
+                                    0, 1, 0, 0, 0,
+                                    0, 0, 1, 0, 0,
+                                    0, 0, 0, 1, 0,
+                                  ]),
+                            child: TileLayer(
+                            key: const Key('passenger-map-tiles'),
+                            tileProvider: demoTileProvider(),
+                            // Both modes use keyless OSM; only day may use backup.
+                            urlTemplate: !_nightMap && _useBackupTiles
+                                ? 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
+                            errorTileCallback: (tile, error, stackTrace) {
+                              debugPrint('PD_PASSENGER_TILE_ERROR: $error');
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (!mounted || _mapTilesFailed ||
+                                    mapGeneration != _tileRetry ||
+                                    // Keep explicitly injected network errors
+                                    // visible in deterministic widget tests.
+                                    (widget.mapConnectivityCheck != null &&
+                                     _mapNetworkError != null)) return;
+                                setState(() {
+                                  _lastTileError = error.toString();
+                                  _mapTileErrors++;
+                                  if (_mapTileErrors >= 3) {
+                                    if (!_nightMap && !_useBackupTiles) {
+                                      // OSM can fail on real Android networks;
+                                      // retry automatically with CARTO light.
+                                      _useBackupTiles = true;
+                                      _mapTileErrors = 0;
+                                      _mapNetworkError = null;
+                                      _tileRetry++;
+                                    } else {
+                                      _mapTilesFailed = true;
+                                    }
+                                  }
+                                });
+                              });
+                            },
+                            ),
+                            ),
+                          ),
+                          if (_roadPoints.isNotEmpty)
+                            PolylineLayer(
+                              key: const Key('passenger-road-route'),
+                              polylines: [
+                                Polyline(
+                                  points: _roadPoints,
+                                  color: gold,
+                                  strokeWidth: 5,
+                                ),
+                              ],
+                            ),
+                          MarkerLayer(markers: mapMarkers),
+                          const RichAttributionWidget(
+                            attributions: [
+                              TextSourceAttribution('© OpenStreetMap contributors'),
+                              TextSourceAttribution('© CARTO'),
+                            ],
+                          ),
+                        ],
+                        ),
+                      )
+                    : const ColoredBox(
+                        key: Key('passenger-map'),
+                        color: Color(0xFF27332F),
+                        child: Center(child: Text('Карта · офлайн-тест')),
+                      ),
+                    if (widget.enableMapTiles &&
+                        (_mapTilesFailed || _mapNetworkError != null))
+                      Positioned.fill(
+                        child: ColoredBox(
+                          color: const Color(0xF01A2A34),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.map_outlined,
+                                  color: Color(0xFFDDC184), size: 42),
+                                const SizedBox(height: 8),
+                                Text(pdLabel(context, 'Карта временно недоступна'),
+                                  key: Key('passenger-map-load-error')),
+                                Text(_mapNetworkError ?? _lastTileError ??
+                                    'Не удалось показать тайлы карты',
+                                  key: const Key('passenger-map-error-details'),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 12)),
+                                TextButton.icon(
+                                  key: const Key('passenger-map-retry'),
+                                  onPressed: _retryMap,
+                                  icon: const Icon(Icons.refresh),
+                                  label: Text(pdLabel(context, 'Повторить загрузку')),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (widget.enableMapTiles && _checkingMapNetwork &&
+                        !_mapTilesFailed)
+                      const Positioned(
+                        left: 8, bottom: 8,
+                        child: Text('Проверка сервера карты…',
+                          key: Key('passenger-map-checking'),
+                          style: TextStyle(color: Colors.white, fontSize: 11)),
+                      ),
+                    Positioned(
+                      top: 8, left: 8,
+                      child: Material(
+                        color: const Color(0xF0172535),
+                        borderRadius: BorderRadius.circular(12),
+                        child: IconButton(
+                          key: const Key('passenger-locate-me'),
+                          tooltip: pdTr(context, 'Моё местоположение',
+                            'Mano vieta', 'My location'),
+                          onPressed: _findingPassenger ? null : _locatePassenger,
+                          icon: _findingPassenger
+                            ? const SizedBox(width: 18, height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.my_location, color: gold),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Material(
+                        color: const Color(0xF0172535),
+                        borderRadius: BorderRadius.circular(12),
+                        child: IconButton(
+                          key: const Key('passenger-map-day-night'),
+                          tooltip: pdLabel(context, _nightMap ? 'Дневная карта' : 'Ночная карта'),
+                          icon: Icon(_nightMap ? Icons.wb_sunny_outlined
+                              : Icons.dark_mode_outlined,
+                              color: const Color(0xFFDDC184), size: 20),
+                          onPressed: () => setState(() {
+                            _nightMap = !_nightMap;
+                            _mapTileErrors = 0;
+                            _mapTilesFailed = false;
+                            _lastTileError = null;
+                            _tileRetry++;
+                          }),
+                          ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+
     Widget bookingForm(ScrollController? panelScrollController) =>
       ListView(
                 controller: panelScrollController,
@@ -872,6 +1056,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 style: const TextStyle(fontSize: 12),
               ),
             const SizedBox(height: 12),
+            if (!widget.enableMapTiles)
+              SizedBox(height: 285, child: passengerMap()),
             if (_locationMessage != null)
               Text(_locationMessage!, key: const Key('passenger-location-error'),
                 style: const TextStyle(color: Colors.orangeAccent)),
@@ -1407,191 +1593,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
       ),
       body: SafeArea(
         child: Stack(children: [
-          Positioned.fill(child:
-            SizedBox.expand(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    widget.enableMapTiles
-                    ? KeyedSubtree(
-                        key: const ValueKey('passenger-route-map-persistent-controller'),
-                        child: FlutterMap(
-                        key: const Key('passenger-map'),
-                        mapController: _passengerMapController,
-                        options: MapOptions(
-                          onTap: (_, point) => _usePickupPoint(point),
-                          initialCenter: startMap,
-                          initialZoom: mapZoom,
-                          backgroundColor: _nightMap
-                              ? const Color(0xFF101B2B)
-                              : const Color(0xFFE0EAF0),
-                        ),
-                        children: [
-                          KeyedSubtree(
-                            key: ValueKey('passenger-raster-tile-generation-$mapGeneration'),
-                            child: ColorFiltered(
-                            key: const Key('passenger-map-night-filter'),
-                            colorFilter: _nightMap
-                                ? const ColorFilter.matrix(<double>[
-                                    -0.65, 0, 0, 0, 170,
-                                    0, -0.65, 0, 0, 170,
-                                    0, 0, -0.65, 0, 170,
-                                    0, 0, 0, 1, 0,
-                                  ])
-                                : const ColorFilter.matrix(<double>[
-                                    1, 0, 0, 0, 0,
-                                    0, 1, 0, 0, 0,
-                                    0, 0, 1, 0, 0,
-                                    0, 0, 0, 1, 0,
-                                  ]),
-                            child: TileLayer(
-                            key: const Key('passenger-map-tiles'),
-                            tileProvider: demoTileProvider(),
-                            // Both modes use keyless OSM; only day may use backup.
-                            urlTemplate: !_nightMap && _useBackupTiles
-                                ? 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
-                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
-                            errorTileCallback: (tile, error, stackTrace) {
-                              debugPrint('PD_PASSENGER_TILE_ERROR: $error');
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (!mounted || _mapTilesFailed ||
-                                    mapGeneration != _tileRetry ||
-                                    // Keep explicitly injected network errors
-                                    // visible in deterministic widget tests.
-                                    (widget.mapConnectivityCheck != null &&
-                                     _mapNetworkError != null)) return;
-                                setState(() {
-                                  _lastTileError = error.toString();
-                                  _mapTileErrors++;
-                                  if (_mapTileErrors >= 3) {
-                                    if (!_nightMap && !_useBackupTiles) {
-                                      // OSM can fail on real Android networks;
-                                      // retry automatically with CARTO light.
-                                      _useBackupTiles = true;
-                                      _mapTileErrors = 0;
-                                      _mapNetworkError = null;
-                                      _tileRetry++;
-                                    } else {
-                                      _mapTilesFailed = true;
-                                    }
-                                  }
-                                });
-                              });
-                            },
-                            ),
-                            ),
-                          ),
-                          if (_roadPoints.isNotEmpty)
-                            PolylineLayer(
-                              key: const Key('passenger-road-route'),
-                              polylines: [
-                                Polyline(
-                                  points: _roadPoints,
-                                  color: gold,
-                                  strokeWidth: 5,
-                                ),
-                              ],
-                            ),
-                          MarkerLayer(markers: mapMarkers),
-                          const RichAttributionWidget(
-                            attributions: [
-                              TextSourceAttribution('© OpenStreetMap contributors'),
-                              TextSourceAttribution('© CARTO'),
-                            ],
-                          ),
-                        ],
-                        ),
-                      )
-                    : const ColoredBox(
-                        key: Key('passenger-map'),
-                        color: Color(0xFF27332F),
-                        child: Center(child: Text('Карта · офлайн-тест')),
-                      ),
-                    if (widget.enableMapTiles &&
-                        (_mapTilesFailed || _mapNetworkError != null))
-                      Positioned.fill(
-                        child: ColoredBox(
-                          color: const Color(0xF01A2A34),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.map_outlined,
-                                  color: Color(0xFFDDC184), size: 42),
-                                const SizedBox(height: 8),
-                                Text(pdLabel(context, 'Карта временно недоступна'),
-                                  key: Key('passenger-map-load-error')),
-                                Text(_mapNetworkError ?? _lastTileError ??
-                                    'Не удалось показать тайлы карты',
-                                  key: const Key('passenger-map-error-details'),
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12)),
-                                TextButton.icon(
-                                  key: const Key('passenger-map-retry'),
-                                  onPressed: _retryMap,
-                                  icon: const Icon(Icons.refresh),
-                                  label: Text(pdLabel(context, 'Повторить загрузку')),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    if (widget.enableMapTiles && _checkingMapNetwork &&
-                        !_mapTilesFailed)
-                      const Positioned(
-                        left: 8, bottom: 8,
-                        child: Text('Проверка сервера карты…',
-                          key: Key('passenger-map-checking'),
-                          style: TextStyle(color: Colors.white, fontSize: 11)),
-                      ),
-                    Positioned(
-                      top: 8, left: 8,
-                      child: Material(
-                        color: const Color(0xF0172535),
-                        borderRadius: BorderRadius.circular(12),
-                        child: IconButton(
-                          key: const Key('passenger-locate-me'),
-                          tooltip: pdTr(context, 'Моё местоположение',
-                            'Mano vieta', 'My location'),
-                          onPressed: _findingPassenger ? null : _locatePassenger,
-                          icon: _findingPassenger
-                            ? const SizedBox(width: 18, height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.my_location, color: gold),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Material(
-                        color: const Color(0xF0172535),
-                        borderRadius: BorderRadius.circular(12),
-                        child: IconButton(
-                          key: const Key('passenger-map-day-night'),
-                          tooltip: pdLabel(context, _nightMap ? 'Дневная карта' : 'Ночная карта'),
-                          icon: Icon(_nightMap ? Icons.wb_sunny_outlined
-                              : Icons.dark_mode_outlined,
-                              color: const Color(0xFFDDC184), size: 20),
-                          onPressed: () => setState(() {
-                            _nightMap = !_nightMap;
-                            _mapTileErrors = 0;
-                            _mapTilesFailed = false;
-                            _lastTileError = null;
-                            _tileRetry++;
-                          }),
-                          ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          if (widget.enableMapTiles)
+            Positioned.fill(child: passengerMap()),
           if (widget.enableMapTiles) DraggableScrollableSheet(
             controller: _passengerSheetController,
             key: const Key('passenger-trip-bottom-sheet'),

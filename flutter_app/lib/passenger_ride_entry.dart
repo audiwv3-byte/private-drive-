@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'passenger_demo.dart';
+import 'passenger_extra_services.dart';
 import 'vilnius_evening_backdrop.dart';
 import 'app_language.dart';
 
@@ -15,6 +16,15 @@ class PassengerRideEntry extends StatelessWidget {
 
   final bool enableMapTiles;
   final DemoTripStore tripStore;
+
+  void _openExtra(BuildContext context, ExtraServiceType service) {
+    Navigator.push(context, MaterialPageRoute<void>(
+      builder: (_) => PdPassengerLanguageScope(
+        child: PassengerExtraServices(
+          type: service, tripStore: tripStore),
+      ),
+    ));
+  }
 
   void _open(BuildContext context, String type) {
     Navigator.push(context, MaterialPageRoute<void>(
@@ -38,7 +48,7 @@ class PassengerRideEntry extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 460),
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center,
+        child: ListView(shrinkWrap: true, children: [
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(pdLabel(context, 'Выбери тип поездки'),
@@ -64,11 +74,36 @@ class PassengerRideEntry extends StatelessWidget {
               onTap: () => _open(context, 'Трансфер'),
             )),
             const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 8),
+            Text('Дополнительные услуги',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 19,
+                fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            Card(child: ListTile(
+              key: const Key('passenger-entry-jumpstart'),
+              leading: const Icon(Icons.battery_charging_full, size: 34),
+              title: const Text('Запуск автомобиля · 20 €'),
+              subtitle: const Text(
+                'Помощь с разряженным аккумулятором'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openExtra(context, ExtraServiceType.jumpstart),
+            )),
+            const SizedBox(height: 12),
+            Card(child: ListTile(
+              key: const Key('passenger-entry-delivery'),
+              leading: const Icon(Icons.shopping_bag_outlined, size: 34),
+              title: const Text('Доставка товаров · 20 €'),
+              subtitle: const Text('Заберём покупки из магазина и доставим'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openExtra(context, ExtraServiceType.delivery),
+            )),
+            const SizedBox(height: 20),
             Text(pdLabel(context, 'Тестовый режим. Реальные заказы и оплата выключены.'),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 12)),
-          ],
-        ),
+          ]),
       ),
     ))),
     ]),

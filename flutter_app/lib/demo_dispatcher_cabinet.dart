@@ -11,39 +11,83 @@ import 'app_language.dart';
 class DemoDispatcherCabinet extends StatefulWidget {
   const DemoDispatcherCabinet({
     super.key, required this.tripStore, this.enableMapTiles = true,
+    this.initialTab = 1,
   });
 
   final DemoTripStore tripStore;
   final bool enableMapTiles;
+  /// Open on the fleet map; callers can deep-link directly to another section.
+  final int initialTab;
 
   @override
   State<DemoDispatcherCabinet> createState() => _DemoDispatcherCabinetState();
 }
 
 class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
-  int _tab = 0;
+  late int _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = widget.initialTab.clamp(0, 3);
+  }
   static const gold = Color(0xFFDDC184);
   static const tabs = ['Заказы', 'Карта', 'Пилоты', 'Пассажиры'];
 
+  void _selectSection(int index) {
+    Navigator.of(context).pop();
+    setState(() => _tab = index);
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Диспетчер')} · DEMO')),
+    drawer: Drawer(
+      key: const Key('dispatcher-navigation-drawer'),
+      child: SafeArea(child: ListView(children: [
+        const DrawerHeader(child: Center(child: Text('PRIVATE DRIVE · Диспетчер',
+          style: TextStyle(fontSize: 20, color: gold)))),
+        for (var index = 0; index < tabs.length; index++)
+          ListTile(
+            key: Key('dispatcher-menu-$index'),
+            leading: Icon([Icons.receipt_long_outlined, Icons.map_outlined,
+              Icons.directions_car_outlined, Icons.people_outline][index]),
+            title: Text(pdLabel(context, tabs[index])),
+            selected: _tab == index,
+            onTap: () => _selectSection(index),
+          ),
+        const Divider(),
+        const ListTile(leading: Icon(Icons.credit_card_outlined),
+          title: Text('Платежи · доступно после подключения API'), enabled: false),
+        const ListTile(leading: Icon(Icons.bar_chart_outlined),
+          title: Text('Отчёты · доступно после подключения API'), enabled: false),
+      ])),
+    ),
+    appBar: AppBar(
+      title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Диспетчер')} · DEMO'),
+      actions: [IconButton(
+        tooltip: 'Карта пилотов',
+        key: const Key('dispatcher-map-home'),
+        icon: const Icon(Icons.map_outlined),
+        onPressed: () => setState(() => _tab = 1),
+      )],
+    ),
     body: Column(children: [
-      SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          for (var index = 0; index < tabs.length; index++)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: ChoiceChip(
-                key: Key('dispatcher-tab-$index'),
-                label: Text(pdLabel(context, tabs[index])),
-                selected: _tab == index,
-                onSelected: (_) => setState(() => _tab = index),
+      if (widget.initialTab == 0)
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (var index = 0; index < tabs.length; index++)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: ChoiceChip(
+                  key: Key('dispatcher-tab-$index'),
+                  label: Text(pdLabel(context, tabs[index])),
+                  selected: _tab == index,
+                  onSelected: (_) => setState(() => _tab = index),
+                ),
               ),
-            ),
-        ]),
-      ),
+          ]),
+        ),
       Expanded(child: AnimatedBuilder(
         animation: widget.tripStore,
         builder: (context, _) => switch (_tab) {
@@ -192,13 +236,8 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
     final hasFix = store.pilotOnline &&
         latitude != null && longitude != null;
     final point = hasFix ? LatLng(latitude, longitude) : null;
-    return Column(key: const Key('dispatcher-map-tab'), children: [
-      const Padding(
-        padding: EdgeInsets.all(12),
-        child: Text('Карта активных пилотов · DEMO',
-          style: TextStyle(color: gold, fontWeight: FontWeight.bold)),
-      ),
-      Expanded(child: widget.enableMapTiles
+    return Stack(key: const Key('dispatcher-map-tab'), children: [
+      Positioned.fill(child: widget.enableMapTiles
         ? FlutterMap(
             key: const Key('dispatcher-live-map'),
             options: MapOptions(
@@ -230,7 +269,10 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
             child: Center(child: Text('Карта · без сетевых тайлов')),
           ),
       ),
-      Padding(
+      Positioned(
+        left: 12, right: 12, bottom: 12,
+        child: Material(color: const Color(0xDB151D2A),
+          borderRadius: BorderRadius.circular(10), child: Padding(
         padding: const EdgeInsets.all(12),
         child: Text(
           hasFix
@@ -240,7 +282,7 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
           key: const Key('dispatcher-fleet-status'),
           textAlign: TextAlign.center,
         ),
-      ),
+        )),
     ]);
   }
 

@@ -10,6 +10,7 @@ import 'passenger_ride_entry.dart';
 import 'app_language.dart';
 import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
+import 'pd_slide_to_confirm.dart';
 import 'pilot_passenger_chat_demo.dart';
 import 'message_voice.dart';
 import 'demo_trip_store.dart';
@@ -526,7 +527,6 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _animationTarget;
   bool _gpsEnabled = false;
   bool _tripPanelCollapsed = false;
-  double _tripSwipeDistance = 0;
   int _pilotPassengerStars = 0;
   String _gpsMessage = 'GPS выключен';
   int stage = 0;
@@ -831,12 +831,6 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     });
   }
 
-  void _finishTripSwipe() {
-    final accepted = _canAdvance && _tripSwipeDistance >= 95;
-    _tripSwipeDistance = 0;
-    if (accepted) advance();
-  }
-
   void advance() {
     if (widget.tripStore != null) {
       final changed = widget.tripStore!.advancePilot();
@@ -1021,23 +1015,14 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                       child: Transform.rotate(
                         key: const Key('pilot-location-heading'),
                         angle: _headingDegrees * math.pi / 180,
-                        child: const Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Icon(
-                              Icons.navigation,
-                              size: 48,
-                              color: Color(0xFF172B3F),
-                              shadows: [
-                                Shadow(color: Colors.black, blurRadius: 10),
-                              ],
-                            ),
-                            Icon(
-                              Icons.navigation,
-                              key: Key('pilot-location-marker'),
-                              size: 38,
-                              color: Color(0xFFB6FF36),
-                            ),
+                        child: const Icon(
+                          Icons.navigation_rounded,
+                          key: Key('pilot-location-marker'),
+                          color: Color(0xFFB6FF36),
+                          size: 44,
+                          shadows: [
+                            Shadow(color: Colors.black, blurRadius: 9),
+                            Shadow(color: Color(0xFF142310), blurRadius: 3),
                           ],
                         ),
                       ),
@@ -1429,47 +1414,13 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                             Row(
                               children: [
                                 Expanded(
-                                  child: GestureDetector(
+                                  child: PdSlideToConfirm(
                                     key: const Key('pilot-next-trip'),
-                                    behavior: HitTestBehavior.opaque,
-                                    onHorizontalDragStart: (_) {
-                                      _tripSwipeDistance = 0;
-                                    },
-                                    onHorizontalDragUpdate: (details) {
-                                      if (_canAdvance) {
-                                        _tripSwipeDistance += details.delta.dx;
-                                      }
-                                    },
-                                    onHorizontalDragEnd: (_) => _finishTripSwipe(),
-                                    onHorizontalDragCancel: () {
-                                      _tripSwipeDistance = 0;
-                                    },
-                                    child: Container(
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        color: _canAdvance
-                                          ? const Color(0xFF27764E)
-                                          : const Color(0xFF414141),
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.swipe_right_alt,
-                                            color: Colors.white),
-                                          const SizedBox(width: 7),
-                                          Flexible(child: Text(
-                                            'Свайп вправо · ${pdLabel(context, _actionText)}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold),
-                                          )),
-                                        ],
-                                      ),
-                                    ),
+                                    thumbKey: const Key('pilot-next-trip-handle'),
+                                    label: pdLabel(context, _actionText),
+                                    enabled: _canAdvance,
+                                    color: const Color(0xFF27764E),
+                                    onConfirmed: advance,
                                   ),
                                 ),
                                 const SizedBox(width: 8),

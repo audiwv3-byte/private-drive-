@@ -8,6 +8,22 @@ import 'remote_sync_client.dart';
 import 'message_voice.dart';
 
 /// Opt-in, test-only native client. Credentials are never stored on disk.
+/// Returns the last *other-role* sender in a newly fetched message batch.
+/// The last message overall may be an echo of the current user's own reply.
+String? newestIncomingChatRole(
+    Iterable<Map<String, dynamic>> messages, String? ownRole) {
+  String? latest;
+  for (final message in messages) {
+    final sender = message['role'];
+    if (sender is String &&
+        ['pilot', 'passenger', 'dispatcher'].contains(sender) &&
+        sender != ownRole) {
+      latest = sender;
+    }
+  }
+  return latest;
+}
+
 class RemoteSyncDemo extends StatefulWidget {
   const RemoteSyncDemo({super.key, this.gateway, this.enableMapTiles = true,
     this.pollInterval = const Duration(seconds: 3),
@@ -144,7 +160,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         if (rows is! List) {
           throw const RemoteDemoException('Неверный формат чата');
         }
-        var newIncoming = false;
+        final newlyReceived = <Map<String, dynamic>>[];
         for (final item in rows) {
           if (item is! Map<String, dynamic> || item['seq'] is! int ||
               item['body'] is! String ||
@@ -155,20 +171,20 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           if (n > chatSeq) {
             chatSeq = n;
             chatMessages.add(item);
-            if (item['role'] != role) newIncoming = true;
+            newlyReceived.add(item);
           }
         }
         if (chatMessages.length > 100) {
           chatMessages = chatMessages.sublist(chatMessages.length - 100);
         }
-        if (_loadedChatForTrip && newIncoming) {
+        final incomingRole = newestIncomingChatRole(newlyReceived, role);
+        if (_loadedChatForTrip && incomingRole != null) {
           if (widget.onIncomingMessageVoice != null) {
             widget.onIncomingMessageVoice!();
           } else {
-            final sender = chatMessages.last['role'];
             unawaited(PdMessageVoice.announce(
-              sender == 'dispatcher' ? 'диспетчера' :
-                (sender == 'pilot' ? 'пилота' : 'пассажира')));
+              incomingRole == 'dispatcher' ? 'диспетчера' :
+              (incomingRole == 'pilot' ? 'пилота' : 'пассажира')));
           }
         }
         _loadedChatForTrip = true;

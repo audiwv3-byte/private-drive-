@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:private_drive/main.dart';
 import 'package:private_drive/brand_logo.dart';
 
 void main() {
+  // These tests cover sign-in, not the separately tested first-run prompts.
+  setUp(() => SharedPreferences.setMockInitialValues({
+    'pd_native_permissions_onboarding_v1': true,
+  }));
   testWidgets('Approved PD logo and upgraded version are visible on startup',
       (tester) async {
     final asset = await rootBundle.load(privateDriveLogoAsset);
@@ -21,6 +26,7 @@ void main() {
     expect(height, 1254);
 
     await tester.pumpWidget(const PrivateDriveApp());
+    await tester.pumpAndSettle();
     expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
     expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
     expect(find.textContaining('0.2.19'), findsOneWidget);
@@ -32,6 +38,7 @@ void main() {
     expect(apiBaseUrl, isEmpty,
         reason: 'Unsigned CI must not connect to production or paid SMS.');
     await tester.pumpWidget(const PrivateDriveApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('PRIVATE DRIVE'), findsWidgets);
     expect(find.text('Независимый вход без Telegram'), findsOneWidget);
@@ -54,6 +61,7 @@ void main() {
   testWidgets('Only phone sign-in is offered and no OTP is sent offline',
       (tester) async {
     await tester.pumpWidget(const PrivateDriveApp());
+    await tester.pumpAndSettle();
     expect(find.text('Телефон в формате +370...'), findsOneWidget);
     expect(find.text('Email'), findsNothing);
     expect(find.byType(SegmentedButton<bool>), findsNothing);

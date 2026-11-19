@@ -1025,18 +1025,18 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           alignment: Alignment.center,
                           children: [
                             Icon(
-                              Icons.directions_car_filled,
-                              size: 46,
-                              color: Color(0xFFFFDC91),
+                              Icons.navigation,
+                              size: 48,
+                              color: Color(0xFF172B3F),
                               shadows: [
-                                Shadow(color: Colors.black, blurRadius: 9),
+                                Shadow(color: Colors.black, blurRadius: 10),
                               ],
                             ),
                             Icon(
-                              Icons.directions_car_filled,
+                              Icons.navigation,
                               key: Key('pilot-location-marker'),
-                              size: 36,
-                              color: Color(0xFF172B3F),
+                              size: 38,
+                              color: Color(0xFFB6FF36),
                             ),
                           ],
                         ),

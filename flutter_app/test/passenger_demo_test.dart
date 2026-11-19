@@ -3,6 +3,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/passenger_demo.dart';
 
 void main() {
+  testWidgets('English airport alias suggests a selectable offline address',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PassengerDemo(enableMapTiles: false),
+    ));
+    final form = find.descendant(
+      of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable),
+    ).first;
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-to')), 180, scrollable: form);
+    await tester.enterText(find.byKey(const Key('passenger-to')),
+      'Vilnius Airport');
+    await tester.pump();
+    expect(find.text('Аэропорт Вильнюса'), findsOneWidget);
+    expect(find.byKey(const Key('passenger-address-search-error')),
+      findsNothing);
+    await tester.tap(find.byKey(const Key('passenger-to-suggestion-0')));
+    await tester.pump();
+    expect(tester.widget<TextField>(
+      find.byKey(const Key('passenger-to'))).controller!.text,
+      'Аэропорт Вильнюса');
+  });
+
   testWidgets('Passenger presets, address swap and date/time controls are local',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(

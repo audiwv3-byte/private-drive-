@@ -33,7 +33,13 @@ void main() {
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('passenger-entry-title')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-form')), findsNothing);
+    await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
+    await tester.pumpAndSettle();
     expect(find.byType(PassengerDemo), findsOneWidget);
+    expect(find.text('Трансфер · выбранный тип поездки'), findsOneWidget);
+    expect(find.byKey(const Key('passenger-ride-type')), findsNothing);
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-to')),
       200,

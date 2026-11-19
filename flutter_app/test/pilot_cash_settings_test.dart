@@ -49,10 +49,10 @@ void main() {
     await tester.pump();
     expect(store.pilotAcceptsCash, isTrue);
     expect(store.assignPilot(), isTrue);
-    expect(await SharedPreferencesAsync().getBool(
-      PilotPaymentSettings.cashKey), isTrue);
+    expect(PilotPaymentSettings.instance.acceptCash, isTrue);
     await tester.tap(toggle);
     await tester.pump();
+    expect(PilotPaymentSettings.instance.acceptCash, isFalse);
     expect(store.pilotAcceptsCash, isFalse);
     expect(store.acceptAssignedPilot(), isFalse);
   });

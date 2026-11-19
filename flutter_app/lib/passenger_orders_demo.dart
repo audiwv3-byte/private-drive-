@@ -109,15 +109,22 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
             ),
             if (canChat) ...[
               const SizedBox(height: 12),
-              Text(pdLabel(context, 'Сообщения пилота'),
+              Text(pdLabel(context, 'Чат заказа: пилот и диспетчер'),
                 style: TextStyle(fontWeight: FontWeight.bold)),
               if (store.pilotChatMessages.isEmpty)
-                Text(pdLabel(context, 'Сообщений от пилота пока нет')),
+                if (store.dispatcherChatMessages.isEmpty)
+                  Text(pdLabel(context, 'Сообщений от пилота пока нет')),
               for (final message in store.pilotChatMessages)
                 ListTile(
                   key: const Key('passenger-pilot-message'),
                   leading: const Icon(Icons.message_outlined),
                   title: Text(message),
+                ),
+              for (final message in store.dispatcherChatMessages)
+                ListTile(
+                  key: const Key('passenger-dispatcher-message'),
+                  leading: const Icon(Icons.support_agent),
+                  title: Text('Диспетчер: $message'),
                 ),
               for (final message in store.passengerChatMessages)
                 ListTile(

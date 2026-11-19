@@ -13,7 +13,7 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,7 +24,7 @@ jobs:
           GH_REPOSITORY: ${{ github.repository }}
         run: |
           python3 - <<'PY'
-          import json, os, re, urllib.request
+          import json, os, re, time, urllib.request
           from pathlib import Path
           repository = os.environ['GH_REPOSITORY']
           token = os.environ['GH_TOKEN']
@@ -37,18 +37,34 @@ jobs:
               with urllib.request.urlopen(req, timeout=45) as res:
                   body = res.read().decode('utf-8', 'replace')
               return body if raw else json.loads(body)
-          runs = fetch('/actions/workflows/flutter-prototype-apk.yml/runs?per_page=100')['workflow_runs']
-          run = next((r for r in runs if r['run_number'] == 583), None)
+          # The fixed commit already triggered the regular Flutter APK workflow.
+          # Poll its native GitHub API result without a paid browser.
+          target = 'f9a3a11817aedc5eafa4211f5a5e845eb99eee9a'
+          run = None
+          for _ in range(28):
+              runs = fetch('/actions/workflows/flutter-prototype-apk.yml/runs?per_page=100')['workflow_runs']
+              run = next((item for item in runs if item.get('head_sha') == target), None)
+              if run and run.get('status') == 'completed':
+                  break
+              time.sleep(20)
           lines = ['# PRIVATE DRIVE — test-branch CI diagnostic', '',
-                   'Source build run: #583', 'No production service accessed.', '']
+                   'Source build: fixed commit f9a3a11', 'No production service accessed.', '']
           if run is None:
-              lines.append('Run #583 not found among 100 latest workflow runs.')
+              lines.append('Build for f9a3a11 not found among recent workflow runs.')
           else:
               lines.extend(['Run: ' + run['html_url'],
+                            'Run ID: ' + str(run['id']),
                             'Commit: ' + run['head_sha'],
+                            'Status: ' + str(run['status']),
                             'Conclusion: ' + str(run['conclusion']), ''])
+              if run.get('status') == 'completed':
+                  artifacts = fetch('/actions/runs/' + str(run['id']) + '/artifacts?per_page=100').get('artifacts', [])
+                  for artifact in artifacts:
+                      lines.append('Artifact: ' + str(artifact['name']) +
+                                   ' (ID ' + str(artifact['id']) + ')')
               jobs = fetch('/actions/runs/' + str(run['id']) + '/jobs?per_page=100')['jobs']
               for job in jobs:
+                  lines.append('Job: ' + str(job['name']) + ' (ID ' + str(job['id']) + ') = ' + str(job.get('conclusion')))
                   if job['conclusion'] != 'failure':
                       continue
                   lines.append('## Failed job: ' + job['name'])
@@ -78,5 +94,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add flutter_app/CI_CHECK_REPORT.md
           git diff --cached --quiet && exit 0
-          git commit -m "ci: save Flutter run 583 error summary"
+          git commit -m "ci: save Flutter APK verification for f9a3a11"
           git push origin HEAD:feature/flutter-independent-auth

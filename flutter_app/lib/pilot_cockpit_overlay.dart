@@ -34,7 +34,7 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
     final to = trip.to.trim().toLowerCase();
     if (trip.rideType == 'Трансфер' &&
         from == 'вильнюс' && to == 'каунас') {
-      return (trip.roundTrip ? 190 : 130) +
+      return (trip.roundTrip ? 200 : 110) +
           (trip.services.contains('Встреча с табличкой') ? 15 : 0);
     }
     return null;
@@ -47,7 +47,8 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
       animation: store ?? _NoopListenable.instance,
       builder: (context, _) {
         final awaiting = store?.status == DemoTripStatus.assigned &&
-            store?.pilotAccepted == false;
+            store?.pilotAccepted == false &&
+            store?.cashOrderNeedsOtherPilot != true;
         final trip = store?.trip;
         final fare = _fare;
         return Stack(

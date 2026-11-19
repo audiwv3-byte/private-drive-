@@ -70,6 +70,7 @@ class DemoTripStore extends ChangeNotifier {
   DateTime? _pilotLastSeen;
   int? _tripRating;
   int? _serviceRating;
+  int? _passengerRatingByPilot;
   final List<String> _pilotChatMessages = <String>[];
   final List<String> _passengerChatMessages = <String>[];
   final List<String> _dispatcherChatMessages = <String>[];
@@ -100,6 +101,16 @@ class DemoTripStore extends ChangeNotifier {
   DateTime? get pilotLastSeen => _pilotLastSeen;
   int? get tripRating => _tripRating;
   int? get serviceRating => _serviceRating;
+  int? get passengerRatingByPilot => _passengerRatingByPilot;
+
+  bool ratePassengerByPilot(int stars) {
+    if (_disposed || _trip == null || _status != DemoTripStatus.finished ||
+        !_pilotAccepted || _passengerRatingByPilot != null ||
+        stars < 1 || stars > 5) return false;
+    _passengerRatingByPilot = stars;
+    notifyListeners();
+    return true;
+  }
 
   /// Session-local state. Never invent extra pilots or publish GPS to a server.
   void setPilotOnline(bool value) {
@@ -230,6 +241,7 @@ class DemoTripStore extends ChangeNotifier {
     _pilotAccepted = false;
     _tripRating = null;
     _serviceRating = null;
+    _passengerRatingByPilot = null;
     notifyListeners();
     return true;
   }
@@ -325,6 +337,7 @@ class DemoTripStore extends ChangeNotifier {
       'pilotAccepted': _pilotAccepted,
       'tripRating': _tripRating,
       'serviceRating': _serviceRating,
+      'passengerRatingByPilot': _passengerRatingByPilot,
       'pilotChatMessages': _pilotChatMessages,
       'passengerChatMessages': _passengerChatMessages,
       'dispatcherChatMessages': _dispatcherChatMessages,
@@ -410,8 +423,11 @@ class DemoTripStore extends ChangeNotifier {
       }
       final tripRating = data['tripRating'];
       final serviceRating = data['serviceRating'];
+      final passengerRatingByPilot = data['passengerRatingByPilot'];
       if ((tripRating != null && (tripRating is! int || tripRating < 1 || tripRating > 5)) ||
-          (serviceRating != null && (serviceRating is! int || serviceRating < 1 || serviceRating > 5))) return false;
+          (serviceRating != null && (serviceRating is! int || serviceRating < 1 || serviceRating > 5)) ||
+          (passengerRatingByPilot != null &&
+            (passengerRatingByPilot is! int || passengerRatingByPilot < 1 || passengerRatingByPilot > 5))) return false;
       _trip = DemoTrip(from: from.trim(), to: to.trim(),
         paymentMethod: payment, departure: parsedDate, rideType: rideType,
         roundTrip: roundTrip,
@@ -428,6 +444,7 @@ class DemoTripStore extends ChangeNotifier {
            _status == DemoTripStatus.finished);
       _tripRating = tripRating as int?;
       _serviceRating = serviceRating as int?;
+      _passengerRatingByPilot = passengerRatingByPilot as int?;
       _pilotChatMessages..clear()..addAll(pilotMessages.cast<String>());
       _passengerChatMessages..clear()..addAll(passengerMessages.cast<String>());
       _dispatcherChatMessages..clear()..addAll(dispatcherMessages.cast<String>());

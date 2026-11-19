@@ -75,7 +75,8 @@ void main() {
     await tester.tap(find.byKey(const Key('pilot-chat-send')));
     await tester.pump();
     expect(store.pilotChatMessages, ['На месте']);
-    expect(find.text('После поездки'), findsNothing);
+    expect(tester.widget<TextField>(find.byKey(const Key('pilot-chat-input'))
+        .controller!.text, 'После поездки');
   });
 
   test('Messages never cross isolated orders or unaccepted assignments', () {

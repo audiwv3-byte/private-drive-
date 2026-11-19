@@ -95,8 +95,8 @@ void main() {
     final tileFinder = find.byKey(const Key('passenger-map-tiles'));
     expect(tileFinder, findsOneWidget);
     final day = tester.widget<TileLayer>(tileFinder);
-    expect(day.urlTemplate, contains('cartocdn.com/voyager'));
-    expect(day.fallbackUrl, contains('tile.openstreetmap.org'));
+    expect(day.urlTemplate, contains('tile.openstreetmap.org'));
+    expect(day.fallbackUrl, isNull);
     expect(find.ancestor(of: tileFinder, matching: find.byType(ColorFiltered)),
         findsNothing);
     tester.widget<IconButton>(find.byKey(

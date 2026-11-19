@@ -60,6 +60,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _flowers = false;
   bool _coffee = false;
   bool _nightMap = false;
+  String _menuSection = 'booking';
+  final DraggableScrollableController _passengerSheetController = DraggableScrollableController();
   late final MapController _passengerMapController = widget.passengerMapController ?? MapController();
   bool _findingPassenger = false;
   LatLng? _passengerLocation;
@@ -361,6 +363,16 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _addressTimer?.cancel();
     ++_addressGeneration;
     _updateRoadPreview();
+  }
+
+  void _openPassengerSection(String section) {
+    Navigator.pop(context);
+    setState(() => _menuSection = section);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_passengerSheetController.isAttached) return;
+      _passengerSheetController.animateTo(0.94,
+        duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    });
   }
 
   Widget _addressSuggestionsWidget(String side) {
@@ -819,6 +831,30 @@ class _PassengerDemoState extends State<PassengerDemo> {
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const Divider(height: 32),
             ListTile(
+              key: const Key('passenger-drawer-booking'),
+              leading: const Icon(Icons.map_outlined),
+              title: Text(pdLabel(context, 'Карта и заказ')),
+              onTap: () => _openPassengerSection('booking'),
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-routes'),
+              leading: const Icon(Icons.route_outlined),
+              title: Text(pdLabel(context, 'Популярные направления')),
+              onTap: () => _openPassengerSection('routes'),
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-preferences'),
+              leading: const Icon(Icons.tune_outlined),
+              title: Text(pdLabel(context, 'Личные настройки пассажира')),
+              onTap: () => _openPassengerSection('preferences'),
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-payments'),
+              leading: const Icon(Icons.credit_card_outlined),
+              title: Text(pdLabel(context, 'Способы оплаты')),
+              onTap: () => _openPassengerSection('payments'),
+            ),
+            ListTile(
               key: const Key('passenger-drawer-history'),
               leading: const Icon(Icons.history),
               title: Text(pdTr(context, 'История', 'Istorija', 'History')),
@@ -842,12 +878,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 'Premijos ir nuolaidų kodai', 'Rewards and promo codes')),
               enabled: false,
             ),
-            ListTile(
-              leading: const Icon(Icons.credit_card_outlined),
-              title: Text(pdTr(context, 'Платёжные карты',
-                'Mokėjimo kortelės', 'Payment cards')),
-              enabled: false,
-            ),
+
             ListTile(
               leading: const Icon(Icons.favorite_border),
               title: Text(pdTr(context, 'Избранные адреса',
@@ -1110,6 +1141,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ),
           ),
           DraggableScrollableSheet(
+            controller: _passengerSheetController,
             key: const Key('passenger-trip-bottom-sheet'),
             initialChildSize: 0.38,
             minChildSize: 0.20,
@@ -1209,6 +1241,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             if (_routeLoading)
               const LinearProgressIndicator(key: Key('passenger-route-loading')),
             const SizedBox(height: 12),
+            if (!widget.enableMapTiles || _menuSection == 'routes') ...[
             Text(pdLabel(context, 'Популярные направления')),
             Wrap(
               spacing: 6,
@@ -1247,6 +1280,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 ),
               ],
             ),
+            ],
             TextField(
               key: const Key('passenger-from'),
               controller: _from,
@@ -1321,6 +1355,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ],
             ),
             const SizedBox(height: 16),
+            if (!widget.enableMapTiles || _menuSection == 'preferences') ...[
             Card(
               key: const Key('passenger-personal-trip-settings-card'),
               child: ExpansionTile(
@@ -1487,6 +1522,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ),
             ),
             const SizedBox(height: 12),
+            ],
+            if (!widget.enableMapTiles || _menuSection == 'payments') ...[
             Text(pdLabel(context, 'Способ оплаты · только выбор'), style: TextStyle(fontWeight: FontWeight.bold)),
             Wrap(
               spacing: 8,
@@ -1503,6 +1540,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ],
             ),
             const SizedBox(height: 12),
+            ],
             Text(
               price == null
                   ? pdTr(context,

@@ -788,15 +788,26 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
               ),
               children: [
                 if (widget.loadMapTiles)
-                  TileLayer(
+                  ColorFiltered(
+                    key: const Key('pilot-map-night-filter'),
+                    colorFilter: _nightMap
+                        ? const ColorFilter.matrix(<double>[
+                            -0.65, 0, 0, 0, 170,
+                            0, -0.65, 0, 0, 170,
+                            0, 0, -0.65, 0, 170,
+                            0, 0, 0, 1, 0,
+                          ])
+                        : const ColorFilter.matrix(<double>[
+                            1, 0, 0, 0, 0,
+                            0, 1, 0, 0, 0,
+                            0, 0, 1, 0, 0,
+                            0, 0, 0, 1, 0,
+                          ]),
+                    child: TileLayer(
                     key: const Key('pilot-map-tiles'),
                     tileProvider: demoTileProvider(),
-                    urlTemplate: _nightMap
-                      ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    fallbackUrl: _nightMap
-                      ? 'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                      : null,
+                    // Raster OSM tiles need no CARTO API key.
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'lt.privatedrive.private_drive.demo',
                     maxNativeZoom: 19,
                     errorTileCallback: (tile, error, stackTrace) {
@@ -809,6 +820,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                         });
                       });
                     },
+                    ),
                   ),
                 if (_navigatingActiveTrip && _pickupRoadPoints.isNotEmpty)
                   PolylineLayer(
@@ -949,20 +961,18 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   child: Material(
                     color: const Color(0xF0172535),
                     borderRadius: BorderRadius.circular(14),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(_nightMap ? 'НОЧЬ' : 'ДЕНЬ',
-                        key: const Key('pilot-map-theme-status'),
-                        style: const TextStyle(color: Color(0xFFDDC184),
-                          fontSize: 12, fontWeight: FontWeight.bold)),
-                      IconButton(
+                    child: IconButton(
                       key: const Key('pilot-map-day-night'),
                       tooltip: _nightMap ? 'Дневная карта' : 'Ночная карта',
                       icon: Icon(_nightMap ? Icons.wb_sunny_outlined
                         : Icons.dark_mode_outlined,
                         color: const Color(0xFFDDC184), size: 22),
-                      onPressed: () => setState(() => _nightMap = !_nightMap),
-                      ),
-                    ]),
+                      onPressed: () => setState(() {
+                        _nightMap = !_nightMap;
+                        _pilotTilesFailed = false;
+                        _pilotTileErrors = 0;
+                      }),
+                    ),
                   ),
                 ),
                 Positioned(

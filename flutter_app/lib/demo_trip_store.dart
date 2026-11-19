@@ -40,18 +40,21 @@ class DemoArchivedChat {
     required this.to,
     required this.pilotMessages,
     required this.passengerMessages,
+    this.dispatcherMessages = const [],
   });
 
   final String from;
   final String to;
   final List<String> pilotMessages;
   final List<String> passengerMessages;
+  final List<String> dispatcherMessages;
 
   Map<String, dynamic> toJson() => {
     'from': from,
     'to': to,
     'pilotMessages': pilotMessages,
     'passengerMessages': passengerMessages,
+    'dispatcherMessages': dispatcherMessages,
   };
 }
 
@@ -69,6 +72,7 @@ class DemoTripStore extends ChangeNotifier {
   int? _serviceRating;
   final List<String> _pilotChatMessages = <String>[];
   final List<String> _passengerChatMessages = <String>[];
+  final List<String> _dispatcherChatMessages = <String>[];
   final List<DemoArchivedChat> _archivedChats = <DemoArchivedChat>[];
   List<DemoArchivedChat> get archivedChats =>
       List<DemoArchivedChat>.unmodifiable(_archivedChats);
@@ -76,12 +80,14 @@ class DemoTripStore extends ChangeNotifier {
   void _archivePreviousChat() {
     final old = _trip;
     if (old == null ||
-        (_pilotChatMessages.isEmpty && _passengerChatMessages.isEmpty)) return;
+        (_pilotChatMessages.isEmpty && _passengerChatMessages.isEmpty &&
+         _dispatcherChatMessages.isEmpty)) return;
     _archivedChats.add(DemoArchivedChat(
       from: old.from,
       to: old.to,
       pilotMessages: List<String>.unmodifiable(_pilotChatMessages),
       passengerMessages: List<String>.unmodifiable(_passengerChatMessages),
+      dispatcherMessages: List<String>.unmodifiable(_dispatcherChatMessages),
     ));
     if (_archivedChats.length > 30) _archivedChats.removeAt(0);
   }
@@ -130,6 +136,19 @@ class DemoTripStore extends ChangeNotifier {
 
   List<String> get pilotChatMessages => List.unmodifiable(_pilotChatMessages);
   List<String> get passengerChatMessages => List.unmodifiable(_passengerChatMessages);
+  List<String> get dispatcherChatMessages => List.unmodifiable(_dispatcherChatMessages);
+
+  /// Dispatcher can send within the current session's active assigned trip.
+  /// All three roles see the message; this never contacts real users.
+  bool addDispatcherChatMessage(String value) {
+    final message = value.trim();
+    if (_disposed || message.isEmpty || message.length > 500 ||
+        _trip == null || !isActive) return false;
+    _dispatcherChatMessages.add(message);
+    notifyListeners();
+    return true;
+  }
+
 
   bool addPilotChatMessage(String value) {
     final message = value.trim();
@@ -209,6 +228,7 @@ class DemoTripStore extends ChangeNotifier {
     _status = DemoTripStatus.requested;
     _pilotChatMessages.clear();
     _passengerChatMessages.clear();
+    _dispatcherChatMessages.clear();
     _paused = false;
     _pilotAccepted = false;
     _tripRating = null;
@@ -310,6 +330,7 @@ class DemoTripStore extends ChangeNotifier {
       'serviceRating': _serviceRating,
       'pilotChatMessages': _pilotChatMessages,
       'passengerChatMessages': _passengerChatMessages,
+      'dispatcherChatMessages': _dispatcherChatMessages,
       'archivedChats': _archivedChats.map((chat) => chat.toJson()).toList(),
     });
   }
@@ -351,9 +372,12 @@ class DemoTripStore extends ChangeNotifier {
       if (parsedDate == null) return false;
       final pilotMessages = data['pilotChatMessages'];
       final passengerMessages = data['passengerChatMessages'];
+      final dispatcherMessages = data['dispatcherChatMessages'] ?? <String>[];
       if (pilotMessages is! List || passengerMessages is! List ||
           pilotMessages.any((v) => v is! String || v.length > 500) ||
-          passengerMessages.any((v) => v is! String || v.length > 500)) {
+          passengerMessages.any((v) => v is! String || v.length > 500) ||
+          dispatcherMessages is! List || dispatcherMessages.length > 300 ||
+          dispatcherMessages.any((v) => v is! String || v.length > 500)) {
         return false;
       }
       final rawArchive = data['archivedChats'];
@@ -367,19 +391,23 @@ class DemoTripStore extends ChangeNotifier {
           final archiveTo = entry['to'];
           final pilot = entry['pilotMessages'];
           final passenger = entry['passengerMessages'];
+          final dispatcher = entry['dispatcherMessages'] ?? <String>[];
           if (archiveFrom is! String || archiveTo is! String ||
               archiveFrom.isEmpty || archiveTo.isEmpty ||
               archiveFrom.length > 500 || archiveTo.length > 500 ||
-              pilot is! List || passenger is! List ||
+              pilot is! List || passenger is! List || dispatcher is! List ||
               pilot.length > 300 || passenger.length > 300 ||
+              dispatcher.length > 300 ||
               pilot.any((m) => m is! String || m.length > 500) ||
-              passenger.any((m) => m is! String || m.length > 500)) {
+              passenger.any((m) => m is! String || m.length > 500) ||
+              dispatcher.any((m) => m is! String || m.length > 500)) {
             return false;
           }
           loadedArchive.add(DemoArchivedChat(
             from: archiveFrom, to: archiveTo,
             pilotMessages: List<String>.unmodifiable(pilot.cast<String>()),
             passengerMessages: List<String>.unmodifiable(passenger.cast<String>()),
+            dispatcherMessages: List<String>.unmodifiable(dispatcher.cast<String>()),
           ));
         }
       }
@@ -405,6 +433,7 @@ class DemoTripStore extends ChangeNotifier {
       _serviceRating = serviceRating as int?;
       _pilotChatMessages..clear()..addAll(pilotMessages.cast<String>());
       _passengerChatMessages..clear()..addAll(passengerMessages.cast<String>());
+      _dispatcherChatMessages..clear()..addAll(dispatcherMessages.cast<String>());
       _archivedChats..clear()..addAll(loadedArchive);
       notifyListeners();
       return true;

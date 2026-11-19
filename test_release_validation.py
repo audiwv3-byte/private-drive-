@@ -77,6 +77,19 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     with patch.object(server.pd_stops,'directions',return_value=(feature,[25.28,54.68],[23.90,54.89])):
         estimate=check(call('/api/route',request),200)
     assert estimate['price']=='121.00',estimate
+    # Exact owner-approved one-way and return transfer tariffs. No discount.
+    with patch.object(server.pd_stops,'directions',return_value=(feature,[25.28,54.68],[23.90,54.89])):
+        one_way=check(call('/api/route',request|{'extras':[]}),200)
+        both=check(call('/api/route',request|{'extras':[],'roundtrip':True}),200)
+        reverse=check(call('/api/route',request|{
+            'origin':'Kaunas','destination':'Vilnius',
+            'origin_coordinates':[23.90,54.89],
+            'destination_coordinates':[25.28,54.68],
+            'extras':[]}),200)
+    assert one_way['price']=='110.00',one_way
+    assert reverse['price']=='90.00',reverse
+    assert both['price']=='200.00',both
+
     for changes in [{'origin':{}},{'roundtrip':'false'},{'origin_coordinates':[float('nan'),54]},{'origin_coordinates':[999,54]},{'extras':{}},{'stop_address':[]}]:
         check(call('/api/route',request|changes),400)
     future=(core.now()+__import__('datetime').timedelta(days=2)).strftime('%d.%m.%Y')

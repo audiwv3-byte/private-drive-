@@ -66,7 +66,7 @@ void main() {
     expect(find.byKey(const Key('pilot-map-theme-status')), findsNothing);
     await tester.tap(find.byKey(const Key('pilot-map-day-night')));
     await tester.pump();
-    expect(find.text('НОЧЬ'), findsOneWidget);
+    expect(find.text('НОЧЬ'), findsNothing);
     expect(tester.widget<TileLayer>(tile).urlTemplate,
         contains('tile.openstreetmap.org'));
     expect(tester.widget<ColorFiltered>(

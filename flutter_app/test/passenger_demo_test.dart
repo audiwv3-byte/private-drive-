@@ -126,7 +126,7 @@ void main() {
         matching: find.byType(Scrollable),
       ).first,
     );
-    expect(find.text('Предварительная стоимость: 130 €'), findsOneWidget);
+    expect(find.text('Предварительная стоимость: 110 €'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('service-meet-sign')), -180,
@@ -149,7 +149,7 @@ void main() {
         matching: find.byType(Scrollable),
       ).first,
     );
-    expect(find.text('Предварительная стоимость: 145 €'), findsOneWidget);
+    expect(find.text('Предварительная стоимость: 125 €'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('service-pets')), -180,
@@ -171,9 +171,9 @@ void main() {
         matching: find.byType(Scrollable),
       ).first,
     );
-    expect(find.text('Расчётная часть: 145 € · дополнительные услуги по запросу'),
+    expect(find.text('Расчётная часть: 125 € · дополнительные услуги по запросу'),
         findsOneWidget);
-    expect(find.text('Предварительная стоимость: 145 €'), findsNothing);
+    expect(find.text('Предварительная стоимость: 125 €'), findsNothing);
   });
 
   testWidgets('Approved Vilnius–Kaunas return transfer costs 200 EUR',
@@ -223,7 +223,7 @@ void main() {
     await tester.pump();
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')), 220, scrollable: list);
-    expect(find.text('Предварительная стоимость: 260 €'), findsOneWidget);
+    expect(find.text('Предварительная стоимость: 220 €'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('service-meet-sign')), -180, scrollable: list);
@@ -232,7 +232,7 @@ void main() {
     await tester.pump();
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')), 220, scrollable: list);
-    expect(find.text('Предварительная стоимость: 275 €'), findsOneWidget);
+    expect(find.text('Предварительная стоимость: 235 €'), findsOneWidget);
   });
 
   testWidgets('Unpriced coffee keeps approved amount visible, not final',
@@ -279,7 +279,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')),
       220, scrollable: list);
-    expect(find.text('Предварительная стоимость: 130 €'), findsOneWidget);
+    expect(find.text('Предварительная стоимость: 110 €'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-to')), -200, scrollable: list);
     await tester.enterText(find.byKey(const Key('passenger-to')), 'Тракай');
@@ -287,7 +287,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-price-preview')),
       220, scrollable: list);
-    expect(find.text('Предварительная стоимость: 130 €'), findsNothing);
+    expect(find.text('Предварительная стоимость: 110 €'), findsNothing);
     expect(find.textContaining('Стоимость по запросу'), findsOneWidget);
   });
 

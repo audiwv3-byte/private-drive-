@@ -131,6 +131,14 @@ jobs:
           info = subprocess.check_output(["flutter", "--version"], text=True).strip().splitlines()[0]
           print("Verified branded APK:", apk.stat().st_size, "bytes", info)
           PY
+      - name: Preserve the actual installable demo APK before integration tests
+        run: |
+          # flutter test integration_test/... rebuilds app-debug.apk as an
+          # instrumentation test harness. Never distribute that test binary.
+          mkdir -p private_drive_release
+          cp private_drive_build/build/app/outputs/flutter-apk/app-debug.apk private_drive_release/private-drive-demo.apk
+          sha256sum private_drive_release/private-drive-demo.apk | tee private_drive_release/private-drive-demo.sha256
+          test "$(stat -c %s private_drive_release/private-drive-demo.apk)" -gt 100000000
       - name: Enable KVM acceleration for Android emulator
         run: |
           test -e /dev/kvm || { echo 'KVM device missing'; exit 1; }
@@ -146,10 +154,15 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 360
           script: bash -lc 'cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m'
-      - name: Upload test APK
+      - name: Confirm preserved installable APK is unchanged
+        run: |
+          test -s private_drive_release/private-drive-demo.apk
+          sha256sum --check private_drive_release/private-drive-demo.sha256
+          test "$(stat -c %s private_drive_release/private-drive-demo.apk)" -gt 100000000
+      - name: Upload verified installable demo APK (not test harness)
         uses: actions/upload-artifact@v4
         with:
-          name: private-drive-android-debug-apk
-          path: private_drive_build/build/app/outputs/flutter-apk/app-debug.apk
+          name: private-drive-android-demo-installable-apk
+          path: private_drive_release/private-drive-demo.apk
           if-no-files-found: error
           retention-days: 7

@@ -100,11 +100,6 @@ jobs:
           assert original in data, "expected generated package ID"
           data = data.replace(original,
               'applicationId = "lt.privatedrive.private_drive.demo"')
-          # permission_handler_android declares compileSdk >= 37; leave
-          # targetSdk untouched to avoid changing Android runtime policies.
-          sdk_marker = 'compileSdk = flutter.compileSdkVersion'
-          assert sdk_marker in data, "generated Flutter compileSdk not found"
-          data = data.replace(sdk_marker, 'compileSdk = 37')
           app.write_text(data)
           assert 'applicationId = "lt.privatedrive.private_drive.demo"' in app.read_text()
           print("Isolated package ID: lt.privatedrive.private_drive.demo")
@@ -159,9 +154,6 @@ jobs:
           data = data.replace("<application", insert + "    <application", 1)
           manifest.write_text(data)
           PY
-      - name: Install Android SDK required by permission handler
-        run: |
-          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-37"
       - name: Verify live day/night raster tiles before building
         run: python3 flutter_app/tool/check_map_tiles.py
       - name: Analyze and build debug APK (no production secrets)

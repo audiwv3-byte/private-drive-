@@ -207,9 +207,11 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                     FilledButton.icon(
                       key: const Key('open-passenger-preview'),
                       onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => PassengerRideEntry(
-                          enableMapTiles: widget.enableMapTiles,
-                          tripStore: _trip,
+                        MaterialPageRoute(builder: (_) => PdPassengerLanguageScope(
+                          child: PassengerRideEntry(
+                            enableMapTiles: widget.enableMapTiles,
+                            tripStore: _trip,
+                          ),
                         ))),
                       icon: const Icon(Icons.person_outline),
                       label: Text(pdLabel(context, 'Пассажир')),
@@ -220,7 +222,8 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                         key: const Key('open-my-orders'),
                         onPressed: () => Navigator.push(context,
                           MaterialPageRoute(builder: (_) =>
-                            PassengerOrdersDemo(tripStore: _trip))),
+                            PdPassengerLanguageScope(
+                              child: PassengerOrdersDemo(tripStore: _trip)))),
                         icon: const Icon(Icons.receipt_long_outlined),
                         label: Text(pdLabel(context, 'Мои заказы · управление')),
                       ),

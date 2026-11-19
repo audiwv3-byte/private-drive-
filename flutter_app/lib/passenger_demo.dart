@@ -775,7 +775,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
                               debugPrint('PD_PASSENGER_TILE_ERROR: $error');
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 if (!mounted || _mapTilesFailed ||
-                                    mapGeneration != _tileRetry) return;
+                                    mapGeneration != _tileRetry ||
+                                    // Keep explicitly injected network errors
+                                    // visible in deterministic widget tests.
+                                    (widget.mapConnectivityCheck != null &&
+                                     _mapNetworkError != null)) return;
                                 setState(() {
                                   _lastTileError = error.toString();
                                   _mapTileErrors++;

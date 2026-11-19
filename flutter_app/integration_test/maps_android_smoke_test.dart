@@ -177,7 +177,9 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(
       const Duration(seconds: 18)));
 
-    await tester.pump(const Duration(milliseconds: 300));
+    // Match the passenger raster test: pump frames after asynchronous HTTP/
+    // image decoding. A single 300 ms pump can capture the unpainted map.
+    await flushRasterImageFrames(tester);
     expect(find.byKey(const Key('pilot-map-load-error')), findsNothing,
       reason: 'Pilot map detected failed network tile requests');
     final rect = tester.getRect(find.byKey(const Key('pilot-map-surface')));

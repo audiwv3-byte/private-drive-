@@ -7,6 +7,7 @@ import 'permissions_onboarding.dart';
 import 'message_voice.dart';
 import 'app_language.dart';
 import 'demo_trip_store.dart';
+import 'taxi_fare.dart';
 import 'demo_rating_panel.dart';
 import 'company_info.dart';
 import 'passenger_orders_demo.dart';
@@ -53,6 +54,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
   String _payment = 'Карта';
   late String _rideType;
   bool _roundTrip = false;
+  bool _taxiOutsideCity = false;
+  bool _taxiAdvanceBooking = false;
+  bool _taxiLargeVehicle = false;
+  int? _roadDistanceMetres;
   bool _meetSign = false;
   bool _pets = false;
   bool _soberDriver = false;
@@ -517,9 +522,16 @@ class _PassengerDemoState extends State<PassengerDemo> {
       departure: departure,
       rideType: _rideType,
       roundTrip: _roundTrip,
-      estimatedFareEur: _pricePreview,
+      estimatedFareEur: _rideType == 'Такси' ? null : _pricePreview,
+      estimatedFareCents: _taxiPriceCents,
       extrasRequireQuote: _requiresCustomQuote,
       services: [
+        if (_rideType == 'Такси' && _taxiAdvanceBooking)
+          'Предварительное бронирование +3 €',
+        if (_rideType == 'Такси' && _taxiLargeVehicle)
+          'Многоместная машина +3 € · подтвердить наличие',
+        if (_rideType == 'Такси' && _taxiOutsideCity)
+          'Тариф за городом 0,79 €/км',
         if (_meetSign) 'Встреча с табличкой',
         if (_pets) 'Животные',
         if (_soberDriver) 'Трезвый водитель',
@@ -583,9 +595,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   int? get _fixedPrice {
     final a = _from.text.trim().toLowerCase();
     final b = _to.text.trim().toLowerCase();
-    if (_rideType == 'Такси') {
-      return !_roundTrip && a == 'вильнюс' && b == 'каунас' ? 90 : null;
-    }
+    if (_rideType == 'Такси') return null;
     if (_rideType != 'Трансфер') return null;
     if (_roundTrip) return a == 'вильнюс' && b == 'каунас' ? 200 : null;
     return _transferFares['$a|$b'];
@@ -594,6 +604,16 @@ class _PassengerDemoState extends State<PassengerDemo> {
   // Only approved amounts enter the preview. Unpriced requests never
   // silently become free and never erase the known fare.
   bool get _requiresCustomQuote => _pets || _flowers || _coffee || _water;
+
+  int? get _taxiPriceCents {
+    if (_rideType != 'Такси' || _roadDistanceMetres == null) return null;
+    final base = PdTaxiFare.calculate(
+      cityMetres: _taxiOutsideCity ? 0 : _roadDistanceMetres!,
+      outsideCityMetres: _taxiOutsideCity ? _roadDistanceMetres! : 0,
+      advanceBooking: _taxiAdvanceBooking,
+      largeVehicle: _taxiLargeVehicle);
+    return base * (_soberDriver ? 2 : 1) + (_meetSign ? 1500 : 0);
+  }
 
   int? get _pricePreview {
     final fixed = _fixedPrice;
@@ -621,6 +641,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final request = ++_routeRequest;
     final start = _resolve(_from.text);
     final finish = _resolve(_to.text);
+    _roadDistanceMetres = null;
     if (start == null || finish == null || !widget.enableMapTiles) {
       if (mounted) setState(() {
         _roadPoints = const [];
@@ -661,6 +682,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       if (!mounted || request != _routeRequest) return;
       setState(() {
         _roadPoints = points;
+        _roadDistanceMetres = (route['distance'] as num).round();
         _routeLoading = false;
         final km = ((route['distance'] as num).toDouble() / 1000).round();
         _routeInfo = 'Дорожный маршрут · около $km км · демо';
@@ -669,6 +691,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       if (!mounted || request != _routeRequest) return;
       setState(() {
         _roadPoints = const [];
+        _roadDistanceMetres = null;
         _routeLoading = false;
         _routeInfo = 'Дорожный маршрут временно недоступен.';
       });
@@ -811,6 +834,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
         : null;
     if (pilotPosition != null) _scheduleFollowPilot();
     final price = _pricePreview;
+    final taxiPrice = _taxiPriceCents;
     final startMap = start != null && finish != null
         ? LatLng((start.latitude + finish.latitude) / 2,
             (start.longitude + finish.longitude) / 2)
@@ -1118,15 +1142,36 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('passenger-transfer-tariffs'),
                 style: const TextStyle(fontSize: 12),
               ),
-            ] else
-              Text(
-                pdTr(context,
-                  'Такси: Вильнюс → Каунас 90 €. Остальные направления — по запросу.',
-                  'Taksi: Vilnius → Kaunas 90 €. Kitos kryptys pagal užklausą.',
-                  'Taxi: Vilnius → Kaunas €90. Other destinations on request.'),
-                key: const Key('passenger-taxi-tariffs'),
-                style: const TextStyle(fontSize: 12),
+            ] else ...[
+              const Text(
+                'Такси: посадка 0,99 € · город 0,66 €/км · '
+                'за городом 0,79 €/км · минимум 4 €. '
+                'Расчёт только по подтверждённому дорожному маршруту.',
+                key: Key('passenger-taxi-tariffs'),
+                style: TextStyle(fontSize: 12),
               ),
+              SwitchListTile(
+                key: const Key('taxi-outside-city'),
+                title: const Text('Тариф поездки за городом · 0,79 €/км'),
+                subtitle: const Text('Весь рассчитанный маршрут по ставке за городом. '
+                    'Для смешанного маршрута стоимость уточняет диспетчер.'),
+                value: _taxiOutsideCity,
+                onChanged: (v) => setState(() => _taxiOutsideCity = v),
+              ),
+              CheckboxListTile(
+                key: const Key('taxi-advance-booking'),
+                title: const Text('Предварительное бронирование · +3 €'),
+                value: _taxiAdvanceBooking,
+                onChanged: (v) => setState(() => _taxiAdvanceBooking = v ?? false),
+              ),
+              CheckboxListTile(
+                key: const Key('taxi-large-vehicle'),
+                title: const Text('Более 4 пассажиров · +3 €'),
+                subtitle: const Text('Требуется подтверждение наличия многоместного авто'),
+                value: _taxiLargeVehicle,
+                onChanged: (v) => setState(() => _taxiLargeVehicle = v ?? false),
+              ),
+            ],
             const SizedBox(height: 12),
             if (!widget.enableMapTiles)
               SizedBox(height: 285, child: passengerMap()),
@@ -1461,12 +1506,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
             const SizedBox(height: 12),
             ],
             Text(
-              price == null
+              ( _rideType == 'Такси' ? taxiPrice == null : price == null )
                   ? pdTr(context,
                       'Стоимость по запросу · фиксированная цена не установлена',
                       'Kaina pagal užklausą · fiksuota kaina nenustatyta',
                       'Price on request · no fixed fare available')
-                  : _requiresCustomQuote
+                  : _rideType == 'Такси'
+                      ? Text('Такси: ' + PdTaxiFare.euros(taxiPrice!) +
+                          (_requiresCustomQuote ? ' · доп. услуги по запросу' : '')).data!
+                      : _requiresCustomQuote
                       ? pdTr(context,
                           'Расчётная часть: $price € · дополнительные услуги по запросу',
                           'Apskaičiuota dalis: $price € · papildomos paslaugos pagal užklausą',

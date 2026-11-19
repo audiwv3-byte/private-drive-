@@ -54,12 +54,34 @@ class DemoStore:
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
                 trip_id TEXT NOT NULL,
                 sender TEXT NOT NULL,
-                role TEXT NOT NULL CHECK(role IN ('pilot','passenger')),
+                role TEXT NOT NULL CHECK(role IN ('pilot','passenger','dispatcher')),
                 client_id TEXT NOT NULL,
                 body TEXT NOT NULL,
                 at TEXT NOT NULL,
                 UNIQUE(trip_id, sender, client_id),
                 FOREIGN KEY(trip_id) REFERENCES trips(id))""")
+            # SQLite cannot ALTER a CHECK constraint; safely migrate older
+            # isolated demo databases while preserving message sequence IDs.
+            schema = self.db.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='trip_messages'"
+            ).fetchone()[0]
+            if "'dispatcher'" not in schema:
+                self.db.execute("""CREATE TABLE trip_messages_upgrade (
+                    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                    trip_id TEXT NOT NULL,
+                    sender TEXT NOT NULL,
+                    role TEXT NOT NULL CHECK(role IN ('pilot','passenger','dispatcher')),
+                    client_id TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    at TEXT NOT NULL,
+                    UNIQUE(trip_id,sender,client_id),
+                    FOREIGN KEY(trip_id) REFERENCES trips(id))""")
+                self.db.execute(
+                    "INSERT INTO trip_messages_upgrade "
+                    "(seq,trip_id,sender,role,client_id,body,at) "
+                    "SELECT seq,trip_id,sender,role,client_id,body,at FROM trip_messages")
+                self.db.execute("DROP TABLE trip_messages")
+                self.db.execute("ALTER TABLE trip_messages_upgrade RENAME TO trip_messages")
             self.db.execute("CREATE INDEX IF NOT EXISTS idx_trip_messages_cursor ON trip_messages(trip_id,seq)")
 
     def close(self):
@@ -174,16 +196,21 @@ class DemoStore:
                 "FROM events WHERE trip_id=? AND seq>? ORDER BY seq LIMIT 100",
                 (trip_id, after))]
 
-    def _chat_access(self, trip_id, role, actor):
-        # Dispatchers can manage trips but must never read private chat.
-        if role not in ("pilot", "passenger"):
+    def _chat_access(self, trip_id, role, actor, *, sending=False):
+        if role not in ("pilot", "passenger", "dispatcher"):
             raise TripError("forbidden", 403)
         row = self._get(trip_id)
+        # Only the owner, assigned pilot, or authenticated dispatcher can
+        # access this trip. Frontend role labels are never trusted.
         self._allowed(row, role, actor)
-        if row["pilot"] is None or row["status"] not in (
-            "assigned", "approaching", "underway"
+        if role == "pilot" and row["pilot"] is None:
+            raise TripError("not_found", 404)
+        if sending and row["status"] not in (
+            "requested", "assigned", "approaching", "underway"
         ):
             raise TripError("chat_unavailable", 409)
+        # Passenger and dispatcher may communicate before pilot assignment;
+        # an assigned pilot can participate in the same isolated trip room.
         return row
 
     def send_message(self, trip_id, role, actor, payload):
@@ -198,7 +225,7 @@ class DemoStore:
         ):
             raise TripError("invalid_message")
         with DB_LOCK, self.db:
-            self._chat_access(trip_id, role, actor)
+            self._chat_access(trip_id, role, actor, sending=True)
             self.db.execute(
                 "INSERT OR IGNORE INTO trip_messages"
                 "(trip_id,sender,role,client_id,body,at) VALUES(?,?,?,?,?,?)",

@@ -762,6 +762,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                 : null,
                             userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
                             errorTileCallback: (tile, error, stackTrace) {
+                              debugPrint('PD_PASSENGER_TILE_ERROR: $error');
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 if (!mounted || _mapTilesFailed) return;
                                 setState(() {

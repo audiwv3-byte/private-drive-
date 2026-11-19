@@ -5,14 +5,17 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'remote_sync_client.dart';
+import 'message_voice.dart';
 
 /// Opt-in, test-only native client. Credentials are never stored on disk.
 class RemoteSyncDemo extends StatefulWidget {
   const RemoteSyncDemo({super.key, this.gateway, this.enableMapTiles = true,
-    this.pollInterval = const Duration(seconds: 3)});
+    this.pollInterval = const Duration(seconds: 3),
+    this.onIncomingMessageVoice});
   final RemoteTripGateway? gateway;
   final bool enableMapTiles;
   final Duration pollInterval;
+  final VoidCallback? onIncomingMessageVoice;
 
   @override
   State<RemoteSyncDemo> createState() => _RemoteSyncDemoState();
@@ -34,6 +37,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   String error = '', gpsLabel = 'GPS выключен';
   int seq = 0;
   int chatSeq = 0;
+  bool _loadedChatForTrip = false;
   List<Map<String, dynamic>> chatMessages = [];
   LatLng? location;
   Map<String, dynamic>? trip;
@@ -114,6 +118,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         events = [];
         chatSeq = 0;
         chatMessages = [];
+        _loadedChatForTrip = false;
       }
       if (id != null) {
         final responseEvents = await client.get('/v1/trips/$id/events?after=$seq');
@@ -138,6 +143,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         if (rows is! List) {
           throw const RemoteDemoException('Неверный формат чата');
         }
+        var newIncoming = false;
         for (final item in rows) {
           if (item is! Map<String, dynamic> || item['seq'] is! int ||
               item['body'] is! String ||
@@ -148,11 +154,21 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           if (n > chatSeq) {
             chatSeq = n;
             chatMessages.add(item);
+            if (item['role'] != role) newIncoming = true;
           }
         }
         if (chatMessages.length > 100) {
           chatMessages = chatMessages.sublist(chatMessages.length - 100);
         }
+        if (_loadedChatForTrip && newIncoming) {
+          if (widget.onIncomingMessageVoice != null) {
+            widget.onIncomingMessageVoice!();
+          } else {
+            unawaited(PdMessageVoice.announce(
+              role == 'passenger' ? 'пилота' : 'пассажира'));
+          }
+        }
+        _loadedChatForTrip = true;
       }
       if (mounted) setState(() { trip = current; error = ''; });
     } on Exception catch (e) {

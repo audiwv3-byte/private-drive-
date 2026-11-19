@@ -18,10 +18,12 @@ class PassengerRideEntry extends StatelessWidget {
 
   void _open(BuildContext context, String type) {
     Navigator.push(context, MaterialPageRoute<void>(
-      builder: (_) => PassengerDemo(
-        enableMapTiles: enableMapTiles,
-        tripStore: tripStore,
-        initialRideType: type,
+      builder: (_) => PdPassengerLanguageScope(
+        child: PassengerDemo(
+          enableMapTiles: enableMapTiles,
+          tripStore: tripStore,
+          initialRideType: type,
+        ),
       ),
     ));
   }

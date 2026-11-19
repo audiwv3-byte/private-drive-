@@ -757,19 +757,28 @@ class _PassengerDemoState extends State<PassengerDemo> {
                               : const Color(0xFFE0EAF0),
                         ),
                         children: [
-                          TileLayer(
-                            // Do not wrap raster tiles in a transparent blend:
-                            // some Android GPUs render that composition blank.
+                          ColorFiltered(
+                            key: const Key('passenger-map-night-filter'),
+                            colorFilter: _nightMap
+                                ? const ColorFilter.matrix(<double>[
+                                    -0.65, 0, 0, 0, 170,
+                                    0, -0.65, 0, 0, 170,
+                                    0, 0, -0.65, 0, 170,
+                                    0, 0, 0, 1, 0,
+                                  ])
+                                : const ColorFilter.matrix(<double>[
+                                    1, 0, 0, 0, 0,
+                                    0, 1, 0, 0, 0,
+                                    0, 0, 1, 0, 0,
+                                    0, 0, 0, 1, 0,
+                                  ]),
+                            child: TileLayer(
                             key: const Key('passenger-map-tiles'),
                             tileProvider: demoTileProvider(),
-                            urlTemplate: _nightMap
-                                ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                                : _useBackupTiles
-                                  ? 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
-                                  : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            fallbackUrl: _nightMap
-                                ? 'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                                : null,
+                            // Both modes use keyless OSM; only day may use backup.
+                            urlTemplate: !_nightMap && _useBackupTiles
+                                ? 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
                             errorTileCallback: (tile, error, stackTrace) {
                               debugPrint('PD_PASSENGER_TILE_ERROR: $error');
@@ -798,6 +807,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                 });
                               });
                             },
+                            ),
                           ),
                           if (_roadPoints.isNotEmpty)
                             PolylineLayer(
@@ -869,13 +879,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       child: Material(
                         color: const Color(0xF0172535),
                         borderRadius: BorderRadius.circular(12),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Text(_nightMap ? 'НОЧЬ' : 'ДЕНЬ',
-                            key: const Key('passenger-map-theme-status'),
-                            style: const TextStyle(
-                              color: Color(0xFFDDC184),
-                              fontSize: 12, fontWeight: FontWeight.bold)),
-                          IconButton(
+                        child: IconButton(
                           key: const Key('passenger-map-day-night'),
                           tooltip: _nightMap ? 'Дневная карта' : 'Ночная карта',
                           icon: Icon(_nightMap ? Icons.wb_sunny_outlined
@@ -889,7 +893,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             _tileRetry++;
                           }),
                           ),
-                        ]),
                       ),
                     ),
                   ],

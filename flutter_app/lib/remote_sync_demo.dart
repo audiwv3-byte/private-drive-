@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -22,6 +23,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   final token = TextEditingController();
   final origin = TextEditingController();
   final destination = TextEditingController();
+  final chatDraft = TextEditingController();
+  final _random = Random.secure();
   final map = MapController();
   RemoteTripGateway? api;
   Timer? timer;
@@ -30,6 +33,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   String? role, lastTripId;
   String error = '', gpsLabel = 'GPS выключен';
   int seq = 0;
+  int chatSeq = 0;
+  List<Map<String, dynamic>> chatMessages = [];
   LatLng? location;
   Map<String, dynamic>? trip;
   List<Map<String, dynamic>> events = [];
@@ -107,6 +112,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         lastTripId = id;
         seq = 0;
         events = [];
+        chatSeq = 0;
+        chatMessages = [];
       }
       if (id != null) {
         final responseEvents = await client.get('/v1/trips/$id/events?after=$seq');
@@ -122,6 +129,29 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           if (events.length > 100) {
             events = events.sublist(events.length - 100);
           }
+        }
+      }
+      if (id != null && role != 'dispatcher' &&
+          ['assigned', 'approaching', 'underway'].contains(current?['status'])) {
+        final inbox = await client.get('/v1/trips/$id/messages?after=$chatSeq');
+        final rows = inbox['messages'];
+        if (rows is! List) {
+          throw const RemoteDemoException('Неверный формат чата');
+        }
+        for (final item in rows) {
+          if (item is! Map<String, dynamic> || item['seq'] is! int ||
+              item['body'] is! String ||
+              !['pilot', 'passenger'].contains(item['role'])) {
+            throw const RemoteDemoException('Неверное сообщение сервера');
+          }
+          final n = item['seq'] as int;
+          if (n > chatSeq) {
+            chatSeq = n;
+            chatMessages.add(item);
+          }
+        }
+        if (chatMessages.length > 100) {
+          chatMessages = chatMessages.sublist(chatMessages.length - 100);
         }
       }
       if (mounted) setState(() { trip = current; error = ''; });
@@ -145,6 +175,58 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     }
     await refresh();
   }
+
+  String _newClientId() {
+    final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
+    return bytes.map((value) => value.toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  Future<void> sendChat() async {
+    final client = api;
+    final id = trip?['id'];
+    final message = chatDraft.text.trim();
+    if (client == null || id is! String || busy || message.isEmpty ||
+        message.length > 500 || role == 'dispatcher' ||
+        !['assigned', 'approaching', 'underway'].contains(status)) return;
+    setState(() { busy = true; error = ''; });
+    try {
+      await client.post('/v1/trips/$id/messages',
+        {'client_id': _newClientId(), 'text': message});
+      chatDraft.clear();
+    } on Exception catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+    await refresh();
+  }
+
+  Widget chatPanel() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const Text('Сообщения поездки · тестовый сервер'),
+      for (final item in chatMessages)
+        Text('${item['role'] == 'pilot' ? 'Пилот' : 'Пассажир'}: ${item['body']}',
+          key: Key('remote-chat-message-${item['seq']}')),
+      Row(children: [
+        Expanded(child: TextField(
+          key: const Key('remote-chat-input'),
+          controller: chatDraft,
+          maxLength: 500,
+          decoration: const InputDecoration(
+            hintText: 'Сообщение по заказу', counterText: ''),
+        )),
+        IconButton(
+          key: const Key('remote-chat-send'),
+          icon: const Icon(Icons.send),
+          onPressed: busy ? null : sendChat,
+        ),
+      ]),
+      const Text('Только изолированный сервер. Без SMS и уведомлений ОС.',
+        style: TextStyle(fontSize: 11)),
+    ],
+  );
 
   Future<void> toggleGps() async {
     if (gpsOn) {
@@ -198,6 +280,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     gps?.cancel();
     if (owned) api?.close();
     url.dispose(); token.dispose(); origin.dispose(); destination.dispose();
+    chatDraft.dispose();
     map.dispose();
     super.dispose();
   }
@@ -254,6 +337,9 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
                 '/v1/trips/' + trip!['id'].toString() + '/assign',
                 {'pilot': 'pilot_test', 'version': version}),
               child: const Text('Назначить тестового пилота')),
+          if (isPassenger && trip != null &&
+              ['assigned','approaching','underway'].contains(status))
+            chatPanel(),
           OutlinedButton(key: const Key('remote-refresh'),
             onPressed: refresh, child: const Text('Обновить статус')),
           if (error.isNotEmpty)
@@ -313,6 +399,10 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
                   Text(statusText, key: const Key('remote-trip-status')),
                   if (error.isNotEmpty)
                     Text(error, key: const Key('remote-error')),
+                  if (moving)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 170),
+                      child: SingleChildScrollView(child: chatPanel())),
                   Row(children: [
                     Expanded(child: FilledButton(
                       key: const Key('remote-pilot-next'),

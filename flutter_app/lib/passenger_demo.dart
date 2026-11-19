@@ -671,7 +671,92 @@ class _PassengerDemoState extends State<PassengerDemo> {
     ];
 
     return Scaffold(
+      drawer: Drawer(
+        key: const Key('passenger-navigation-drawer'),
+        backgroundColor: const Color(0xFF172033),
+        child: SafeArea(child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const SizedBox(height: 24),
+            const CircleAvatar(
+              radius: 38,
+              backgroundColor: Color(0xFF31405A),
+              child: Icon(Icons.person_outline, size: 48, color: gold),
+            ),
+            const SizedBox(height: 12),
+            Text(pdLabel(context, 'Пассажир'), textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Divider(height: 32),
+            ListTile(
+              key: const Key('passenger-drawer-history'),
+              leading: const Icon(Icons.history),
+              title: Text(pdTr(context, 'История', 'Istorija', 'History')),
+              enabled: widget.tripStore != null,
+              onTap: widget.tripStore == null ? null : () {
+                Navigator.pop(context);
+                _openOrders();
+              },
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-profile'),
+              leading: const Icon(Icons.account_circle_outlined),
+              title: Text(pdTr(context, 'Профиль', 'Profilis', 'Profile')),
+              subtitle: Text(pdTr(context, 'После SMS-регистрации',
+                'Po SMS registracijos', 'After SMS registration')),
+              enabled: false,
+            ),
+            ListTile(
+              leading: const Icon(Icons.card_giftcard_outlined),
+              title: Text(pdTr(context, 'Бонусы и промокоды',
+                'Premijos ir nuolaidų kodai', 'Rewards and promo codes')),
+              enabled: false,
+            ),
+            ListTile(
+              leading: const Icon(Icons.credit_card_outlined),
+              title: Text(pdTr(context, 'Платёжные карты',
+                'Mokėjimo kortelės', 'Payment cards')),
+              enabled: false,
+            ),
+            ListTile(
+              leading: const Icon(Icons.favorite_border),
+              title: Text(pdTr(context, 'Избранные адреса',
+                'Mėgstami adresai', 'Favorite addresses')),
+              enabled: false,
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-language'),
+              leading: const Icon(Icons.language),
+              title: Text(pdTr(context, 'Язык', 'Kalba', 'Language')),
+              trailing: const PdLanguageMenu(),
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-info'),
+              leading: const Icon(Icons.info_outline),
+              title: Text(pdLabel(context, 'Контакты и документы')),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const CompanyInfoPage()));
+              },
+            ),
+          ],
+        )),
+      ),
       appBar: AppBar(
+        leading: Builder(builder: (menuContext) => IconButton(
+          key: const Key('passenger-open-drawer'),
+          tooltip: pdTr(context, 'Открыть меню', 'Atidaryti meniu', 'Open menu'),
+          icon: Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111111),
+              border: Border.all(color: gold),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.menu, color: gold),
+          ),
+          onPressed: () => Scaffold.of(menuContext).openDrawer(),
+        )),
         title: Text(pdLabel(context, 'PRIVATE DRIVE · Пассажир')),
         actions: [
           const PdLanguageMenu(),

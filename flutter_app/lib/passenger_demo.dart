@@ -1207,7 +1207,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 for (final method in ['Карта', 'PayPal', 'Банковский перевод', 'Криптовалюта'])
                   ChoiceChip(
                     key: Key('payment-$method'),
-                    label: Text(method),
+                    label: Text(method == 'Карта'
+                      ? pdTr(context, 'Карта', 'Kortelė', 'Card')
+                      : pdLabel(context, method)),
                     selected: _payment == method,
                     onSelected: (_) => setState(() => _payment = method),
                   ),
@@ -1216,10 +1218,19 @@ class _PassengerDemoState extends State<PassengerDemo> {
             const SizedBox(height: 12),
             Text(
               price == null
-                  ? 'Стоимость по запросу · фиксированная цена не установлена'
+                  ? pdTr(context,
+                      'Стоимость по запросу · фиксированная цена не установлена',
+                      'Kaina pagal užklausą · fiksuota kaina nenustatyta',
+                      'Price on request · no fixed fare available')
                   : _requiresCustomQuote
-                      ? 'Расчётная часть: $price € · дополнительные услуги по запросу'
-                      : 'Предварительная стоимость: $price €',
+                      ? pdTr(context,
+                          'Расчётная часть: $price € · дополнительные услуги по запросу',
+                          'Apskaičiuota dalis: $price € · papildomos paslaugos pagal užklausą',
+                          'Estimated portion: €$price · extras priced on request')
+                      : pdTr(context,
+                          'Предварительная стоимость: $price €',
+                          'Preliminari kaina: $price €',
+                          'Estimated fare: €$price'),
               key: const Key('passenger-price-preview'),
               style: const TextStyle(
                 color: gold, fontWeight: FontWeight.bold, fontSize: 16,
@@ -1232,7 +1243,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
               style: const TextStyle(fontSize: 12)),
             const SizedBox(height: 12),
             Text(
-              'Выбрано: $_rideType · ${_route.isNotEmpty ? _route : 'свой маршрут'} · $_payment',
+              pdTr(context, 'Выбрано', 'Pasirinkta', 'Selected') +
+                ': ${pdLabel(context, _rideType)} · ${_route.isNotEmpty ? _route : pdLabel(context, 'свой маршрут')} · ' +
+                (_payment == 'Карта' ? pdTr(context, 'Карта', 'Kortelė', 'Card') : pdLabel(context, _payment)),
               key: const Key('passenger-summary'),
             ),
             const SizedBox(height: 12),

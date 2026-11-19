@@ -232,6 +232,41 @@ void main() {
         findsOneWidget);
   });
 
+  testWidgets('Passenger map follows pilot and allows manual camera mode',
+      (tester) async {
+    final store = makeOrder();
+    addTearDown(store.dispose);
+    final map = MapController();
+    addTearDown(map.dispose);
+    await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+      enableMapTiles: true,
+      tripStore: store,
+      passengerMapController: map,
+      mapConnectivityCheck: () async => null,
+    )));
+    await tester.pump();
+    store.setPilotOnline(true);
+    store.updatePilotLocation(54.6872, 25.2797);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('passenger-follow-pilot')), findsOneWidget);
+    expect((map.camera.center.latitude - 54.6872).abs(), lessThan(0.001));
+    expect((map.camera.center.longitude - 25.2797).abs(), lessThan(0.001));
+
+    await tester.tap(find.byKey(const Key('passenger-follow-pilot')));
+    await tester.pump();
+    store.updatePilotLocation(54.7000, 25.3000);
+    await tester.pump();
+    await tester.pump();
+    expect((map.camera.center.latitude - 54.6872).abs(), lessThan(0.001),
+        reason: 'Manual mode must not recenter the map');
+
+    await tester.tap(find.byKey(const Key('passenger-follow-pilot')));
+    await tester.pump();
+    await tester.pump();
+    expect((map.camera.center.latitude - 54.7000).abs(), lessThan(0.001));
+  });
+
   testWidgets('Pilot can switch day and night without leaving map',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: PilotDemo(

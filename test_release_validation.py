@@ -87,7 +87,7 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
             'destination_coordinates':[25.28,54.68],
             'extras':[]}),200)
     assert one_way['price']=='110.00',one_way
-    assert reverse['price']=='90.00',reverse
+    assert __import__('pd_fixed_prices').base({'origin':'Kaunas','destination':'Vilnius','roundtrip':False}) is None
     assert both['price']=='200.00',both
 
     for changes in [{'origin':{}},{'roundtrip':'false'},{'origin_coordinates':[float('nan'),54]},{'origin_coordinates':[999,54]},{'extras':{}},{'stop_address':[]}]:

@@ -4,10 +4,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'demo_interfaces.dart';
 import 'brand_logo.dart';
+import 'app_language.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await pdLanguage.restore();
   runApp(const PrivateDriveApp());
 }
 
@@ -16,7 +19,9 @@ class PrivateDriveApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return PdLanguageScope(
+      language: pdLanguage,
+      child: MaterialApp(
       title: 'PRIVATE DRIVE',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -28,6 +33,7 @@ class PrivateDriveApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF111111),
       ),
       home: const NativeSignInScreen(),
+      ),
     );
   }
 }
@@ -43,7 +49,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   final destination = TextEditingController();
   final code = TextEditingController();
   bool busy = false;
-  String language = 'RU';
+  String get language => PdLanguageScope.of(context).value;
 
   String tr(String ru, String lt, String en) =>
       language == 'LT' ? lt : language == 'EN' ? en : ru;
@@ -59,7 +65,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
             key: Key('native-language-${entry[0]}'),
             label: Text('${entry[1]} ${entry[0]}'),
             selected: language == entry[0],
-            onSelected: (_) => setState(() => language = entry[0]),
+            onSelected: (_) => pdLanguage.set(entry[0]),
           ),
         ),
     ],

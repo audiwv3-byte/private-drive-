@@ -526,6 +526,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _animationTarget;
   bool _gpsEnabled = false;
   bool _tripPanelCollapsed = false;
+  double _tripSwipeDistance = 0;
+  int _pilotPassengerStars = 0;
   String _gpsMessage = 'GPS выключен';
   int stage = 0;
   bool paused = false;
@@ -827,6 +829,12 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
       _gpsMessage = 'GPS выключен';
       _position = null;
     });
+  }
+
+  void _finishTripSwipe() {
+    final accepted = _canAdvance && _tripSwipeDistance >= 95;
+    _tripSwipeDistance = 0;
+    if (accepted) advance();
   }
 
   void advance() {
@@ -1421,10 +1429,47 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                             Row(
                               children: [
                                 Expanded(
-                                  child: FilledButton(
+                                  child: GestureDetector(
                                     key: const Key('pilot-next-trip'),
-                                    onPressed: _canAdvance ? advance : null,
-                                    child: Text(pdLabel(context, _actionText)),
+                                    behavior: HitTestBehavior.opaque,
+                                    onHorizontalDragStart: (_) {
+                                      _tripSwipeDistance = 0;
+                                    },
+                                    onHorizontalDragUpdate: (details) {
+                                      if (_canAdvance) {
+                                        _tripSwipeDistance += details.delta.dx;
+                                      }
+                                    },
+                                    onHorizontalDragEnd: (_) => _finishTripSwipe(),
+                                    onHorizontalDragCancel: () {
+                                      _tripSwipeDistance = 0;
+                                    },
+                                    child: Container(
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: _canAdvance
+                                          ? const Color(0xFF27764E)
+                                          : const Color(0xFF414141),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.swipe_right_alt,
+                                            color: Colors.white),
+                                          const SizedBox(width: 7),
+                                          Flexible(child: Text(
+                                            'Свайп вправо · ${pdLabel(context, _actionText)}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold),
+                                          )),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -1436,6 +1481,48 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                 ),
                               ],
                             ),
+                            if (widget.tripStore?.status == DemoTripStatus.finished)
+                              Card(
+                                key: const Key('pilot-rate-passenger-panel'),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(children: [
+                                    const Text('Оцени пассажира',
+                                      style: TextStyle(fontWeight: FontWeight.bold)),
+                                    if (widget.tripStore!.passengerRatingByPilot != null)
+                                      Text('Оценка сохранена: ${widget.tripStore!.passengerRatingByPilot}/5',
+                                        key: const Key('pilot-passenger-rating-saved'))
+                                    else ...[
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          for (var stars = 1; stars <= 5; stars++)
+                                            IconButton(
+                                              key: Key('pilot-rate-passenger-$stars'),
+                                              onPressed: () => setState(() =>
+                                                _pilotPassengerStars = stars),
+                                              icon: Icon(
+                                                _pilotPassengerStars >= stars
+                                                  ? Icons.star : Icons.star_border,
+                                                color: const Color(0xFFDDC184)),
+                                            ),
+                                        ],
+                                      ),
+                                      FilledButton(
+                                        key: const Key('pilot-submit-passenger-rating'),
+                                        onPressed: _pilotPassengerStars == 0 ? null
+                                          : () {
+                                              if (widget.tripStore!.ratePassengerByPilot(
+                                                  _pilotPassengerStars)) {
+                                                setState(() {});
+                                              }
+                                            },
+                                        child: const Text('Сохранить оценку · демо'),
+                                      ),
+                                    ],
+                                  ]),
+                                ),
+                              ),
                             ], // expanded trip panel contents
                           ],
                         ),

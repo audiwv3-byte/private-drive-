@@ -10,6 +10,11 @@ import 'package:flutter_map/flutter_map.dart';
 class DemoDisabledTileCache with DisabledMapCachingProvider
     implements MapCachingProvider {}
 
-NetworkTileProvider demoTileProvider() => NetworkTileProvider(
+// Reuse one network provider across Flutter rebuilds. Constructing a new
+// provider from every TileLayer build can replace in-flight image requests
+// while GPS, network state and other map UI elements update.
+final NetworkTileProvider _demoNetworkTiles = NetworkTileProvider(
   cachingProvider: DemoDisabledTileCache(),
 );
+
+NetworkTileProvider demoTileProvider() => _demoNetworkTiles;

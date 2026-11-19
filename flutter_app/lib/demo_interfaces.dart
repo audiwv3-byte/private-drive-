@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'passenger_demo.dart';
+import 'passenger_ride_entry.dart';
 import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
 import 'pilot_passenger_chat_demo.dart';
@@ -205,7 +206,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                     FilledButton.icon(
                       key: const Key('open-passenger-preview'),
                       onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => PassengerDemo(
+                        MaterialPageRoute(builder: (_) => PassengerRideEntry(
                           enableMapTiles: widget.enableMapTiles,
                           tripStore: _trip,
                         ))),

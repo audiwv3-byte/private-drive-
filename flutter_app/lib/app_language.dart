@@ -47,6 +47,35 @@ class PdLanguageScope extends InheritedNotifier<PdLanguage> {
       pdLanguage;
 }
 
+/// Compact selector: selecting a language notifies every mounted demo route.
+/// It can be used by passengers without returning to the sign-in screen.
+class PdLanguageMenu extends StatelessWidget {
+  const PdLanguageMenu({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = PdLanguageScope.of(context).value;
+    return PopupMenuButton<String>(
+      key: const Key('passenger-global-language-menu'),
+      tooltip: pdTr(context, 'Язык приложения', 'Programėlės kalba', 'App language'),
+      icon: const Icon(Icons.language),
+      initialValue: selected,
+      onSelected: pdLanguage.set,
+      itemBuilder: (context) => const [
+        PopupMenuItem<String>(
+          key: Key('passenger-select-language-RU'),
+          value: 'RU', child: Text('Русский · RU')),
+        PopupMenuItem<String>(
+          key: Key('passenger-select-language-LT'),
+          value: 'LT', child: Text('Lietuvių · LT')),
+        PopupMenuItem<String>(
+          key: Key('passenger-select-language-EN'),
+          value: 'EN', child: Text('English · EN')),
+      ],
+    );
+  }
+}
+
 String pdTr(BuildContext context, String ru, String lt, String en) {
   final language = PdLanguageScope.of(context).value;
   return language == 'LT' ? lt : language == 'EN' ? en : ru;

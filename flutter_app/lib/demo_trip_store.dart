@@ -165,10 +165,7 @@ class DemoTripStore extends ChangeNotifier {
   bool addPassengerChatMessage(String value) {
     final message = value.trim();
     if (_disposed || message.isEmpty || message.length > 500 ||
-        !_pilotAccepted ||
-        (_status != DemoTripStatus.assigned &&
-         _status != DemoTripStatus.approaching &&
-         _status != DemoTripStatus.underway)) return false;
+        _trip == null || !isActive) return false;
     _passengerChatMessages.add(message);
     notifyListeners();
     return true;

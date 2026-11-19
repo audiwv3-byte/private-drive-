@@ -63,6 +63,11 @@ String pdLabel(BuildContext context, String ru) {
 }
 
 const Map<String, List<String>> _labels = {
+  'Банковский перевод': ['Bankinis pavedimas', 'Bank transfer'],
+  'Криптовалюта': ['Kriptovaliuta', 'Cryptocurrency'],
+  'Без радио': ['Be radijo', 'No radio'],
+  'свой маршрут': ['individualus maršrutas', 'custom route'],
+  'Цена по запросу': ['Kaina pagal užklausą', 'Price on request'],
   'Нет тестового заказа': ['Nėra bandomojo užsakymo', 'No demo booking'],
   'Заявка создана · ожидает назначения':
       ['Užsakymas sukurtas · laukiama priskyrimo', 'Booking created · awaiting assignment'],

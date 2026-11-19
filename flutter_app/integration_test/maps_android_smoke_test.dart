@@ -162,6 +162,14 @@ void main() {
     expect(palette.length, greaterThan(20),
       reason: 'Passenger tile region has only ${palette.length} colors '
               '(blank raster background; map is NOT ready)');
+    // Night uses the same reachable OSM raster under a local dark filter.
+    await tester.tap(find.byKey(const Key('passenger-map-day-night')));
+    await flushRasterImageFrames(tester);
+    expect(find.byKey(const Key('passenger-map-load-error')), findsNothing);
+    final nightPalette = await sampleCleanMapArea(tester, key, mapRect,
+      xStart: 0.08, xEnd: 0.48, yStart: 0.12, yEnd: 0.38);
+    expect(nightPalette.length, greaterThan(20),
+      reason: 'Passenger night raster is blank');
   });
 
   testWidgets('Pilot raster streets visibly painted on real Android',
@@ -188,5 +196,12 @@ void main() {
     expect(palette.length, greaterThan(20),
       reason: 'Pilot tile region has only ${palette.length} colors '
               '(blank raster background; map is NOT ready)');
+    await tester.tap(find.byKey(const Key('pilot-map-day-night')));
+    await flushRasterImageFrames(tester);
+    expect(find.byKey(const Key('pilot-map-load-error')), findsNothing);
+    final nightPalette = await sampleCleanMapArea(tester, key, rect,
+      xStart: 0.55, xEnd: 0.90, yStart: 0.23, yEnd: 0.48);
+    expect(nightPalette.length, greaterThan(20),
+      reason: 'Pilot night raster is blank');
   });
 }

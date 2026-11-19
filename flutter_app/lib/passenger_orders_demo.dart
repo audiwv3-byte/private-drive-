@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
+import 'app_language.dart';
 
 /// Passenger order controls remain available while navigating between screens.
 /// All data is in-memory and disappears on process restart; production persistence
@@ -24,7 +25,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Мои заказы · PRIVATE DRIVE')),
+    appBar: AppBar(title: Text(pdLabel(context, 'Мои заказы · PRIVATE DRIVE'))),
     body: AnimatedBuilder(
       animation: widget.tripStore,
       builder: (context, _) {
@@ -53,7 +54,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                     Text('${trip.from} → ${trip.to}'),
                     Text(store.statusLabel,
                       key: const Key('passenger-order-status')),
-                    Text('Оплата: ${trip.paymentMethod}'),
+                    Text('${pdLabel(context, 'Оплата')}: ${trip.paymentMethod}'),
                     if (trip.estimatedFareEur != null)
                       Text(
                         trip.extrasRequireQuote
@@ -70,22 +71,22 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                       OutlinedButton.icon(
                         key: const Key('passenger-cancel-order'),
                         icon: const Icon(Icons.cancel_outlined),
-                        label: const Text('Отменить заказ'),
+                        label: Text(pdLabel(context, 'Отменить заказ')),
                         onPressed: () async {
                           final approved = await showDialog<bool>(
                             context: context,
                             builder: (ctx) => AlertDialog(
-                              title: const Text('Отменить заказ?'),
+                              title: Text(pdLabel(context, 'Отменить заказ?')),
                               content: const Text(
                                 'Отменится только тестовая заявка.'),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Оставить заказ')),
+                                  child: Text(pdLabel(context, 'Оставить заказ'))),
                                 FilledButton(
                                   key: const Key('passenger-confirm-cancel'),
                                   onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Подтвердить отмену')),
+                                  child: Text(pdLabel(context, 'Подтвердить отмену'))),
                               ],
                             ),
                           );
@@ -97,17 +98,17 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                       const Text('Отмена через приложение недоступна на '
                         'этом этапе поездки. Обратись к диспетчеру.'),
                     if (store.status == DemoTripStatus.cancelled)
-                      const Text('Заявка отменена · демо'),
+                      Text(pdLabel(context, 'Заявка отменена · демо')),
                   ],
                 ),
               ),
             ),
             if (canChat) ...[
               const SizedBox(height: 12),
-              const Text('Сообщения пилота',
+              Text(pdLabel(context, 'Сообщения пилота'),
                 style: TextStyle(fontWeight: FontWeight.bold)),
               if (store.pilotChatMessages.isEmpty)
-                const Text('Сообщений от пилота пока нет'),
+                Text(pdLabel(context, 'Сообщений от пилота пока нет')),
               for (final message in store.pilotChatMessages)
                 ListTile(
                   key: const Key('passenger-pilot-message'),
@@ -124,8 +125,8 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                   key: const Key('passenger-chat-input'),
                   controller: _draft,
                   maxLength: 500,
-                  decoration: const InputDecoration(
-                    hintText: 'Ответить пилоту', counterText: ''),
+                  decoration: InputDecoration(
+                    hintText: pdLabel(context, 'Ответить пилоту'), counterText: ''),
                 )),
                 IconButton(
                   key: const Key('passenger-chat-send'),
@@ -137,7 +138,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                   },
                 ),
               ]),
-              const Text('Локальный чат DEMO: без отправки через интернет.',
+              Text(pdLabel(context, 'Локальный чат DEMO: без отправки через интернет.'),
                 style: TextStyle(fontSize: 11)),
             ],
             DemoRatingPanel(tripStore: store),

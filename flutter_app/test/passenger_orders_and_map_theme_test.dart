@@ -91,10 +91,11 @@ void main() {
     await tester.tap(find.byKey(const Key('passenger-locate-me')));
     await tester.pumpAndSettle();
     expect(requests, 1);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-use-current-as-pickup')), 130,
+      scrollable: find.byKey(const Key('passenger-form')));
     expect(find.byKey(const Key('passenger-use-current-as-pickup')),
         findsOneWidget);
-    await tester.ensureVisible(
-      find.byKey(const Key('passenger-use-current-as-pickup')));
     await tester.tap(find.byKey(const Key('passenger-use-current-as-pickup')));
     await tester.pump();
     expect(tester.widget<TextField>(
@@ -112,6 +113,9 @@ void main() {
     ));
     await tester.tap(find.byKey(const Key('passenger-locate-me')));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-location-error')), 130,
+      scrollable: find.byKey(const Key('passenger-form')));
     expect(find.byKey(const Key('passenger-location-error')), findsOneWidget);
     expect(find.byKey(const Key('passenger-use-current-as-pickup')),
       findsNothing);

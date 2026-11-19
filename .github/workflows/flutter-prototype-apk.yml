@@ -147,12 +147,15 @@ jobs:
       - name: Render passenger and pilot maps on real Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          # Android 35 Pixel 6 failed to finish booting on the free runner
+          # (run 44469697173), before either map integration assertion ran.
+          # Use the lighter Android 34 AVD and allow additional cold-boot time.
+          api-level: 34
           arch: x86_64
           target: google_apis
-          profile: pixel_6
+          profile: pixel_2
           disable-animations: true
-          emulator-boot-timeout: 360
+          emulator-boot-timeout: 600
           script: bash -lc 'cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m'
       - name: Confirm preserved installable APK is unchanged
         run: |

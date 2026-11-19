@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'passenger_ride_entry.dart';
+import 'app_language.dart';
 import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
 import 'pilot_passenger_chat_demo.dart';
@@ -164,7 +165,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
         key: Key('demo-order-restoring'))));
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('PRIVATE DRIVE · Демоверсия')),
+      appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdTr(context, 'Демоверсия', 'Demonstracija', 'Demo')}')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -178,12 +179,12 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                     const Icon(Icons.verified_user_outlined,
                         size: 50, color: Color(0xFFDDC184)),
                     const SizedBox(height: 16),
-                    const Text('Выбери тестовый интерфейс',
-                        style: TextStyle(fontSize: 22)),
+                    Text(pdLabel(context, 'Выбери тестовый интерфейс'),
+                        style: const TextStyle(fontSize: 22)),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(pdLabel(context,
                       'Тестовые заявки сохраняются на этом устройстве. '
-                      'Нет реальных заказов, платежей и сервера.',
+                      'Нет реальных заказов, платежей и сервера.'),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 18),
@@ -211,7 +212,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                           tripStore: _trip,
                         ))),
                       icon: const Icon(Icons.person_outline),
-                      label: const Text('Пассажир'),
+                      label: Text(pdLabel(context, 'Пассажир')),
                     ),
                     const SizedBox(height: 12),
                     if (_trip.trip != null) ...[
@@ -221,7 +222,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                           MaterialPageRoute(builder: (_) =>
                             PassengerOrdersDemo(tripStore: _trip))),
                         icon: const Icon(Icons.receipt_long_outlined),
-                        label: const Text('Мои заказы · управление'),
+                        label: Text(pdLabel(context, 'Мои заказы · управление')),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -233,7 +234,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                           enableMapTiles: widget.enableMapTiles,
                         ))),
                       icon: const Icon(Icons.support_agent),
-                      label: const Text('Кабинет диспетчера · демо'),
+                      label: Text(pdLabel(context, 'Кабинет диспетчера · демо')),
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
@@ -241,7 +242,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                       onPressed: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const RemoteSyncDemo())),
                       icon: const Icon(Icons.sync_alt),
-                      label: const Text('Тестовая связь между устройствами'),
+                      label: Text(pdLabel(context, 'Тестовая связь между устройствами')),
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
@@ -250,7 +251,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                         MaterialPageRoute(
                           builder: (_) => const CompanyInfoPage())),
                       icon: const Icon(Icons.info_outline),
-                      label: const Text('О компании · Контакты · Соглашение'),
+                      label: Text(pdLabel(context, 'О компании · Контакты · Соглашение')),
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(
@@ -267,7 +268,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> {
                         )));
                       },
                       icon: const Icon(Icons.navigation_outlined),
-                      label: const Text('Кабина пилота'),
+                      label: Text(pdLabel(context, 'Кабина пилота')),
                     ),
                   ],
                 ),

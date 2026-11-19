@@ -32,8 +32,8 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
         final store = widget.tripStore;
         final trip = store.trip;
         if (trip == null) {
-          return const Center(child: Text('Заказов в демосессии пока нет',
-            key: Key('passenger-orders-empty')));
+          return Center(child: Text(pdLabel(context, 'Заказов в демосессии пока нет'),
+            key: const Key('passenger-orders-empty')));
         }
         final canChat = store.pilotAccepted &&
             (store.status == DemoTripStatus.assigned ||
@@ -49,23 +49,29 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(trip.rideType, style: const TextStyle(
+                    Text(pdLabel(context, trip.rideType), style: const TextStyle(
                       fontWeight: FontWeight.bold)),
                     Text('${trip.from} → ${trip.to}'),
-                    Text(store.statusLabel,
+                    Text(pdLabel(context, store.statusLabel),
                       key: const Key('passenger-order-status')),
-                    Text('${pdLabel(context, 'Оплата')}: ${trip.paymentMethod}'),
+                    Text('${pdLabel(context, 'Оплата')}: ${pdLabel(context, trip.paymentMethod)}'),
                     if (trip.estimatedFareEur != null)
                       Text(
                         trip.extrasRequireQuote
-                            ? 'Расчётная часть: ${trip.estimatedFareEur} € · дополнительные услуги по запросу'
-                            : 'Предварительная стоимость: ${trip.estimatedFareEur} €',
+                            ? pdTr(context,
+                                'Расчётная часть: ${trip.estimatedFareEur} € · дополнительные услуги по запросу',
+                                'Apskaičiuota dalis: ${trip.estimatedFareEur} € · papildomos paslaugos pagal užklausą',
+                                'Estimated portion: €${trip.estimatedFareEur} · extras on request')
+                            : pdTr(context,
+                                'Предварительная стоимость: ${trip.estimatedFareEur} €',
+                                'Preliminari kaina: ${trip.estimatedFareEur} €',
+                                'Estimated fare: €${trip.estimatedFareEur}'),
                         key: const Key('passenger-order-price'),
                       )
                     else
-                      const Text(
-                        'Стоимость по запросу · диспетчер подтвердит цену до оплаты',
-                        key: Key('passenger-order-price'),
+                      Text(
+                        pdLabel(context, 'Стоимость по запросу · диспетчер подтвердит цену до оплаты'),
+                        key: const Key('passenger-order-price'),
                       ),
                     if (store.canPassengerCancel)
                       OutlinedButton.icon(
@@ -77,8 +83,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                             context: context,
                             builder: (ctx) => AlertDialog(
                               title: Text(pdLabel(context, 'Отменить заказ?')),
-                              content: const Text(
-                                'Отменится только тестовая заявка.'),
+                              content: Text(pdLabel(context, 'Отменится только тестовая заявка.')),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.pop(ctx, false),
@@ -95,8 +100,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                       ),
                     if (!store.canPassengerCancel &&
                         store.status != DemoTripStatus.cancelled)
-                      const Text('Отмена через приложение недоступна на '
-                        'этом этапе поездки. Обратись к диспетчеру.'),
+                      Text(pdLabel(context, 'Отмена через приложение недоступна на этом этапе поездки. Обратись к диспетчеру.')),
                     if (store.status == DemoTripStatus.cancelled)
                       Text(pdLabel(context, 'Заявка отменена · демо')),
                   ],

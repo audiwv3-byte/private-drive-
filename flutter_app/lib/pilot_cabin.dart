@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'pilot_offer_tone.dart';
+import 'pilot_sound_settings.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
 import 'pilot_cockpit_overlay.dart';
@@ -40,7 +41,9 @@ class _PilotCabinState extends State<PilotCabin> {
     if (callback != null) {
       callback();
     } else {
-      unawaited(_offerTone.play());
+      if (PilotSoundSettings.instance.enabled) {
+        unawaited(_offerTone.play(melody: PilotSoundSettings.instance.melody));
+      }
     }
   }
 
@@ -53,6 +56,8 @@ class _PilotCabinState extends State<PilotCabin> {
     super.initState();
     _onLine = widget.tripStore?.pilotOnline ?? false;
     widget.tripStore?.addListener(_syncOfferSound);
+    PilotSoundSettings.instance.addListener(_onSettingsChanged);
+    unawaited(PilotSoundSettings.instance.load());
     if (_onLine) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -61,6 +66,10 @@ class _PilotCabinState extends State<PilotCabin> {
         }
       });
     }
+  }
+
+  void _onSettingsChanged() {
+    if (!PilotSoundSettings.instance.enabled) _offerTone.stop();
   }
 
   void _syncOfferSound() {
@@ -111,6 +120,7 @@ class _PilotCabinState extends State<PilotCabin> {
   @override
   void dispose() {
     widget.tripStore?.removeListener(_syncOfferSound);
+    PilotSoundSettings.instance.removeListener(_onSettingsChanged);
     _hideCockpitOverlay();
     // Leaving this screen is not the same as ending a shift.
     _offerTone.dispose();

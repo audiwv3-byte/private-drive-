@@ -88,7 +88,7 @@ void main() {
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
   });
 
-  testWidgets('Android passenger map uses unfiltered tiles in both themes',
+  testWidgets('Android passenger map uses keyless OSM tiles in both themes',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(
       home: PassengerDemo(enableMapTiles: true),
@@ -102,12 +102,14 @@ void main() {
     expect(day.tileProvider.headers['User-Agent'],
         'PRIVATE DRIVE demo Android visual QA');
     expect(find.ancestor(of: tileFinder, matching: find.byType(ColorFiltered)),
-        findsNothing);
+        findsOneWidget);
     tester.widget<IconButton>(find.byKey(
         const Key('passenger-map-day-night'))).onPressed!();
     await tester.pump();
     final night = tester.widget<TileLayer>(tileFinder);
-    expect(night.urlTemplate, contains('cartocdn.com/dark_all'));
+    expect(night.urlTemplate, contains('tile.openstreetmap.org'));
+    expect(find.text('ДЕНЬ'), findsNothing);
+    expect(find.text('НОЧЬ'), findsNothing);
     expect(find.ancestor(of: tileFinder, matching: find.byType(ColorFiltered)),
         findsNothing);
   });

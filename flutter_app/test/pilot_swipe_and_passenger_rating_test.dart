@@ -19,8 +19,8 @@ void main() {
     await tester.pump();
     expect(trip.status, DemoTripStatus.assigned,
       reason: 'An accidental tap must not advance the trip');
-    await tester.drag(find.byKey(const Key('pilot-next-trip')),
-      const Offset(-180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset(-(tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(trip.status, DemoTripStatus.assigned,
       reason: 'Swiping in the wrong direction must not advance the trip');
@@ -29,8 +29,8 @@ void main() {
       DemoTripStatus.underway,
       DemoTripStatus.finished,
     ]) {
-      await tester.drag(find.byKey(const Key('pilot-next-trip')),
-        const Offset(180, 0));
+      await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
       await tester.pump();
       expect(trip.status, expected);
     }
@@ -64,8 +64,8 @@ void main() {
     expect(trip.togglePause(), isTrue);
     await tester.pumpWidget(MaterialApp(home: PilotDemo(
       enableMapTiles: false, tripStore: trip)));
-    await tester.drag(find.byKey(const Key('pilot-next-trip')),
-      const Offset(180, 0));
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(trip.status, DemoTripStatus.approaching);
     expect(trip.passengerRatingByPilot, isNull);

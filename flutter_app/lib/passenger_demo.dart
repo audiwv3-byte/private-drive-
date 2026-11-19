@@ -16,9 +16,10 @@ import 'package:latlong2/latlong.dart' show LatLng;
 /// geocoding, payment SDK, charge or persistent booking in this screen.
 class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
-      this.preferencesStorage});
+      this.preferencesStorage, this.initialRideType = 'Трансфер'});
 
   final bool enableMapTiles;
+  final String initialRideType;
   final DemoTripStore? tripStore;
   final PassengerPreferencesStorage? preferencesStorage;
 
@@ -37,7 +38,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   TimeOfDay? _time;
   String _route = '';
   String _payment = 'Карта';
-  String _rideType = 'Трансфер';
+  late String _rideType;
   bool _roundTrip = false;
   bool _meetSign = false;
   bool _pets = false;
@@ -46,6 +47,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _flowers = false;
   bool _coffee = false;
   bool _nightMap = false;
+  bool _mapTilesFailed = false;
+  int _tileRetry = 0;
   bool _water = false;
   bool _quietRide = false;
   bool _luggageHelp = false;
@@ -258,6 +261,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   @override
   void initState() {
     super.initState();
+    _rideType = widget.initialRideType == 'Такси' ? 'Такси' : 'Трансфер';
     _knownPilotMessageCount = widget.tripStore?.pilotChatMessages.length ?? 0;
     widget.tripStore?.addListener(_onTripChanged);
     _tripWishes.addListener(_savePreferences);
@@ -621,22 +625,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
             const SizedBox(height: 6),
             const Text('Демонстрация. Не отправляет заказы и не списывает деньги.'),
             const SizedBox(height: 12),
-            const Text('Тип поездки', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            SegmentedButton<String>(
-              key: const Key('passenger-ride-type'),
-              segments: const [
-                ButtonSegment(value: 'Такси', label: Text('Такси'),
-                  icon: Icon(Icons.local_taxi_outlined)),
-                ButtonSegment(value: 'Трансфер', label: Text('Трансфер'),
-                  icon: Icon(Icons.airport_shuttle_outlined)),
-              ],
-              selected: {_rideType},
-              onSelectionChanged: (v) => setState(() {
-                _rideType = v.first;
-                if (_rideType != 'Трансфер') _roundTrip = false;
-              }),
-            ),
+            Text('$_rideType · выбранный тип поездки',
+              key: const Key('passenger-selected-ride-type'),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
             if (_rideType == 'Трансфер') ...[
               SwitchListTile(
                 key: const Key('passenger-round-trip'),
@@ -662,7 +654,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 195,
+              height: 285,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Stack(
@@ -670,7 +662,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   children: [
                     widget.enableMapTiles
                     ? KeyedSubtree(
-                        key: ValueKey('passenger-route-map-${_from.text}-${_to.text}'),
+                        key: ValueKey('passenger-route-map-${_from.text}-${_to.text}-$_tileRetry'),
                         child: FlutterMap(
                         key: const Key('passenger-map'),
                         options: MapOptions(
@@ -691,6 +683,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             child: TileLayer(
                               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                               userAgentPackageName: 'lt.privatedrive.privateDrive',
+                              errorTileCallback: (tile, error, stackTrace) {
+                                if (_mapTilesFailed) return;
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (mounted && !_mapTilesFailed) {
+                                    setState(() => _mapTilesFailed = true);
+                                  }
+                                });
+                              },
                             ),
                           ),
                           if (_roadPoints.isNotEmpty)
@@ -717,6 +717,35 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         key: Key('passenger-map'),
                         color: Color(0xFF27332F),
                         child: Center(child: Text('Карта · офлайн-тест')),
+                      ),
+                    if (widget.enableMapTiles && _mapTilesFailed)
+                      Positioned.fill(
+                        child: ColoredBox(
+                          color: const Color(0xF01A2A34),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.map_outlined,
+                                  color: Color(0xFFDDC184), size: 42),
+                                const SizedBox(height: 8),
+                                const Text('Карта временно недоступна',
+                                  key: Key('passenger-map-load-error')),
+                                const Text('Проверь интернет-соединение',
+                                  style: TextStyle(fontSize: 12)),
+                                TextButton.icon(
+                                  key: const Key('passenger-map-retry'),
+                                  onPressed: () => setState(() {
+                                    _mapTilesFailed = false;
+                                    _tileRetry++;
+                                  }),
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Повторить загрузку'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     Positioned(
                       top: 8,

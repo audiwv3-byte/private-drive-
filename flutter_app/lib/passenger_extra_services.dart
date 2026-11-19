@@ -31,7 +31,11 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
   bool get _jumpstart => widget.type == ExtraServiceType.jumpstart;
   String get _title => _jumpstart ? 'Запуск автомобиля' : 'Доставка товаров';
 
-  bool get _valid => !widget.tripStore.isActive &&
+  bool get _isAdvanceBooking => _date != null || _time != null;
+  bool get _cashBlockedForAdvance =>
+      _isAdvanceBooking && _payment == 'Наличные';
+
+  bool get _valid => !_cashBlockedForAdvance && !widget.tripStore.isActive &&
       _from.text.trim().isNotEmpty &&
       (_jumpstart || (_to.text.trim().isNotEmpty &&
           _to.text.trim().toLowerCase() != _from.text.trim().toLowerCase()));
@@ -66,6 +70,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
       from: _from.text.trim(),
       to: _jumpstart ? 'Помощь на месте' : _to.text.trim(),
       paymentMethod: _payment,
+      advanceBooking: _isAdvanceBooking,
       departure: when,
       rideType: _title,
       estimatedFareEur: 20,
@@ -112,6 +117,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
           const SizedBox(height: 20),
           TextField(
             key: const Key('extra-service-from'),
+            readOnly: widget.tripStore.isActive,
             controller: _from,
             maxLength: 200,
             decoration: InputDecoration(
@@ -125,6 +131,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
             const SizedBox(height: 12),
             TextField(
               key: const Key('extra-service-to'),
+              readOnly: widget.tripStore.isActive,
               controller: _to,
               maxLength: 200,
               decoration: const InputDecoration(
@@ -137,6 +144,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
           const SizedBox(height: 10),
           TextField(
             key: const Key('extra-service-notes'),
+            readOnly: widget.tripStore.isActive,
             controller: _notes,
             maxLength: 500,
             maxLines: 3,
@@ -154,13 +162,16 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
               label: Text(_date == null
                   ? 'Дата'
                   : '${_date!.day}.${_date!.month}.${_date!.year}'),
-              onPressed: () async {
+              onPressed: widget.tripStore.isActive ? null : () async {
                 final d = await showDatePicker(
                   context: context,
                   initialDate: _date ?? DateTime.now(),
                   firstDate: DateUtils.dateOnly(DateTime.now()),
                   lastDate: DateTime.now().add(const Duration(days: 365)));
-                if (d != null && mounted) setState(() => _date = d);
+                if (d != null && mounted && !widget.tripStore.isActive) setState(() {
+                  _date = d;
+                  if (_cashBlockedForAdvance) _payment = 'Карта';
+                });
               },
             )),
             const SizedBox(width: 8),
@@ -168,11 +179,14 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
               key: const Key('extra-service-time'),
               icon: const Icon(Icons.schedule),
               label: Text(_time?.format(context) ?? 'Время'),
-              onPressed: () async {
+              onPressed: widget.tripStore.isActive ? null : () async {
                 final t = await showTimePicker(
                   context: context,
                   initialTime: _time ?? TimeOfDay.now());
-                if (t != null && mounted) setState(() => _time = t);
+                if (t != null && mounted && !widget.tripStore.isActive) setState(() {
+                  _time = t;
+                  if (_cashBlockedForAdvance) _payment = 'Карта';
+                });
               },
             )),
           ]),
@@ -187,9 +201,14 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
                 key: Key('extra-payment-$method'),
                 label: Text(method),
                 selected: _payment == method,
-                onSelected: (_) => setState(() => _payment = method),
+                onSelected: widget.tripStore.isActive ||
+                    (_isAdvanceBooking && method == 'Наличные') ? null
+                    : (_) => setState(() => _payment = method),
               ),
           ]),
+          if (_isAdvanceBooking)
+            const Text('Предварительные заявки принимаются только по безналичной оплате.',
+              key: Key('extra-advance-cash-notice')),
           if (widget.tripStore.isActive)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 10),

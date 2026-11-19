@@ -1143,11 +1143,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
           DraggableScrollableSheet(
             controller: _passengerSheetController,
             key: const Key('passenger-trip-bottom-sheet'),
-            initialChildSize: 0.38,
-            minChildSize: 0.20,
-            maxChildSize: 0.94,
-            snap: true,
-            snapSizes: const [0.38, 0.94],
+            initialChildSize: widget.enableMapTiles ? 0.38 : 1.0,
+            minChildSize: widget.enableMapTiles ? 0.20 : 1.0,
+            maxChildSize: widget.enableMapTiles ? 0.94 : 1.0,
+            snap: widget.enableMapTiles,
+            snapSizes: widget.enableMapTiles ? const [0.38, 0.94] : null,
             builder: (context, panelScrollController) => Material(
               color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),

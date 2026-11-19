@@ -1475,7 +1475,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                             const SizedBox(height: 4),
                             if ((widget.tripStore?.paused ?? paused) ||
                                 _waitingElapsed > Duration.zero)
-                              Text('Платное ожидание · $_waitingClock · учёт времени',
+                              Text('Остановка · $_waitingClock · без начисления за посадку',
                                 key: const Key('pilot-paid-wait-timer'),
                                 style: const TextStyle(
                                   color: Color(0xFFDDC184),

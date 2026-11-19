@@ -44,7 +44,7 @@ void main() {
     await tester.tap(find.byKey(const Key('pilot-passenger-chat')));
     await tester.pumpAndSettle();
     expect(find.byType(PilotPassengerChatDemo), findsOneWidget);
-    expect(find.textContaining('не отправляются пассажиру'), findsOneWidget);
+    expect(find.textContaining('не передаются между телефонами'), findsOneWidget);
     await tester.tap(find.text('Я на месте'));
     await tester.pump();
     expect(find.text('Я на месте'), findsNWidgets(2));

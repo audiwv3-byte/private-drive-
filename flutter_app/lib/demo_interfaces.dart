@@ -525,6 +525,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   LatLng? _animationStart;
   LatLng? _animationTarget;
   bool _gpsEnabled = false;
+  bool _tripPanelCollapsed = false;
   String _gpsMessage = 'GPS выключен';
   int stage = 0;
   bool paused = false;
@@ -1202,7 +1203,16 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                 ),
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: Padding(
+                  child: GestureDetector(
+                    onVerticalDragEnd: (details) {
+                      if (details.primaryVelocity == null) return;
+                      if (details.primaryVelocity! > 180 && !_tripPanelCollapsed) {
+                        setState(() => _tripPanelCollapsed = true);
+                      } else if (details.primaryVelocity! < -180 && _tripPanelCollapsed) {
+                        setState(() => _tripPanelCollapsed = false);
+                      }
+                    },
+                    child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -1214,8 +1224,24 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(pdLabel(context, _tripLabel),
-                                key: const Key('pilot-trip-state')),
+                            InkWell(
+                              key: const Key('pilot-trip-panel-toggle'),
+                              onTap: () => setState(() =>
+                                _tripPanelCollapsed = !_tripPanelCollapsed),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 3),
+                                child: Row(children: [
+                                  const SizedBox(width: 12),
+                                  Expanded(child: Text(pdLabel(context, _tripLabel),
+                                    key: const Key('pilot-trip-state'),
+                                    textAlign: TextAlign.center)),
+                                  Icon(_tripPanelCollapsed
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down),
+                                ]),
+                              ),
+                            ),
+                            if (!_tripPanelCollapsed) ...[
                             if (_navigatingActiveTrip) ...[
                               if (_pickupRoutingInfo.isNotEmpty)
                                 Text(_pickupRoutingInfo,
@@ -1410,11 +1436,13 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                 ),
                               ],
                             ),
+                            ], // expanded trip panel contents
                           ],
                         ),
                       ),
                     ),
                   ),
+                  ), // swipeable trip panel
                 ),
               ],
             ),

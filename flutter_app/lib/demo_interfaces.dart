@@ -842,6 +842,56 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: Drawer(
+        key: const Key('pilot-navigation-drawer'),
+        child: SafeArea(child: ListView(children: [
+          const DrawerHeader(child: Center(child: Text('PRIVATE DRIVE · Пилот',
+            style: TextStyle(fontSize: 20)))),
+          ListTile(
+            key: const Key('pilot-drawer-map'),
+            leading: const Icon(Icons.map_outlined),
+            title: Text(pdLabel(context, 'Карта и текущая поездка')),
+            onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            key: const Key('pilot-drawer-trip-status'),
+            leading: const Icon(Icons.route_outlined),
+            title: Text(pdLabel(context, 'Статус поездки')),
+            subtitle: Text(pdLabel(context, _tripLabel)),
+            onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            key: const Key('pilot-drawer-history'),
+            leading: const Icon(Icons.history),
+            title: Text(pdLabel(context, 'История и заработок')),
+            subtitle: const Text('После подключения защищённого API'),
+            enabled: false,
+          ),
+          ListTile(
+            key: const Key('pilot-drawer-vehicle'),
+            leading: const Icon(Icons.directions_car_outlined),
+            title: Text(pdLabel(context, 'Автомобиль и документы')),
+            subtitle: const Text('После регистрации пилота'),
+            enabled: false,
+          ),
+          ListTile(
+            key: const Key('pilot-drawer-language'),
+            leading: const Icon(Icons.language),
+            title: Text(pdLabel(context, 'Язык')),
+            trailing: const PdLanguageMenu(),
+          ),
+          ListTile(
+            key: const Key('pilot-drawer-support'),
+            leading: const Icon(Icons.help_outline),
+            title: Text(pdLabel(context, 'Поддержка')),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const CompanyInfoPage()));
+            },
+          ),
+        ])),
+      ),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -1012,6 +1062,16 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                 Positioned(
                   top: 64,
                   left: 12,
+                  child: Builder(builder: (menuContext) => IconButton.filledTonal(
+                    key: const Key('pilot-open-drawer'),
+                    tooltip: pdLabel(context, 'Меню пилота'),
+                    onPressed: () => Scaffold.of(menuContext).openDrawer(),
+                    icon: const Icon(Icons.menu),
+                  )),
+                ),
+                Positioned(
+                  top: 120,
+                  left: 12,
                   child: OutlinedButton(
                     key: const Key('pilot-open-waze'),
                     onPressed: _openWaze,
@@ -1028,7 +1088,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   ),
                 ),
                 Positioned(
-                  top: 120,
+                  top: 176,
                   left: 12,
                   child: Material(
                     color: const Color(0xF0172535),

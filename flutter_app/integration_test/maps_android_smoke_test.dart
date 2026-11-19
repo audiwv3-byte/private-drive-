@@ -83,6 +83,32 @@ void main() {
     }
   }
 
+  testWidgets('Pixel reader detects a known multicolor Android gradient',
+      (tester) async {
+    final key = GlobalKey();
+    await tester.pumpWidget(RepaintBoundary(
+      key: key,
+      child: const MaterialApp(home: Scaffold(
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.red, Colors.blue],
+            ),
+          ),
+          child: SizedBox.expand(),
+        ),
+      )),
+    ));
+    await tester.pump();
+    final rect = tester.getRect(find.byType(Scaffold));
+    final palette = await sampleCleanMapArea(tester, key, rect,
+        xStart: 0.15, xEnd: 0.85, yStart: 0.15, yEnd: 0.85);
+    // ignore: avoid_print
+    print('PIXEL_READER_CALIBRATION: colors=${palette.length}');
+    expect(palette.length, greaterThan(20),
+      reason: 'Android screenshot reader cannot capture known gradient');
+  });
+
   testWidgets('Passenger raster streets visibly painted on real Android',
       (tester) async {
     final key = GlobalKey();

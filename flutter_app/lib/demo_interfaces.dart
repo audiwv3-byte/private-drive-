@@ -491,6 +491,43 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   String _gpsMessage = 'GPS выключен';
   int stage = 0;
   bool paused = false;
+  Timer? _waitingTicker;
+  DateTime? _waitingStartedAt;
+  Duration _waitingElapsed = Duration.zero;
+  String? _waitingTripId;
+
+  Duration get _waitingTotal => _waitingElapsed +
+      (_waitingStartedAt == null ? Duration.zero :
+      DateTime.now().difference(_waitingStartedAt!));
+
+  String get _waitingClock {
+    final seconds = _waitingTotal.inSeconds;
+    return '${(seconds ~/ 3600).toString().padLeft(2, '0')}:'
+        '${((seconds ~/ 60) % 60).toString().padLeft(2, '0')}:'
+        '${(seconds % 60).toString().padLeft(2, '0')}';
+  }
+
+  void _togglePaidWait() {
+    final currentlyPaused = widget.tripStore?.paused ?? paused;
+    if (!currentlyPaused) {
+      _waitingStartedAt = DateTime.now();
+      _waitingTicker ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      if (_waitingStartedAt != null) {
+        _waitingElapsed += DateTime.now().difference(_waitingStartedAt!);
+      }
+      _waitingStartedAt = null;
+      _waitingTicker?.cancel();
+      _waitingTicker = null;
+    }
+    if (widget.tripStore != null) {
+      widget.tripStore!.togglePause();
+    } else {
+      setState(() => paused = !paused);
+    }
+  }
   static const stages = ['К пассажиру', 'В путь', 'Завершить'];
   static const labels = ['Нет активной поездки', 'Едем к пассажиру', 'Поездка выполняется'];
   static const vilnius = LatLng(54.6872, 25.2797);
@@ -555,6 +592,20 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   void _onTripChanged() {
     if (!mounted) return;
     final store = widget.tripStore;
+    final tripId = store?.trip?.id;
+    if (tripId != _waitingTripId) {
+      _waitingTripId = tripId;
+      _waitingElapsed = Duration.zero;
+      _waitingStartedAt = null;
+      _waitingTicker?.cancel();
+      _waitingTicker = null;
+    }
+    if (store?.status == DemoTripStatus.finished && _waitingStartedAt != null) {
+      _waitingElapsed += DateTime.now().difference(_waitingStartedAt!);
+      _waitingStartedAt = null;
+      _waitingTicker?.cancel();
+      _waitingTicker = null;
+    }
     final lat = store?.pilotLatitude;
     final lng = store?.pilotLongitude;
     if (store?.pilotOnline == true && lat != null && lng != null &&
@@ -763,6 +814,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
+    _waitingTicker?.cancel();
     widget.tripStore?.removeListener(_onTripChanged);
     _gps?.cancel();
     _synthetic?.cancel();
@@ -1224,6 +1276,13 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                               const SizedBox(height: 10),
                             ],
 
+                            if ((widget.tripStore?.paused ?? paused) ||
+                                _waitingElapsed > Duration.zero)
+                              Text('Платное ожидание · $_waitingClock · учёт времени',
+                                key: const Key('pilot-paid-wait-timer'),
+                                style: const TextStyle(
+                                  color: Color(0xFFDDC184),
+                                  fontWeight: FontWeight.bold)),
                             Row(
                               children: [
                                 Expanded(
@@ -1236,13 +1295,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                 const SizedBox(width: 8),
                                 OutlinedButton(
                                   key: const Key('pilot-pause-trip'),
-                                  onPressed: !_canPause ? null : () {
-                                    if (widget.tripStore != null) {
-                                      widget.tripStore!.togglePause();
-                                    } else {
-                                      setState(() => paused = !paused);
-                                    }
-                                  },
+                                  onPressed: !_canPause ? null : _togglePaidWait,
                                   child: Text((widget.tripStore?.paused ?? paused)
                                       ? 'Продолжить' : 'Остановка'),
                                 ),

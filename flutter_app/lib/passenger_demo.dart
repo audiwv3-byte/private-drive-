@@ -1133,7 +1133,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('passenger-round-trip'),
                 title: Text(pdLabel(context, 'Туда и обратно')),
                 value: _roundTrip,
-                onChanged: (v) => setState(() => _roundTrip = v),
+                onChanged: widget.tripStore?.isActive == true ? null : (v) => setState(() => _roundTrip = v),
               ),
               Text(
                 pdTr(context,
@@ -1165,7 +1165,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 subtitle: const Text('Весь рассчитанный маршрут по ставке за городом. '
                     'Для смешанного маршрута стоимость уточняет диспетчер.'),
                 value: _taxiOutsideCity,
-                onChanged: (v) => setState(() => _taxiOutsideCity = v),
+                onChanged: widget.tripStore?.isActive == true ? null : (v) => setState(() => _taxiOutsideCity = v),
               ),
               CheckboxListTile(
                 key: const Key('taxi-advance-booking'),
@@ -1253,6 +1253,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             TextField(
               key: const Key('passenger-from'),
               controller: _from,
+              readOnly: widget.tripStore?.isActive == true,
               onChanged: (_) { _addressChanged('from'); _updateRoadPreview(); },
               decoration: InputDecoration(
                 labelText: pdLabel(context, 'Откуда'), prefixIcon: Icon(Icons.trip_origin),
@@ -1265,6 +1266,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   child: TextField(
                     key: const Key('passenger-to'),
                     controller: _to,
+                    readOnly: widget.tripStore?.isActive == true,
                     onChanged: (_) { _addressChanged('to'); _updateRoadPreview(); },
                     decoration: InputDecoration(
                       labelText: pdLabel(context, 'Куда'), prefixIcon: Icon(Icons.location_on_outlined),
@@ -1274,7 +1276,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 IconButton(
                   key: const Key('passenger-swap'),
                   tooltip: pdLabel(context, 'Поменять А и Б'),
-                  onPressed: () {
+                  onPressed: widget.tripStore?.isActive == true ? null : () {
                     setState(() {
                       _pickedPickup = null;
                       final previous = _from.text;

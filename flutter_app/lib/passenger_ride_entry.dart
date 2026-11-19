@@ -49,8 +49,6 @@ class PassengerRideEntry extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: ListView(shrinkWrap: true, children: [
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
             Text(pdLabel(context, 'Выбери тип поездки'),
               key: const Key('passenger-entry-title'),
               textAlign: TextAlign.center,

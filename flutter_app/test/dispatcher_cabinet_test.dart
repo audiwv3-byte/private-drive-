@@ -39,6 +39,35 @@ void main() {
     expect(store.declineAssignedPilot(), isFalse);
   });
 
+  testWidgets('Dispatcher sees both sides of the chat read-only',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    expect(store.create(
+      from: 'Вильнюс', to: 'Каунас',
+      paymentMethod: 'Карта',
+      departure: DateTime(2026, 11, 20),
+      services: const [],
+    ), isTrue);
+    expect(store.assignPilot(), isTrue);
+    expect(store.acceptAssignedPilot(), isTrue);
+    expect(store.addPilotChatMessage('Я подъехал'), isTrue);
+    expect(store.addPassengerChatMessage('Сейчас выйду'), isTrue);
+    await tester.pumpWidget(MaterialApp(
+      home: DemoDispatcherCabinet(
+        tripStore: store, enableMapTiles: false,
+      ),
+    ));
+    await tester.ensureVisible(find.byKey(const Key('dispatcher-current-chat')));
+    await tester.tap(find.text('Переписка по текущему заказу'));
+    await tester.pumpAndSettle();
+    expect(find.text('Я подъехал'), findsOneWidget);
+    expect(find.text('Сейчас выйду'), findsOneWidget);
+    expect(find.textContaining('Только просмотр'), findsOneWidget);
+    expect(store.pilotChatMessages, ['Я подъехал']);
+    expect(store.passengerChatMessages, ['Сейчас выйду']);
+  });
+
   testWidgets('Decline returns request to dispatcher for reassignment',
       (tester) async {
     final store = DemoTripStore();

@@ -60,7 +60,7 @@ void main() {
     final store = DemoTripStore();
     addTearDown(store.dispose);
     await tester.pumpWidget(MaterialApp(
-      home: DemoDispatcherCabinet(tripStore: store, enableMapTiles: false),
+      home: DemoDispatcherCabinet(initialTab: 0, tripStore: store, enableMapTiles: false),
     ));
     expect(find.byKey(const Key('dispatcher-cabinet')), findsOneWidget);
     await tester.tap(find.byKey(const Key('dispatcher-tab-1')));

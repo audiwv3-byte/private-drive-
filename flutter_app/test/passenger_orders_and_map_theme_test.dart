@@ -108,6 +108,30 @@ void main() {
         findsNothing);
   });
 
+  testWidgets('Map network error is visible and retry re-checks the server',
+      (tester) async {
+    var checks = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: PassengerDemo(
+        enableMapTiles: true,
+        mapConnectivityCheck: () async {
+          checks++;
+          return checks == 1 ? 'Тестовая ошибка HTTPS' : null;
+        },
+      ),
+    ));
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('passenger-map-load-error')), findsOneWidget);
+    expect(find.text('Тестовая ошибка HTTPS'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('passenger-map-retry')));
+    await tester.pump();
+    await tester.pump();
+    expect(checks, 2);
+    expect(find.text('Тестовая ошибка HTTPS'), findsNothing);
+    expect(find.byKey(const Key('passenger-map')), findsOneWidget);
+  });
+
   testWidgets('Passenger sees only real fresh pilot GPS for an active order',
       (tester) async {
     final store = makeOrder();

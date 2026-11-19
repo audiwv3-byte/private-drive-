@@ -194,4 +194,56 @@ void main() {
     expect(find.byKey(const Key('remote-assign')), findsNothing);
     expect(find.byKey(const Key('remote-create')), findsNothing);
   });
+  testWidgets('Pilot and passenger exchange messages across separate remote sessions',
+      (tester) async {
+    final server = FakeDemoServer();
+    server.trip = {
+      'id': '11111111111111111111111111111111',
+      'origin': 'Вильнюс', 'destination': 'Каунас',
+      'pilot': 'pilot_test', 'status': 'assigned',
+      'paused': 0, 'version': 2,
+    };
+    const interval = Duration(hours: 1);
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      key: const ValueKey('remote-pilot-chat'),
+      gateway: server.actor('pilot'),
+      enableMapTiles: false, pollInterval: interval,
+    )));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('remote-chat-input')), 'Я у входа');
+    await tester.tap(find.byKey(const Key('remote-chat-send')));
+    await tester.pumpAndSettle();
+    expect(server.messages.single['body'], 'Я у входа');
+
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      key: const ValueKey('remote-passenger-chat'),
+      gateway: server.actor('passenger'),
+      enableMapTiles: false, pollInterval: interval,
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('Пилот: Я у входа'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('remote-chat-input')), 'Выхожу');
+    await tester.tap(find.byKey(const Key('remote-chat-send')));
+    await tester.pumpAndSettle();
+    expect(server.messages.length, 2);
+
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      key: const ValueKey('remote-pilot-again'),
+      gateway: server.actor('pilot'),
+      enableMapTiles: false, pollInterval: interval,
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('Пассажир: Выхожу'), findsOneWidget);
+
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      key: const ValueKey('remote-dispatcher-no-chat'),
+      gateway: server.actor('dispatcher'),
+      enableMapTiles: false, pollInterval: interval,
+    )));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('remote-chat-input')), findsNothing);
+  });
+
 }

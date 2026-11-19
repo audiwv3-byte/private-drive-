@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_language.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Informational preview. Legal texts require owner and legal review
@@ -33,7 +34,7 @@ class CompanyInfoPage extends StatelessWidget {
     length: 3,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('PRIVATE DRIVE · Информация'),
+        title: Text(pdLabel(context, 'PRIVATE DRIVE · Информация')),
         bottom: const TabBar(isScrollable: true, tabs: [
           Tab(text: 'О компании'),
           Tab(text: 'Соглашение'),
@@ -55,20 +56,20 @@ class CompanyInfoPage extends StatelessWidget {
               'Индивидуальная деятельность в Литве '
               '(Individualios veiklos pažymos Nr. 1374775). '
               'Сведения предоставлены владельцем проекта.'),
-            const Text('Связаться с нами',
+            Text(pdLabel(context, 'Связаться с нами'),
               style: TextStyle(fontWeight: FontWeight.bold, color: gold)),
             ListTile(
               key: const Key('company-email'),
               leading: const Icon(Icons.email_outlined),
               title: const Text('eurobaltictransfer@gmail.com'),
-              subtitle: const Text('Электронная почта'),
+              subtitle: Text(pdLabel(context, 'Электронная почта')),
               onTap: () => _launch(context, Uri(
                 scheme: 'mailto', path: 'eurobaltictransfer@gmail.com')),
             ),
             ListTile(
               key: const Key('company-telegram-support'),
               leading: const Icon(Icons.forum_outlined),
-              title: const Text('Чат поддержки PRIVATE DRIVE'),
+              title: Text(pdLabel(context, 'Чат поддержки PRIVATE DRIVE')),
               subtitle: const Text('Telegram @PrivatDraiv · контакт из прежнего Mini App'),
               onTap: () => _launch(context,
                 Uri.parse('https://t.me/PrivatDraiv')),
@@ -77,7 +78,7 @@ class CompanyInfoPage extends StatelessWidget {
               key: const Key('company-telegram-channel'),
               leading: const Icon(Icons.campaign_outlined),
               title: const Text('@PrivateDriveTransfer'),
-              subtitle: const Text('Официальный Telegram-канал'),
+              subtitle: Text(pdLabel(context, 'Официальный Telegram-канал')),
               onTap: () => _launch(context,
                 Uri.parse('https://t.me/PrivateDriveTransfer')),
             ),
@@ -85,7 +86,7 @@ class CompanyInfoPage extends StatelessWidget {
             ListTile(
               key: const Key('company-website'),
               leading: const Icon(Icons.language),
-              title: const Text('Сайт PRIVATE DRIVE'),
+              title: Text(pdLabel(context, 'Сайт PRIVATE DRIVE')),
               subtitle: const Text('wilsonpark.pythonanywhere.com'),
               onTap: () => _launch(context,
                 Uri.parse('https://wilsonpark.pythonanywhere.com/')),
@@ -98,7 +99,7 @@ class CompanyInfoPage extends StatelessWidget {
         ListView(key: const Key('company-terms-tab'),
           padding: const EdgeInsets.all(18),
           children: [
-            const Text('Пользовательское соглашение · проект',
+            Text(pdLabel(context, 'Пользовательское соглашение · проект'),
               style: TextStyle(color: gold, fontWeight: FontWeight.bold,
                 fontSize: 19)),
             _paragraph('Редакция для предварительного тестирования: '
@@ -125,7 +126,7 @@ class CompanyInfoPage extends StatelessWidget {
         ListView(key: const Key('company-privacy-tab'),
           padding: const EdgeInsets.all(18),
           children: [
-            const Text('Политика конфиденциальности · проект',
+            Text(pdLabel(context, 'Политика конфиденциальности · проект'),
               style: TextStyle(color: gold, fontWeight: FontWeight.bold,
                 fontSize: 19)),
             _paragraph('Предварительная редакция: 18.11.2026. '

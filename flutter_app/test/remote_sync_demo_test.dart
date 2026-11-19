@@ -98,6 +98,21 @@ class FakeGateway extends RemoteTripGateway {
 }
 
 void main() {
+  test('Voice notification uses latest incoming role, never own message', () {
+    final batch = <Map<String, dynamic>>[
+      {'seq': 2, 'role': 'pilot', 'body': 'На месте'},
+      {'seq': 3, 'role': 'dispatcher', 'body': 'Водитель приехал'},
+      {'seq': 4, 'role': 'passenger', 'body': 'Спасибо'},
+    ];
+    expect(newestIncomingChatRole(batch, 'passenger'), 'dispatcher');
+    expect(newestIncomingChatRole(batch, 'pilot'), 'passenger');
+    expect(newestIncomingChatRole(batch, 'dispatcher'), 'passenger');
+    expect(newestIncomingChatRole([
+      {'seq': 5, 'role': 'passenger', 'body': 'Собственный ответ'},
+    ], 'passenger'), isNull);
+    expect(newestIncomingChatRole(const [], 'pilot'), isNull);
+  });
+
   test('Remote API only allows HTTPS or device-local loopback addresses', () {
     expect(
       () => RemoteDemoClient('http://example.com', List.filled(40, 'x').join()),

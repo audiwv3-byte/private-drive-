@@ -63,12 +63,16 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
       ])),
     ),
     appBar: AppBar(
-      leading: Builder(builder: (menuContext) => IconButton(
-        key: const Key('dispatcher-open-drawer'),
-        icon: const Icon(Icons.menu),
-        tooltip: pdLabel(context, 'Меню диспетчера'),
-        onPressed: () => Scaffold.of(menuContext).openDrawer(),
-      )),
+      leadingWidth: Navigator.of(context).canPop() ? 104 : 56,
+      leading: Row(children: [
+        if (Navigator.of(context).canPop()) const BackButton(),
+        Builder(builder: (menuContext) => IconButton(
+          key: const Key('dispatcher-open-drawer'),
+          icon: const Icon(Icons.menu),
+          tooltip: pdLabel(context, 'Меню диспетчера'),
+          onPressed: () => Scaffold.of(menuContext).openDrawer(),
+        )),
+      ]),
       title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Диспетчер')} · DEMO'),
       actions: [IconButton(
         tooltip: 'Карта пилотов',

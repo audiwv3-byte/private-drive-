@@ -191,6 +191,15 @@ jobs:
           cp private_drive_build/build/app/outputs/flutter-apk/app-debug.apk private_drive_release/private-drive-demo.apk
           sha256sum private_drive_release/private-drive-demo.apk | tee private_drive_release/private-drive-demo.sha256
           test "$(stat -c %s private_drive_release/private-drive-demo.apk)" -gt 100000000
+      # Flutter/Gradle compilation has already finished. Gradle daemons can
+      # retain multiple GB on the 7 GB GitHub-hosted runner; stop them before
+      # booting Android so adb can fork and query the emulator reliably.
+      - name: Release build memory before Android emulator
+        run: |
+          if test -x private_drive_build/android/gradlew; then
+            (cd private_drive_build/android && ./gradlew --stop) || true
+          fi
+          free -m
       - name: Enable KVM acceleration for Android emulator
         run: |
           test -e /dev/kvm || { echo 'KVM device missing'; exit 1; }
@@ -206,6 +215,10 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_2
+          # Cap AVD memory; previous run exhausted runner RAM when adb forked.
+          ram-size: 1536M
+          heap-size: 256M
+          cores: 2
           disable-animations: true
           emulator-boot-timeout: 600
           script: bash -lc 'cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m'

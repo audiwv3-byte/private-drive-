@@ -244,6 +244,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     setState(() {
       _route = '';
       _roadPoints = const [];
+      _roadDistanceMetres = null;
       _routeInfo = '';
       _editingAddress = side;
       _addressSuggestions = _localAddressMatches(query);
@@ -524,7 +525,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
       roundTrip: _roundTrip,
       estimatedFareEur: _rideType == 'Такси' ? null : _pricePreview,
       estimatedFareCents: _taxiPriceCents,
-      extrasRequireQuote: _requiresCustomQuote,
+      extrasRequireQuote: _requiresCustomQuote ||
+          (_rideType == 'Такси' && _taxiLargeVehicle),
       services: [
         if (_rideType == 'Такси' && _taxiAdvanceBooking)
           'Предварительное бронирование +3 €',
@@ -1512,8 +1514,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       'Kaina pagal užklausą · fiksuota kaina nenustatyta',
                       'Price on request · no fixed fare available')
                   : _rideType == 'Такси'
-                      ? Text('Такси: ' + PdTaxiFare.euros(taxiPrice!) +
-                          (_requiresCustomQuote ? ' · доп. услуги по запросу' : '')).data!
+                      ? 'Такси: ${PdTaxiFare.euros(taxiPrice!)}' +
+                          ((_requiresCustomQuote || _taxiLargeVehicle)
+                            ? ' · доп. услуги/авто требуют подтверждения' : '')
                       : _requiresCustomQuote
                       ? pdTr(context,
                           'Расчётная часть: $price € · дополнительные услуги по запросу',

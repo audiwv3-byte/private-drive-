@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090b0d">
+  <meta name="description" content="PRIVATE DRIVE — такси и индивидуальные трансферы. Предпросмотр обновлённой главной страницы.">
+  <title>PRIVATE DRIVE — Такси и трансферы</title>
+  <style>
+    :root{color-scheme:dark;--bg:#090b0d;--panel:#13171b;--ink:#f4efe5;--muted:#b2a99a;--gold:#e8c47c;--line:#39342e;--soft:#1e2428}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+    a{color:inherit}a:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:4px}button{font:inherit}
+    .wrap{width:min(1160px,calc(100% - 40px));margin:auto}.preview{background:#28231a;border-bottom:1px solid #6b5632;padding:8px 20px;color:#f4dba7;text-align:center;font-size:12px;letter-spacing:.05em}
+    .top{position:sticky;top:0;z-index:10;background:#090b0def;backdrop-filter:blur(18px);border-bottom:1px solid #2e2b26}.top-inner{min-height:86px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+    .brand{display:flex;gap:13px;align-items:center;text-decoration:none;min-width:190px}.brand img{width:58px;height:58px;object-fit:contain;border-radius:50%;background:#050505}.brand strong{display:block;font:700 19px/1.1 Georgia,serif;letter-spacing:.16em;color:var(--gold)}.brand small{font-size:10px;letter-spacing:.18em;color:var(--muted)}
+    nav{display:flex;gap:25px;align-items:center}nav a{text-decoration:none;color:#ddd5c8;font-size:14px}nav a:hover{color:var(--gold)}
+    .button{display:inline-flex;align-items:center;justify-content:center;text-align:center;border:1px solid var(--gold);background:var(--gold);color:#15130d;padding:13px 20px;border-radius:11px;text-decoration:none;font-weight:750;min-height:48px;cursor:pointer}
+    .button.secondary{background:transparent;color:var(--gold)}.button:hover{filter:brightness(1.12)}
+    .hero{position:relative;overflow:hidden;border-bottom:1px solid #26292a;background:radial-gradient(ellipse at 75% 32%,#29372e 0%,transparent 43%),radial-gradient(ellipse at 20% 75%,#292219 0%,transparent 47%),#0b0d0f}
+    .hero-inner{display:grid;grid-template-columns:1.18fr .82fr;align-items:center;gap:30px;padding:90px 0 96px}
+    .eyebrow{color:var(--gold);letter-spacing:.23em;font-weight:700;font-size:12px;text-transform:uppercase}
+    h1,h2,h3,p{margin-top:0}h1{font:500 clamp(45px,5.9vw,79px)/1.08 Georgia,serif;letter-spacing:-.025em;margin:20px 0 22px}h1 em{font-style:normal;color:var(--gold)}.lede{max-width:590px;font-size:18px;color:#d5cfc3;line-height:1.75}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+    .trust{display:flex;gap:22px;flex-wrap:wrap;margin-top:30px;color:#aba497;font-size:13px}.trust span:before{content:"✦";color:var(--gold);margin-right:7px}
+    .hero-art{min-height:400px;display:grid;place-items:center;position:relative}.halo{width:min(100%,400px);aspect-ratio:1;border-radius:50%;border:1px solid #79633c;box-shadow:0 0 0 34px #cda76509,0 0 0 100px #cda76505,inset 0 0 100px #070707;display:grid;place-items:center;background:radial-gradient(circle,#1f251f,#080908 72%)}.halo img{width:73%;max-height:300px;object-fit:contain;filter:drop-shadow(0 12px 28px #000)}.art-caption{position:absolute;bottom:2%;font-size:11px;color:#b7a47d;letter-spacing:.2em;text-align:center}
+    section{scroll-margin-top:110px} .section{padding:78px 0}.section.alt{background:#101316;border-block:1px solid #222629}.section-head{display:flex;gap:25px;justify-content:space-between;align-items:end;margin-bottom:30px}.section-head h2{font:500 clamp(30px,3.3vw,47px)/1.15 Georgia,serif;margin:9px 0 0}.section-head p{max-width:420px;color:var(--muted);margin:0}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:17px}.card{background:linear-gradient(145deg,#191d1f,#111416);border:1px solid #3d372d;border-radius:20px;padding:29px;min-height:250px}.card .mark{color:var(--gold);font-size:30px}.card h3{font:500 25px Georgia,serif;margin:15px 0 9px}.card p{color:#c1b9a9}.card .price{color:var(--gold);font-weight:750;font-size:21px;margin-top:20px}.card .note{font-size:12px;color:#9e978c}.card.accent{border-color:#79633f;background:linear-gradient(150deg,#222017,#111416)}
+    .route-list{display:grid;gap:12px}.route{display:flex;justify-content:space-between;align-items:center;gap:15px;background:#151a1d;border:1px solid #353a39;border-radius:13px;padding:20px}.route strong{font-size:16px}.route span{color:var(--gold);font-weight:750;font-size:20px;white-space:nowrap}.route small{display:block;color:var(--muted);margin-top:4px}
+    .registration{display:grid;grid-template-columns:1fr 1fr;gap:18px}.registration .card{min-height:220px}.pill{color:#d7b572;background:#2b261d;border:1px solid #5c4c32;border-radius:30px;padding:5px 11px;font-size:11px;letter-spacing:.08em}
+    .legal{display:flex;flex-wrap:wrap;gap:20px;font-size:13px;color:#aaa49a;border-top:1px solid var(--line);padding:28px 0 36px}.legal a{color:#e3c186}.legal strong{color:var(--gold)}.fine{font-size:12px;color:#9e988b;margin-top:24px}
+    @media(max-width:900px){nav{gap:12px}nav a{font-size:12px}.hero-inner{padding:66px 0;grid-template-columns:1fr .7fr}.hero-art{min-height:260px}.grid{grid-template-columns:1fr 1fr}.grid .card:last-child{grid-column:1/-1}}
+    @media(max-width:700px){.top-inner{padding:13px 0;flex-wrap:wrap}.top-inner nav{order:3;justify-content:space-between;width:100%;overflow:auto;padding-bottom:5px}.top .button{padding:10px 13px;min-height:42px}.brand img{width:44px;height:44px}.brand strong{font-size:15px}.hero-inner{display:flex;flex-direction:column;align-items:stretch;padding:51px 0 60px}.hero-art{min-height:180px;order:-1}.halo{width:160px;box-shadow:0 0 0 22px #cda76509}.halo img{width:79%}.art-caption{display:none}.section{padding:53px 0}.section-head{display:block}.section-head p{margin-top:14px}.grid,.registration{grid-template-columns:1fr}.grid .card:last-child{grid-column:auto}.card{min-height:auto}.route{padding:16px}.route strong{font-size:14px}.route span{font-size:17px}}
+  </style>
+</head>
+<body>
+  <div class="preview" role="status">ТЕСТОВЫЙ МАКЕТ · НЕ ПРИНИМАЕТ РЕАЛЬНЫЕ ЗАКАЗЫ И ПЛАТЕЖИ</div>
+  <header class="top"><div class="wrap top-inner">
+    <a class="brand" href="#top" aria-label="PRIVATE DRIVE — на главную">
+      <img src="../miniapp/static/private-drive-official-logo.jpeg" alt="Фирменный логотип PD" width="58" height="58">
+      <span><strong>PRIVATE DRIVE</strong><small>PREMIUM TRANSFERS</small></span>
+    </a>
+    <nav aria-label="Основное меню"><a href="#taxi">Такси</a><a href="#transfers">Трансферы</a><a href="#extras">Услуги</a><a href="#registration">Регистрация</a></nav>
+    <a class="button secondary" href="#registration">Начать</a>
+  </div></header>
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title"><div class="wrap hero-inner">
+      <div>
+        <span class="eyebrow">Вильнюс · Литва · Европа</span>
+        <h1 id="hero-title">Ваша поездка.<br><em>Наше внимание.</em></h1>
+        <p class="lede">PRIVATE DRIVE объединяет городские поездки, индивидуальные трансферы и полезные услуги в одном сервисе. Комфорт, понятные условия и внимательное сопровождение.</p>
+        <div class="actions"><a class="button" href="#taxi">Выбрать поездку</a><a class="button secondary" href="#registration">Зарегистрироваться</a></div>
+        <div class="trust"><span>Заказ через приложение</span><span>Тариф до подтверждения</span><span>Поддержка диспетчера</span></div>
+      </div>
+      <div class="hero-art" aria-label="Фирменный стиль PRIVATE DRIVE"><div class="halo"><img src="../miniapp/static/private-drive-official-logo.jpeg" alt="Золотой логотип PRIVATE DRIVE на чёрном фоне"></div><span class="art-caption">PRIVATE DRIVE · PREMIUM SERVICE</span></div>
+    </div></section>
+
+    <section id="taxi" class="section"><div class="wrap">
+      <div class="section-head"><div><span class="eyebrow">01 / Такси</span><h2>Поездки по вашему маршруту</h2></div><p>Отображаем согласованные базовые ставки. Итог зависит от дорожного расстояния и выбранных услуг.</p></div>
+      <div class="grid">
+        <article class="card accent"><div class="mark">◆</div><h3>Город</h3><p>Удобные поездки по Вильнюсу с расчётом по автомобильному маршруту.</p><div class="price">0,66 € / км</div><div class="note">Посадка 0,99 € · минимум 4 €</div></article>
+        <article class="card"><div class="mark">◇</div><h3>За городом</h3><p>Поездки за пределами города с отдельной ставкой на расстояние.</p><div class="price">0,79 € / км</div><div class="note">Смешанные маршруты уточняются при расчёте</div></article>
+        <article class="card"><div class="mark">◈</div><h3>Ожидание при подаче</h3><p>Первые три минуты после подтверждённого прибытия пилота бесплатны.</p><div class="price">0,30 € / мин</div><div class="note">После трёх бесплатных минут</div></article>
+      </div>
+    </div></section>
+
+    <section id="transfers" class="section alt"><div class="wrap">
+      <div class="section-head"><div><span class="eyebrow">02 / Трансферы</span><h2>Маршруты с известной ценой</h2></div><p>Фиксированные тарифы трансфера — отдельно от городского такси.</p></div>
+      <div class="route-list">
+        <div class="route"><div><strong>Вильнюс → Каунас</strong><small>Индивидуальный трансфер · в одну сторону</small></div><span>110 €</span></div>
+        <div class="route"><div><strong>Вильнюс ↔ Каунас</strong><small>Туда и обратно · согласованный тариф</small></div><span>200 €</span></div>
+        <div class="route"><div><strong>Вильнюс ↔ Аэропорт Вильнюса</strong><small>Трансфер в обоих направлениях</small></div><span>40 €</span></div>
+      </div>
+      <p class="fine">Другие маршруты рассчитываются индивидуально. Отдельного фиксированного тарифа Каунас → Вильнюс здесь нет.</p>
+    </div></section>
+
+    <section id="extras" class="section"><div class="wrap">
+      <div class="section-head"><div><span class="eyebrow">03 / Дополнительные услуги</span><h2>Больше, чем поездка</h2></div><p>Заказываются отдельно или согласовываются с диспетчером. Никаких автоматических списаний в этом макете.</p></div>
+      <div class="grid">
+        <article class="card"><div class="mark">✦</div><h3>Встреча с табличкой</h3><p>Поможем найти пилота в аэропорту или в согласованной точке встречи.</p><div class="price">+15 €</div></article>
+        <article class="card"><div class="mark">⚡</div><h3>Запуск автомобиля</h3><p>Помощь при разряженном аккумуляторе.</p><div class="price">20 €</div></article>
+        <article class="card"><div class="mark">▣</div><h3>Доставка товаров</h3><p>Заберём покупки из магазина и доставим по указанному адресу.</p><div class="price">20 €</div></article>
+      </div>
+      <p class="fine">Дополнительные остановки и изменение маршрута согласовываются отдельно до выполнения.</p>
+    </div></section>
+
+    <section id="registration" class="section alt"><div class="wrap">
+      <div class="section-head"><div><span class="eyebrow">04 / Регистрация</span><h2>Ваш PRIVATE DRIVE</h2></div><p>Действующие формы и заказы не переносим в макет. После согласования подключим этот дизайн к существующему сервису.</p></div>
+      <div class="registration">
+        <article class="card"><span class="pill">ПАССАЖИР</span><h3>Путешествуй с комфортом</h3><p>Выбор маршрута, способа оплаты, дополнительных услуг и управление заказом.</p><a class="button secondary" href="https://t.me/EuroBalticTransferBot?start=register" rel="noopener noreferrer" target="_blank">Действующая регистрация через Telegram</a></article>
+        <article class="card"><span class="pill">ПИЛОТ</span><h3>Присоединяйся к команде</h3><p>Заявка пилота, данные автомобиля и проверка документов администратором.</p><a class="button secondary" href="https://wilsonpark.pythonanywhere.com/" rel="noopener noreferrer" target="_blank">Открыть действующий сервис</a></article>
+      </div>
+      <p class="fine">Предварительное бронирование — только безналично. Приём наличных обычных заказов пилот может выключить в своём приложении. Функции в макете не выполняют бронирование.</p>
+    </div></section>
+  </main>
+  <footer><div class="wrap legal">
+    <strong>PRIVATE DRIVE</strong>
+    <a href="https://wilsonpark.pythonanywhere.com/privacy?lang=ru" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a>
+    <a href="https://wilsonpark.pythonanywhere.com/legal?lang=ru" target="_blank" rel="noopener noreferrer">Условия поездки, оплаты и возвратов</a>
+    <a href="mailto:eurobaltictransfer@gmail.com">Контакты</a>
+    <span>Дизайн для согласования · действующий сайт не изменён</span>
+  </div></footer>
+</body>
+</html>

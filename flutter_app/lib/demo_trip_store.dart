@@ -345,7 +345,9 @@ class DemoTripStore extends ChangeNotifier {
     };
     if (next == null) return false;
     if (next == DemoTripStatus.underway && _arrivalAt != null) {
-      _departureFromPickupAt ??= DateTime.now();
+      final departureTime = DateTime.now();
+      _departureFromPickupAt ??= departureTime.isBefore(_arrivalAt!)
+          ? _arrivalAt : departureTime;
     }
     _status = next;
     notifyListeners();

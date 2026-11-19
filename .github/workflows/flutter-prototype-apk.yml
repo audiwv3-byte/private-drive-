@@ -132,7 +132,7 @@ jobs:
           marker = "    - assets/brand/private_drive_logo.webp"
           assert contents.count(marker) == 1
           pubspec.write_text(contents.replace(marker,
-              marker + "\\n    - assets/brand/private_drive_logo_transparent.png".replace("\\n", "\n")))
+              marker + chr(10) + "    - assets/brand/private_drive_logo_transparent.png"))
           assert dest.stat().st_size > 10000
           print(f"Original logo unchanged; sign-in transparency ready: {dest.stat().st_size} bytes")
           PY

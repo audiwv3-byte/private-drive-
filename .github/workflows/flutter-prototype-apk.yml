@@ -28,6 +28,10 @@ jobs:
           flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
           cp -R flutter_app/lib/. private_drive_build/lib/
           cp -R flutter_app/assets private_drive_build/assets
+          # Install Pillow BEFORE starting the Python interpreter.
+          # Installing it from inside a running Python process leaves its
+          # newly created user-site path unavailable to that same process.
+          python3 -m pip install --quiet Pillow
           # The exact, approved 1254px lossless asset is used by Flutter,
           # the Android launcher, and the native launch background.
           python3 - <<'PY'
@@ -48,8 +52,6 @@ jobs:
           # narrow phones; the old 1254px artwork could be clipped.
           # Generate a smaller lossless native splash image with margins.
           import io
-          import subprocess
-          subprocess.check_call(["python3", "-m", "pip", "install", "--quiet", "Pillow"])
           from PIL import Image
           with Image.open(io.BytesIO(data)) as source_image:
               source_image.thumbnail((720, 720), Image.Resampling.LANCZOS)

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,37 @@ import 'package:private_drive/passenger_demo.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  Future<void> verifyEmulatorNetwork(WidgetTester tester, String role) async {
+    await tester.runAsync(() async {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 8);
+      try {
+        final uri = Uri.parse(
+            'https://tile.openstreetmap.org/10/583/325.png');
+        final request = await client.getUrl(uri)
+            .timeout(const Duration(seconds: 10));
+        request.headers.set(HttpHeaders.userAgentHeader,
+            'PRIVATE DRIVE demo Android visual QA');
+        final response = await request.close()
+            .timeout(const Duration(seconds: 10));
+        final first = await response.first
+            .timeout(const Duration(seconds: 10));
+        // This checks the emulator, not just the GitHub runner.
+        // Keep the result explicit in CI logs.
+        // ignore: avoid_print
+        print('EMULATOR_MAP_HTTP_$role: status=${response.statusCode} '
+            'type=${response.headers.contentType} bytes=${first.length}');
+        expect(response.statusCode, HttpStatus.ok,
+            reason: 'Android emulator itself cannot load OSM tile');
+        expect(first.length, greaterThan(8));
+        expect(first[0], 0x89, reason: 'Not a PNG tile');
+        expect(first[1], 0x50, reason: 'Not a PNG tile');
+      } finally {
+        client.close(force: true);
+      }
+    });
+  }
+
   Future<Set<int>> sampleCleanMapArea(
       WidgetTester tester, GlobalKey frameKey, Rect mapRect,
       {required double xStart, required double xEnd,
@@ -21,6 +53,9 @@ void main() {
     final boundary = frameKey.currentContext!.findRenderObject()
         as RenderRepaintBoundary;
     final image = await boundary.toImage(pixelRatio: 1);
+    // ignore: avoid_print
+    print('MAP_RENDER_SAMPLE: surface=${image.width}x${image.height} '
+        'mapRect=$mapRect');
     try {
       final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
       if (bytes == null) throw StateError('Screenshot pixel data unavailable');
@@ -51,6 +86,7 @@ void main() {
   testWidgets('Passenger raster streets visibly painted on real Android',
       (tester) async {
     final key = GlobalKey();
+    await verifyEmulatorNetwork(tester, 'PASSENGER');
     await tester.pumpWidget(RepaintBoundary(
       key: key,
       child: const MaterialApp(
@@ -77,6 +113,7 @@ void main() {
   testWidgets('Pilot raster streets visibly painted on real Android',
       (tester) async {
     final key = GlobalKey();
+    await verifyEmulatorNetwork(tester, 'PILOT');
     await tester.pumpWidget(RepaintBoundary(
       key: key,
       child: const MaterialApp(

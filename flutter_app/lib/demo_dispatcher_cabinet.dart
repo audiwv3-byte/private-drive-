@@ -24,6 +24,13 @@ class DemoDispatcherCabinet extends StatefulWidget {
 }
 
 class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
+  final _dispatcherDraft = TextEditingController();
+
+  @override
+  void dispose() {
+    _dispatcherDraft.dispose();
+    super.dispose();
+  }
   late int _tab;
 
   @override
@@ -174,6 +181,8 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
             route: '${trip.from} → ${trip.to}',
             pilotMessages: widget.tripStore.pilotChatMessages,
             passengerMessages: widget.tripStore.passengerChatMessages,
+            dispatcherMessages: widget.tripStore.dispatcherChatMessages,
+            allowReply: widget.tripStore.isActive,
             key: const Key('dispatcher-current-chat'),
           ),
         for (final (index, entry) in widget.tripStore.archivedChats.reversed.indexed)
@@ -182,6 +191,7 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
             route: '${entry.from} → ${entry.to}',
             pilotMessages: entry.pilotMessages,
             passengerMessages: entry.passengerMessages,
+            dispatcherMessages: entry.dispatcherMessages,
             key: ValueKey('dispatcher-archived-chat-$index'),
           ),
         const SizedBox(height: 8),
@@ -198,6 +208,8 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
     required String route,
     required List<String> pilotMessages,
     required List<String> passengerMessages,
+    required List<String> dispatcherMessages,
+    bool allowReply = false,
   }) => Card(
     key: key,
     child: ExpansionTile(
@@ -205,7 +217,8 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
       subtitle: Text(route),
       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
-        if (pilotMessages.isEmpty && passengerMessages.isEmpty)
+        if (pilotMessages.isEmpty && passengerMessages.isEmpty &&
+            dispatcherMessages.isEmpty)
           const Text('Сообщений по заказу пока нет'),
         if (pilotMessages.isNotEmpty) ...[
           const Align(
@@ -233,8 +246,40 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
               title: Text(message),
             ),
         ],
-        const Text('Только просмотр. Сообщения пилота и пассажира '
-          'не редактируются диспетчером.'),
+        if (dispatcherMessages.isNotEmpty) ...[
+          const Align(alignment: Alignment.centerLeft,
+            child: Text('Диспетчер',
+              style: TextStyle(fontWeight: FontWeight.bold))),
+          for (final message in dispatcherMessages)
+            ListTile(
+              key: const Key('dispatcher-sent-message'),
+              dense: true,
+              leading: const Icon(Icons.support_agent),
+              title: Text(message),
+            ),
+        ],
+        if (allowReply)
+          Row(children: [
+            Expanded(child: TextField(
+              key: const Key('dispatcher-chat-input'),
+              controller: _dispatcherDraft,
+              maxLength: 500,
+              decoration: const InputDecoration(
+                hintText: 'Написать пилоту и пассажиру', counterText: ''),
+            )),
+            IconButton(
+              key: const Key('dispatcher-chat-send'),
+              icon: const Icon(Icons.send),
+              onPressed: () {
+                if (widget.tripStore.addDispatcherChatMessage(
+                    _dispatcherDraft.text)) {
+                  _dispatcherDraft.clear();
+                }
+              },
+            ),
+          ])
+        else
+          const Text('Архив · только просмотр'),
       ],
     ),
   );

@@ -34,8 +34,8 @@ def probe(url: str) -> tuple[bool, str]:
             content_type = response.headers.get("Content-Type", "")
             signature = response.read(8)
         valid = status == 200 and content_type.startswith("image/") and (
-            signature == b"\\x89PNG\\r\\n\\x1a\\n"
-            or signature.startswith(b"\\xff\\xd8\\xff")
+            signature == b"\x89PNG\r\n\x1a\n"
+            or signature.startswith(b"\xff\xd8\xff")
             or signature.startswith(b"RIFF")
         )
         return valid, f"HTTP {status}, {content_type}, valid_image={valid}"

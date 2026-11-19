@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
@@ -16,9 +17,19 @@ class PassengerOrdersDemo extends StatefulWidget {
 
 class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
   final _draft = TextEditingController();
+  Timer? _waitingRefresh;
+
+  @override
+  void initState() {
+    super.initState();
+    _waitingRefresh = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && widget.tripStore.isWaitingAtPickup) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
+    _waitingRefresh?.cancel();
     _draft.dispose();
     super.dispose();
   }
@@ -69,6 +80,19 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                       Text(
                         pdLabel(context, 'Стоимость по запросу · диспетчер подтвердит цену до оплаты'),
                         key: const Key('passenger-order-price'),
+                      ),
+                    if (store.arrivalAt != null)
+                      Text(
+                        store.isWaitingAtPickup
+                            ? store.pickupWaitingElapsed() <
+                                DemoTripStore.freePickupWaiting
+                                ? 'Пилот прибыл · бесплатное ожидание '
+                                  'до 3 минут · 0,00 €'
+                                : 'Платное ожидание · 0,30 €/мин · '
+                                  'сейчас ${store.pickupWaitingFeeLabel()}'
+                            : 'Ожидание при посадке · итог '
+                              '${store.pickupWaitingFeeLabel()}',
+                        key: const Key('passenger-pickup-waiting-fee'),
                       ),
                     if (store.canPassengerCancel)
                       OutlinedButton.icon(

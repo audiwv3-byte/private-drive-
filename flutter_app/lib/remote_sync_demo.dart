@@ -136,8 +136,9 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           }
         }
       }
-      if (id != null && role != 'dispatcher' &&
-          ['assigned', 'approaching', 'underway'].contains(current?['status'])) {
+      if (id != null &&
+          ['requested', 'assigned', 'approaching', 'underway', 'finished']
+              .contains(current?['status'])) {
         final inbox = await client.get('/v1/trips/$id/messages?after=$chatSeq');
         final rows = inbox['messages'];
         if (rows is! List) {
@@ -147,7 +148,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         for (final item in rows) {
           if (item is! Map<String, dynamic> || item['seq'] is! int ||
               item['body'] is! String ||
-              !['pilot', 'passenger'].contains(item['role'])) {
+              !['pilot', 'passenger', 'dispatcher'].contains(item['role'])) {
             throw const RemoteDemoException('Неверное сообщение сервера');
           }
           final n = item['seq'] as int;
@@ -164,8 +165,10 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           if (widget.onIncomingMessageVoice != null) {
             widget.onIncomingMessageVoice!();
           } else {
+            final sender = chatMessages.last['role'];
             unawaited(PdMessageVoice.announce(
-              role == 'passenger' ? 'пилота' : 'пассажира'));
+              sender == 'dispatcher' ? 'диспетчера' :
+                (sender == 'pilot' ? 'пилота' : 'пассажира')));
           }
         }
         _loadedChatForTrip = true;
@@ -202,8 +205,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     final id = trip?['id'];
     final message = chatDraft.text.trim();
     if (client == null || id is! String || busy || message.isEmpty ||
-        message.length > 500 || role == 'dispatcher' ||
-        !['assigned', 'approaching', 'underway'].contains(status)) return;
+        message.length > 500 ||
+        !['requested', 'assigned', 'approaching', 'underway'].contains(status)) return;
     setState(() { busy = true; error = ''; });
     try {
       await client.post('/v1/trips/$id/messages',
@@ -223,8 +226,9 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     children: [
       const Text('Сообщения поездки · тестовый сервер'),
       for (final item in chatMessages)
-        Text('${item['role'] == 'pilot' ? 'Пилот' : 'Пассажир'}: ${item['body']}',
+        Text('${switch (item['role']) { 'pilot' => 'Пилот', 'dispatcher' => 'Диспетчер', _ => 'Пассажир' }}: ${item['body']}',
           key: Key('remote-chat-message-${item['seq']}')),
+      if (['requested', 'assigned', 'approaching', 'underway'].contains(status))
       Row(children: [
         Expanded(child: TextField(
           key: const Key('remote-chat-input'),
@@ -353,8 +357,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
                 '/v1/trips/' + trip!['id'].toString() + '/assign',
                 {'pilot': 'pilot_test', 'version': version}),
               child: const Text('Назначить тестового пилота')),
-          if (isPassenger && trip != null &&
-              ['assigned','approaching','underway'].contains(status))
+          if (trip != null &&
+              ['requested','assigned','approaching','underway','finished'].contains(status))
             chatPanel(),
           OutlinedButton(key: const Key('remote-refresh'),
             onPressed: refresh, child: const Text('Обновить статус')),

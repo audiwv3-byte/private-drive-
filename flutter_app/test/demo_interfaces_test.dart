@@ -141,7 +141,8 @@ void main() {
     final marker = tester.widget<Icon>(
         find.byKey(const Key('pilot-location-marker')));
     expect(marker.color, const Color(0xFF172B3F));
-    expect(marker.icon, Icons.directions_car_filled);
+    expect(marker.icon, Icons.navigation);
+    expect(marker.color, const Color(0xFFB6FF36));
 
     // Panning should not silently disable GPS follow on later fixes.
     await tester.drag(find.byKey(const Key('pilot-map-surface')),

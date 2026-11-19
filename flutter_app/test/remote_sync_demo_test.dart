@@ -7,6 +7,7 @@ class FakeDemoServer {
   Map<String, dynamic>? trip;
   int version = 0;
   List<Map<String, dynamic>> events = [];
+  List<Map<String, dynamic>> messages = [];
 
   RemoteTripGateway actor(String role) => FakeGateway(this, role);
 
@@ -37,6 +38,12 @@ class FakeGateway extends RemoteTripGateway {
       }
       return {'trip': server.trip};
     }
+    if (path.contains('/messages?after=')) {
+      if (role == 'dispatcher') throw StateError('Dispatcher chat denied');
+      final after = int.parse(path.split('after=').last);
+      return {'messages': server.messages.where((x) =>
+        (x['seq'] as int) > after).toList()};
+    }
     if (path.contains('/events?after=')) {
       final number = int.parse(path.split('after=').last);
       return {'events': server.events.where((x) => (x['seq'] as int) > number).toList()};
@@ -46,6 +53,18 @@ class FakeGateway extends RemoteTripGateway {
 
   @override
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> data) async {
+    if (path.endsWith('/messages') && role != 'dispatcher' &&
+        server.trip?['pilot'] == 'pilot_test' &&
+        ['assigned', 'approaching', 'underway'].contains(server.trip?['status'])) {
+      final message = <String, dynamic>{
+        'seq': server.messages.length + 1,
+        'role': role,
+        'body': data['text'],
+        'at': 'test',
+      };
+      server.messages.add(message);
+      return {'message': message};
+    }
     if (path == '/v1/trips' && role == 'passenger') {
       server.trip = {
         'id': '11111111111111111111111111111111',

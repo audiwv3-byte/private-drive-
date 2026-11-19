@@ -330,7 +330,7 @@ void main() {
       isTrue,
     );
     expect(find.textContaining('PayPal'), findsWidgets);
-    expect(find.text('Наличные'), findsNothing);
+    expect(find.text('Наличные'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-book-disabled')),

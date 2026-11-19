@@ -200,6 +200,11 @@ void main() {
     expect(find.byKey(const Key('demo-dispatch-assign')), findsNothing);
     await tester.tap(find.byKey(const Key('open-dispatcher-preview')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dispatcher-live-map')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('dispatcher-open-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('dispatcher-menu-0')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('dispatcher-cabinet')), findsOneWidget);
     expect(find.byKey(const Key('dispatcher-order-card')), findsOneWidget);
     await tester.tap(find.byKey(const Key('dispatcher-assign-pilot')));

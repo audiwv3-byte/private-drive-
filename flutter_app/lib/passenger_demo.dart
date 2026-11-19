@@ -668,6 +668,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         options: MapOptions(
                           initialCenter: startMap,
                           initialZoom: mapZoom,
+                          backgroundColor: const Color(0xFF1A2A34),
                         ),
                         children: [
                           ColorFiltered(

@@ -420,15 +420,14 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (!_hasAssignedPassenger) return;
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => PilotPassengerChatDemo(
+        tripStore: widget.tripStore!,
         messages: [
           ...widget.tripStore!.pilotChatMessages,
           ...widget.tripStore!.passengerChatMessages.map(
             (message) => 'Пассажир: $message'),
         ],
-        onSend: (text) {
-          if (!_hasAssignedPassenger) return;
-          widget.tripStore!.addPilotChatMessage(text);
-        },
+        onSend: (text) => _hasAssignedPassenger &&
+            widget.tripStore!.addPilotChatMessage(text),
       ),
     ));
   }

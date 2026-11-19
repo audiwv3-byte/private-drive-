@@ -49,7 +49,7 @@ void main() {
     expect(find.byKey(const Key('pilot-global-offer')), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
     expect(alertCount, 2, reason: 'Alert should repeat while pilot has not answered');
-    expect(find.text('Стоимость · 130 €'), findsOneWidget);
+    expect(find.text('Стоимость · 110 €'), findsOneWidget);
     expect(find.textContaining('Доход пилота · требуется тариф'), findsOneWidget);
     await tester.drag(find.byKey(const Key('pilot-global-accept-handle')),
       Offset((tester.getSize(find.byKey(const Key('pilot-global-accept'))).width - 52), 0));

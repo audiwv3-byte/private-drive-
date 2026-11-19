@@ -69,6 +69,7 @@ jobs:
           print(f"Brand asset verified ({len(data)} bytes), Android icon and splash replaced")
           PY
           cp -R flutter_app/test/. private_drive_build/test/
+          cp -R flutter_app/integration_test private_drive_build/integration_test
           # Isolate test app from any future production package and keep its
           # PUBLIC demo-only debug signature stable across GitHub Action runs.
           mkdir -p "$HOME/.android"
@@ -130,6 +131,18 @@ jobs:
           info = subprocess.check_output(["flutter", "--version"], text=True).strip().splitlines()[0]
           print("Verified branded APK:", apk.stat().st_size, "bytes", info)
           PY
+      - name: Render passenger and pilot maps on real Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: |
+            cd private_drive_build
+            flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:

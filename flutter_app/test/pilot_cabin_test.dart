@@ -104,8 +104,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('На линии · демо'), findsOneWidget);
-    expect(find.byKey(const Key('pilot-offline-vilnius-background')), findsNothing);
+    expect(find.byKey(const Key('pilot-offline-vilnius-background')), findsOneWidget);
     expect(find.text('УЙТИ С ЛИНИИ'), findsOneWidget);
+    final logoRect = tester.getRect(find.byKey(const Key('pilot-line-transparent-logo')));
+    final headingRect = tester.getRect(find.text('КАБИНЕТ ПИЛОТА'));
+    final statusRect = tester.getRect(find.byKey(const Key('pilot-line-status')));
+    expect(logoRect.bottom, lessThan(headingRect.top));
+    expect(headingRect.bottom, lessThan(statusRect.top));
     expect(find.byKey(const Key('pilot-open-map')), findsOneWidget);
     final powerOnIcon = tester.widget<Icon>(
       find.byIcon(Icons.power_settings_new),

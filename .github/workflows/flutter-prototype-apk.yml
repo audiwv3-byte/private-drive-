@@ -145,9 +145,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-boot-timeout: 360
-          script: |
-            cd private_drive_build
-            flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m
+          script: bash -lc 'cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m'
       - name: Upload test APK
         uses: actions/upload-artifact@v4
         with:

@@ -30,8 +30,8 @@ void main() {
     expect(find.byKey(const Key('pilot-location-marker')), findsOneWidget);
     final icon = tester.widget<Icon>(
       find.byKey(const Key('pilot-location-marker')));
-    expect(icon.icon, Icons.directions_car_filled);
-    expect(icon.color, const Color(0xFF172B3F));
+    expect(icon.icon, Icons.local_taxi_rounded);
+    expect(icon.color, const Color(0xFFDDC184));
     expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsOneWidget);
     await tester.tap(find.byKey(const Key('pilot-map-day-night')));
     await tester.pump();

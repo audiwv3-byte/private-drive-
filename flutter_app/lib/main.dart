@@ -233,7 +233,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
               padding: const EdgeInsets.all(24),
               children: [
                 const SizedBox(height: 16),
-                const PrivateDriveBrandLogo(size: 132),
+                const PrivateDriveBrandLogo(size: 132, transparentBackground: true),
                 const SizedBox(height: 18),
                 Text(tr('Добро пожаловать', 'Sveiki atvykę', 'Welcome'),
                     textAlign: TextAlign.center,

@@ -27,12 +27,30 @@ void main() {
   test('Immediate cash ride remains allowed for cash-enabled pilot', () {
     final store = DemoTripStore();
     addTearDown(store.dispose);
-    expect(store.create(from: 'А', to: 'Б', departure: date,
+    expect(store.create(from: 'А', to: 'Б', departure: DateTime.now(),
       paymentMethod: 'Наличные', services: const []), isTrue);
     expect(store.trip!.advanceBooking, isFalse);
     expect(store.assignPilot(), isFalse);
     store.setPilotAcceptsCash(true);
     expect(store.assignPilot(), isTrue);
+  });
+
+  test('After booking, services and payment are immutable', () {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    final original = <String>['Встреча с табличкой'];
+    expect(store.create(from: 'Вильнюс', to: 'Каунас',
+      departure: date, paymentMethod: 'Карта',
+      advanceBooking: true, services: original), isTrue);
+    original.add('Кофе');
+    expect(store.trip!.services, ['Встреча с табличкой']);
+    expect(() => store.trip!.services.add('Кофе'), throwsUnsupportedError);
+    expect(store.create(from: 'Вильнюс', to: 'Тракай',
+      departure: date, paymentMethod: 'PayPal',
+      advanceBooking: true, services: const ['Кофе']), isFalse);
+    expect(store.trip!.paymentMethod, 'Карта');
+    expect(store.trip!.services, ['Встреча с табличкой']);
+    expect(store.trip!.advanceBooking, isTrue);
   });
 
   test('Route modifications do not change original payment automatically', () {

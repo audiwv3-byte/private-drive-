@@ -848,13 +848,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
           width: 52,
           height: 52,
           child: const Icon(
-            Icons.directions_car_filled,
+            Icons.location_on,
             key: Key('passenger-pilot-map-marker'),
-            color: Color(0xFF172B3F),
-            size: 38,
+            color: Color(0xFFB6FF36),
+            size: 46,
             shadows: [
-              Shadow(color: Color(0xFFDDC184), blurRadius: 9),
-              Shadow(color: Colors.black, blurRadius: 4),
+              Shadow(color: Colors.black, blurRadius: 8),
+              Shadow(color: Color(0xFF355100), blurRadius: 3),
             ],
           ),
         ),

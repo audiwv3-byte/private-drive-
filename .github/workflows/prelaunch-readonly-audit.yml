@@ -1,0 +1,25 @@
+name: PRIVATE DRIVE - isolated prelaunch audit
+on:
+  push:
+    branches: [audit/prelaunch-passenger-pilot-dispatch-20261106]
+    paths:
+      - ops/pa_prelaunch_readonly_audit.py
+      - .github/workflows/prelaunch-readonly-audit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m py_compile ops/pa_prelaunch_readonly_audit.py
+      - run: pip install requests
+      - name: Inspect production code and public authentication boundaries (GET only)
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: python ops/pa_prelaunch_readonly_audit.py

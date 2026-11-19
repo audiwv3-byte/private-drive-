@@ -37,6 +37,15 @@ void main() {
       home: PassengerRideEntry(enableMapTiles: false, tripStore: store),
     ));
     expect(find.byKey(const Key('passenger-entry-title')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-offline-vilnius-background')), findsOneWidget);
+    expect(find.descendant(
+      of: find.byKey(const Key('passenger-entry-transfer')),
+      matching: find.byIcon(Icons.directions_car_filled),
+    ), findsOneWidget);
+    expect(find.descendant(
+      of: find.byKey(const Key('passenger-entry-transfer')),
+      matching: find.byIcon(Icons.airport_shuttle),
+    ), findsNothing);
     expect(find.byKey(const Key('passenger-form')), findsNothing);
     await tester.tap(find.byKey(const Key('passenger-entry-taxi')));
     await tester.pumpAndSettle();

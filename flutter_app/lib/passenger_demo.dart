@@ -84,6 +84,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   int _addressGeneration = 0;
   String? _editingAddress;
   List<String> _addressSuggestions = const [];
+  String? _addressSearchError;
   final Map<String, LatLng> _resolvedAddresses = {};
   late final PassengerPreferencesStorage _preferencesStorage =
       widget.preferencesStorage ?? DevicePassengerPreferencesStorage();
@@ -198,6 +199,35 @@ class _PassengerDemoState extends State<PassengerDemo> {
   LatLng? _resolve(String address) =>
       _resolvedAddresses[address.trim()] ?? _places[address.trim()];
 
+  // Common Lithuanian/English names should work even when Photon is offline.
+  static const _addressAliases = <String, String>{
+    'vilnius airport': 'Аэропорт Вильнюса',
+    'vno': 'Аэропорт Вильнюса',
+    'vilniaus oro uostas': 'Аэропорт Вильнюса',
+    'vilnius': 'Вильнюс',
+    'vilnius city': 'Вильнюс',
+    'kaunas': 'Каунас',
+    'klaipeda': 'Клайпеда',
+    'klaipėda': 'Клайпеда',
+    'palanga': 'Паланга',
+    'trakai': 'Тракай',
+    'warsaw': 'Варшава',
+    'warszawa': 'Варшава',
+  };
+
+  List<String> _localAddressMatches(String query) {
+    if (query.isEmpty) return const [];
+    final needle = query.toLowerCase();
+    final results = <String>{};
+    for (final name in _places.keys) {
+      if (name.toLowerCase().contains(needle)) results.add(name);
+    }
+    for (final entry in _addressAliases.entries) {
+      if (entry.key.contains(needle)) results.add(entry.value);
+    }
+    return results.take(5).toList();
+  }
+
   void _addressChanged(String side) {
     _addressTimer?.cancel();
     final query = (side == 'from' ? _from.text : _to.text).trim();
@@ -207,9 +237,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _roadPoints = const [];
       _routeInfo = '';
       _editingAddress = side;
-      _addressSuggestions = _places.keys
-        .where((x) => x.toLowerCase().contains(query.toLowerCase()))
-        .take(5).toList();
+      _addressSuggestions = _localAddressMatches(query);
+      _addressSearchError = null;
     });
     ++_addressGeneration;
     if (query.length < 3 || !widget.enableMapTiles) return;
@@ -223,7 +252,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
         });
         final req = await client.getUrl(uri).timeout(const Duration(seconds: 6));
         final res = await req.close().timeout(const Duration(seconds: 6));
-        if (res.statusCode != 200) return;
+        if (res.statusCode != 200) {
+          throw HttpException('Photon HTTP ${res.statusCode}');
+        }
         final payload = jsonDecode(await utf8.decoder.bind(res).join()
           .timeout(const Duration(seconds: 6))) as Map<String, dynamic>;
         final found = <String>[];
@@ -241,10 +272,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
           found.add(name);
         }
         if (mounted && current == _addressGeneration && _editingAddress == side) {
-          setState(() => _addressSuggestions = found);
+          setState(() {
+            _addressSuggestions = {..._localAddressMatches(query), ...found}.take(5).toList();
+            _addressSearchError = null;
+          });
         }
       } catch (_) {
-        // Local city suggestions remain usable without external search.
+        // Preserve offline suggestions and show a diagnostic instead of silence.
+        if (mounted && current == _addressGeneration && _editingAddress == side) {
+          setState(() => _addressSearchError =
+              'Поиск адресов временно недоступен. Проверь интернет; популярные направления доступны.');
+        }
       } finally {
         client?.close(force: true);
       }
@@ -302,6 +340,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _from.text = label;
       _editingAddress = null;
       _addressSuggestions = const [];
+      _addressSearchError = null;
       _route = '';
       _roadPoints = const [];
       _routeInfo = '';
@@ -325,9 +364,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   }
 
   Widget _addressSuggestionsWidget(String side) {
-    if (_editingAddress != side || _addressSuggestions.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (_editingAddress != side) return const SizedBox.shrink();
     return Column(children: [
       for (var i = 0; i < _addressSuggestions.length; i++)
         ListTile(
@@ -336,6 +373,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
           leading: const Icon(Icons.place_outlined),
           title: Text(_addressSuggestions[i], maxLines: 2),
           onTap: () => _selectAddress(_addressSuggestions[i], side),
+        ),
+      if (_addressSearchError != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Text(_addressSearchError!,
+              key: const Key('passenger-address-search-error'),
+              style: const TextStyle(fontSize: 12, color: Colors.orange)),
         ),
     ]);
   }

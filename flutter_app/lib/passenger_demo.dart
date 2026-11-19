@@ -743,7 +743,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         options: MapOptions(
                           initialCenter: startMap,
                           initialZoom: mapZoom,
-                          backgroundColor: const Color(0xFF1A2A34),
+                          backgroundColor: _nightMap
+                              ? const Color(0xFF101B2B)
+                              : const Color(0xFFE0EAF0),
                         ),
                         children: [
                           TileLayer(
@@ -837,9 +839,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       top: 8,
                       right: 8,
                       child: Material(
-                        color: const Color(0xE8172535),
+                        color: const Color(0xF0172535),
                         borderRadius: BorderRadius.circular(12),
-                        child: IconButton(
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Text(_nightMap ? 'НОЧЬ' : 'ДЕНЬ',
+                            key: const Key('passenger-map-theme-status'),
+                            style: const TextStyle(
+                              color: Color(0xFFDDC184),
+                              fontSize: 12, fontWeight: FontWeight.bold)),
+                          IconButton(
                           key: const Key('passenger-map-day-night'),
                           tooltip: _nightMap ? 'Дневная карта' : 'Ночная карта',
                           icon: Icon(_nightMap ? Icons.wb_sunny_outlined
@@ -851,7 +859,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             _mapTilesFailed = false;
                             _tileRetry++;
                           }),
-                        ),
+                          ),
+                        ]),
                       ),
                     ),
                   ],

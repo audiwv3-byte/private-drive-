@@ -16,7 +16,7 @@ void main() {
     expect(privateDriveWazeAppUri.host, isEmpty);
   });
 
-  testWidgets('Offline entry opens passenger preview; booking stays disabled',
+  testWidgets('Offline entry requires taxi or transfer choice before booking',
       (tester) async {
     expect(apiBaseUrl, isEmpty);
     await tester.pumpWidget(const PrivateDriveApp());
@@ -40,23 +40,8 @@ void main() {
     expect(find.byType(PassengerDemo), findsOneWidget);
     expect(find.text('Трансфер · выбранный тип поездки'), findsOneWidget);
     expect(find.byKey(const Key('passenger-ride-type')), findsNothing);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('passenger-to')),
-      200,
-      scrollable: find.byType(Scrollable).last,
-    );
-    expect(find.text('Откуда'), findsOneWidget);
-    expect(find.text('Куда'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('passenger-book-disabled')),
-      250,
-      scrollable: find.byType(Scrollable).last,
-    );
-    expect(find.text('Создать тестовую заявку · без сервера'), findsOneWidget);
-    final booking = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Создать тестовую заявку · без сервера'),
-    );
-    expect(booking.onPressed, isNull);
+    expect(find.byKey(const Key('passenger-form')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-map')), findsOneWidget);
     expect(find.byType(PilotDemo), findsNothing);
   });
 

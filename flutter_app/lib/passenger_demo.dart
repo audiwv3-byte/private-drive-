@@ -245,20 +245,25 @@ class _PassengerDemoState extends State<PassengerDemo> {
     ++_addressGeneration;
     if (query.length < 3 || !widget.enableMapTiles) return;
     final current = _addressGeneration;
-    _addressTimer = Timer(const Duration(milliseconds: 450), () async {
+    // The public Photon demo throttles rapid requests. Do not flood it
+    // while someone enters each letter of a street or house number.
+    _addressTimer = Timer(const Duration(milliseconds: 1100), () async {
       HttpClient? client;
       try {
-        client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+        client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+        client.userAgent = 'PRIVATE-DRIVE-Demo/0.2.20 (eurobaltictransfer@gmail.com)';
         final uri = Uri.https('photon.komoot.io', '/api/', {
           'q': query, 'limit': '5', 'lang': 'en',
+          'lat': '54.6872', 'lon': '25.2797',
         });
-        final req = await client.getUrl(uri).timeout(const Duration(seconds: 6));
-        final res = await req.close().timeout(const Duration(seconds: 6));
+        final req = await client.getUrl(uri).timeout(const Duration(seconds: 9));
+        req.headers.set(HttpHeaders.acceptHeader, 'application/json');
+        final res = await req.close().timeout(const Duration(seconds: 9));
         if (res.statusCode != 200) {
-          throw HttpException('Photon HTTP ${res.statusCode}');
+          throw HttpException('Photon HTTP ${res.statusCode}', uri: uri);
         }
         final payload = jsonDecode(await utf8.decoder.bind(res).join()
-          .timeout(const Duration(seconds: 6))) as Map<String, dynamic>;
+          .timeout(const Duration(seconds: 9))) as Map<String, dynamic>;
         final found = <String>[];
         for (final raw in (payload['features'] as List<dynamic>? ?? const [])) {
           final feature = raw as Map<String, dynamic>;
@@ -275,15 +280,23 @@ class _PassengerDemoState extends State<PassengerDemo> {
         }
         if (mounted && current == _addressGeneration && _editingAddress == side) {
           setState(() {
-            _addressSuggestions = {..._localAddressMatches(query), ...found}.take(5).toList();
+            _addressSuggestions = {..._localAddressMatches(query), ...found}
+                .take(5).toList();
             _addressSearchError = null;
           });
         }
-      } catch (_) {
-        // Preserve offline suggestions and show a diagnostic instead of silence.
+      } catch (error) {
+        debugPrint('PD_ADDRESS_LOOKUP_FAILED: ${error.runtimeType}');
         if (mounted && current == _addressGeneration && _editingAddress == side) {
-          setState(() => _addressSearchError =
-              'Поиск адресов временно недоступен. Проверь интернет; популярные направления доступны.');
+          setState(() {
+            // A lookup failure must not hide working offline destinations.
+            if (_addressSuggestions.isEmpty) {
+              _addressSearchError = 'Поиск улиц и домов временно недоступен. '
+                  'Проверь подключение и нажми «Повторить поиск».';
+            } else {
+              _addressSearchError = null;
+            }
+          });
         }
       } finally {
         client?.close(force: true);
@@ -389,9 +402,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
       if (_addressSearchError != null)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: Text(_addressSearchError!,
+          child: Column(children: [
+            Text(_addressSearchError!,
               key: const Key('passenger-address-search-error'),
               style: const TextStyle(fontSize: 12, color: Colors.orange)),
+            TextButton.icon(
+              key: const Key('passenger-retry-address-search'),
+              onPressed: () => _addressChanged(side),
+              icon: const Icon(Icons.refresh),
+              label: Text(pdLabel(context, 'Повторить поиск')),
+            ),
+          ]),
         ),
     ]);
   }

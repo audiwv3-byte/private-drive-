@@ -546,7 +546,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
     try {
       final uri = Uri.parse(
-        'https://a.basemaps.cartocdn.com/voyager/10/584/328.png');
+        'https://tile.openstreetmap.org/10/583/325.png');
       final req = await client.getUrl(uri).timeout(const Duration(seconds: 7));
       req.headers.set(HttpHeaders.userAgentHeader,
           'PRIVATE DRIVE DEMO Android map diagnostic');

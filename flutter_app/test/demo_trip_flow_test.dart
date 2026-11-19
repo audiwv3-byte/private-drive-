@@ -163,6 +163,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('route-kaunas')),
       160,
@@ -189,6 +191,8 @@ void main() {
     expect(find.text('Заявка создана · ожидает назначения'), findsOneWidget);
     expect(tester.widget<FilledButton>(book).onPressed, isNull);
 
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('Заявка создана · ожидает назначения'), findsOneWidget);

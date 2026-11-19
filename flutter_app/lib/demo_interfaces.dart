@@ -494,7 +494,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   Timer? _waitingTicker;
   DateTime? _waitingStartedAt;
   Duration _waitingElapsed = Duration.zero;
-  String? _waitingTripId;
+  DemoTrip? _waitingTripId;
 
   Duration get _waitingTotal => _waitingElapsed +
       (_waitingStartedAt == null ? Duration.zero :
@@ -592,7 +592,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   void _onTripChanged() {
     if (!mounted) return;
     final store = widget.tripStore;
-    final tripId = store?.trip?.id;
+    final tripId = store?.trip;
     if (tripId != _waitingTripId) {
       _waitingTripId = tripId;
       _waitingElapsed = Duration.zero;

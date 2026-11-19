@@ -11,7 +11,7 @@ class PdLanguage extends ChangeNotifier {
   Future<void> restore() async {
     try {
       final stored = await SharedPreferencesAsync().getString(_storageKey);
-      if (stored == 'RU' || stored == 'LT' || stored == 'EN') {
+      if (stored != null && (stored == 'RU' || stored == 'LT' || stored == 'EN')) {
         set(stored, persist: false);
       }
     } catch (_) {

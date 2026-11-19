@@ -52,6 +52,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _coffee = false;
   bool _nightMap = false;
   bool _mapTilesFailed = false;
+  bool _useBackupTiles = false;
+  String? _lastTileError;
   String? _mapNetworkError;
   bool _checkingMapNetwork = false;
   int _mapTileErrors = 0;
@@ -564,12 +566,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
         _mapTilesFailed = false;
       });
     } on Exception catch (error) {
+      // A direct OSM probe may fail on the device even when CARTO works.
+      // Switch providers rather than covering an otherwise usable map.
       if (mounted) setState(() {
-        _mapNetworkError = error is HttpException
-            ? 'HTTP-ошибка сервера карты: ${error.message}'
-            : error is TimeoutException
-                ? 'Сервер карты не ответил вовремя'
-                : 'Нет доступа к серверу карты: ${error.runtimeType}';
+        _lastTileError = 'Сеть: ${error.runtimeType}';
+        if (!_useBackupTiles) {
+          _useBackupTiles = true;
+          _mapTileErrors = 0;
+          _tileRetry++;
+        }
       });
     } finally {
       client.close(force: true);
@@ -582,6 +587,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _mapTilesFailed = false;
       _mapNetworkError = null;
       _mapTileErrors = 0;
+      _useBackupTiles = false;
+      _lastTileError = null;
       _tileRetry++;
     });
     unawaited(_checkMapNetwork());
@@ -624,6 +631,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
         ? LatLng((start.latitude + finish.latitude) / 2,
             (start.longitude + finish.longitude) / 2)
         : start ?? const LatLng(54.6872, 25.2797);
+    final mapGeneration = _tileRetry;
     final mapZoom = start != null && finish != null
         ? (start.longitude - finish.longitude).abs() > 2 ? 6.3 : 8.2
         : 10.0;
@@ -756,7 +764,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             tileProvider: demoTileProvider(),
                             urlTemplate: _nightMap
                                 ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                : _useBackupTiles
+                                  ? 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+                                  : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             fallbackUrl: _nightMap
                                 ? 'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
                                 : null,
@@ -764,11 +774,22 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             errorTileCallback: (tile, error, stackTrace) {
                               debugPrint('PD_PASSENGER_TILE_ERROR: $error');
                               WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (!mounted || _mapTilesFailed) return;
+                                if (!mounted || _mapTilesFailed ||
+                                    mapGeneration != _tileRetry) return;
                                 setState(() {
+                                  _lastTileError = error.toString();
                                   _mapTileErrors++;
                                   if (_mapTileErrors >= 3) {
-                                    _mapTilesFailed = true;
+                                    if (!_nightMap && !_useBackupTiles) {
+                                      // OSM can fail on real Android networks;
+                                      // retry automatically with CARTO light.
+                                      _useBackupTiles = true;
+                                      _mapTileErrors = 0;
+                                      _mapNetworkError = null;
+                                      _tileRetry++;
+                                    } else {
+                                      _mapTilesFailed = true;
+                                    }
                                   }
                                 });
                               });
@@ -814,7 +835,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                 const SizedBox(height: 8),
                                 const Text('Карта временно недоступна',
                                   key: Key('passenger-map-load-error')),
-                                Text(_mapNetworkError ??
+                                Text(_mapNetworkError ?? _lastTileError ??
                                     'Не удалось показать тайлы карты',
                                   key: const Key('passenger-map-error-details'),
                                   textAlign: TextAlign.center,
@@ -860,6 +881,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             _nightMap = !_nightMap;
                             _mapTileErrors = 0;
                             _mapTilesFailed = false;
+                            _lastTileError = null;
                             _tileRetry++;
                           }),
                           ),

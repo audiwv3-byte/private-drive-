@@ -11,6 +11,7 @@ import 'app_language.dart';
 import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
 import 'pilot_sound_settings.dart';
+import 'pilot_payment_settings.dart';
 import 'pilot_offer_tone.dart';
 import 'pd_slide_to_confirm.dart';
 import 'pilot_passenger_chat_demo.dart';
@@ -944,6 +945,18 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
               Navigator.pop(context);
               Navigator.of(context).push(MaterialPageRoute<void>(
                 builder: (_) => const PilotSoundSettingsPage()));
+            },
+          ),
+          ListTile(
+            key: const Key('pilot-drawer-cash-settings'),
+            leading: const Icon(Icons.payments_outlined),
+            title: const Text('Настройки оплаты'),
+            subtitle: const Text('Принимать наличные: включить / выключить'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => PilotPaymentSettingsPage(
+                  tripStore: widget.tripStore)));
             },
           ),
           ListTile(

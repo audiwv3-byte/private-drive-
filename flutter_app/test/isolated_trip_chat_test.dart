@@ -15,6 +15,7 @@ class SyntheticChatServer {
   String status = 'assigned';
   final Map<String, List<Map<String, dynamic>>> history = {};
   final Map<String, Map<String, dynamic>> acceptedIds = {};
+  bool appendInvalidMessage = false;
 
   RemoteTripGateway role(String name) => SyntheticChatGateway(this, name);
 
@@ -41,8 +42,12 @@ class SyntheticChatGateway extends RemoteTripGateway {
     }
     if (path.contains('/messages?after=')) {
       final after = int.parse(path.split('after=').last);
-      return {'messages': server.messages
-          .where((item) => (item['seq'] as int) > after).toList()};
+      final received = server.messages
+          .where((item) => (item['seq'] as int) > after).toList();
+      if (server.appendInvalidMessage) {
+        received.add({'seq': after + 999, 'role': 'unknown', 'body': 'bad'});
+      }
+      return {'messages': received};
     }
     throw StateError('Unexpected GET $path');
   }
@@ -161,6 +166,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Пилот: Только старый заказ'), findsNothing);
     expect(server.messages, isEmpty);
+  });
+
+  testWidgets('Malformed batch does not skip valid messages on retry',
+      (tester) async {
+    final server = SyntheticChatServer();
+    await tester.pumpWidget(MaterialApp(home: Scaffold(
+      body: IsolatedTripChat(
+        expectedRole: 'passenger',
+        gateway: server.role('passenger'),
+        pollInterval: const Duration(hours: 1),
+      ),
+    )));
+    await tester.pumpAndSettle();
+    server.messages.add({
+      'seq': 1, 'role': 'pilot', 'body': 'После сбоя получено',
+      'at': 'test',
+    });
+    server.appendInvalidMessage = true;
+    await tester.tap(find.byKey(const Key('isolated-chat-refresh')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('isolated-chat-error')), findsOneWidget);
+    expect(find.text('Пилот: После сбоя получено'), findsNothing);
+
+    server.appendInvalidMessage = false;
+    await tester.tap(find.byKey(const Key('isolated-chat-refresh')));
+    await tester.pumpAndSettle();
+    expect(find.text('Пилот: После сбоя получено'), findsOneWidget);
+    expect(find.byKey(const Key('isolated-chat-error')), findsNothing);
   });
 
   testWidgets('Pilot test-server chat opens without local demo assignment',

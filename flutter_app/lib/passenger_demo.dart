@@ -721,21 +721,30 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 value: _roundTrip,
                 onChanged: (v) => setState(() => _roundTrip = v),
               ),
-              const Text(
-                'Фиксированные тарифы Sedan без скидки: '
-                'Вильнюс → Каунас 130 €, обратно 90 €, '
-                'Вильнюс ↔ аэропорт Вильнюса 40 €. '
-                'Вильнюс — Каунас туда и обратно 200 €. '
-                'Другие маршруты — по тарифной таблице или по запросу.',
-                key: Key('passenger-transfer-tariffs'),
-                style: TextStyle(fontSize: 12),
+              Text(
+                pdTr(context,
+                  'Фиксированные тарифы Sedan без скидки: '
+                  'Вильнюс → Каунас 130 €, обратно 90 €, '
+                  'Вильнюс ↔ аэропорт Вильнюса 40 €. '
+                  'Вильнюс — Каунас туда и обратно 200 €. '
+                  'Другие маршруты — по тарифной таблице или по запросу.',
+                  'Fiksuotos Sedan kainos be nuolaidos: Vilnius → Kaunas 130 €, '
+                  'atgal 90 €, Vilnius ↔ Vilniaus oro uostas 40 €. '
+                  'Vilnius–Kaunas į abi puses 200 €. Kiti maršrutai pagal kainoraštį arba užklausą.',
+                  'Fixed Sedan fares with no discount: Vilnius → Kaunas €130, '
+                  'return €90, Vilnius ↔ Vilnius Airport €40. '
+                  'Vilnius–Kaunas round trip €200. Other routes per price list or on request.'),
+                key: const Key('passenger-transfer-tariffs'),
+                style: const TextStyle(fontSize: 12),
               ),
             ] else
-              const Text(
-                'Такси: Вильнюс → Каунас 90 €. '
-                'Остальные направления — по запросу.',
-                key: Key('passenger-taxi-tariffs'),
-                style: TextStyle(fontSize: 12),
+              Text(
+                pdTr(context,
+                  'Такси: Вильнюс → Каунас 90 €. Остальные направления — по запросу.',
+                  'Taksi: Vilnius → Kaunas 90 €. Kitos kryptys pagal užklausą.',
+                  'Taxi: Vilnius → Kaunas €90. Other destinations on request.'),
+                key: const Key('passenger-taxi-tariffs'),
+                style: const TextStyle(fontSize: 12),
               ),
             const SizedBox(height: 12),
             SizedBox(
@@ -992,9 +1001,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ],
             ),
             _addressSuggestionsWidget('to'),
-            const Text('Адресные подсказки запрашиваются у внешнего сервиса Photon. '
+            Text(pdTr(context,
+              'Адресные подсказки запрашиваются у внешнего сервиса Photon. '
               'Не вводи конфиденциальные адреса в демоверсии.',
-              style: TextStyle(fontSize: 11)),
+              'Adreso pasiūlymai gaunami iš išorinės Photon paslaugos. '
+              'Demo versijoje neįveskite konfidencialių adresų.',
+              'Address suggestions come from the external Photon service. '
+              'Do not enter confidential addresses in the demo.'),
+              style: const TextStyle(fontSize: 11)),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -1004,7 +1018,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                     onPressed: _pickDate,
                     icon: const Icon(Icons.calendar_today),
                     label: Text(_date == null
-                        ? 'Дата'
+                        ? pdLabel(context, 'Дата')
                         : '${_date!.day.toString().padLeft(2, '0')}.${_date!.month.toString().padLeft(2, '0')}.${_date!.year}'),
                   ),
                 ),
@@ -1112,10 +1126,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 value: _luggageHelp,
                 onChanged: (v) => setState(() => _luggageHelp = v ?? false),
               ),
-              const Padding(
-                padding: EdgeInsets.only(top: 12, bottom: 8),
-                child: Text('Комфорт и музыка в дороге',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Text(pdLabel(context, 'Комфорт и музыка в дороге'),
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
               DropdownButtonFormField<String>(
                 key: ValueKey('passenger-radio-station-$_radioStation'),
@@ -1144,7 +1158,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                     controller: _favoriteTracks[i],
                     maxLength: 100,
                     decoration: InputDecoration(
-                      labelText: 'Любимый трек ${i + 1} · исполнитель и название',
+                      labelText: pdTr(context,
+                        'Любимый трек ${i + 1} · исполнитель и название',
+                        'Mėgstama daina ${i + 1} · atlikėjas ir pavadinimas',
+                        'Favorite track ${i + 1} · artist and title'),
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -1157,8 +1174,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   border: OutlineInputBorder(),
                 ),
                 items: [
-                  const DropdownMenuItem<double?>(
-                    value: null, child: Text('На усмотрение пилота')),
+                  DropdownMenuItem<double?>(
+                    value: null, child: Text(pdLabel(context, 'На усмотрение пилота')),
                   for (var temp = 18; temp <= 26; temp++)
                     DropdownMenuItem<double?>(
                       value: temp.toDouble(), child: Text('$temp °C')),
@@ -1208,9 +1225,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 color: gold, fontWeight: FontWeight.bold, fontSize: 16,
               ),
             ),
-            const Text('Предпросмотр согласованных тарифов. '
-              'Окончательная цена назначается диспетчером до оплаты.',
-              style: TextStyle(fontSize: 12)),
+            Text(pdTr(context,
+              'Предпросмотр согласованных тарифов. Окончательная цена назначается диспетчером до оплаты.',
+              'Suderintų tarifų peržiūra. Galutinę kainą dispečeris patvirtins prieš apmokėjimą.',
+              'Fare preview. Dispatcher confirms final price before payment.'),
+              style: const TextStyle(fontSize: 12)),
             const SizedBox(height: 12),
             Text(
               'Выбрано: $_rideType · ${_route.isNotEmpty ? _route : 'свой маршрут'} · $_payment',
@@ -1218,7 +1237,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ),
             const SizedBox(height: 12),
             if (widget.tripStore != null) ...[
-              Text(widget.tripStore!.statusLabel,
+              Text(pdLabel(context, widget.tripStore!.statusLabel),
                   key: const Key('passenger-trip-status')),
               if (widget.tripStore!.trip != null)
                 FilledButton.icon(
@@ -1235,8 +1254,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-book-disabled'),
               onPressed: _canCreateLocalTrip ? _createLocalTrip : null,
               child: Text(widget.tripStore == null
-                  ? 'Заказать поездку — недоступно в демоверсии'
-                  : 'Создать тестовую заявку · без сервера'),
+                  ? pdTr(context, 'Заказать поездку — недоступно в демоверсии',
+                      'Užsakyti kelionę — demo versijoje nepasiekiama',
+                      'Book ride — unavailable in demo')
+                  : pdTr(context, 'Создать тестовую заявку · без сервера',
+                      'Sukurti bandomąjį užsakymą · be serverio',
+                      'Create demo booking · no server')),
             ),
             const SizedBox(height: 12),
           ],

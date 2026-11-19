@@ -773,27 +773,25 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
             FlutterMap(
               key: const Key('pilot-map-surface'),
               mapController: _map,
-              options: const MapOptions(
+              options: MapOptions(
                 initialCenter: vilnius,
                 initialZoom: 14,
+                backgroundColor: _nightMap
+                  ? const Color(0xFF101B2B)
+                  : const Color(0xFFE0EAF0),
               ),
               children: [
                 if (widget.loadMapTiles)
-                  ColorFiltered(
-                    colorFilter: _nightMap
-                        ? const ColorFilter.matrix(<double>[
-                            -0.78, 0, 0, 0, 211,
-                            0, -0.78, 0, 0, 211,
-                            0, 0, -0.78, 0, 211,
-                            0, 0, 0, 1, 0,
-                          ])
-                        : const ColorFilter.mode(
-                            Colors.transparent, BlendMode.dst),
-                    child: TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'lt.privatedrive.privateDrive',
-                      maxNativeZoom: 19,
-                    ),
+                  TileLayer(
+                    key: const Key('pilot-map-tiles'),
+                    urlTemplate: _nightMap
+                      ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+                      : 'https://a.basemaps.cartocdn.com/voyager/{z}/{x}/{y}.png',
+                    fallbackUrl: _nightMap
+                      ? 'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'lt.privatedrive.private_drive.demo',
+                    maxNativeZoom: 19,
                   ),
                 if (_navigatingActiveTrip && _pickupRoadPoints.isNotEmpty)
                   PolylineLayer(
@@ -855,6 +853,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                 const RichAttributionWidget(
                   attributions: [
                     TextSourceAttribution('© OpenStreetMap contributors'),
+                    TextSourceAttribution('© CARTO'),
                   ],
                 ),
               ],
@@ -901,16 +900,22 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   top: 120,
                   left: 12,
                   child: Material(
-                    color: const Color(0xE8172535),
+                    color: const Color(0xF0172535),
                     borderRadius: BorderRadius.circular(14),
-                    child: IconButton(
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(_nightMap ? 'НОЧЬ' : 'ДЕНЬ',
+                        key: const Key('pilot-map-theme-status'),
+                        style: const TextStyle(color: Color(0xFFDDC184),
+                          fontSize: 12, fontWeight: FontWeight.bold)),
+                      IconButton(
                       key: const Key('pilot-map-day-night'),
                       tooltip: _nightMap ? 'Дневная карта' : 'Ночная карта',
                       icon: Icon(_nightMap ? Icons.wb_sunny_outlined
                         : Icons.dark_mode_outlined,
                         color: const Color(0xFFDDC184), size: 22),
                       onPressed: () => setState(() => _nightMap = !_nightMap),
-                    ),
+                      ),
+                    ]),
                   ),
                 ),
                 Positioned(

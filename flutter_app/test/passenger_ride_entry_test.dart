@@ -6,6 +6,40 @@ import 'package:private_drive/passenger_ride_entry.dart';
 import 'package:private_drive/app_language.dart';
 
 void main() {
+  testWidgets('Passenger language picker changes all screens without returning to login',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    addTearDown(() => pdLanguage.set('RU', persist: false));
+    pdLanguage.set('RU', persist: false);
+    await tester.pumpWidget(PdLanguageScope(
+      language: pdLanguage,
+      child: MaterialApp(
+        home: PassengerRideEntry(enableMapTiles: false, tripStore: store),
+      ),
+    ));
+    await tester.tap(find.byKey(const Key('passenger-global-language-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('passenger-select-language-LT')));
+    await tester.pumpAndSettle();
+    expect(find.text('Pasirink kelionės tipą'), findsOneWidget);
+    expect(pdLanguage.value, 'LT');
+
+    await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
+    await tester.pumpAndSettle();
+    expect(find.text('Bandomasis kelionės užsakymas'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('passenger-global-language-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('passenger-select-language-EN')));
+    await tester.pumpAndSettle();
+    expect(find.text('Demo trip booking'), findsOneWidget);
+    expect(pdLanguage.value, 'EN');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Choose ride type'), findsOneWidget);
+  });
+
   testWidgets('Selected language persists across ride entry and booking route',
       (tester) async {
     final store = DemoTripStore();

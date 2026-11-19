@@ -264,7 +264,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
-                  'Версия 0.2.19 · сборка 2026111919 · ДЕМО',
+                  'Версия 0.2.20 · сборка 2026111920 · ДЕМО',
                   key: Key('app-demo-version'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),

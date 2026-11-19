@@ -40,7 +40,19 @@ void main() {
       home: PilotDemo(enableMapTiles: false, tripStore: store)));
     await tester.tap(find.byKey(const Key('pilot-open-drawer')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('pilot-drawer-cash-settings')));
+    // The drawer is scrollable: new pilot-only menu entries can move
+    // payment settings below the initial viewport without hiding the feature.
+    final cashItem = find.byKey(const Key('pilot-drawer-cash-settings'));
+    await tester.scrollUntilVisible(
+      cashItem,
+      120,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('pilot-navigation-drawer')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(cashItem);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pilot-accept-cash')), findsOneWidget);
     final toggle = find.byKey(const Key('pilot-accept-cash'));

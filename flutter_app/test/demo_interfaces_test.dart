@@ -56,7 +56,7 @@ void main() {
     expect(find.byKey(const Key('pilot-open-waze')), findsOneWidget);
     expect(find.text('Waze'), findsOneWidget);
     expect(find.text('Нет активной поездки'), findsOneWidget);
-    expect(find.textContaining('Свайп вправо · К пассажиру'), findsOneWidget);
+    expect(find.text('К пассажиру'), findsOneWidget);
     expect(find.text('Откуда'), findsNothing);
     expect(find.text('Куда'), findsNothing);
     expect(find.textContaining('Заказать поездку'), findsNothing);
@@ -70,7 +70,7 @@ void main() {
       Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(find.text('Едем к пассажиру'), findsOneWidget);
-    expect(find.textContaining('Свайп вправо · В путь'), findsOneWidget);
+    expect(find.text('В путь'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('pilot-pause-trip')));
     await tester.pump();
@@ -143,9 +143,8 @@ void main() {
     expect(map.camera.center.longitude, closeTo(first.longitude, 0.0001));
     final marker = tester.widget<Icon>(
         find.byKey(const Key('pilot-location-marker')));
-    expect(marker.color, const Color(0xFF172B3F));
-    expect(marker.icon, Icons.navigation);
-    expect(marker.color, const Color(0xFFB6FF36));
+    expect(marker.icon, Icons.local_taxi_rounded);
+    expect(marker.color, const Color(0xFFDDC184));
 
     // Panning should not silently disable GPS follow on later fixes.
     await tester.drag(find.byKey(const Key('pilot-map-surface')),

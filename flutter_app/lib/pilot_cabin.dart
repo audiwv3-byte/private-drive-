@@ -151,7 +151,7 @@ class _PilotCabinState extends State<PilotCabin> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          if (!_onLine) const VilniusEveningBackdrop(),
+          const VilniusEveningBackdrop(),
           SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -160,22 +160,6 @@ class _PilotCabinState extends State<PilotCabin> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'КАБИНЕТ ПИЛОТА',
-                    style: TextStyle(
-                      color: Color(0xFFDDC184),
-                      letterSpacing: 2,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 20,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    _onLine ? 'На линии · демо' : 'Не на линии · демо',
-                    key: const Key('pilot-line-status'),
-                    style: TextStyle(color: accent, fontSize: 18),
-                  ),
-                  const SizedBox(height: 14),
                   const SizedBox(
                     key: Key('pilot-line-transparent-logo'),
                     width: 112,
@@ -185,7 +169,23 @@ class _PilotCabinState extends State<PilotCabin> {
                       transparentBackground: true,
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'КАБИНЕТ ПИЛОТА',
+                    style: TextStyle(
+                      color: Color(0xFFDDC184),
+                      letterSpacing: 2,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _onLine ? 'На линии · демо' : 'Не на линии · демо',
+                    key: const Key('pilot-line-status'),
+                    style: TextStyle(color: accent, fontSize: 18),
+                  ),
+                  const SizedBox(height: 20),
                   Semantics(
                     button: true,
                     label: _onLine ? 'Уйти с линии' : 'Выйти на линию',

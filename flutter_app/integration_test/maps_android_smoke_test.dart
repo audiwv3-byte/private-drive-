@@ -69,12 +69,18 @@ void main() {
        required double yStart, required double yEnd}) async {
     final boundary = frameKey.currentContext!.findRenderObject()
         as RenderRepaintBoundary;
-    final image = await boundary.toImage(pixelRatio: 1);
+    final image = await boundary.toImage(pixelRatio: 1).timeout(
+      const Duration(seconds: 30),
+      onTimeout: () => throw TimeoutException('Android screenshot capture timed out'),
+    );
     // ignore: avoid_print
     print('MAP_RENDER_SAMPLE: surface=${image.width}x${image.height} '
         'mapRect=$mapRect');
     try {
-      final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw TimeoutException('Android screenshot pixel read timed out'),
+      );
       if (bytes == null) throw StateError('Screenshot pixel data unavailable');
       final raw = bytes.buffer.asUint8List();
       final colors = <int>{};

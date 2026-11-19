@@ -26,7 +26,7 @@ void main() {
     await tester.pump();
     expect(store.paused, isTrue);
     expect(find.byKey(const Key('pilot-paid-wait-timer')), findsOneWidget);
-    expect(find.textContaining('Платное ожидание'), findsOneWidget);
+    expect(find.textContaining('без начисления за посадку'), findsOneWidget);
     expect(find.text('Продолжить'), findsOneWidget);
     // Show elapsed time only; do not invent a charge or hourly rate.
     await tester.tap(stop);

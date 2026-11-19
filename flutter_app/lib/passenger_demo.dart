@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'permissions_onboarding.dart';
+import 'message_voice.dart';
 import 'app_language.dart';
 import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
@@ -21,7 +22,8 @@ import 'package:latlong2/latlong.dart' show LatLng;
 class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
       this.preferencesStorage, this.initialRideType = 'Трансфер',
-      this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController});
+      this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController,
+      this.onIncomingMessageVoice});
 
   final bool enableMapTiles;
   final String initialRideType;
@@ -30,6 +32,8 @@ class PassengerDemo extends StatefulWidget {
   final DemoTripStore? tripStore;
   final Future<LatLng> Function()? currentPositionLoader;
   final MapController? passengerMapController;
+  /// A test hook; production reads a short TTS phrase for a new pilot message.
+  final VoidCallback? onIncomingMessageVoice;
   final PassengerPreferencesStorage? preferencesStorage;
 
   @override
@@ -366,6 +370,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
     if (!mounted) return;
     final messages = widget.tripStore?.pilotChatMessages ?? const <String>[];
     if (messages.length > _knownPilotMessageCount) {
+      if (widget.onIncomingMessageVoice != null) {
+        widget.onIncomingMessageVoice!();
+      } else {
+        unawaited(PdMessageVoice.announce('пилота'));
+      }
       final latest = messages.last;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;

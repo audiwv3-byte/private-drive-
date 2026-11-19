@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:private_drive/demo_map_tile_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/demo_trip_store.dart';
@@ -72,6 +73,48 @@ void main() {
     await tester.tap(find.byKey(const Key('passenger-chat-send')));
     await tester.pump();
     expect(store.passengerChatMessages, ['Вижу автомобиль']);
+  });
+
+  testWidgets('GPS button reads device fix and uses it as pickup',
+      (tester) async {
+    var requests = 0;
+    await tester.pumpWidget(MaterialApp(
+      home: PassengerDemo(
+        enableMapTiles: false,
+        currentPositionLoader: () async {
+          requests++;
+          return const LatLng(54.700001, 25.300002);
+        },
+      ),
+    ));
+    expect(requests, 0, reason: 'GPS must not start without a tap');
+    await tester.tap(find.byKey(const Key('passenger-locate-me')));
+    await tester.pumpAndSettle();
+    expect(requests, 1);
+    expect(find.byKey(const Key('passenger-use-current-as-pickup')),
+        findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const Key('passenger-use-current-as-pickup')));
+    await tester.tap(find.byKey(const Key('passenger-use-current-as-pickup')));
+    await tester.pump();
+    expect(tester.widget<TextField>(
+      find.byKey(const Key('passenger-from'))).controller!.text,
+      '54.700001, 25.300002');
+  });
+
+  testWidgets('GPS errors are shown and do not invent passenger coordinates',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: PassengerDemo(
+        enableMapTiles: false,
+        currentPositionLoader: () async => throw StateError('no GPS'),
+      ),
+    ));
+    await tester.tap(find.byKey(const Key('passenger-locate-me')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('passenger-location-error')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-use-current-as-pickup')),
+      findsNothing);
   });
 
   testWidgets('Passenger menu opens from the top left without fake features',

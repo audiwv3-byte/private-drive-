@@ -673,6 +673,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       appBar: AppBar(
         title: Text(pdLabel(context, 'PRIVATE DRIVE · Пассажир')),
         actions: [
+          const PdLanguageMenu(),
           if (widget.tripStore != null)
             IconButton(
               key: const Key('passenger-orders-button'),

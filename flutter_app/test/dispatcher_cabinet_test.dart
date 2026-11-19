@@ -63,7 +63,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Я подъехал'), findsOneWidget);
     expect(find.text('Сейчас выйду'), findsOneWidget);
-    expect(find.textContaining('Только просмотр'), findsOneWidget);
+    expect(find.byKey(const Key('dispatcher-chat-input')), findsOneWidget);
     expect(store.pilotChatMessages, ['Я подъехал']);
     expect(store.passengerChatMessages, ['Сейчас выйду']);
   });

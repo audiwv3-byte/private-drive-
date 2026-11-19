@@ -319,7 +319,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final store = widget.tripStore;
     if (store == null) return;
     Navigator.push(context, MaterialPageRoute(
-      builder: (_) => PassengerOrdersDemo(tripStore: store)));
+      builder: (_) => PdPassengerLanguageScope(
+        child: PassengerOrdersDemo(tripStore: store))));
   }
 
   void _createLocalTrip() {
@@ -1257,8 +1258,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 FilledButton.icon(
                   key: const Key('passenger-manage-order'),
                   onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => PassengerOrdersDemo(
-                      tripStore: widget.tripStore!))),
+                    MaterialPageRoute(builder: (_) => PdPassengerLanguageScope(
+                      child: PassengerOrdersDemo(
+                        tripStore: widget.tripStore!)))),
                   icon: const Icon(Icons.receipt_long_outlined),
                   label: Text(pdLabel(context, 'Управление заказом · сообщения')),
                 ),

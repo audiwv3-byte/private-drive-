@@ -5,6 +5,7 @@ import 'package:private_drive/remote_sync_client.dart';
 import 'package:private_drive/demo_trip_store.dart';
 import 'package:private_drive/passenger_orders_demo.dart';
 import 'package:private_drive/pilot_passenger_chat_demo.dart';
+import 'package:private_drive/demo_interfaces.dart' show PilotDemo;
 
 const firstTripId = '11111111111111111111111111111111';
 const nextTripId = '22222222222222222222222222222222';
@@ -160,6 +161,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Пилот: Только старый заказ'), findsNothing);
     expect(server.messages, isEmpty);
+  });
+
+  testWidgets('Pilot test-server chat opens without local demo assignment',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    await tester.pumpWidget(MaterialApp(
+      home: PilotDemo(
+        tripStore: store,
+        enableMapTiles: false,
+        loadMapTiles: false,
+      ),
+    ));
+    await tester.tap(find.byKey(const Key('pilot-open-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('pilot-drawer-remote-chat')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('isolated-chat-pilot')), findsOneWidget);
+    expect(find.byKey(const Key('isolated-chat-connect')), findsOneWidget);
+    expect(store.trip, isNull);
   });
 
   testWidgets('Existing cabins expose role-specific remote test chat',

@@ -85,9 +85,10 @@ class ChatTests(unittest.TestCase):
         route = "/v1/trips/" + tid + "/messages"
         message = {"client_id": uuid.uuid4().hex, "text": "test"}
         self.assertEqual(self.req("POST", route, role="pilot", data=message)[0], 404)
-        self.assertEqual(self.req("GET", route)[0], 409)
-        self.assertEqual(self.req("POST", route, role="dispatcher", data=message)[0], 403)
-        self.assertEqual(self.req("GET", route, role="dispatcher")[0], 403)
+        self.assertEqual(self.req("GET", route)[0], 200)
+        self.assertEqual(self.req("POST", route, role="dispatcher", data=message)[0], 201)
+        self.assertEqual(self.req("GET", route, role="dispatcher")[0], 200)
+        self.assertEqual(self.req("GET", route, role="pilot")[0], 404)
         self.assertEqual(self.req("GET", route, token="invalid")[0], 401)
         self.assertEqual(self.req("POST", "/v1/trips/" + tid + "/assign",
             role="dispatcher", data={"pilot": "pilot_test", "version": 1})[0], 200)
@@ -102,7 +103,32 @@ class ChatTests(unittest.TestCase):
             self.assertEqual(self.req("POST", "/v1/trips/" + tid + "/action",
                 role="pilot", data={"action": "advance", "version": v})[0], 200)
         self.assertEqual(self.req("POST", route, role="pilot", data=message)[0], 409)
-        self.assertEqual(self.req("GET", route, role="passenger")[0], 409)
+        self.assertEqual(self.req("GET", route, role="passenger")[0], 200)
+        self.assertEqual(self.req("POST", route, role="passenger", data={
+            "client_id": uuid.uuid4().hex, "text": "поздно"})[0], 409)
+
+    def test_dispatcher_message_visible_to_owner_and_assigned_pilot(self):
+        status, created = self.req("POST", "/v1/trips", data={"from": "A", "to": "B"})
+        self.assertEqual(status, 201)
+        tid = created["trip"]["id"]
+        route = "/v1/trips/" + tid + "/messages"
+        status, sent = self.req("POST", route, role="dispatcher", data={
+            "client_id": uuid.uuid4().hex,
+            "text": "Подбираем пилота",
+        })
+        self.assertEqual(status, 201)
+        self.assertEqual(sent["message"]["role"], "dispatcher")
+        self.assertEqual(self.req("GET", route, role="passenger")[1]["messages"],
+                         [sent["message"]])
+        self.assertEqual(self.req("GET", route, role="pilot")[0], 404)
+        self.assertEqual(self.req("POST", "/v1/trips/" + tid + "/assign",
+            role="dispatcher", data={"pilot": "pilot_test", "version": 1})[0], 200)
+        self.assertEqual(self.req("GET", route, role="pilot")[1]["messages"],
+                         [sent["message"]])
+        self.store.close()
+        self.store = DemoStore(self.path)
+        self.server.store = self.store
+        self.assertEqual(len(self.req("GET", route, role="dispatcher")[1]["messages"]), 1)
 
 if __name__ == "__main__":
     unittest.main()

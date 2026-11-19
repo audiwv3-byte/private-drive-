@@ -791,10 +791,10 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     key: const Key('pilot-map-tiles'),
                     urlTemplate: _nightMap
                       ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                      : 'https://a.basemaps.cartocdn.com/voyager/{z}/{x}/{y}.png',
+                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     fallbackUrl: _nightMap
                       ? 'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      : null,
                     userAgentPackageName: 'lt.privatedrive.private_drive.demo',
                     maxNativeZoom: 19,
                     errorTileCallback: (tile, error, stackTrace) {

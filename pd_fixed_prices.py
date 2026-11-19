@@ -10,5 +10,6 @@ def city(address):
 def base(data):
     if data.get('stop_address'):return None
     start,end=city(data.get('origin','')),city(data.get('destination',''))
-    if start=='vilnius' and end=='kaunas':return '190.00' if data.get('roundtrip') else '110.00'
+    if start=='vilnius' and end=='kaunas':return '200.00' if data.get('roundtrip') else '110.00'
+    if start=='kaunas' and end=='vilnius' and not data.get('roundtrip'):return '90.00'
     return None

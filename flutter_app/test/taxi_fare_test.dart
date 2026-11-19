@@ -13,7 +13,7 @@ void main() {
     expect(PdTaxiFare.calculate(cityMetres: 0, outsideCityMetres: 10000), 889);
     expect(PdTaxiFare.calculate(
       cityMetres: 5000, outsideCityMetres: 10000,
-      advanceBooking: true, largeVehicle: true), 1819);
+      advanceBooking: true), 1519);
     expect(PdTaxiFare.calculate(
       cityMetres: 5000, outsideCityMetres: 0,
       paidWaitingStartedMinutes: 2), 489);

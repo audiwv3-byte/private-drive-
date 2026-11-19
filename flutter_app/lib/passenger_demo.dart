@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'app_language.dart';
 import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
 import 'company_info.dart';
@@ -670,18 +671,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PRIVATE DRIVE · Пассажир'),
+        title: Text(pdLabel(context, 'PRIVATE DRIVE · Пассажир')),
         actions: [
           if (widget.tripStore != null)
             IconButton(
               key: const Key('passenger-orders-button'),
-              tooltip: 'Мои заказы',
+              tooltip: pdLabel(context, 'Мои заказы'),
               icon: const Icon(Icons.receipt_long_outlined),
               onPressed: _openOrders,
             ),
           IconButton(
             key: const Key('passenger-company-info'),
-            tooltip: 'Контакты и документы',
+            tooltip: pdLabel(context, 'Контакты и документы'),
             onPressed: () => Navigator.push(context, MaterialPageRoute(
               builder: (_) => const CompanyInfoPage())),
             icon: const Icon(Icons.info_outline),
@@ -698,25 +699,25 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('passenger-pilot-message-alert'),
                 child: ListTile(
                   leading: const Icon(Icons.mark_chat_unread_outlined),
-                  title: const Text('Сообщение от пилота'),
+                  title: Text(pdLabel(context, 'Сообщение от пилота')),
                   subtitle: Text(widget.tripStore!.pilotChatMessages.last,
                     maxLines: 2, overflow: TextOverflow.ellipsis),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _openOrders,
                 ),
               ),
-            const Text('Тестовый заказ поездки', style: TextStyle(fontSize: 22)),
+            Text(pdLabel(context, 'Тестовый заказ поездки'), style: TextStyle(fontSize: 22)),
             const SizedBox(height: 6),
-            const Text('Демонстрация. Не отправляет заказы и не списывает деньги.'),
+            Text(pdLabel(context, 'Демонстрация. Не отправляет заказы и не списывает деньги.')),
             const SizedBox(height: 12),
-            Text('$_rideType · выбранный тип поездки',
+            Text('${pdLabel(context, _rideType)} · ${pdLabel(context, 'выбранный тип поездки')}',
               key: const Key('passenger-selected-ride-type'),
               style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             if (_rideType == 'Трансфер') ...[
               SwitchListTile(
                 key: const Key('passenger-round-trip'),
-                title: const Text('Туда и обратно'),
+                title: Text(pdLabel(context, 'Туда и обратно')),
                 value: _roundTrip,
                 onChanged: (v) => setState(() => _roundTrip = v),
               ),
@@ -847,7 +848,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                 const Icon(Icons.map_outlined,
                                   color: Color(0xFFDDC184), size: 42),
                                 const SizedBox(height: 8),
-                                const Text('Карта временно недоступна',
+                                Text(pdLabel(context, 'Карта временно недоступна'),
                                   key: Key('passenger-map-load-error')),
                                 Text(_mapNetworkError ?? _lastTileError ??
                                     'Не удалось показать тайлы карты',
@@ -858,7 +859,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                   key: const Key('passenger-map-retry'),
                                   onPressed: _retryMap,
                                   icon: const Icon(Icons.refresh),
-                                  label: const Text('Повторить загрузку'),
+                                  label: Text(pdLabel(context, 'Повторить загрузку')),
                                 ),
                               ],
                             ),
@@ -881,7 +882,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         borderRadius: BorderRadius.circular(12),
                         child: IconButton(
                           key: const Key('passenger-map-day-night'),
-                          tooltip: _nightMap ? 'Дневная карта' : 'Ночная карта',
+                          tooltip: pdLabel(context, _nightMap ? 'Дневная карта' : 'Ночная карта'),
                           icon: Icon(_nightMap ? Icons.wb_sunny_outlined
                               : Icons.dark_mode_outlined,
                               color: const Color(0xFFDDC184), size: 20),
@@ -913,40 +914,40 @@ class _PassengerDemoState extends State<PassengerDemo> {
             if (_routeLoading)
               const LinearProgressIndicator(key: Key('passenger-route-loading')),
             const SizedBox(height: 12),
-            const Text('Популярные направления'),
+            Text(pdLabel(context, 'Популярные направления')),
             Wrap(
               spacing: 6,
               children: [
                 ActionChip(
                   key: const Key('route-kaunas'),
-                  label: const Text('Вильнюс — Каунас'),
+                  label: Text(pdLabel(context, 'Вильнюс — Каунас')),
                   onPressed: () => _chooseRoute('Вильнюс — Каунас', 'Вильнюс', 'Каунас'),
                 ),
                 ActionChip(
                   key: const Key('route-airport'),
-                  label: const Text('Аэропорт'),
+                  label: Text(pdLabel(context, 'Аэропорт')),
                   onPressed: () => _chooseRoute('Аэропорт', 'Вильнюс', 'Аэропорт Вильнюса'),
                 ),
                 ActionChip(
                   key: const Key('route-warsaw'),
-                  label: const Text('Вильнюс — Варшава'),
+                  label: Text(pdLabel(context, 'Вильнюс — Варшава')),
                   onPressed: () => _chooseRoute('Вильнюс — Варшава', 'Вильнюс', 'Варшава'),
                 ),
                 ActionChip(
                   key: const Key('route-klaipeda'),
-                  label: const Text('Вильнюс — Клайпеда'),
+                  label: Text(pdLabel(context, 'Вильнюс — Клайпеда')),
                   onPressed: () => _chooseRoute(
                     'Вильнюс — Клайпеда', 'Вильнюс', 'Клайпеда'),
                 ),
                 ActionChip(
                   key: const Key('route-trakai'),
-                  label: const Text('Вильнюс — Тракай'),
+                  label: Text(pdLabel(context, 'Вильнюс — Тракай')),
                   onPressed: () => _chooseRoute(
                     'Вильнюс — Тракай', 'Вильнюс', 'Тракай'),
                 ),
                 ActionChip(
                   key: const Key('route-palanga'),
-                  label: const Text('Вильнюс — Паланга'),
+                  label: Text(pdLabel(context, 'Вильнюс — Паланга')),
                   onPressed: () => _chooseRoute('Вильнюс — Паланга', 'Вильнюс', 'Паланга'),
                 ),
               ],
@@ -956,7 +957,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               controller: _from,
               onChanged: (_) { _addressChanged('from'); _updateRoadPreview(); },
               decoration: const InputDecoration(
-                labelText: 'Откуда', prefixIcon: Icon(Icons.trip_origin),
+                labelText: pdLabel(context, 'Откуда'), prefixIcon: Icon(Icons.trip_origin),
               ),
             ),
             _addressSuggestionsWidget('from'),
@@ -968,13 +969,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
                     controller: _to,
                     onChanged: (_) { _addressChanged('to'); _updateRoadPreview(); },
                     decoration: const InputDecoration(
-                      labelText: 'Куда', prefixIcon: Icon(Icons.location_on_outlined),
+                      labelText: pdLabel(context, 'Куда'), prefixIcon: Icon(Icons.location_on_outlined),
                     ),
                   ),
                 ),
                 IconButton(
                   key: const Key('passenger-swap'),
-                  tooltip: 'Поменять А и Б',
+                  tooltip: pdLabel(context, 'Поменять А и Б'),
                   onPressed: () {
                     setState(() {
                       final previous = _from.text;
@@ -1013,7 +1014,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                     key: const Key('passenger-time'),
                     onPressed: _pickTime,
                     icon: const Icon(Icons.schedule),
-                    label: Text(_time == null ? 'Время' : _time!.format(context)),
+                    label: Text(_time == null ? pdLabel(context, 'Время') : _time!.format(context)),
                   ),
                 ),
               ],
@@ -1025,15 +1026,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('passenger-personal-trip-settings'),
                 initiallyExpanded: true,
                 leading: const Icon(Icons.tune),
-                title: const Text('Личные настройки пассажира для поездки'),
-                subtitle: const Text('Цветы, кофе, вода, комфорт и пожелания'),
+                title: Text(pdLabel(context, 'Личные настройки пассажира для поездки')),
+                subtitle: Text(pdLabel(context, 'Цветы, кофе, вода, комфорт и пожелания')),
                 childrenPadding: const EdgeInsets.symmetric(horizontal: 12),
                 children: [
               CheckboxListTile(
                 key: const Key('service-meet-sign'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Встреча с табличкой · +15 €'),
+                title: Text(pdLabel(context, 'Встреча с табличкой · +15 €')),
                 value: _meetSign,
                 onChanged: (v) => setState(() => _meetSign = v ?? false),
               ),
@@ -1041,7 +1042,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('service-pets'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Поездка с животными · цена по запросу'),
+                title: Text(pdLabel(context, 'Поездка с животными · цена по запросу')),
                 value: _pets,
                 onChanged: (v) => setState(() => _pets = v ?? false),
               ),
@@ -1049,7 +1050,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('service-sober'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Трезвый водитель · ×2 к тарифу'),
+                title: Text(pdLabel(context, 'Трезвый водитель · ×2 к тарифу')),
                 value: _soberDriver,
                 onChanged: (v) => setState(() => _soberDriver = v ?? false),
               ),
@@ -1057,7 +1058,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('service-music'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Музыка в дорогу · бесплатно'),
+                title: Text(pdLabel(context, 'Музыка в дорогу · бесплатно')),
                 value: _music,
                 onChanged: (v) => setState(() {
                   _music = v ?? false;
@@ -1069,7 +1070,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('service-flowers'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Цветы · стоимость по запросу'),
+                title: Text(pdLabel(context, 'Цветы · стоимость по запросу')),
                 value: _flowers,
                 onChanged: (v) => setState(() => _flowers = v ?? false),
               ),
@@ -1077,7 +1078,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('service-coffee'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Кофе · стоимость по запросу'),
+                title: Text(pdLabel(context, 'Кофе · стоимость по запросу')),
                 value: _coffee,
                 onChanged: (v) => setState(() => _coffee = v ?? false),
               ),
@@ -1085,7 +1086,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('service-water'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Питьевая вода · стоимость уточняется'),
+                title: Text(pdLabel(context, 'Питьевая вода · стоимость уточняется')),
                 value: _water,
                 onChanged: (v) => setState(() => _water = v ?? false),
               ),
@@ -1093,7 +1094,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('service-quiet-ride'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Тихая поездка · без музыки и разговоров'),
+                title: Text(pdLabel(context, 'Тихая поездка · без музыки и разговоров')),
                 value: _quietRide,
                 onChanged: (v) => setState(() {
                   _quietRide = v ?? false;
@@ -1107,7 +1108,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('service-luggage-help'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Помощь с багажом'),
+                title: Text(pdLabel(context, 'Помощь с багажом')),
                 value: _luggageHelp,
                 onChanged: (v) => setState(() => _luggageHelp = v ?? false),
               ),
@@ -1121,7 +1122,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 initialValue: _radioStation,
                 isExpanded: true,
                 decoration: const InputDecoration(
-                  labelText: 'Радиостанция · FM-частоты Вильнюса',
+                  labelText: pdLabel(context, 'Радиостанция · FM-частоты Вильнюса'),
                   border: OutlineInputBorder(),
                 ),
                 items: _vilniusRadio.map((station) =>
@@ -1152,7 +1153,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: ValueKey('passenger-cabin-temperature-$_cabinTemperature'),
                 initialValue: _cabinTemperature,
                 decoration: const InputDecoration(
-                  labelText: 'Желаемая температура в салоне',
+                  labelText: pdLabel(context, 'Желаемая температура в салоне'),
                   border: OutlineInputBorder(),
                 ),
                 items: [
@@ -1173,8 +1174,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 maxLines: 3,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
-                  labelText: 'Другие пожелания к поездке',
-                  hintText: 'Например, вода без газа, тишина или помощь с багажом',
+                  labelText: pdLabel(context, 'Другие пожелания к поездке'),
+                  hintText: pdLabel(context, 'Например, вода без газа, тишина или помощь с багажом'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -1182,7 +1183,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text('Способ оплаты · только выбор', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(pdLabel(context, 'Способ оплаты · только выбор'), style: TextStyle(fontWeight: FontWeight.bold)),
             Wrap(
               spacing: 8,
               children: [
@@ -1226,7 +1227,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                     MaterialPageRoute(builder: (_) => PassengerOrdersDemo(
                       tripStore: widget.tripStore!))),
                   icon: const Icon(Icons.receipt_long_outlined),
-                  label: const Text('Управление заказом · сообщения'),
+                  label: Text(pdLabel(context, 'Управление заказом · сообщения')),
                 ),
               DemoRatingPanel(tripStore: widget.tripStore!),
             ],

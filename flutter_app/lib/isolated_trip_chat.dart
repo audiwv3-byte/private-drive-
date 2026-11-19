@@ -141,6 +141,10 @@ class _IsolatedTripChatState extends State<IsolatedTripChat> {
         if (rows is! List) {
           throw const RemoteDemoException('Некорректная история сообщений');
         }
+        // Validate the entire batch before advancing the pagination cursor:
+        // a malformed trailing row must never hide earlier valid messages.
+        final received = <Map<String, dynamic>>[];
+        var nextCursor = _cursor;
         for (final row in rows) {
           if (row is! Map<String, dynamic> ||
               row['seq'] is! int || row['seq'] <= 0 ||
@@ -150,11 +154,13 @@ class _IsolatedTripChatState extends State<IsolatedTripChat> {
             throw const RemoteDemoException('Некорректное сообщение сервера');
           }
           final number = row['seq'] as int;
-          if (number > _cursor) {
-            _messages.add(row);
-            _cursor = number;
+          if (number > nextCursor) {
+            received.add(row);
+            nextCursor = number;
           }
         }
+        _messages.addAll(received);
+        _cursor = nextCursor;
         // Keep a bounded screen buffer; the authoritative history is on server.
         if (_messages.length > 100) {
           _messages.removeRange(0, _messages.length - 100);

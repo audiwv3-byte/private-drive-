@@ -122,13 +122,13 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
             passengerMessages: widget.tripStore.passengerChatMessages,
             key: const Key('dispatcher-current-chat'),
           ),
-        for (final entry in widget.tripStore.archivedChats.reversed)
+        for (final (index, entry) in widget.tripStore.archivedChats.reversed.indexed)
           _chatPanel(
             title: 'История переписки',
             route: '${entry.from} → ${entry.to}',
             pilotMessages: entry.pilotMessages,
             passengerMessages: entry.passengerMessages,
-            key: const Key('dispatcher-archived-chat'),
+            key: ValueKey('dispatcher-archived-chat-$index'),
           ),
         const SizedBox(height: 8),
         const Text('Чаты DEMO сохраняются только на этом устройстве. '
@@ -161,7 +161,7 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
           for (final message in pilotMessages)
             ListTile(
               dense: true,
-              key: const Key('dispatcher-pilot-chat-message'),
+              // No constant key: multiple messages share the same parent.
               leading: const Icon(Icons.directions_car_outlined),
               title: Text(message),
             ),
@@ -174,7 +174,7 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
           for (final message in passengerMessages)
             ListTile(
               dense: true,
-              key: const Key('dispatcher-passenger-chat-message'),
+              // Each message is read-only; ordering is defined by its list.
               leading: const Icon(Icons.person_outline),
               title: Text(message),
             ),

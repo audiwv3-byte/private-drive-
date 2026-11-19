@@ -15,7 +15,9 @@ void main() {
     await tester.pumpWidget(PdLanguageScope(
       language: pdLanguage,
       child: MaterialApp(
-        home: PassengerRideEntry(enableMapTiles: false, tripStore: store),
+        home: PdPassengerLanguageScope(
+          child: PassengerRideEntry(enableMapTiles: false, tripStore: store),
+        ),
       ),
     ));
     await tester.tap(find.byKey(const Key('passenger-global-language-menu')));
@@ -49,7 +51,9 @@ void main() {
     await tester.pumpWidget(PdLanguageScope(
       language: pdLanguage,
       child: MaterialApp(
-        home: PassengerRideEntry(enableMapTiles: false, tripStore: store),
+        home: PdPassengerLanguageScope(
+          child: PassengerRideEntry(enableMapTiles: false, tripStore: store),
+        ),
       ),
     ));
     expect(find.text('Pasirink kelionės tipą'), findsOneWidget);
@@ -62,6 +66,33 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Demo trip booking'), findsOneWidget);
     expect(find.text('Round trip'), findsOneWidget);
+  });
+
+  testWidgets('Language selection never translates pilot or dispatcher UI',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    addTearDown(() => pdLanguage.set('RU', persist: false));
+    pdLanguage.set('LT', persist: false);
+    await tester.pumpWidget(PdLanguageScope(
+      language: pdLanguage,
+      child: MaterialApp(
+        home: Builder(builder: (context) => Column(children: [
+          Text(pdLabel(context, 'Кабина пилота')),
+          Text(pdLabel(context, 'Кабинет диспетчера · демо')),
+          Text(pdTr(context, 'Выйти на линию', 'Prisijungti', 'Go online')),
+        ])),
+      ),
+    ));
+    expect(find.text('Кабина пилота'), findsOneWidget);
+    expect(find.text('Кабинет диспетчера · демо'), findsOneWidget);
+    expect(find.text('Выйти на линию'), findsOneWidget);
+    expect(find.text('Vairuotojo kabina'), findsNothing);
+    pdLanguage.set('EN', persist: false);
+    await tester.pump();
+    expect(find.text('Кабина пилота'), findsOneWidget);
+    expect(find.text('Кабинет диспетчера · демо'), findsOneWidget);
+    expect(find.text('Go online'), findsNothing);
   });
 
   testWidgets('Passenger chooses taxi before seeing booking form', (tester) async {

@@ -9,7 +9,9 @@ import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/main.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() => SharedPreferences.setMockInitialValues({
+    'pd_native_permissions_onboarding_v1': true,
+  }));
   test('Waze uses native app scheme rather than an embedded web URL', () {
     expect(privateDriveWazeAppUri.scheme, 'waze');
     expect(privateDriveWazeAppUri.scheme, isNot('https'));
@@ -20,6 +22,7 @@ void main() {
       (tester) async {
     expect(apiBaseUrl, isEmpty);
     await tester.pumpWidget(const PrivateDriveApp());
+    await tester.pumpAndSettle();
     // ListView lazily builds off-screen children: scroll until the demo entry
     // is in the widget tree before attempting to tap it.
     await tester.scrollUntilVisible(

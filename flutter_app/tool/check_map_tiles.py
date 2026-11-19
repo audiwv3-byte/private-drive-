@@ -46,9 +46,10 @@ def probe(url: str) -> tuple[bool, str]:
 def main() -> None:
     z, x, y = tile_at(54.6872, 25.2797, 10)
     print(f"Vilnius city centre actual raster coordinates: {z}/{x}/{y}", flush=True)
+    # The day and night views share the same keyless raster source;
+    # dark colors are applied client-side, without a CARTO API token.
     sources = {
-        "OSM day": f"https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "CARTO night": f"https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "OSM day/night": f"https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     }
     successes = set()
     for name, url in sources.items():
@@ -56,11 +57,9 @@ def main() -> None:
         print(f"{name}: {details}: {url}", flush=True)
         if ok:
             successes.add(name)
-    if "OSM day" not in successes:
-        raise SystemExit("No working daytime map source. Do not publish APK.")
-    if "CARTO night" not in successes:
-        raise SystemExit("Night map endpoint failed. Do not publish APK.")
-    print("PASS: actual valid raster image data from day and night providers", flush=True)
+    if "OSM day/night" not in successes:
+        raise SystemExit("Shared daytime/nighttime raster source failed. Do not publish APK.")
+    print("PASS: actual valid keyless raster image used by both day and night", flush=True)
 
 
 if __name__ == "__main__":

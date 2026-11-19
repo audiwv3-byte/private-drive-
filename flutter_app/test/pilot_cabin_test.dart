@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/pilot_cabin.dart';
+import 'package:private_drive/brand_logo.dart';
 import 'package:private_drive/demo_trip_store.dart';
 
 void main() {
@@ -68,8 +69,16 @@ void main() {
     );
 
     expect(find.byKey(const Key('pilot-power-toggle')), findsOneWidget);
-    expect(find.byKey(const Key('private-drive-round-logo')), findsOneWidget);
-    expect(find.byType(ClipOval), findsWidgets);
+    expect(find.byKey(const Key('pilot-line-transparent-logo')), findsOneWidget);
+    final pilotLineLogo = tester.widget<PrivateDriveBrandLogo>(
+      find.descendant(
+        of: find.byKey(const Key('pilot-line-transparent-logo')),
+        matching: find.byType(PrivateDriveBrandLogo),
+      ),
+    );
+    expect(pilotLineLogo.transparentBackground, isTrue);
+    expect(pilotLineLogo.circular, isFalse);
+    expect(find.byKey(const Key('private-drive-round-logo')), findsNothing);
     expect(find.text('Не на линии · демо'), findsOneWidget);
     expect(find.text('ВЫЙТИ НА ЛИНИЮ'), findsOneWidget);
     expect(find.byKey(const Key('pilot-offline-vilnius-background')), findsOneWidget);

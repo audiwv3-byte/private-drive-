@@ -48,7 +48,6 @@ def main() -> None:
     print(f"Vilnius city centre actual raster coordinates: {z}/{x}/{y}", flush=True)
     sources = {
         "OSM day": f"https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "CARTO day": f"https://a.basemaps.cartocdn.com/voyager/{z}/{x}/{y}.png",
         "CARTO night": f"https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
     }
     successes = set()
@@ -57,7 +56,7 @@ def main() -> None:
         print(f"{name}: {details}: {url}", flush=True)
         if ok:
             successes.add(name)
-    if not ({"OSM day", "CARTO day"} & successes):
+    if "OSM day" not in successes:
         raise SystemExit("No working daytime map source. Do not publish APK.")
     if "CARTO night" not in successes:
         raise SystemExit("Night map endpoint failed. Do not publish APK.")

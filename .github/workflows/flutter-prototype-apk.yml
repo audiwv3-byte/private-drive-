@@ -102,6 +102,8 @@ jobs:
           data = data.replace("<application", insert + "    <application", 1)
           manifest.write_text(data)
           PY
+      - name: Verify live day/night raster tiles before building
+        run: python3 flutter_app/tool/check_map_tiles.py
       - name: Analyze and build debug APK (no production secrets)
         working-directory: private_drive_build
         run: |

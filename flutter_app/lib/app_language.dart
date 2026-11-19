@@ -63,6 +63,59 @@ String pdLabel(BuildContext context, String ru) {
 }
 
 const Map<String, List<String>> _labels = {
+  'Заказы': ['Užsakymai', 'Bookings'],
+  'Карта': ['Žemėlapis', 'Map'],
+  'Пилоты': ['Vairuotojai', 'Pilots'],
+  'Пассажиры': ['Keleiviai', 'Passengers'],
+  'Диспетчер': ['Dispečeris', 'Dispatcher'],
+  'Контроль заказов · DEMO': ['Užsakymų valdymas · DEMO', 'Booking management · DEMO'],
+  'Назначение только вручную. Локальные тестовые данные.':
+      ['Priskiriama tik rankiniu būdu. Vietiniai bandomieji duomenys.',
+       'Manual dispatch only. Local demo data.'],
+  'Новых тестовых заявок нет': ['Nėra naujų bandomųjų užsakymų', 'No new demo bookings'],
+  'Назначить тестового пилота': ['Priskirti bandomąjį vairuotoją', 'Assign demo pilot'],
+  'Назначено пилоту · ожидает принятия':
+      ['Priskirta vairuotojui · laukiama patvirtinimo', 'Assigned to pilot · awaiting acceptance'],
+  'Пилот принял заказ': ['Vairuotojas priėmė užsakymą', 'Pilot accepted booking'],
+  'Заказ завершён': ['Užsakymas baigtas', 'Booking completed'],
+  'Карта активных пилотов · DEMO': ['Aktyvių vairuotojų žemėlapis · DEMO', 'Active pilots map · DEMO'],
+  'Карта · без сетевых тайлов': ['Žemėlapis · neprisijungus', 'Map · offline tiles'],
+  'ПИЛОТЫ · DEMO': ['VAIRUOTOJAI · DEMO', 'PILOTS · DEMO'],
+  'Тестовый пилот · текущая сессия':
+      ['Bandomasis vairuotojas · ši sesija', 'Demo pilot · current session'],
+  'ПАССАЖИРЫ · DEMO': ['KELEIVIAI · DEMO', 'PASSENGERS · DEMO'],
+  'В текущей сессии пассажирские заявки отсутствуют':
+      ['Šioje sesijoje keleivių užsakymų nėra', 'No passenger bookings in this session'],
+  'Тестовый пассажир · без персональных данных':
+      ['Bandomasis keleivis · be asmens duomenų', 'Demo passenger · no personal data'],
+  'Мои заказы · PRIVATE DRIVE': ['Mano užsakymai · PRIVATE DRIVE', 'My bookings · PRIVATE DRIVE'],
+  'Заказов в демосессии пока нет':
+      ['Šioje demo sesijoje užsakymų dar nėra', 'No bookings in this demo session'],
+  'Стоимость по запросу · диспетчер подтвердит цену до оплаты':
+      ['Kaina pagal užklausą · dispečeris patvirtins prieš apmokėjimą',
+       'Price on request · dispatcher confirms before payment'],
+  'Отменить заказ': ['Atšaukti užsakymą', 'Cancel booking'],
+  'Отменить заказ?': ['Atšaukti užsakymą?', 'Cancel booking?'],
+  'Отменится только тестовая заявка.':
+      ['Bus atšauktas tik bandomasis užsakymas.', 'Only the demo booking will be cancelled.'],
+  'Оставить заказ': ['Palikti užsakymą', 'Keep booking'],
+  'Подтвердить отмену': ['Patvirtinti atšaukimą', 'Confirm cancellation'],
+  'Заявка отменена · демо': ['Užsakymas atšauktas · demo', 'Booking cancelled · demo'],
+  'Сообщения пилота': ['Vairuotojo žinutės', 'Pilot messages'],
+  'Сообщений от пилота пока нет':
+      ['Vairuotojo žinučių dar nėra', 'No messages from pilot yet'],
+  'Ответить пилоту': ['Atsakyti vairuotojui', 'Reply to pilot'],
+  'Локальный чат DEMO: без отправки через интернет.':
+      ['Vietinis DEMO pokalbis: žinutės nesiunčiamos internetu.',
+       'Local DEMO chat: no messages sent online.'],
+  'На линии': ['Prisijungęs', 'Online'],
+  'Не на линии': ['Neprisijungęs', 'Offline'],
+  'GPS нет': ['GPS nėra', 'No GPS'],
+  'GPS доступен': ['GPS veikia', 'GPS available'],
+  'Оплата': ['Mokėjimas', 'Payment'],
+  'Подача': ['Paėmimas', 'Pickup'],
+  'Назначение': ['Tikslas', 'Destination'],
+  'Услуги': ['Paslaugos', 'Services'],
   'PRIVATE DRIVE · Пассажир': ['PRIVATE DRIVE · Keleivis', 'PRIVATE DRIVE · Passenger'],
   'Мои заказы': ['Mano užsakymai', 'My bookings'],
   'Контакты и документы': ['Kontaktai ir dokumentai', 'Contacts and documents'],

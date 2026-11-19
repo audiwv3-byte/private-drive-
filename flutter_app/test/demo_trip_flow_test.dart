@@ -228,7 +228,7 @@ void main() {
     expect(find.byKey(const Key('pilot-global-route')), findsOneWidget);
     expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
     expect(find.textContaining('Свайп вправо · К пассажиру'), findsOneWidget);
-    expect(store.pilotAccepted, isFalse);
+    expect(find.byKey(const Key('pilot-global-accept')), findsOneWidget);
     await tester.drag(find.byKey(const Key('pilot-global-accept')), const Offset(180, 0));
     await tester.pump();
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);

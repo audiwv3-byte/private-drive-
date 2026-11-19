@@ -16,6 +16,7 @@ import 'company_info.dart';
 import 'remote_sync_demo.dart';
 export 'passenger_demo.dart' show PassengerDemo;
 import 'package:flutter_map/flutter_map.dart';
+import 'demo_map_tile_provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -789,6 +790,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                 if (widget.loadMapTiles)
                   TileLayer(
                     key: const Key('pilot-map-tiles'),
+                    tileProvider: demoTileProvider(),
                     urlTemplate: _nightMap
                       ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
                       : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',

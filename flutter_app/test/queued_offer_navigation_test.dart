@@ -47,7 +47,7 @@ void main() {
     expect(find.byKey(const Key('pilot-road-route')), findsOneWidget);
     // Only ending the current trip removes its navigation.
     await tester.ensureVisible(find.byKey(const Key('pilot-next-trip')));
-    await tester.tap(find.byKey(const Key('pilot-next-trip')));
+    await tester.drag(find.byKey(const Key('pilot-next-trip')), const Offset(180, 0));
     await tester.pump();
     expect(store.status, DemoTripStatus.finished);
     expect(find.byKey(const Key('pilot-road-route')), findsNothing);

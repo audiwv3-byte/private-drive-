@@ -25,7 +25,8 @@ void main() {
     )));
     await tester.pump();
     expect(find.byKey(const Key('pilot-map-day-night')), findsOneWidget);
-    expect(find.text('ДЕНЬ'), findsOneWidget);
+    expect(find.text('ДЕНЬ'), findsNothing);
+    expect(find.text('НОЧЬ'), findsNothing);
     expect(find.byKey(const Key('pilot-location-marker')), findsOneWidget);
     final icon = tester.widget<Icon>(
       find.byKey(const Key('pilot-location-marker')));
@@ -37,7 +38,7 @@ void main() {
     final toggle = tester.widget<IconButton>(
       find.byKey(const Key('pilot-map-day-night')));
     expect(toggle.tooltip, 'Дневная карта');
-    expect(find.text('НОЧЬ'), findsOneWidget);
+    expect(find.text('НОЧЬ'), findsNothing);
     expect(store.status, DemoTripStatus.approaching);
     expect(find.byKey(const Key('pilot-location-marker')), findsOneWidget);
     expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsOneWidget);
@@ -61,13 +62,16 @@ void main() {
     expect(provider.headers['User-Agent'],
         'PRIVATE DRIVE demo Android visual QA');
     expect(find.ancestor(of: tile, matching: find.byType(ColorFiltered)),
-        findsNothing);
-    expect(find.byKey(const Key('pilot-map-theme-status')), findsOneWidget);
+        findsOneWidget);
+    expect(find.byKey(const Key('pilot-map-theme-status')), findsNothing);
     await tester.tap(find.byKey(const Key('pilot-map-day-night')));
     await tester.pump();
     expect(find.text('НОЧЬ'), findsOneWidget);
     expect(tester.widget<TileLayer>(tile).urlTemplate,
-        contains('cartocdn.com/dark_all'));
+        contains('tile.openstreetmap.org'));
+    expect(tester.widget<ColorFiltered>(
+      find.byKey(const Key('pilot-map-night-filter'))).colorFilter,
+      isA<ColorFilter>());
   });
 
 }

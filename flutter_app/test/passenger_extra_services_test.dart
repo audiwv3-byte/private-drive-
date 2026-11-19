@@ -36,6 +36,7 @@ void main() {
       find.byKey(const Key('extra-service-submit'))).onPressed, isNull);
     await tester.enterText(find.byKey(const Key('extra-service-from')),
       'Gedimino pr. 1, Vilnius');
+    await tester.pump();
     final submit = tester.widget<FilledButton>(
       find.byKey(const Key('extra-service-submit')));
     expect(submit.onPressed, isNotNull);
@@ -61,6 +62,7 @@ void main() {
       find.byKey(const Key('extra-service-submit'))).onPressed, isNull);
     await tester.enterText(find.byKey(const Key('extra-service-to')),
       'Дом, Вильнюс');
+    await tester.pump();
     final submit = tester.widget<FilledButton>(
       find.byKey(const Key('extra-service-submit')));
     expect(submit.onPressed, isNotNull);

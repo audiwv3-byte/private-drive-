@@ -68,6 +68,52 @@ void main() {
     expect(store.passengerChatMessages, ['Сейчас выйду']);
   });
 
+  testWidgets('Multiple archived chats keep distinct panels and messages',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    for (var i = 0; i < 3; i++) {
+      expect(store.create(
+        from: 'Вильнюс', to: 'Каунас',
+        paymentMethod: 'Карта',
+        departure: DateTime(2026, 11, 20),
+        services: const [],
+      ), isTrue);
+      expect(store.assignPilot(), isTrue);
+      expect(store.acceptAssignedPilot(), isTrue);
+      expect(store.addPilotChatMessage('Пилот номер $i'), isTrue);
+      expect(store.addPassengerChatMessage('Ответ номер $i'), isTrue);
+      expect(store.cancelByPassenger(), isTrue);
+    }
+    expect(store.create(
+      from: 'Каунас', to: 'Вильнюс',
+      paymentMethod: 'Карта',
+      departure: DateTime(2026, 11, 21),
+      services: const [],
+    ), isTrue);
+    expect(store.archivedChats, hasLength(3));
+
+    await tester.pumpWidget(MaterialApp(home: DemoDispatcherCabinet(
+      tripStore: store, enableMapTiles: false,
+    )));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    for (var i = 0; i < 3; i++) {
+      final panel = find.byKey(Key('dispatcher-archived-chat-$i'));
+      await tester.scrollUntilVisible(panel, 160,
+          scrollable: find.byKey(const Key('dispatcher-cabinet')));
+      expect(panel, findsOneWidget);
+      await tester.tap(find.descendant(
+          of: panel, matching: find.byType(ExpansionTile)));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+    for (var i = 0; i < 3; i++) {
+      expect(store.archivedChats[i].pilotMessages, ['Пилот номер $i']);
+      expect(store.archivedChats[i].passengerMessages, ['Ответ номер $i']);
+    }
+  });
+
   testWidgets('Decline returns request to dispatcher for reassignment',
       (tester) async {
     final store = DemoTripStore();

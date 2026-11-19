@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'demo_trip_store.dart';
+import 'app_language.dart';
 
 /// Offline dispatcher console: one session-local pilot and one synthetic order.
 /// No fabricated pilot locations, real drivers, server access or payments.
@@ -26,7 +27,7 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('PRIVATE DRIVE · Диспетчер · DEMO')),
+    appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Диспетчер')} · DEMO')),
     body: Column(children: [
       SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -36,7 +37,7 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: ChoiceChip(
                 key: Key('dispatcher-tab-$index'),
-                label: Text(tabs[index]),
+                label: Text(pdLabel(context, tabs[index])),
                 selected: _tab == index,
                 onSelected: (_) => setState(() => _tab = index),
               ),
@@ -62,9 +63,9 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
       key: const Key('dispatcher-cabinet'),
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('Контроль заказов · DEMO', style: TextStyle(
+        Text(pdLabel(context, 'Контроль заказов · DEMO'), style: TextStyle(
           fontWeight: FontWeight.bold, color: gold, fontSize: 18)),
-        const Text('Назначение только вручную. Локальные тестовые данные.'),
+        Text(pdLabel(context, 'Назначение только вручную. Локальные тестовые данные.')),
         if (trip == null) const Card(child: Padding(
           padding: EdgeInsets.all(16),
           child: Text('Новых тестовых заявок нет',
@@ -81,29 +82,29 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
                   key: const Key('dispatcher-order-status'),
                   style: const TextStyle(color: gold,
                     fontWeight: FontWeight.bold)),
-                Text('Подача: ${trip.from}',
+                Text('${pdLabel(context, 'Подача')}: ${trip.from}',
                   key: const Key('dispatcher-pickup')),
-                Text('Назначение: ${trip.to}'),
-                Text('Оплата: ${trip.paymentMethod}'),
+                Text('${pdLabel(context, 'Назначение')}: ${trip.to}'),
+                Text('${pdLabel(context, 'Оплата')}: ${trip.paymentMethod}'),
                 Text('Дата: ${trip.departure.day}.${trip.departure.month}.${trip.departure.year}'),
                 if (trip.services.isNotEmpty)
-                  Text('Услуги: ${trip.services.join(', ')}'),
+                  Text('${pdLabel(context, 'Услуги')}: ${trip.services.join(', ')}'),
                 const SizedBox(height: 12),
                 if (status == DemoTripStatus.requested)
                   FilledButton.icon(
                     key: const Key('dispatcher-assign-pilot'),
                     onPressed: widget.tripStore.assignPilot,
                     icon: const Icon(Icons.assignment_ind_outlined),
-                    label: const Text('Назначить тестового пилота'),
+                    label: Text(pdLabel(context, 'Назначить тестового пилота')),
                   ),
                 if (status == DemoTripStatus.assigned &&
                     !widget.tripStore.pilotAccepted)
-                  const Text('Назначено пилоту · ожидает принятия'),
+                  Text(pdLabel(context, 'Назначено пилоту · ожидает принятия')),
                 if (status == DemoTripStatus.assigned &&
                     widget.tripStore.pilotAccepted)
-                  const Text('Пилот принял заказ'),
+                  Text(pdLabel(context, 'Пилот принял заказ')),
                 if (status == DemoTripStatus.finished) ...[
-                  const Text('Заказ завершён'),
+                  Text(pdLabel(context, 'Заказ завершён')),
                   Text(widget.tripStore.tripRating == null
                     ? 'Оценка пассажира ещё не получена'
                     : 'Поездка: ${widget.tripStore.tripRating}/5 · '
@@ -181,14 +182,14 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
     return ListView(key: const Key('dispatcher-pilots-tab'),
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('ПИЛОТЫ · DEMO', style: TextStyle(color: gold,
+        Text(pdLabel(context, 'ПИЛОТЫ · DEMO'), style: TextStyle(color: gold,
           fontWeight: FontWeight.bold, fontSize: 19)),
         Card(child: ListTile(
           leading: const Icon(Icons.directions_car),
-          title: const Text('Тестовый пилот · текущая сессия'),
+          title: Text(pdLabel(context, 'Тестовый пилот · текущая сессия')),
           subtitle: Text(
-            '${store.pilotOnline ? 'На линии' : 'Не на линии'} · '
-            '${store.pilotLatitude == null ? 'GPS нет' : 'GPS доступен'} · '
+            '${pdLabel(context, store.pilotOnline ? 'На линии' : 'Не на линии')} · '
+            '${pdLabel(context, store.pilotLatitude == null ? 'GPS нет' : 'GPS доступен')} · '
             '${store.statusLabel}',
           ),
         )),
@@ -203,14 +204,14 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
     return ListView(key: const Key('dispatcher-passengers-tab'),
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('ПАССАЖИРЫ · DEMO', style: TextStyle(color: gold,
+        Text(pdLabel(context, 'ПАССАЖИРЫ · DEMO'), style: TextStyle(color: gold,
           fontWeight: FontWeight.bold, fontSize: 19)),
         if (trip == null)
-          const Text('В текущей сессии пассажирские заявки отсутствуют'),
+          Text(pdLabel(context, 'В текущей сессии пассажирские заявки отсутствуют')),
         if (trip != null)
           Card(child: ListTile(
             leading: const Icon(Icons.person),
-            title: const Text('Тестовый пассажир · без персональных данных'),
+            title: Text(pdLabel(context, 'Тестовый пассажир · без персональных данных')),
             subtitle: Text('${trip.from} → ${trip.to} · '
               '${widget.tripStore.statusLabel}'),
           )),

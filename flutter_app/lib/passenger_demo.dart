@@ -48,6 +48,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _coffee = false;
   bool _nightMap = false;
   bool _mapTilesFailed = false;
+  int _mapTileErrors = 0;
   int _tileRetry = 0;
   bool _water = false;
   bool _quietRide = false;
@@ -671,29 +672,28 @@ class _PassengerDemoState extends State<PassengerDemo> {
                           backgroundColor: const Color(0xFF1A2A34),
                         ),
                         children: [
-                          ColorFiltered(
-                            colorFilter: _nightMap
-                                ? const ColorFilter.matrix(<double>[
-                                    -0.78, 0, 0, 0, 211,
-                                    0, -0.78, 0, 0, 211,
-                                    0, 0, -0.78, 0, 211,
-                                    0, 0, 0, 1, 0,
-                                  ])
-                                : const ColorFilter.mode(
-                                    Colors.transparent, BlendMode.dst),
-                            child: TileLayer(
-                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              fallbackUrl: 'https://a.basemaps.cartocdn.com/voyager/{z}/{x}/{y}.png',
-                              userAgentPackageName: 'lt.privatedrive.privateDrive',
-                              errorTileCallback: (tile, error, stackTrace) {
-                                if (_mapTilesFailed) return;
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  if (mounted && !_mapTilesFailed) {
-                                    setState(() => _mapTilesFailed = true);
+                          TileLayer(
+                            // Do not wrap raster tiles in a transparent blend:
+                            // some Android GPUs render that composition blank.
+                            key: const Key('passenger-map-tiles'),
+                            urlTemplate: _nightMap
+                                ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+                                : 'https://a.basemaps.cartocdn.com/voyager/{z}/{x}/{y}.png',
+                            fallbackUrl: _nightMap
+                                ? 'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
+                            errorTileCallback: (tile, error, stackTrace) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (!mounted || _mapTilesFailed) return;
+                                setState(() {
+                                  _mapTileErrors++;
+                                  if (_mapTileErrors >= 3) {
+                                    _mapTilesFailed = true;
                                   }
                                 });
-                              },
-                            ),
+                              });
+                            },
                           ),
                           if (_roadPoints.isNotEmpty)
                             PolylineLayer(
@@ -740,6 +740,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                   key: const Key('passenger-map-retry'),
                                   onPressed: () => setState(() {
                                     _mapTilesFailed = false;
+                                    _mapTileErrors = 0;
                                     _tileRetry++;
                                   }),
                                   icon: const Icon(Icons.refresh),
@@ -762,7 +763,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
                           icon: Icon(_nightMap ? Icons.wb_sunny_outlined
                               : Icons.dark_mode_outlined,
                               color: const Color(0xFFDDC184), size: 20),
-                          onPressed: () => setState(() => _nightMap = !_nightMap),
+                          onPressed: () => setState(() {
+                            _nightMap = !_nightMap;
+                            _mapTileErrors = 0;
+                            _mapTilesFailed = false;
+                            _tileRetry++;
+                          }),
                         ),
                       ),
                     ),

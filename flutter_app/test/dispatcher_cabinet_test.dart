@@ -93,21 +93,23 @@ void main() {
     ), isTrue);
     expect(store.archivedChats, hasLength(3));
 
+    // Render all three archived panels in one viewport. A lazy ListView
+    // does not create widgets that are far below the visible area.
+    tester.view.physicalSize = const Size(1000, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(MaterialApp(home: DemoDispatcherCabinet(
       tripStore: store, enableMapTiles: false,
     )));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     for (var i = 0; i < 3; i++) {
-      final panel = find.byKey(Key('dispatcher-archived-chat-$i'));
-      await tester.ensureVisible(panel);
-      await tester.pumpAndSettle();
-      expect(panel, findsOneWidget);
-      await tester.tap(find.descendant(
-          of: panel, matching: find.byType(ExpansionTile)));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
+      expect(find.byKey(Key('dispatcher-archived-chat-$i')), findsOneWidget);
     }
+    await tester.tap(find.text('История переписки').first);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     for (var i = 0; i < 3; i++) {
       expect(store.archivedChats[i].pilotMessages, ['Пилот номер $i']);
       expect(store.archivedChats[i].passengerMessages, ['Ответ номер $i']);

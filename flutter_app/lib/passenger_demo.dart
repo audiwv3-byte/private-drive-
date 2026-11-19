@@ -956,7 +956,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-from'),
               controller: _from,
               onChanged: (_) { _addressChanged('from'); _updateRoadPreview(); },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: pdLabel(context, 'Откуда'), prefixIcon: Icon(Icons.trip_origin),
               ),
             ),
@@ -968,7 +968,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                     key: const Key('passenger-to'),
                     controller: _to,
                     onChanged: (_) { _addressChanged('to'); _updateRoadPreview(); },
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: pdLabel(context, 'Куда'), prefixIcon: Icon(Icons.location_on_outlined),
                     ),
                   ),
@@ -1121,7 +1121,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: ValueKey('passenger-radio-station-$_radioStation'),
                 initialValue: _radioStation,
                 isExpanded: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: pdLabel(context, 'Радиостанция · FM-частоты Вильнюса'),
                   border: OutlineInputBorder(),
                 ),
@@ -1152,7 +1152,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               DropdownButtonFormField<double?>(
                 key: ValueKey('passenger-cabin-temperature-$_cabinTemperature'),
                 initialValue: _cabinTemperature,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: pdLabel(context, 'Желаемая температура в салоне'),
                   border: OutlineInputBorder(),
                 ),
@@ -1173,7 +1173,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 maxLength: 500,
                 maxLines: 3,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: pdLabel(context, 'Другие пожелания к поездке'),
                   hintText: pdLabel(context, 'Например, вода без газа, тишина или помощь с багажом'),
                   border: OutlineInputBorder(),

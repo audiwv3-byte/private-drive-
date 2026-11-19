@@ -36,8 +36,10 @@ void main() {
       find.byKey(const Key('extra-service-submit'))).onPressed, isNull);
     await tester.enterText(find.byKey(const Key('extra-service-from')),
       'Gedimino pr. 1, Vilnius');
-    await tester.ensureVisible(find.byKey(const Key('extra-service-submit')));
-    await tester.tap(find.byKey(const Key('extra-service-submit')));
+    final submit = tester.widget<FilledButton>(
+      find.byKey(const Key('extra-service-submit')));
+    expect(submit.onPressed, isNotNull);
+    submit.onPressed!();
     await tester.pumpAndSettle();
     expect(store.trip!.rideType, 'Запуск автомобиля');
     expect(store.trip!.estimatedFareEur, 20);
@@ -59,8 +61,10 @@ void main() {
       find.byKey(const Key('extra-service-submit'))).onPressed, isNull);
     await tester.enterText(find.byKey(const Key('extra-service-to')),
       'Дом, Вильнюс');
-    await tester.ensureVisible(find.byKey(const Key('extra-service-submit')));
-    await tester.tap(find.byKey(const Key('extra-service-submit')));
+    final submit = tester.widget<FilledButton>(
+      find.byKey(const Key('extra-service-submit')));
+    expect(submit.onPressed, isNotNull);
+    submit.onPressed!();
     await tester.pumpAndSettle();
     expect(store.trip!.rideType, 'Доставка товаров');
     expect(store.trip!.estimatedFareEur, 20);

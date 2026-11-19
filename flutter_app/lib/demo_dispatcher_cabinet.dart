@@ -114,9 +114,76 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
             ),
           ),
         ),
+        if (trip != null)
+          _chatPanel(
+            title: 'Переписка по текущему заказу',
+            route: '${trip.from} → ${trip.to}',
+            pilotMessages: widget.tripStore.pilotChatMessages,
+            passengerMessages: widget.tripStore.passengerChatMessages,
+            key: const Key('dispatcher-current-chat'),
+          ),
+        for (final entry in widget.tripStore.archivedChats.reversed)
+          _chatPanel(
+            title: 'История переписки',
+            route: '${entry.from} → ${entry.to}',
+            pilotMessages: entry.pilotMessages,
+            passengerMessages: entry.passengerMessages,
+            key: const Key('dispatcher-archived-chat'),
+          ),
+        const SizedBox(height: 8),
+        const Text('Чаты DEMO сохраняются только на этом устройстве. '
+          'Для безопасной синхронизации между устройствами требуется сервер '
+          'и проверка прав диспетчера.'),
       ],
     );
   }
+
+  Widget _chatPanel({
+    required Key key,
+    required String title,
+    required String route,
+    required List<String> pilotMessages,
+    required List<String> passengerMessages,
+  }) => Card(
+    key: key,
+    child: ExpansionTile(
+      title: Text(title),
+      subtitle: Text(route),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      children: [
+        if (pilotMessages.isEmpty && passengerMessages.isEmpty)
+          const Text('Сообщений по заказу пока нет'),
+        if (pilotMessages.isNotEmpty) ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Пилот', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          for (final message in pilotMessages)
+            ListTile(
+              dense: true,
+              key: const Key('dispatcher-pilot-chat-message'),
+              leading: const Icon(Icons.directions_car_outlined),
+              title: Text(message),
+            ),
+        ],
+        if (passengerMessages.isNotEmpty) ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Пассажир', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          for (final message in passengerMessages)
+            ListTile(
+              dense: true,
+              key: const Key('dispatcher-passenger-chat-message'),
+              leading: const Icon(Icons.person_outline),
+              title: Text(message),
+            ),
+        ],
+        const Text('Только просмотр. Сообщения пилота и пассажира '
+          'не редактируются диспетчером.'),
+      ],
+    ),
+  );
 
   Widget _fleetMap() {
     final store = widget.tripStore;

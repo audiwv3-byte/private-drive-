@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -28,18 +29,34 @@ void main() {
             'PRIVATE DRIVE demo Android visual QA');
         final response = await request.close()
             .timeout(const Duration(seconds: 10));
-        final first = await response.first
+        final chunks = await response.toList()
             .timeout(const Duration(seconds: 10));
+        final raw = Uint8List.fromList(chunks.expand((part) => part).toList());
         // This checks the emulator, not just the GitHub runner.
         // Keep the result explicit in CI logs.
         // ignore: avoid_print
         print('EMULATOR_MAP_HTTP_$role: status=${response.statusCode} '
-            'type=${response.headers.contentType} bytes=${first.length}');
+            'type=${response.headers.contentType} bytes=${raw.length}');
         expect(response.statusCode, HttpStatus.ok,
             reason: 'Android emulator itself cannot load OSM tile');
-        expect(first.length, greaterThan(8));
-        expect(first[0], 0x89, reason: 'Not a PNG tile');
-        expect(first[1], 0x50, reason: 'Not a PNG tile');
+        expect(raw.length, greaterThan(8));
+        expect(raw[0], 0x89, reason: 'Not a PNG tile');
+        expect(raw[1], 0x50, reason: 'Not a PNG tile');
+        final codec = await ui.instantiateImageCodec(raw);
+        try {
+          final frame = await codec.getNextFrame();
+          try {
+            // ignore: avoid_print
+            print('EMULATOR_MAP_DECODE_$role: '
+                '${frame.image.width}x${frame.image.height}');
+            expect(frame.image.width, 256);
+            expect(frame.image.height, 256);
+          } finally {
+            frame.image.dispose();
+          }
+        } finally {
+          codec.dispose();
+        }
       } finally {
         client.close(force: true);
       }
@@ -109,6 +126,17 @@ void main() {
       reason: 'Android screenshot reader cannot capture known gradient');
   });
 
+  Future<void> flushRasterImageFrames(WidgetTester tester) async {
+    // Real HTTP fetch and image decoding happen outside the widget-test fake
+    // clock. Pump successive frames to allow completed images to be painted.
+    // This does not weaken the independent pixel-colour assertion below.
+    for (var i = 0; i < 12; i++) {
+      await tester.runAsync(() => Future<void>.delayed(
+          const Duration(milliseconds: 250)));
+      await tester.pump(const Duration(milliseconds: 150));
+    }
+  }
+
   testWidgets('Passenger raster streets visibly painted on real Android',
       (tester) async {
     final key = GlobalKey();
@@ -122,7 +150,7 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(
       const Duration(seconds: 18)));
 
-    await tester.pump(const Duration(milliseconds: 300));
+    await flushRasterImageFrames(tester);
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
     expect(find.byKey(const Key('passenger-map-load-error')), findsNothing,
         reason: 'Passenger map detected a tile or HTTPS error');

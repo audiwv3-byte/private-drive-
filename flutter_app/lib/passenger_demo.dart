@@ -11,6 +11,7 @@ import 'company_info.dart';
 import 'passenger_orders_demo.dart';
 import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'demo_map_tile_provider.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 
@@ -20,13 +21,15 @@ import 'package:latlong2/latlong.dart' show LatLng;
 class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
       this.preferencesStorage, this.initialRideType = 'Трансфер',
-      this.mapConnectivityCheck});
+      this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController});
 
   final bool enableMapTiles;
   final String initialRideType;
   /// Test injection: null uses a real HTTPS tile request on Android.
   final Future<String?> Function()? mapConnectivityCheck;
   final DemoTripStore? tripStore;
+  final Future<LatLng> Function()? currentPositionLoader;
+  final MapController? passengerMapController;
   final PassengerPreferencesStorage? preferencesStorage;
 
   @override
@@ -53,6 +56,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _flowers = false;
   bool _coffee = false;
   bool _nightMap = false;
+  late final MapController _passengerMapController = widget.passengerMapController ?? MapController();
+  bool _findingPassenger = false;
+  LatLng? _passengerLocation;
+  LatLng? _pickedPickup;
+  String? _locationMessage;
   bool _mapTilesFailed = false;
   bool _useBackupTiles = false;
   String? _lastTileError;
@@ -189,6 +197,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void _addressChanged(String side) {
     _addressTimer?.cancel();
     final query = (side == 'from' ? _from.text : _to.text).trim();
+    if (side == 'from') _pickedPickup = null;
     setState(() {
       _route = '';
       _roadPoints = const [];
@@ -238,9 +247,68 @@ class _PassengerDemoState extends State<PassengerDemo> {
     });
   }
 
+  Future<LatLng> _readDevicePosition() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw StateError('GPS выключен');
+    }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw StateError('Нет разрешения на геолокацию');
+    }
+    final pos = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 18)));
+    return LatLng(pos.latitude, pos.longitude);
+  }
+
+  Future<void> _locatePassenger() async {
+    if (_findingPassenger) return;
+    setState(() { _findingPassenger = true; _locationMessage = null; });
+    try {
+      final point = await (widget.currentPositionLoader?.call() ??
+          _readDevicePosition()).timeout(const Duration(seconds: 22));
+      if (!mounted) return;
+      if (!point.latitude.isFinite || !point.longitude.isFinite ||
+          point.latitude.abs() > 90 || point.longitude.abs() > 180) {
+        throw const FormatException('Некорректные координаты GPS');
+      }
+      setState(() => _passengerLocation = point);
+      if (widget.enableMapTiles) _passengerMapController.move(point, 16);
+    } catch (_) {
+      if (mounted) setState(() => _locationMessage =
+        'Не удалось определить местоположение. Проверь GPS и разрешение в настройках.');
+    } finally {
+      if (mounted) setState(() => _findingPassenger = false);
+    }
+  }
+
+  void _usePickupPoint(LatLng point) {
+    if (!point.latitude.isFinite || !point.longitude.isFinite ||
+        point.latitude.abs() > 90 || point.longitude.abs() > 180) return;
+    final label = '${point.latitude.toStringAsFixed(6)}, ${point.longitude.toStringAsFixed(6)}';
+    _addressTimer?.cancel();
+    ++_addressGeneration;
+    setState(() {
+      _pickedPickup = point;
+      _resolvedAddresses[label] = point;
+      _from.text = label;
+      _editingAddress = null;
+      _addressSuggestions = const [];
+      _route = '';
+      _roadPoints = const [];
+      _routeInfo = '';
+    });
+    unawaited(_updateRoadPreview());
+  }
+
   void _selectAddress(String value, String side) {
     setState(() {
       (side == 'from' ? _from : _to).text = value;
+      if (side == 'from') _pickedPickup = null;
       _editingAddress = null;
       _addressSuggestions = const [];
       _route = '';
@@ -603,6 +671,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _routeRequest++;
     _addressTimer?.cancel();
     _gpsFreshnessTimer?.cancel();
+    if (widget.passengerMapController == null) _passengerMapController.dispose();
     _from.dispose();
     _to.dispose();
     _tripWishes.removeListener(_savePreferences);
@@ -639,7 +708,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
         ? (start.longitude - finish.longitude).abs() > 2 ? 6.3 : 8.2
         : 10.0;
     final mapMarkers = <Marker>[
-      if (start != null)
+      if (_passengerLocation != null)
+        Marker(point: _passengerLocation!, width: 42, height: 42,
+          child: const Icon(Icons.my_location, color: Colors.lightBlueAccent,
+            key: Key('passenger-gps-marker'), size: 30)),
+      if (_pickedPickup != null)
+        Marker(point: _pickedPickup!, width: 45, height: 45,
+          child: const Icon(Icons.place, color: Colors.amber,
+            key: Key('passenger-picked-pickup-marker'), size: 36)),
+      if (start != null && _pickedPickup == null)
         Marker(
           point: start,
           width: 48,
@@ -862,7 +939,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         key: ValueKey('passenger-route-map-${_from.text}-${_to.text}-$_tileRetry'),
                         child: FlutterMap(
                         key: const Key('passenger-map'),
+                        mapController: _passengerMapController,
                         options: MapOptions(
+                          onTap: (_, point) => _usePickupPoint(point),
                           initialCenter: startMap,
                           initialZoom: mapZoom,
                           backgroundColor: _nightMap
@@ -987,6 +1066,23 @@ class _PassengerDemoState extends State<PassengerDemo> {
                           style: TextStyle(color: Colors.white, fontSize: 11)),
                       ),
                     Positioned(
+                      top: 8, left: 8,
+                      child: Material(
+                        color: const Color(0xF0172535),
+                        borderRadius: BorderRadius.circular(12),
+                        child: IconButton(
+                          key: const Key('passenger-locate-me'),
+                          tooltip: pdTr(context, 'Моё местоположение',
+                            'Mano vieta', 'My location'),
+                          onPressed: _findingPassenger ? null : _locatePassenger,
+                          icon: _findingPassenger
+                            ? const SizedBox(width: 18, height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.my_location, color: gold),
+                        ),
+                      ),
+                    ),
+                    Positioned(
                       top: 8,
                       right: 8,
                       child: Material(
@@ -1012,6 +1108,22 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 ),
               ),
             ),
+            if (_locationMessage != null)
+              Text(_locationMessage!, key: const Key('passenger-location-error'),
+                style: const TextStyle(color: Colors.orangeAccent)),
+            if (_passengerLocation != null)
+              OutlinedButton.icon(
+                key: const Key('passenger-use-current-as-pickup'),
+                onPressed: () => _usePickupPoint(_passengerLocation!),
+                icon: const Icon(Icons.trip_origin),
+                label: Text(pdTr(context, 'Забрать меня здесь',
+                  'Paimti mane čia', 'Pick me up here')),
+              ),
+            Text(pdTr(context, 'Нажми на карту, чтобы выбрать точку посадки.',
+              'Paliesk žemėlapį, kad pasirinktum paėmimo vietą.',
+              'Tap the map to choose your pickup point.'),
+              key: const Key('passenger-pickup-map-instruction'),
+              style: const TextStyle(fontSize: 12)),
             if (store != null && store.isActive)
               Text(
                 pilotPosition != null
@@ -1090,6 +1202,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   tooltip: pdLabel(context, 'Поменять А и Б'),
                   onPressed: () {
                     setState(() {
+                      _pickedPickup = null;
                       final previous = _from.text;
                       _from.text = _to.text;
                       _to.text = previous;

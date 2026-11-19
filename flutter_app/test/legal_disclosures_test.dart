@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/company_info.dart';
+import 'package:private_drive/main.dart';
 
 void main() {
+  testWidgets('SMS entry shows privacy and terms without marketing opt-in',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: NativeSignInScreen()));
+    expect(find.byKey(const Key('native-legal-acknowledgement')),
+        findsOneWidget);
+    await tester.tap(find.byKey(const Key('native-open-legal-documents')));
+    await tester.pumpAndSettle();
+    expect(find.text('Конфиденциальность'), findsOneWidget);
+    expect(find.text('Отмена и возврат'), findsOneWidget);
+  });
+
   testWidgets('Legal disclosures expose all four sections in app',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: CompanyInfoPage()));

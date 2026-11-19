@@ -38,7 +38,8 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
       _visibleMessages
         ..clear()
         ..addAll(store.pilotChatMessages)
-        ..addAll(store.passengerChatMessages.map((m) => 'Пассажир: $m'));
+        ..addAll(store.passengerChatMessages.map((m) => 'Пассажир: $m'))
+        ..addAll(store.dispatcherChatMessages.map((m) => 'Диспетчер: $m'));
     });
   }
 

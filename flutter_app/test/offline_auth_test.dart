@@ -42,6 +42,8 @@ void main() {
 
     expect(find.text('PRIVATE DRIVE'), findsWidgets);
     expect(find.text('Независимый вход без Telegram'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Получить код'), 120,
+      scrollable: find.byType(Scrollable).first);
     expect(find.text('Получить код'), findsOneWidget);
 
     final button = tester.widget<FilledButton>(
@@ -65,6 +67,8 @@ void main() {
     expect(find.text('Телефон в формате +370...'), findsOneWidget);
     expect(find.text('Email'), findsNothing);
     expect(find.byType(SegmentedButton<bool>), findsNothing);
+    await tester.scrollUntilVisible(find.text('Получить код'), 120,
+      scrollable: find.byType(Scrollable).first);
     expect(find.text('Получить код'), findsOneWidget);
     expect(tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Получить код'),

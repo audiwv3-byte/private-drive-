@@ -10,16 +10,19 @@ class PrivateDriveBrandLogo extends StatelessWidget {
     super.key,
     this.size = 176,
     this.circular = false,
+    this.transparentBackground = false,
   });
 
   final double size;
   /// Use a round seal in the Pilot Cockpit, retaining the original elsewhere.
   final bool circular;
+  /// Removes only the legacy black image backdrop on the sign-in screen.
+  final bool transparentBackground;
 
   @override
   Widget build(BuildContext context) {
     final asset = Image.asset(
-      privateDriveLogoAsset,
+      transparentBackground ? 'assets/brand/private_drive_logo_transparent.png' : privateDriveLogoAsset,
       key: const Key('private-drive-brand-logo'),
       width: size,
       height: size,

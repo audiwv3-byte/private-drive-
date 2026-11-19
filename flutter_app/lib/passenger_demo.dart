@@ -510,7 +510,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
   void _createLocalTrip() {
     final store = widget.tripStore;
-    if (store == null) return;
+    if (store == null || store.isActive || _cashBlockedForAdvance) return;
     final date = _date ?? DateUtils.dateOnly(DateTime.now());
     final time = _time ?? TimeOfDay.now();
     final departure = DateTime(date.year, date.month, date.day,
@@ -720,7 +720,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
       firstDate: today,
       lastDate: today.add(const Duration(days: 365)),
     );
-    if (selected != null && mounted) setState(() => _date = selected);
+    if (selected != null && mounted && widget.tripStore?.isActive != true) setState(() {
+      _date = selected;
+      if (_cashBlockedForAdvance) _payment = 'Карта';
+    });
   }
 
   Future<void> _pickTime() async {
@@ -728,7 +731,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
       context: context,
       initialTime: _time ?? TimeOfDay.now(),
     );
-    if (selected != null && mounted) setState(() => _time = selected);
+    if (selected != null && mounted && widget.tripStore?.isActive != true) setState(() {
+      _time = selected;
+      if (_cashBlockedForAdvance) _payment = 'Карта';
+    });
   }
 
   // Independent of flutter_map's image pipeline: surfaces DNS/TLS/HTTP errors
@@ -1165,7 +1171,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('taxi-advance-booking'),
                 title: const Text('Предварительное бронирование · +3 €'),
                 value: _taxiAdvanceBooking,
-                onChanged: (v) => setState(() => _taxiAdvanceBooking = v ?? false),
+                onChanged: widget.tripStore?.isActive == true ? null : (v) => setState(() {
+                  _taxiAdvanceBooking = v ?? false;
+                  if (_cashBlockedForAdvance) _payment = 'Карта';
+                }),
               ),
             ],
             const SizedBox(height: 12),
@@ -1296,7 +1305,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 Expanded(
                   child: OutlinedButton.icon(
                     key: const Key('passenger-date'),
-                    onPressed: _pickDate,
+                    onPressed: widget.tripStore?.isActive == true ? null : _pickDate,
                     icon: const Icon(Icons.calendar_today),
                     label: Text(_date == null
                         ? pdLabel(context, 'Дата')
@@ -1307,7 +1316,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 Expanded(
                   child: OutlinedButton.icon(
                     key: const Key('passenger-time'),
-                    onPressed: _pickTime,
+                    onPressed: widget.tripStore?.isActive == true ? null : _pickTime,
                     icon: const Icon(Icons.schedule),
                     label: Text(_time == null ? pdLabel(context, 'Время') : _time!.format(context)),
                   ),
@@ -1316,7 +1325,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ),
             const SizedBox(height: 16),
             if (!widget.enableMapTiles || _menuSection == 'preferences') ...[
-            Card(
+            AbsorbPointer(
+              absorbing: widget.tripStore?.isActive == true,
+              child: Card(
               key: const Key('passenger-personal-trip-settings-card'),
               child: ExpansionTile(
                 key: const Key('passenger-personal-trip-settings'),
@@ -1481,6 +1492,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 ],
               ),
             ),
+            ),
             const SizedBox(height: 12),
             ],
             if (!widget.enableMapTiles || _menuSection == 'payments') ...[
@@ -1495,7 +1507,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       ? pdTr(context, 'Карта', 'Kortelė', 'Card')
                       : pdLabel(context, method)),
                     selected: _payment == method,
-                    onSelected: (_) => setState(() => _payment = method),
+                    onSelected: widget.tripStore?.isActive == true ||
+                        (_isAdvanceBooking && method == 'Наличные') ? null
+                        : (_) => setState(() => _payment = method),
                   ),
               ],
             ),

@@ -10,6 +10,8 @@ import 'passenger_ride_entry.dart';
 import 'app_language.dart';
 import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
+import 'pilot_sound_settings.dart';
+import 'pilot_offer_tone.dart';
 import 'pd_slide_to_confirm.dart';
 import 'pilot_passenger_chat_demo.dart';
 import 'message_voice.dart';
@@ -433,6 +435,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     }
   }
 
+  final PilotOfferTone _demoOfferTone = PilotOfferTone();
   bool _incomingOffer = false;
   bool _nextAccepted = false;
 
@@ -444,7 +447,9 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (widget.onIncomingSound != null) {
       widget.onIncomingSound!();
     } else {
-      SystemSound.play(SystemSoundType.alert);
+      if (PilotSoundSettings.instance.enabled) {
+        unawaited(_demoOfferTone.play(melody: PilotSoundSettings.instance.melody));
+      }
     }
   }
 
@@ -870,6 +875,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     widget.tripStore?.removeListener(_onTripChanged);
     _gps?.cancel();
     _synthetic?.cancel();
+    _demoOfferTone.dispose();
     _cameraAnimation.dispose();
     if (widget.mapController == null) _map.dispose();
     super.dispose();
@@ -895,6 +901,17 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
             title: Text(pdLabel(context, 'Статус поездки')),
             subtitle: Text(pdLabel(context, _tripLabel)),
             onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            key: const Key('pilot-drawer-sounds'),
+            leading: const Icon(Icons.volume_up_outlined),
+            title: Text(pdLabel(context, 'Настройки звуков')),
+            subtitle: const Text('Заказы: 3 мелодии или без звука'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const PilotSoundSettingsPage()));
+            },
           ),
           ListTile(
             key: const Key('pilot-drawer-history'),
@@ -1016,13 +1033,13 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                         key: const Key('pilot-location-heading'),
                         angle: _headingDegrees * math.pi / 180,
                         child: const Icon(
-                          Icons.navigation_rounded,
+                          Icons.local_taxi_rounded,
                           key: Key('pilot-location-marker'),
-                          color: Color(0xFFB6FF36),
+                          color: Color(0xFFDDC184),
                           size: 44,
                           shadows: [
                             Shadow(color: Colors.black, blurRadius: 9),
-                            Shadow(color: Color(0xFF142310), blurRadius: 3),
+                            Shadow(color: Color(0xFF172B3F), blurRadius: 4),
                           ],
                         ),
                       ),

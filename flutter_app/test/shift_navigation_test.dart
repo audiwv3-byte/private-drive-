@@ -31,8 +31,10 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('open-dispatcher-preview')));
     await tester.tap(find.byKey(const Key('open-dispatcher-preview')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('dispatcher-tab-2')));
-    await tester.pump();
+    await tester.tap(find.byKey(const Key('dispatcher-open-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('dispatcher-menu-2')));
+    await tester.pumpAndSettle();
     expect(find.textContaining('На линии'), findsWidgets);
 
     await tester.pageBack();

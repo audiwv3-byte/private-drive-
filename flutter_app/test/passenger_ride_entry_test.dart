@@ -1,0 +1,37 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:private_drive/demo_trip_store.dart';
+import 'package:private_drive/passenger_demo.dart';
+import 'package:private_drive/passenger_ride_entry.dart';
+
+void main() {
+  testWidgets('Passenger chooses taxi before seeing booking form', (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    await tester.pumpWidget(MaterialApp(
+      home: PassengerRideEntry(enableMapTiles: false, tripStore: store),
+    ));
+    expect(find.byKey(const Key('passenger-entry-title')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-form')), findsNothing);
+    await tester.tap(find.byKey(const Key('passenger-entry-taxi')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PassengerDemo), findsOneWidget);
+    expect(find.text('Такси · выбранный тип поездки'), findsOneWidget);
+    expect(find.byKey(const Key('passenger-round-trip')), findsNothing);
+    expect(find.byKey(const Key('passenger-ride-type')), findsNothing);
+    expect(find.byKey(const Key('passenger-map')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-map-day-night')), findsOneWidget);
+  });
+
+  testWidgets('Passenger chooses transfer on dedicated entry screen', (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    await tester.pumpWidget(MaterialApp(
+      home: PassengerRideEntry(enableMapTiles: false, tripStore: store),
+    ));
+    await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
+    await tester.pumpAndSettle();
+    expect(find.text('Трансфер · выбранный тип поездки'), findsOneWidget);
+    expect(find.byKey(const Key('passenger-round-trip')), findsOneWidget);
+  });
+}

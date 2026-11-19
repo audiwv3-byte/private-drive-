@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
 import 'app_language.dart';
+import 'isolated_trip_chat.dart';
 
 /// Passenger order controls remain available while navigating between screens.
 /// All data is in-memory and disappears on process restart; production persistence
@@ -43,8 +44,18 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
         final store = widget.tripStore;
         final trip = store.trip;
         if (trip == null) {
-          return Center(child: Text(pdLabel(context, 'Заказов в демосессии пока нет'),
-            key: const Key('passenger-orders-empty')));
+          return ListView(padding: const EdgeInsets.all(16), children: [
+            Text(pdLabel(context, 'Заказов в демосессии пока нет'),
+              key: const Key('passenger-orders-empty')),
+            const Card(child: ExpansionTile(
+              key: Key('passenger-isolated-chat-panel'),
+              title: Text('Связь между устройствами · тест'),
+              children: [Padding(
+                padding: EdgeInsets.all(12),
+                child: IsolatedTripChat(expectedRole: 'passenger'),
+              )],
+            )),
+          ]);
         }
         final canChat = store.isActive;
         return ListView(
@@ -173,6 +184,14 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
               Text(pdLabel(context, 'Локальный чат DEMO: без отправки через интернет.'),
                 style: TextStyle(fontSize: 11)),
             ],
+            const Card(child: ExpansionTile(
+              key: Key('passenger-isolated-chat-panel'),
+              title: Text('Связь между устройствами · тест'),
+              children: [Padding(
+                padding: EdgeInsets.all(12),
+                child: IsolatedTripChat(expectedRole: 'passenger'),
+              )],
+            )),
             DemoRatingPanel(tripStore: store),
           ],
         );

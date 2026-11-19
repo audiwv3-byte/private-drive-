@@ -12,7 +12,7 @@ void main() {
     final store = DemoTripStore();
     expect(store.create(
       from: 'Вильнюс', to: 'Аэропорт Вильнюса',
-      departure: DateTime(2026, 11, 21),
+      departure: DateTime.now(),
       paymentMethod: 'Наличные', services: const []), isTrue);
     return store;
   }

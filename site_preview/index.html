@@ -16,7 +16,7 @@
     .top{position:sticky;top:0;z-index:20;background:#0a0b0aef;backdrop-filter:blur(24px);border-bottom:1px solid #64503688}
     .top-inner{min-height:98px;display:flex;align-items:center;justify-content:space-between;gap:28px}
     .brand{display:flex;gap:13px;align-items:center;text-decoration:none;min-width:216px}
-    .brand img{width:70px;height:70px;object-fit:contain;border-radius:50%;background:#050505;box-shadow:0 0 0 1px #836936,0 0 24px #a77f302e}
+    .brand img{width:70px;height:70px;object-fit:contain;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #836936,0 0 24px #a77f302e}
     .brand strong{display:block;font:600 19px/1.2 Georgia,serif;letter-spacing:.19em;color:var(--gold-hi)}.brand small{font-size:9px;letter-spacing:.32em;color:#b7a17c}
     nav{display:flex;gap:30px;align-items:center}nav a{text-decoration:none;color:#d2c6af;font-size:13px;letter-spacing:.05em;transition:color .2s}nav a:hover{color:var(--gold-hi)}
     .button{display:inline-flex;gap:10px;align-items:center;justify-content:center;text-align:center;border:1px solid var(--gold);background:linear-gradient(125deg,#fff0c2 0%,#dbb66a 43%,#ac7f3c 100%);color:#171207;padding:15px 24px;border-radius:3px;text-decoration:none;font-weight:730;font-size:13px;letter-spacing:.075em;min-height:51px;cursor:pointer;transition:transform .2s,filter .2s}
@@ -32,9 +32,9 @@
     .hero-art{min-height:495px;display:grid;place-items:center;position:relative}
     .hero-art:before{content:"";position:absolute;width:min(100%,490px);aspect-ratio:1;border:1px solid #be92572b;transform:rotate(45deg);pointer-events:none}
     .hero-art:after{content:"PRIVATE  •  DRIVE  •  PREMIUM  •  EXPERIENCE";position:absolute;left:50%;top:6%;transform:translateX(-50%);white-space:nowrap;letter-spacing:.23em;font-size:8px;color:#a78f64}
-    .halo{width:min(89%,434px);aspect-ratio:1;border-radius:50%;border:1px solid #b89b62;box-shadow:0 0 0 1px #4e3b1d,0 0 0 26px #cda7650a,0 0 0 67px #cda76506,inset 0 0 90px #000;display:grid;place-items:center;background:radial-gradient(circle,#26241e 0%,#0a0a09 70%);position:relative}
+    .halo{width:min(89%,434px);aspect-ratio:1;border-radius:50%;border:1px solid #b89b62;box-shadow:0 0 0 1px #4e3b1d,0 0 0 26px #cda7650a,0 0 0 67px #cda76506,inset 0 0 90px #000;display:grid;place-items:center;background:radial-gradient(circle,#fcf8ed 0%,#d8c99d 66%,#1c1a13 100%);position:relative}
     .halo:before{content:"";position:absolute;inset:13px;border-radius:50%;border:1px solid #cba76c55;pointer-events:none}
-    .halo img{width:75%;max-height:330px;object-fit:contain;filter:drop-shadow(0 20px 30px #000)}
+    .halo img{width:75%;max-height:330px;object-fit:contain;border-radius:18%;filter:drop-shadow(0 20px 30px #000)}
     .art-caption{position:absolute;bottom:1%;font-size:10px;color:#d1ad70;letter-spacing:.25em;text-align:center}
     .hero-divider{height:1px;background:linear-gradient(90deg,transparent,#c49b52 35%,#f7dca3 50%,#c49b52 65%,transparent)}
     .intro-strip{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:19px 0;color:#c8b995;font-size:11px;letter-spacing:.22em;text-transform:uppercase}
@@ -62,7 +62,7 @@
   <div class="preview" role="status">ТЕСТОВЫЙ МАКЕТ · НЕ ПРИНИМАЕТ РЕАЛЬНЫЕ ЗАКАЗЫ И ПЛАТЕЖИ</div>
   <header class="top"><div class="wrap top-inner">
     <a class="brand" href="#top" aria-label="PRIVATE DRIVE — на главную">
-      <img src="../miniapp/static/private-drive-official-logo.jpeg" alt="Фирменный логотип PD" width="58" height="58">
+      <img src="assets/private-drive-gold-car.webp" alt="Золотой фирменный логотип PD с автомобилем" width="58" height="58">
       <span><strong>PRIVATE DRIVE</strong><small>PREMIUM TRANSFERS</small></span>
     </a>
     <nav aria-label="Основное меню"><a href="#taxi">Такси</a><a href="#transfers">Трансферы</a><a href="#extras">Услуги</a><a href="#registration">Регистрация</a></nav>
@@ -77,7 +77,7 @@
         <div class="actions"><a class="button" href="#taxi">Выбрать поездку <span aria-hidden="true">↗</span></a><a class="button secondary" href="#registration">Регистрация <span aria-hidden="true">→</span></a></div>
         <div class="trust"><span>Заказ через приложение</span><span>Тариф до подтверждения</span><span>Поддержка диспетчера</span></div>
       </div>
-      <div class="hero-art" aria-label="Фирменный стиль PRIVATE DRIVE"><div class="halo"><img src="../miniapp/static/private-drive-official-logo.jpeg" alt="Золотой логотип PRIVATE DRIVE на чёрном фоне"></div><span class="art-caption">PRIVATE DRIVE · PREMIUM SERVICE</span></div>
+      <div class="hero-art" aria-label="Фирменный стиль PRIVATE DRIVE"><div class="halo"><img src="assets/private-drive-gold-car.webp" alt="Золотая монограмма PD, надпись PRIVATE DRIVE и автомобиль"></div><span class="art-caption">PRIVATE DRIVE · PREMIUM SERVICE</span></div>
     </div></section>
     <div class="hero-divider" aria-hidden="true"></div>
     <div class="wrap intro-strip" aria-label="Сервис PRIVATE DRIVE"><span>Персональный подход</span><span>Такси и трансферы</span><span>Вильнюс · Европа</span></div>

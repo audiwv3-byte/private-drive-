@@ -800,6 +800,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     userAgentPackageName: 'lt.privatedrive.private_drive.demo',
                     maxNativeZoom: 19,
                     errorTileCallback: (tile, error, stackTrace) {
+                    debugPrint('PD_PILOT_TILE_ERROR: $error');
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (!mounted || _pilotTilesFailed) return;
                         setState(() {

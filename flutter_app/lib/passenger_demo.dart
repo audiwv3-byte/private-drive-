@@ -923,65 +923,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          key: const Key('passenger-form'),
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (widget.tripStore?.pilotChatMessages.isNotEmpty == true)
-              Card(
-                key: const Key('passenger-pilot-message-alert'),
-                child: ListTile(
-                  leading: const Icon(Icons.mark_chat_unread_outlined),
-                  title: Text(pdLabel(context, 'Сообщение от пилота')),
-                  subtitle: Text(widget.tripStore!.pilotChatMessages.last,
-                    maxLines: 2, overflow: TextOverflow.ellipsis),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _openOrders,
-                ),
-              ),
-            Text(pdLabel(context, 'Тестовый заказ поездки'), style: TextStyle(fontSize: 22)),
-            const SizedBox(height: 6),
-            Text(pdLabel(context, 'Демонстрация. Не отправляет заказы и не списывает деньги.')),
-            const SizedBox(height: 12),
-            Text('${pdLabel(context, _rideType)} · ${pdLabel(context, 'выбранный тип поездки')}',
-              key: const Key('passenger-selected-ride-type'),
-              style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (_rideType == 'Трансфер') ...[
-              SwitchListTile(
-                key: const Key('passenger-round-trip'),
-                title: Text(pdLabel(context, 'Туда и обратно')),
-                value: _roundTrip,
-                onChanged: (v) => setState(() => _roundTrip = v),
-              ),
-              Text(
-                pdTr(context,
-                  'Фиксированные тарифы Sedan без скидки: '
-                  'Вильнюс → Каунас 130 €, обратно 90 €, '
-                  'Вильнюс ↔ аэропорт Вильнюса 40 €. '
-                  'Вильнюс — Каунас туда и обратно 200 €. '
-                  'Другие маршруты — по тарифной таблице или по запросу.',
-                  'Fiksuotos Sedan kainos be nuolaidos: Vilnius → Kaunas 130 €, '
-                  'atgal 90 €, Vilnius ↔ Vilniaus oro uostas 40 €. '
-                  'Vilnius–Kaunas į abi puses 200 €. Kiti maršrutai pagal kainoraštį arba užklausą.',
-                  'Fixed Sedan fares with no discount: Vilnius → Kaunas €130, '
-                  'return €90, Vilnius ↔ Vilnius Airport €40. '
-                  'Vilnius–Kaunas round trip €200. Other routes per price list or on request.'),
-                key: const Key('passenger-transfer-tariffs'),
-                style: const TextStyle(fontSize: 12),
-              ),
-            ] else
-              Text(
-                pdTr(context,
-                  'Такси: Вильнюс → Каунас 90 €. Остальные направления — по запросу.',
-                  'Taksi: Vilnius → Kaunas 90 €. Kitos kryptys pagal užklausą.',
-                  'Taxi: Vilnius → Kaunas €90. Other destinations on request.'),
-                key: const Key('passenger-taxi-tariffs'),
-                style: const TextStyle(fontSize: 12),
-              ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 285,
+        child: Stack(children: [
+          Positioned.fill(child:
+            SizedBox.expand(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Stack(
@@ -1164,6 +1108,77 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 ),
               ),
             ),
+          ),
+          DraggableScrollableSheet(
+            key: const Key('passenger-trip-bottom-sheet'),
+            initialChildSize: 0.38,
+            minChildSize: 0.20,
+            maxChildSize: 0.94,
+            snap: true,
+            snapSizes: const [0.38, 0.94],
+            builder: (context, panelScrollController) => Material(
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              clipBehavior: Clip.antiAlias,
+              elevation: 12,
+              child: ListView(
+                controller: panelScrollController,
+                key: const Key('passenger-form'),
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (widget.tripStore?.pilotChatMessages.isNotEmpty == true)
+              Card(
+                key: const Key('passenger-pilot-message-alert'),
+                child: ListTile(
+                  leading: const Icon(Icons.mark_chat_unread_outlined),
+                  title: Text(pdLabel(context, 'Сообщение от пилота')),
+                  subtitle: Text(widget.tripStore!.pilotChatMessages.last,
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _openOrders,
+                ),
+              ),
+            Text(pdLabel(context, 'Тестовый заказ поездки'), style: TextStyle(fontSize: 22)),
+            const SizedBox(height: 6),
+            Text(pdLabel(context, 'Демонстрация. Не отправляет заказы и не списывает деньги.')),
+            const SizedBox(height: 12),
+            Text('${pdLabel(context, _rideType)} · ${pdLabel(context, 'выбранный тип поездки')}',
+              key: const Key('passenger-selected-ride-type'),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            if (_rideType == 'Трансфер') ...[
+              SwitchListTile(
+                key: const Key('passenger-round-trip'),
+                title: Text(pdLabel(context, 'Туда и обратно')),
+                value: _roundTrip,
+                onChanged: (v) => setState(() => _roundTrip = v),
+              ),
+              Text(
+                pdTr(context,
+                  'Фиксированные тарифы Sedan без скидки: '
+                  'Вильнюс → Каунас 130 €, обратно 90 €, '
+                  'Вильнюс ↔ аэропорт Вильнюса 40 €. '
+                  'Вильнюс — Каунас туда и обратно 200 €. '
+                  'Другие маршруты — по тарифной таблице или по запросу.',
+                  'Fiksuotos Sedan kainos be nuolaidos: Vilnius → Kaunas 130 €, '
+                  'atgal 90 €, Vilnius ↔ Vilniaus oro uostas 40 €. '
+                  'Vilnius–Kaunas į abi puses 200 €. Kiti maršrutai pagal kainoraštį arba užklausą.',
+                  'Fixed Sedan fares with no discount: Vilnius → Kaunas €130, '
+                  'return €90, Vilnius ↔ Vilnius Airport €40. '
+                  'Vilnius–Kaunas round trip €200. Other routes per price list or on request.'),
+                key: const Key('passenger-transfer-tariffs'),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ] else
+              Text(
+                pdTr(context,
+                  'Такси: Вильнюс → Каунас 90 €. Остальные направления — по запросу.',
+                  'Taksi: Vilnius → Kaunas 90 €. Kitos kryptys pagal užklausą.',
+                  'Taxi: Vilnius → Kaunas €90. Other destinations on request.'),
+                key: const Key('passenger-taxi-tariffs'),
+                style: const TextStyle(fontSize: 12),
+              ),
+            const SizedBox(height: 12),
             if (_locationMessage != null)
               Text(_locationMessage!, key: const Key('passenger-location-error'),
                 style: const TextStyle(color: Colors.orangeAccent)),
@@ -1549,8 +1564,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ),
             const SizedBox(height: 12),
           ],
-        ),
-      ),
+              ), // scrolling booking form
+            ), // material panel
+          ), // draggable panel
+        ]), // viewport map stack
+      ), // safe area
     );
   }
 }

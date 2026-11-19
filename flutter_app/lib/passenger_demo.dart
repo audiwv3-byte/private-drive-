@@ -683,6 +683,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                     Colors.transparent, BlendMode.dst),
                             child: TileLayer(
                               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              fallbackUrl: 'https://a.basemaps.cartocdn.com/voyager/{z}/{x}/{y}.png',
                               userAgentPackageName: 'lt.privatedrive.privateDrive',
                               errorTileCallback: (tile, error, stackTrace) {
                                 if (_mapTilesFailed) return;
@@ -709,6 +710,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                           const RichAttributionWidget(
                             attributions: [
                               TextSourceAttribution('© OpenStreetMap contributors'),
+                              TextSourceAttribution('© CARTO'),
                             ],
                           ),
                         ],

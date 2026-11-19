@@ -35,10 +35,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
           return Center(child: Text(pdLabel(context, 'Заказов в демосессии пока нет'),
             key: const Key('passenger-orders-empty')));
         }
-        final canChat = store.pilotAccepted &&
-            (store.status == DemoTripStatus.assigned ||
-             store.status == DemoTripStatus.approaching ||
-             store.status == DemoTripStatus.underway);
+        final canChat = store.isActive;
         return ListView(
           key: const Key('passenger-orders-list'),
           padding: const EdgeInsets.all(16),
@@ -137,7 +134,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                   controller: _draft,
                   maxLength: 500,
                   decoration: InputDecoration(
-                    hintText: pdLabel(context, 'Ответить пилоту'), counterText: ''),
+                    hintText: pdLabel(context, 'Написать пилоту и диспетчеру'), counterText: ''),
                 )),
                 IconButton(
                   key: const Key('passenger-chat-send'),

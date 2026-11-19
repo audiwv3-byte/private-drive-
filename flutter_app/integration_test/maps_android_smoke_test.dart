@@ -57,7 +57,9 @@ void main() {
         home: PassengerDemo(enableMapTiles: true),
       ),
     ));
-    await Future<void>.delayed(const Duration(seconds: 18));
+    await tester.runAsync(() => Future<void>.delayed(
+      const Duration(seconds: 18)));
+
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
     expect(find.byKey(const Key('passenger-map-load-error')), findsNothing,
@@ -81,7 +83,9 @@ void main() {
         home: PilotDemo(enableMapTiles: true, loadMapTiles: true),
       ),
     ));
-    await Future<void>.delayed(const Duration(seconds: 18));
+    await tester.runAsync(() => Future<void>.delayed(
+      const Duration(seconds: 18)));
+
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('pilot-map-load-error')), findsNothing,
       reason: 'Pilot map detected failed network tile requests');

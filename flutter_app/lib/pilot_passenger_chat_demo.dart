@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'app_language.dart';
+import 'isolated_trip_chat.dart';
 
 /// Pilot-only offline chat preview. No APIs, SMS, phone calls or persistence.
 /// The demo has no verified passenger contact details.
@@ -78,6 +79,14 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: gold),
               ),
+            ),
+            const ExpansionTile(
+              key: Key('pilot-isolated-chat-panel'),
+              title: Text('Связь между устройствами · тест'),
+              children: [Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                child: IsolatedTripChat(expectedRole: 'pilot'),
+              )],
             ),
             Expanded(
               child: ListView(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
+import 'app_language.dart';
 
 /// Pilot-only offline chat preview. No APIs, SMS, phone calls or persistence.
 /// The demo has no verified passenger contact details.
@@ -63,17 +64,17 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
     const gold = Color(0xFFDDC184);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Пассажир · демо'),
+        title: Text(pdLabel(context, 'Пассажир · демо')),
       ),
       body: SafeArea(
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.all(12),
+            Padding(
+              padding: const EdgeInsets.all(12),
               child: Text(
-                'Локальный чат DEMO: сообщения доступны пассажиру в этом приложении, но не передаются между телефонами.',
+                pdLabel(context, 'Локальный чат DEMO: сообщения доступны пассажиру в этом приложении, но не передаются между телефонами.'),
                 textAlign: TextAlign.center,
-                style: TextStyle(color: gold),
+                style: const TextStyle(color: gold),
               ),
             ),
             Expanded(
@@ -93,7 +94,9 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
                           ),
                           child: Padding(
                             padding: const EdgeInsets.all(12),
-                            child: Text(message),
+                            child: Text(message.startsWith('Пассажир: ')
+                               ? '${pdLabel(context, 'Пассажир')}: ${message.substring('Пассажир: '.length)}'
+                               : message),
                           ),
                         ),
                       ),
@@ -111,7 +114,7 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: ActionChip(
-                        label: Text(reply),
+                        label: Text(pdLabel(context, reply)),
                         onPressed: () => _send(reply),
                       ),
                     ),
@@ -128,8 +131,8 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
                       controller: _draft,
                       maxLength: 500,
                       onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        hintText: 'Введите сообщение',
+                      decoration: InputDecoration(
+                        hintText: pdLabel(context, 'Введите сообщение'),
                         border: OutlineInputBorder(),
                         counterText: '',
                       ),
@@ -137,7 +140,7 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
                   ),
                   IconButton.filled(
                     key: const Key('pilot-chat-send'),
-                    tooltip: 'Отправить в демочат',
+                    tooltip: pdLabel(context, 'Отправить в демочат'),
                     onPressed: () => _send(),
                     icon: const Icon(Icons.send),
                   ),

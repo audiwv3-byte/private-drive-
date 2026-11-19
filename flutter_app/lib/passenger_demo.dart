@@ -813,347 +813,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
         ),
     ];
 
-    return Scaffold(
-      drawer: Drawer(
-        key: const Key('passenger-navigation-drawer'),
-        backgroundColor: const Color(0xFF172033),
-        child: SafeArea(child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const SizedBox(height: 24),
-            const CircleAvatar(
-              radius: 38,
-              backgroundColor: Color(0xFF31405A),
-              child: Icon(Icons.person_outline, size: 48, color: gold),
-            ),
-            const SizedBox(height: 12),
-            Text(pdLabel(context, 'Пассажир'), textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const Divider(height: 32),
-            ListTile(
-              key: const Key('passenger-drawer-booking'),
-              leading: const Icon(Icons.map_outlined),
-              title: Text(pdLabel(context, 'Карта и заказ')),
-              onTap: () => _openPassengerSection('booking'),
-            ),
-            ListTile(
-              key: const Key('passenger-drawer-routes'),
-              leading: const Icon(Icons.route_outlined),
-              title: Text(pdLabel(context, 'Популярные направления')),
-              onTap: () => _openPassengerSection('routes'),
-            ),
-            ListTile(
-              key: const Key('passenger-drawer-preferences'),
-              leading: const Icon(Icons.tune_outlined),
-              title: Text(pdLabel(context, 'Личные настройки пассажира')),
-              onTap: () => _openPassengerSection('preferences'),
-            ),
-            ListTile(
-              key: const Key('passenger-drawer-payments'),
-              leading: const Icon(Icons.credit_card_outlined),
-              title: Text(pdLabel(context, 'Способы оплаты')),
-              onTap: () => _openPassengerSection('payments'),
-            ),
-            ListTile(
-              key: const Key('passenger-drawer-history'),
-              leading: const Icon(Icons.history),
-              title: Text(pdTr(context, 'История', 'Istorija', 'History')),
-              enabled: widget.tripStore != null,
-              onTap: widget.tripStore == null ? null : () {
-                Navigator.pop(context);
-                _openOrders();
-              },
-            ),
-            ListTile(
-              key: const Key('passenger-drawer-profile'),
-              leading: const Icon(Icons.account_circle_outlined),
-              title: Text(pdTr(context, 'Профиль', 'Profilis', 'Profile')),
-              subtitle: Text(pdTr(context, 'После SMS-регистрации',
-                'Po SMS registracijos', 'After SMS registration')),
-              enabled: false,
-            ),
-            ListTile(
-              leading: const Icon(Icons.card_giftcard_outlined),
-              title: Text(pdTr(context, 'Бонусы и промокоды',
-                'Premijos ir nuolaidų kodai', 'Rewards and promo codes')),
-              enabled: false,
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.favorite_border),
-              title: Text(pdTr(context, 'Избранные адреса',
-                'Mėgstami adresai', 'Favorite addresses')),
-              enabled: false,
-            ),
-            ListTile(
-              key: const Key('passenger-drawer-language'),
-              leading: const Icon(Icons.language),
-              title: Text(pdTr(context, 'Язык', 'Kalba', 'Language')),
-              trailing: const PdLanguageMenu(),
-            ),
-            ListTile(
-              key: const Key('passenger-permissions-settings'),
-              leading: const Icon(Icons.location_on_outlined),
-              title: Text(pdTr(context, 'Разрешения приложения',
-                'Programėlės leidimai', 'App permissions')),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => const PdPermissionSettingsPage()));
-              },
-            ),
-            ListTile(
-              key: const Key('passenger-drawer-info'),
-              leading: const Icon(Icons.info_outline),
-              title: Text(pdLabel(context, 'Контакты и документы')),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => const CompanyInfoPage()));
-              },
-            ),
-          ],
-        )),
-      ),
-      appBar: AppBar(
-        leadingWidth: Navigator.of(context).canPop() ? 104 : 56,
-        leading: Row(children: [
-          if (Navigator.of(context).canPop()) const BackButton(),
-          Builder(builder: (menuContext) => IconButton(
-            key: const Key('passenger-open-drawer'),
-            tooltip: pdTr(context, 'Открыть меню', 'Atidaryti meniu', 'Open menu'),
-            icon: Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111111),
-                border: Border.all(color: gold),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.menu, color: gold),
-            ),
-            onPressed: () => Scaffold.of(menuContext).openDrawer(),
-          )),
-        ]),
-        title: Text(pdLabel(context, 'PRIVATE DRIVE · Пассажир')),
-        actions: [
-          const PdLanguageMenu(),
-          if (widget.tripStore != null)
-            IconButton(
-              key: const Key('passenger-orders-button'),
-              tooltip: pdLabel(context, 'Мои заказы'),
-              icon: const Icon(Icons.receipt_long_outlined),
-              onPressed: _openOrders,
-            ),
-          IconButton(
-            key: const Key('passenger-company-info'),
-            tooltip: pdLabel(context, 'Контакты и документы'),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => const CompanyInfoPage())),
-            icon: const Icon(Icons.info_outline),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Stack(children: [
-          Positioned.fill(child:
-            SizedBox.expand(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    widget.enableMapTiles
-                    ? KeyedSubtree(
-                        key: const ValueKey('passenger-route-map-persistent-controller'),
-                        child: FlutterMap(
-                        key: const Key('passenger-map'),
-                        mapController: _passengerMapController,
-                        options: MapOptions(
-                          onTap: (_, point) => _usePickupPoint(point),
-                          initialCenter: startMap,
-                          initialZoom: mapZoom,
-                          backgroundColor: _nightMap
-                              ? const Color(0xFF101B2B)
-                              : const Color(0xFFE0EAF0),
-                        ),
-                        children: [
-                          KeyedSubtree(
-                            key: ValueKey('passenger-raster-tile-generation-$mapGeneration'),
-                            child: ColorFiltered(
-                            key: const Key('passenger-map-night-filter'),
-                            colorFilter: _nightMap
-                                ? const ColorFilter.matrix(<double>[
-                                    -0.65, 0, 0, 0, 170,
-                                    0, -0.65, 0, 0, 170,
-                                    0, 0, -0.65, 0, 170,
-                                    0, 0, 0, 1, 0,
-                                  ])
-                                : const ColorFilter.matrix(<double>[
-                                    1, 0, 0, 0, 0,
-                                    0, 1, 0, 0, 0,
-                                    0, 0, 1, 0, 0,
-                                    0, 0, 0, 1, 0,
-                                  ]),
-                            child: TileLayer(
-                            key: const Key('passenger-map-tiles'),
-                            tileProvider: demoTileProvider(),
-                            // Both modes use keyless OSM; only day may use backup.
-                            urlTemplate: !_nightMap && _useBackupTiles
-                                ? 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
-                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
-                            errorTileCallback: (tile, error, stackTrace) {
-                              debugPrint('PD_PASSENGER_TILE_ERROR: $error');
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (!mounted || _mapTilesFailed ||
-                                    mapGeneration != _tileRetry ||
-                                    // Keep explicitly injected network errors
-                                    // visible in deterministic widget tests.
-                                    (widget.mapConnectivityCheck != null &&
-                                     _mapNetworkError != null)) return;
-                                setState(() {
-                                  _lastTileError = error.toString();
-                                  _mapTileErrors++;
-                                  if (_mapTileErrors >= 3) {
-                                    if (!_nightMap && !_useBackupTiles) {
-                                      // OSM can fail on real Android networks;
-                                      // retry automatically with CARTO light.
-                                      _useBackupTiles = true;
-                                      _mapTileErrors = 0;
-                                      _mapNetworkError = null;
-                                      _tileRetry++;
-                                    } else {
-                                      _mapTilesFailed = true;
-                                    }
-                                  }
-                                });
-                              });
-                            },
-                            ),
-                            ),
-                          ),
-                          if (_roadPoints.isNotEmpty)
-                            PolylineLayer(
-                              key: const Key('passenger-road-route'),
-                              polylines: [
-                                Polyline(
-                                  points: _roadPoints,
-                                  color: gold,
-                                  strokeWidth: 5,
-                                ),
-                              ],
-                            ),
-                          MarkerLayer(markers: mapMarkers),
-                          const RichAttributionWidget(
-                            attributions: [
-                              TextSourceAttribution('© OpenStreetMap contributors'),
-                              TextSourceAttribution('© CARTO'),
-                            ],
-                          ),
-                        ],
-                        ),
-                      )
-                    : const ColoredBox(
-                        key: Key('passenger-map'),
-                        color: Color(0xFF27332F),
-                        child: Center(child: Text('Карта · офлайн-тест')),
-                      ),
-                    if (widget.enableMapTiles &&
-                        (_mapTilesFailed || _mapNetworkError != null))
-                      Positioned.fill(
-                        child: ColoredBox(
-                          color: const Color(0xF01A2A34),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.map_outlined,
-                                  color: Color(0xFFDDC184), size: 42),
-                                const SizedBox(height: 8),
-                                Text(pdLabel(context, 'Карта временно недоступна'),
-                                  key: Key('passenger-map-load-error')),
-                                Text(_mapNetworkError ?? _lastTileError ??
-                                    'Не удалось показать тайлы карты',
-                                  key: const Key('passenger-map-error-details'),
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12)),
-                                TextButton.icon(
-                                  key: const Key('passenger-map-retry'),
-                                  onPressed: _retryMap,
-                                  icon: const Icon(Icons.refresh),
-                                  label: Text(pdLabel(context, 'Повторить загрузку')),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    if (widget.enableMapTiles && _checkingMapNetwork &&
-                        !_mapTilesFailed)
-                      const Positioned(
-                        left: 8, bottom: 8,
-                        child: Text('Проверка сервера карты…',
-                          key: Key('passenger-map-checking'),
-                          style: TextStyle(color: Colors.white, fontSize: 11)),
-                      ),
-                    Positioned(
-                      top: 8, left: 8,
-                      child: Material(
-                        color: const Color(0xF0172535),
-                        borderRadius: BorderRadius.circular(12),
-                        child: IconButton(
-                          key: const Key('passenger-locate-me'),
-                          tooltip: pdTr(context, 'Моё местоположение',
-                            'Mano vieta', 'My location'),
-                          onPressed: _findingPassenger ? null : _locatePassenger,
-                          icon: _findingPassenger
-                            ? const SizedBox(width: 18, height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.my_location, color: gold),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Material(
-                        color: const Color(0xF0172535),
-                        borderRadius: BorderRadius.circular(12),
-                        child: IconButton(
-                          key: const Key('passenger-map-day-night'),
-                          tooltip: pdLabel(context, _nightMap ? 'Дневная карта' : 'Ночная карта'),
-                          icon: Icon(_nightMap ? Icons.wb_sunny_outlined
-                              : Icons.dark_mode_outlined,
-                              color: const Color(0xFFDDC184), size: 20),
-                          onPressed: () => setState(() {
-                            _nightMap = !_nightMap;
-                            _mapTileErrors = 0;
-                            _mapTilesFailed = false;
-                            _lastTileError = null;
-                            _tileRetry++;
-                          }),
-                          ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          DraggableScrollableSheet(
-            controller: _passengerSheetController,
-            key: const Key('passenger-trip-bottom-sheet'),
-            initialChildSize: widget.enableMapTiles ? 0.38 : 1.0,
-            minChildSize: widget.enableMapTiles ? 0.20 : 1.0,
-            maxChildSize: widget.enableMapTiles ? 0.94 : 1.0,
-            snap: widget.enableMapTiles,
-            snapSizes: widget.enableMapTiles ? const [0.38, 0.94] : null,
-            builder: (context, panelScrollController) => Material(
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              clipBehavior: Clip.antiAlias,
-              elevation: 12,
-              child: ListView(
+    Widget bookingForm(ScrollController? panelScrollController) =>
+      ListView(
                 controller: panelScrollController,
                 key: const Key('passenger-form'),
           padding: const EdgeInsets.all(16),
@@ -1602,9 +1263,353 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ),
             const SizedBox(height: 12),
           ],
-              ), // scrolling booking form
+              );
+
+    return Scaffold(
+      drawer: Drawer(
+        key: const Key('passenger-navigation-drawer'),
+        backgroundColor: const Color(0xFF172033),
+        child: SafeArea(child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const SizedBox(height: 24),
+            const CircleAvatar(
+              radius: 38,
+              backgroundColor: Color(0xFF31405A),
+              child: Icon(Icons.person_outline, size: 48, color: gold),
+            ),
+            const SizedBox(height: 12),
+            Text(pdLabel(context, 'Пассажир'), textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Divider(height: 32),
+            ListTile(
+              key: const Key('passenger-drawer-booking'),
+              leading: const Icon(Icons.map_outlined),
+              title: Text(pdLabel(context, 'Карта и заказ')),
+              onTap: () => _openPassengerSection('booking'),
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-routes'),
+              leading: const Icon(Icons.route_outlined),
+              title: Text(pdLabel(context, 'Популярные направления')),
+              onTap: () => _openPassengerSection('routes'),
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-preferences'),
+              leading: const Icon(Icons.tune_outlined),
+              title: Text(pdLabel(context, 'Личные настройки пассажира')),
+              onTap: () => _openPassengerSection('preferences'),
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-payments'),
+              leading: const Icon(Icons.credit_card_outlined),
+              title: Text(pdLabel(context, 'Способы оплаты')),
+              onTap: () => _openPassengerSection('payments'),
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-history'),
+              leading: const Icon(Icons.history),
+              title: Text(pdTr(context, 'История', 'Istorija', 'History')),
+              enabled: widget.tripStore != null,
+              onTap: widget.tripStore == null ? null : () {
+                Navigator.pop(context);
+                _openOrders();
+              },
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-profile'),
+              leading: const Icon(Icons.account_circle_outlined),
+              title: Text(pdTr(context, 'Профиль', 'Profilis', 'Profile')),
+              subtitle: Text(pdTr(context, 'После SMS-регистрации',
+                'Po SMS registracijos', 'After SMS registration')),
+              enabled: false,
+            ),
+            ListTile(
+              leading: const Icon(Icons.card_giftcard_outlined),
+              title: Text(pdTr(context, 'Бонусы и промокоды',
+                'Premijos ir nuolaidų kodai', 'Rewards and promo codes')),
+              enabled: false,
+            ),
+
+            ListTile(
+              leading: const Icon(Icons.favorite_border),
+              title: Text(pdTr(context, 'Избранные адреса',
+                'Mėgstami adresai', 'Favorite addresses')),
+              enabled: false,
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-language'),
+              leading: const Icon(Icons.language),
+              title: Text(pdTr(context, 'Язык', 'Kalba', 'Language')),
+              trailing: const PdLanguageMenu(),
+            ),
+            ListTile(
+              key: const Key('passenger-permissions-settings'),
+              leading: const Icon(Icons.location_on_outlined),
+              title: Text(pdTr(context, 'Разрешения приложения',
+                'Programėlės leidimai', 'App permissions')),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const PdPermissionSettingsPage()));
+              },
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-info'),
+              leading: const Icon(Icons.info_outline),
+              title: Text(pdLabel(context, 'Контакты и документы')),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const CompanyInfoPage()));
+              },
+            ),
+          ],
+        )),
+      ),
+      appBar: AppBar(
+        leadingWidth: Navigator.of(context).canPop() ? 104 : 56,
+        leading: Row(children: [
+          if (Navigator.of(context).canPop()) const BackButton(),
+          Builder(builder: (menuContext) => IconButton(
+            key: const Key('passenger-open-drawer'),
+            tooltip: pdTr(context, 'Открыть меню', 'Atidaryti meniu', 'Open menu'),
+            icon: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                border: Border.all(color: gold),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.menu, color: gold),
+            ),
+            onPressed: () => Scaffold.of(menuContext).openDrawer(),
+          )),
+        ]),
+        title: Text(pdLabel(context, 'PRIVATE DRIVE · Пассажир')),
+        actions: [
+          const PdLanguageMenu(),
+          if (widget.tripStore != null)
+            IconButton(
+              key: const Key('passenger-orders-button'),
+              tooltip: pdLabel(context, 'Мои заказы'),
+              icon: const Icon(Icons.receipt_long_outlined),
+              onPressed: _openOrders,
+            ),
+          IconButton(
+            key: const Key('passenger-company-info'),
+            tooltip: pdLabel(context, 'Контакты и документы'),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => const CompanyInfoPage())),
+            icon: const Icon(Icons.info_outline),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Stack(children: [
+          Positioned.fill(child:
+            SizedBox.expand(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    widget.enableMapTiles
+                    ? KeyedSubtree(
+                        key: const ValueKey('passenger-route-map-persistent-controller'),
+                        child: FlutterMap(
+                        key: const Key('passenger-map'),
+                        mapController: _passengerMapController,
+                        options: MapOptions(
+                          onTap: (_, point) => _usePickupPoint(point),
+                          initialCenter: startMap,
+                          initialZoom: mapZoom,
+                          backgroundColor: _nightMap
+                              ? const Color(0xFF101B2B)
+                              : const Color(0xFFE0EAF0),
+                        ),
+                        children: [
+                          KeyedSubtree(
+                            key: ValueKey('passenger-raster-tile-generation-$mapGeneration'),
+                            child: ColorFiltered(
+                            key: const Key('passenger-map-night-filter'),
+                            colorFilter: _nightMap
+                                ? const ColorFilter.matrix(<double>[
+                                    -0.65, 0, 0, 0, 170,
+                                    0, -0.65, 0, 0, 170,
+                                    0, 0, -0.65, 0, 170,
+                                    0, 0, 0, 1, 0,
+                                  ])
+                                : const ColorFilter.matrix(<double>[
+                                    1, 0, 0, 0, 0,
+                                    0, 1, 0, 0, 0,
+                                    0, 0, 1, 0, 0,
+                                    0, 0, 0, 1, 0,
+                                  ]),
+                            child: TileLayer(
+                            key: const Key('passenger-map-tiles'),
+                            tileProvider: demoTileProvider(),
+                            // Both modes use keyless OSM; only day may use backup.
+                            urlTemplate: !_nightMap && _useBackupTiles
+                                ? 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
+                            errorTileCallback: (tile, error, stackTrace) {
+                              debugPrint('PD_PASSENGER_TILE_ERROR: $error');
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (!mounted || _mapTilesFailed ||
+                                    mapGeneration != _tileRetry ||
+                                    // Keep explicitly injected network errors
+                                    // visible in deterministic widget tests.
+                                    (widget.mapConnectivityCheck != null &&
+                                     _mapNetworkError != null)) return;
+                                setState(() {
+                                  _lastTileError = error.toString();
+                                  _mapTileErrors++;
+                                  if (_mapTileErrors >= 3) {
+                                    if (!_nightMap && !_useBackupTiles) {
+                                      // OSM can fail on real Android networks;
+                                      // retry automatically with CARTO light.
+                                      _useBackupTiles = true;
+                                      _mapTileErrors = 0;
+                                      _mapNetworkError = null;
+                                      _tileRetry++;
+                                    } else {
+                                      _mapTilesFailed = true;
+                                    }
+                                  }
+                                });
+                              });
+                            },
+                            ),
+                            ),
+                          ),
+                          if (_roadPoints.isNotEmpty)
+                            PolylineLayer(
+                              key: const Key('passenger-road-route'),
+                              polylines: [
+                                Polyline(
+                                  points: _roadPoints,
+                                  color: gold,
+                                  strokeWidth: 5,
+                                ),
+                              ],
+                            ),
+                          MarkerLayer(markers: mapMarkers),
+                          const RichAttributionWidget(
+                            attributions: [
+                              TextSourceAttribution('© OpenStreetMap contributors'),
+                              TextSourceAttribution('© CARTO'),
+                            ],
+                          ),
+                        ],
+                        ),
+                      )
+                    : const ColoredBox(
+                        key: Key('passenger-map'),
+                        color: Color(0xFF27332F),
+                        child: Center(child: Text('Карта · офлайн-тест')),
+                      ),
+                    if (widget.enableMapTiles &&
+                        (_mapTilesFailed || _mapNetworkError != null))
+                      Positioned.fill(
+                        child: ColoredBox(
+                          color: const Color(0xF01A2A34),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.map_outlined,
+                                  color: Color(0xFFDDC184), size: 42),
+                                const SizedBox(height: 8),
+                                Text(pdLabel(context, 'Карта временно недоступна'),
+                                  key: Key('passenger-map-load-error')),
+                                Text(_mapNetworkError ?? _lastTileError ??
+                                    'Не удалось показать тайлы карты',
+                                  key: const Key('passenger-map-error-details'),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 12)),
+                                TextButton.icon(
+                                  key: const Key('passenger-map-retry'),
+                                  onPressed: _retryMap,
+                                  icon: const Icon(Icons.refresh),
+                                  label: Text(pdLabel(context, 'Повторить загрузку')),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (widget.enableMapTiles && _checkingMapNetwork &&
+                        !_mapTilesFailed)
+                      const Positioned(
+                        left: 8, bottom: 8,
+                        child: Text('Проверка сервера карты…',
+                          key: Key('passenger-map-checking'),
+                          style: TextStyle(color: Colors.white, fontSize: 11)),
+                      ),
+                    Positioned(
+                      top: 8, left: 8,
+                      child: Material(
+                        color: const Color(0xF0172535),
+                        borderRadius: BorderRadius.circular(12),
+                        child: IconButton(
+                          key: const Key('passenger-locate-me'),
+                          tooltip: pdTr(context, 'Моё местоположение',
+                            'Mano vieta', 'My location'),
+                          onPressed: _findingPassenger ? null : _locatePassenger,
+                          icon: _findingPassenger
+                            ? const SizedBox(width: 18, height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.my_location, color: gold),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Material(
+                        color: const Color(0xF0172535),
+                        borderRadius: BorderRadius.circular(12),
+                        child: IconButton(
+                          key: const Key('passenger-map-day-night'),
+                          tooltip: pdLabel(context, _nightMap ? 'Дневная карта' : 'Ночная карта'),
+                          icon: Icon(_nightMap ? Icons.wb_sunny_outlined
+                              : Icons.dark_mode_outlined,
+                              color: const Color(0xFFDDC184), size: 20),
+                          onPressed: () => setState(() {
+                            _nightMap = !_nightMap;
+                            _mapTileErrors = 0;
+                            _mapTilesFailed = false;
+                            _lastTileError = null;
+                            _tileRetry++;
+                          }),
+                          ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (widget.enableMapTiles) DraggableScrollableSheet(
+            controller: _passengerSheetController,
+            key: const Key('passenger-trip-bottom-sheet'),
+            initialChildSize: widget.enableMapTiles ? 0.38 : 1.0,
+            minChildSize: widget.enableMapTiles ? 0.20 : 1.0,
+            maxChildSize: widget.enableMapTiles ? 0.94 : 1.0,
+            snap: widget.enableMapTiles,
+            snapSizes: widget.enableMapTiles ? const [0.38, 0.94] : null,
+            builder: (context, panelScrollController) => Material(
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              clipBehavior: Clip.antiAlias,
+              elevation: 12,
+              child: bookingForm(panelScrollController), // scrolling booking form
             ), // material panel
           ), // draggable panel
+          if (!widget.enableMapTiles)
+            Positioned.fill(child: bookingForm(null)),
         ]), // viewport map stack
       ), // safe area
     );

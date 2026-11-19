@@ -29,6 +29,7 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
     super.initState();
     _visibleMessages = List<String>.of(widget.messages);
     widget.tripStore?.addListener(_refreshMessages);
+    _refreshMessages();
   }
 
   void _refreshMessages() {

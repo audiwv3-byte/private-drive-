@@ -11,6 +11,7 @@ import 'app_language.dart';
 import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
 import 'pilot_passenger_chat_demo.dart';
+import 'message_voice.dart';
 import 'demo_trip_store.dart';
 import 'demo_dispatcher_cabinet.dart';
 import 'company_info.dart';
@@ -295,6 +296,7 @@ class PilotDemo extends StatefulWidget {
     this.mapController,
     this.loadMapTiles = true,
     this.onIncomingSound,
+    this.onIncomingMessageVoice,
     this.showAssignedOffer = true,
     this.testRoadPoints,
   });
@@ -309,6 +311,8 @@ class PilotDemo extends StatefulWidget {
   final bool loadMapTiles;
   /// Test hook; production demo uses a local device notification sound.
   final VoidCallback? onIncomingSound;
+  /// Test hook: only new incoming passenger messages trigger this callback.
+  final VoidCallback? onIncomingMessageVoice;
   /// The premium cockpit renders this offer in the root overlay instead.
   final bool showAssignedOffer;
   /// Synthetic route fixture for widget tests only; never used by app UI.
@@ -495,6 +499,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   DateTime? _waitingStartedAt;
   Duration _waitingElapsed = Duration.zero;
   DemoTrip? _waitingTripId;
+  int _seenPassengerMessageCount = 0;
 
   Duration get _waitingTotal => _waitingElapsed +
       (_waitingStartedAt == null ? Duration.zero :
@@ -581,6 +586,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
+    _seenPassengerMessageCount =
+        widget.tripStore?.passengerChatMessages.length ?? 0;
     widget.tripStore?.addListener(_onTripChanged);
     if (widget.tripStore?.pilotOnline == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -592,6 +599,15 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   void _onTripChanged() {
     if (!mounted) return;
     final store = widget.tripStore;
+    final count = store?.passengerChatMessages.length ?? 0;
+    if (count > _seenPassengerMessageCount) {
+      if (widget.onIncomingMessageVoice != null) {
+        widget.onIncomingMessageVoice!();
+      } else {
+        unawaited(PdMessageVoice.announce('пассажира'));
+      }
+    }
+    _seenPassengerMessageCount = count;
     final tripId = store?.trip;
     if (tripId != _waitingTripId) {
       _waitingTripId = tripId;

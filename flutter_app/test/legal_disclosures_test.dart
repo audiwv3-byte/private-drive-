@@ -9,6 +9,9 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: NativeSignInScreen()));
     expect(find.byKey(const Key('native-legal-acknowledgement')),
         findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('native-open-legal-documents')), 120,
+      scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const Key('native-open-legal-documents')));
     await tester.pumpAndSettle();
     expect(find.text('Конфиденциальность'), findsOneWidget);

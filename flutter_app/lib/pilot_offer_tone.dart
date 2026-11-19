@@ -69,7 +69,7 @@ class PilotOfferTone {
       await player.stop();
       if (_closed) return;
       await player.play(
-        BytesSource(_melodies[melody.clamp(0, 2)], mimeType: 'audio/wav'),
+        BytesSource(_melodies[melody.clamp(0, 2).toInt()], mimeType: 'audio/wav'),
         volume: 1.0,
         mode: PlayerMode.mediaPlayer,
       );

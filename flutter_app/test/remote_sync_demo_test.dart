@@ -255,18 +255,18 @@ void main() {
       'pilot': 'pilot_test', 'status': 'assigned',
       'paused': 0, 'version': 2,
     };
-    server.messages.add({'seq': 1, 'role': 'passenger',
+    server.messages.add({'seq': 1, 'role': 'pilot',
       'body': 'Старое сообщение', 'at': 'test'});
     var alerts = 0;
     await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
-      gateway: server.actor('pilot'),
+      gateway: server.actor('passenger'),
       enableMapTiles: false,
       pollInterval: const Duration(hours: 1),
       onIncomingMessageVoice: () => alerts++,
     )));
     await tester.pumpAndSettle();
     expect(alerts, 0); // History is not announced on session start.
-    server.messages.add({'seq': 2, 'role': 'passenger',
+    server.messages.add({'seq': 2, 'role': 'pilot',
       'body': 'Новое сообщение', 'at': 'test'});
     await tester.tap(find.byKey(const Key('remote-refresh')));
     await tester.pumpAndSettle();
@@ -274,12 +274,12 @@ void main() {
     await tester.tap(find.byKey(const Key('remote-refresh')));
     await tester.pumpAndSettle();
     expect(alerts, 1); // Cursor protects against duplicates.
-    server.messages.add({'seq': 3, 'role': 'pilot',
+    server.messages.add({'seq': 3, 'role': 'passenger',
       'body': 'Ответ пилота', 'at': 'test'});
     await tester.tap(find.byKey(const Key('remote-refresh')));
     await tester.pumpAndSettle();
     expect(alerts, 1); // Own sends do not announce.
-    server.messages.add({'seq': 4, 'role': 'passenger',
+    server.messages.add({'seq': 4, 'role': 'pilot',
       'body': 'Второе входящее', 'at': 'test'});
     await tester.tap(find.byKey(const Key('remote-refresh')));
     await tester.pumpAndSettle();

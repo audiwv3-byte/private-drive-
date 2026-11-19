@@ -103,9 +103,10 @@ jobs:
           print("Isolated package ID: lt.privatedrive.private_drive.demo")
           PY
           cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
-          # Sign-in-only transparency: preserve the original PD pixels, gold
-          # typography, car and frame. Remove only near-black RGB backdrop.
-          # Do not alter the native splash, launcher icon or cockpit logo.
+          # The generated transparent artwork is shared by native sign-in and
+          # the pilot's offline go-online screen, never by the launcher icon.
+          # Ensure Pillow exists in this Python context before generating it.
+          python3 -m pip install --quiet Pillow
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image

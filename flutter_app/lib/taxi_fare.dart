@@ -6,7 +6,6 @@ class PdTaxiFare {
   static const int outsideCityCentsPerKm = 79;
   static const int minimumCents = 400;
   static const int advanceBookingCents = 300;
-  static const int largeVehicleCents = 300;
   static const int freeWaitingSeconds = 180;
   static const int waitingCentsPerMinute = 30;
 
@@ -17,7 +16,6 @@ class PdTaxiFare {
     required int cityMetres,
     required int outsideCityMetres,
     bool advanceBooking = false,
-    bool largeVehicle = false,
     int paidWaitingStartedMinutes = 0,
   }) {
     if (cityMetres < 0 || outsideCityMetres < 0 ||
@@ -32,7 +30,6 @@ class PdTaxiFare {
     final base = boardingCents + distanceCents;
     return (base < minimumCents ? minimumCents : base) +
         (advanceBooking ? advanceBookingCents : 0) +
-        (largeVehicle ? largeVehicleCents : 0) +
         paidWaitingStartedMinutes * waitingCentsPerMinute;
   }
 

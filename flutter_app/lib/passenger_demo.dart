@@ -1175,7 +1175,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 ),
                 items: [
                   DropdownMenuItem<double?>(
-                    value: null, child: Text(pdLabel(context, 'На усмотрение пилота')),
+                    value: null, child: Text(pdLabel(context, 'На усмотрение пилота'))),
                   for (var temp = 18; temp <= 26; temp++)
                     DropdownMenuItem<double?>(
                       value: temp.toDouble(), child: Text('$temp °C')),

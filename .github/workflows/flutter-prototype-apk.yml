@@ -6,6 +6,7 @@ on:
       - feature/flutter-independent-auth
     paths:
       - 'flutter_app/**'
+      - 'test_sync_server/**'
       - '.github/workflows/flutter-prototype-apk.yml'
   workflow_dispatch:
 
@@ -155,6 +156,9 @@ jobs:
           data = data.replace("<application", insert + "    <application", 1)
           manifest.write_text(data)
           PY
+      - name: Verify two isolated HTTP chat sessions and message delivery
+        run: |
+          python3 -m unittest discover -s test_sync_server -p 'test_chat_delivery.py' -v
       - name: Verify live day/night raster tiles before building
         run: python3 flutter_app/tool/check_map_tiles.py
       - name: Analyze and build debug APK (no production secrets)

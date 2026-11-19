@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'pilot_offer_tone.dart';
 import 'pilot_sound_settings.dart';
+import 'pilot_payment_settings.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
 import 'pilot_cockpit_overlay.dart';
@@ -48,6 +49,7 @@ class _PilotCabinState extends State<PilotCabin> {
   }
 
   bool get _pendingOffer => _onLine &&
+      !(widget.tripStore?.cashOrderNeedsOtherPilot ?? false) &&
       widget.tripStore?.status == DemoTripStatus.assigned &&
       widget.tripStore?.pilotAccepted == false;
 
@@ -58,6 +60,9 @@ class _PilotCabinState extends State<PilotCabin> {
     widget.tripStore?.addListener(_syncOfferSound);
     PilotSoundSettings.instance.addListener(_onSettingsChanged);
     unawaited(PilotSoundSettings.instance.load());
+    PilotPaymentSettings.instance.addListener(_onPaymentSettingsChanged);
+    _onPaymentSettingsChanged();
+    unawaited(_loadPaymentSettings());
     if (_onLine) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -66,6 +71,17 @@ class _PilotCabinState extends State<PilotCabin> {
         }
       });
     }
+  }
+
+  Future<void> _loadPaymentSettings() async {
+    await PilotPaymentSettings.instance.load();
+    _onPaymentSettingsChanged();
+  }
+
+  void _onPaymentSettingsChanged() {
+    widget.tripStore?.setPilotAcceptsCash(
+      PilotPaymentSettings.instance.acceptCash);
+    _syncOfferSound();
   }
 
   void _onSettingsChanged() {
@@ -121,6 +137,7 @@ class _PilotCabinState extends State<PilotCabin> {
   void dispose() {
     widget.tripStore?.removeListener(_syncOfferSound);
     PilotSoundSettings.instance.removeListener(_onSettingsChanged);
+    PilotPaymentSettings.instance.removeListener(_onPaymentSettingsChanged);
     _hideCockpitOverlay();
     // Leaving this screen is not the same as ending a shift.
     _offerTone.dispose();

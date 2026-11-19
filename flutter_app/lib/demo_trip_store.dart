@@ -66,6 +66,7 @@ class DemoTripStore extends ChangeNotifier {
   DemoTripStatus? _status;
   bool _paused = false;
   bool _pilotAccepted = false;
+  bool _pilotAcceptsCash = false;
   DateTime? _arrivalAt;
   DateTime? _departureFromPickupAt;
   bool _disposed = false;
@@ -189,6 +190,16 @@ class DemoTripStore extends ChangeNotifier {
   DemoTripStatus? get status => _status;
   bool get paused => _paused;
   bool get pilotAccepted => _pilotAccepted;
+  bool get pilotAcceptsCash => _pilotAcceptsCash;
+
+  void setPilotAcceptsCash(bool value) {
+    if (_disposed || _pilotAcceptsCash == value) return;
+    _pilotAcceptsCash = value;
+    notifyListeners();
+  }
+
+  bool get cashOrderNeedsOtherPilot => _trip != null &&
+      _trip!.paymentMethod == 'Наличные' && !_pilotAcceptsCash;
   static const freePickupWaiting = Duration(minutes: 3);
   static const pickupWaitingCentsPerMinute = 30;
   DateTime? get arrivalAt => _arrivalAt;
@@ -266,8 +277,8 @@ class DemoTripStore extends ChangeNotifier {
         (estimatedFareEur < 0 || estimatedFareEur > 1000000)) return false;
     if (estimatedFareCents != null &&
         (estimatedFareCents < 0 || estimatedFareCents > 100000000)) return false;
-    if (paymentMethod.toLowerCase().contains('налич') ||
-        paymentMethod.toLowerCase() == 'cash') return false;
+    if (!['Карта', 'PayPal', 'Банковский перевод',
+      'Криптовалюта', 'Наличные'].contains(paymentMethod)) return false;
     if (_disposed || isActive || a.isEmpty || b.isEmpty ||
         a.toLowerCase() == b.toLowerCase()) return false;
     _archivePreviousChat();
@@ -316,7 +327,8 @@ class DemoTripStore extends ChangeNotifier {
       _status == DemoTripStatus.assigned;
 
     bool assignPilot() {
-    if (_disposed || _status != DemoTripStatus.requested) return false;
+    if (_disposed || _status != DemoTripStatus.requested ||
+        cashOrderNeedsOtherPilot) return false;
     _status = DemoTripStatus.assigned;
     _pilotAccepted = false;
     notifyListeners();
@@ -325,7 +337,8 @@ class DemoTripStore extends ChangeNotifier {
 
   /// A pilot must explicitly accept a dispatcher-assigned offline demo trip.
   bool acceptAssignedPilot() {
-    if (_disposed || _status != DemoTripStatus.assigned || _pilotAccepted) {
+    if (_disposed || _status != DemoTripStatus.assigned || _pilotAccepted ||
+        cashOrderNeedsOtherPilot) {
       return false;
     }
     _pilotAccepted = true;
@@ -440,8 +453,10 @@ class DemoTripStore extends ChangeNotifier {
       if (from is! String || from.trim().isEmpty ||
           to is! String || to.trim().isEmpty ||
           from.trim().toLowerCase() == to.trim().toLowerCase() ||
-          payment is! String || payment.toLowerCase().contains('налич') ||
-          payment.toLowerCase() == 'cash' || departure is! String ||
+          payment is! String ||
+          !['Карта', 'PayPal', 'Банковский перевод',
+            'Криптовалюта', 'Наличные'].contains(payment) ||
+          departure is! String ||
           rideType is! String || roundTrip is! bool ||
           services is! List || services.any((v) => v is! String) ||
           statusName is! String ||

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:private_drive/demo_map_tile_provider.dart';
 import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/demo_trip_store.dart';
 
@@ -55,6 +56,10 @@ void main() {
     expect(tile, findsOneWidget);
     expect(tester.widget<TileLayer>(tile).urlTemplate,
         contains('tile.openstreetmap.org'));
+    final provider = tester.widget<TileLayer>(tile).tileProvider
+        as NetworkTileProvider;
+    expect(provider.cachingProvider, isA<DemoDisabledTileCache>());
+    expect(provider.cachingProvider!.isSupported, isFalse);
     expect(find.ancestor(of: tile, matching: find.byType(ColorFiltered)),
         findsNothing);
     expect(find.byKey(const Key('pilot-map-theme-status')), findsOneWidget);

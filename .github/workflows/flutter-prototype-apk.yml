@@ -149,7 +149,8 @@ jobs:
           insert = ('    <uses-permission android:name="android.permission.INTERNET"/>\\n'
                     '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\\n'
                     '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\\n'
-                    '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\\n')
+                    '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\\n'
+                    '    <queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>\\n')
           insert = insert.replace('\\n', '\n')
           data = data.replace("<application", insert + "    <application", 1)
           manifest.write_text(data)

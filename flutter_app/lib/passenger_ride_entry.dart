@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'passenger_demo.dart';
 import 'vilnius_evening_backdrop.dart';
+import 'app_language.dart';
 
 /// The first screen after choosing the passenger role.
 /// Taxi and transfer are separate entry choices, not a control inside booking.
@@ -27,7 +28,7 @@ class PassengerRideEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('PRIVATE DRIVE · Пассажир')),
+    appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Пассажир')}')),
     body: Stack(fit: StackFit.expand, children: [
       const VilniusEveningBackdrop(),
       SafeArea(child: Center(child: ConstrainedBox(
@@ -37,16 +38,16 @@ class PassengerRideEntry extends StatelessWidget {
         child: Column(mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Выбери тип поездки',
-              key: Key('passenger-entry-title'),
+            Text(pdLabel(context, 'Выбери тип поездки'),
+              key: const Key('passenger-entry-title'),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+              style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
             const SizedBox(height: 30),
             Card(child: ListTile(
               key: const Key('passenger-entry-taxi'),
               leading: const Icon(Icons.local_taxi, size: 36),
-              title: const Text('Такси'),
-              subtitle: const Text('Поездка по городу и другие направления'),
+              title: Text(pdLabel(context, 'Такси')),
+              subtitle: Text(pdLabel(context, 'Поездка по городу и другие направления')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _open(context, 'Такси'),
             )),
@@ -54,15 +55,15 @@ class PassengerRideEntry extends StatelessWidget {
             Card(child: ListTile(
               key: const Key('passenger-entry-transfer'),
               leading: const Icon(Icons.directions_car_filled, size: 36),
-              title: const Text('Трансфер'),
-              subtitle: const Text('Междугородние поездки и аэропорты'),
+              title: Text(pdLabel(context, 'Трансфер')),
+              subtitle: Text(pdLabel(context, 'Междугородние поездки и аэропорты')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _open(context, 'Трансфер'),
             )),
             const SizedBox(height: 20),
-            const Text('Тестовый режим. Реальные заказы и оплата выключены.',
+            Text(pdLabel(context, 'Тестовый режим. Реальные заказы и оплата выключены.'),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12)),
+              style: const TextStyle(fontSize: 12)),
           ],
         ),
       ),

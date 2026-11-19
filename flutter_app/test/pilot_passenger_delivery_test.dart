@@ -75,7 +75,7 @@ void main() {
     await tester.tap(find.byKey(const Key('pilot-chat-send')));
     await tester.pump();
     expect(store.pilotChatMessages, ['На месте']);
-    expect(tester.widget<TextField>(find.byKey(const Key('pilot-chat-input'))
+    expect(tester.widget<TextField>(find.byKey(const Key('pilot-chat-input')))
         .controller!.text, 'После поездки');
   });
 

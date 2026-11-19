@@ -1,0 +1,63 @@
+name: PRIVATE DRIVE website preview visual check
+on:
+  push:
+    branches:
+      - feature/website-private-drive-preview
+    paths:
+      - site_preview/**
+      - .github/workflows/site-preview-visual.yml
+  workflow_dispatch:
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser
+        run: |
+          npm install --no-save playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Capture full-page screenshots and audit
+        run: |
+          mkdir -p site_preview/screenshots
+          cat > visual-check.cjs <<'JS'
+          const { chromium } = require('playwright');
+          const { pathToFileURL } = require('node:url');
+          const path=require('node:path');
+          const fs=require('node:fs');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            const pageUrl=pathToFileURL(path.resolve('site_preview/index.html')).href;
+            const output=[];
+            for(const [name,width,height] of [['mobile-320',320,740],['mobile-390',390,844],['tablet-768',768,1024],['desktop-1440',1440,900]]) {
+              const page=await browser.newPage({viewport:{width,height},deviceScaleFactor:1});
+              await page.goto(pageUrl,{waitUntil:'load'});
+              await page.evaluate(()=>document.fonts.ready);
+              const report=await page.evaluate(()=>({
+                scrollWidth:document.documentElement.scrollWidth,
+                clientWidth:document.documentElement.clientWidth,
+                images:[...document.images].map(x=>({loaded:x.complete&&x.naturalWidth>0,width:x.naturalWidth,src:x.getAttribute('src')})),
+                sections:['taxi','transfers','extras','registration'].map(id=>({id,present:!!document.getElementById(id)})),
+                nav:[...document.querySelectorAll('nav a')].map(x=>({text:x.textContent,visible:x.getBoundingClientRect().width>0}))
+              }));
+              await page.screenshot({path:'site_preview/screenshots/'+name+'.png',fullPage:true});
+              output.push({name,width,height,...report});
+              await page.close();
+            }
+            await browser.close();
+            fs.writeFileSync('site_preview/screenshots/audit.json',JSON.stringify(output,null,2));
+            console.log(JSON.stringify(output,null,2));
+            if(output.some(x=>x.scrollWidth>x.clientWidth||x.images.some(i=>!i.loaded)||x.sections.some(s=>!s.present)))process.exitCode=1;
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          JS
+          node visual-check.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: private-drive-full-page-screenshots
+          path: site_preview/screenshots/
+          retention-days: 14

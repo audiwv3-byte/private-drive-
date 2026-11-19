@@ -54,7 +54,7 @@ void main() {
     final tile = find.byKey(const Key('pilot-map-tiles'));
     expect(tile, findsOneWidget);
     expect(tester.widget<TileLayer>(tile).urlTemplate,
-        contains('cartocdn.com/voyager'));
+        contains('tile.openstreetmap.org'));
     expect(find.ancestor(of: tile, matching: find.byType(ColorFiltered)),
         findsNothing);
     expect(find.byKey(const Key('pilot-map-theme-status')), findsOneWidget);

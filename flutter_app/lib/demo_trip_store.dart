@@ -63,6 +63,8 @@ class DemoTripStore extends ChangeNotifier {
   DemoTripStatus? _status;
   bool _paused = false;
   bool _pilotAccepted = false;
+  DateTime? _arrivalAt;
+  DateTime? _departureFromPickupAt;
   bool _disposed = false;
   bool _pilotOnline = false;
   double? _pilotLatitude;
@@ -184,6 +186,45 @@ class DemoTripStore extends ChangeNotifier {
   DemoTripStatus? get status => _status;
   bool get paused => _paused;
   bool get pilotAccepted => _pilotAccepted;
+  static const freePickupWaiting = Duration(minutes: 3);
+  static const pickupWaitingCentsPerMinute = 30;
+  DateTime? get arrivalAt => _arrivalAt;
+  bool get isWaitingAtPickup => _arrivalAt != null &&
+      _departureFromPickupAt == null && _status == DemoTripStatus.approaching;
+
+  /// Only pilot-confirmed arrival starts pickup waiting, never GPS proximity.
+  bool markArrived({DateTime? now}) {
+    if (_disposed || _status != DemoTripStatus.approaching ||
+        !_pilotAccepted || _arrivalAt != null) return false;
+    _arrivalAt = now ?? DateTime.now();
+    notifyListeners();
+    return true;
+  }
+
+  Duration pickupWaitingElapsed({DateTime? now}) {
+    final start = _arrivalAt;
+    if (start == null) return Duration.zero;
+    final end = _departureFromPickupAt ?? now ?? DateTime.now();
+    if (end.isBefore(start)) return Duration.zero;
+    return end.difference(start);
+  }
+
+  Duration pickupPaidWaitingElapsed({DateTime? now}) {
+    final paid = pickupWaitingElapsed(now: now) - freePickupWaiting;
+    return paid.isNegative ? Duration.zero : paid;
+  }
+
+  /// 0.30 EUR per started paid minute. Free first 180 seconds.
+  int pickupWaitingChargeCents({DateTime? now}) {
+    final elapsed = pickupPaidWaitingElapsed(now: now);
+    if (elapsed == Duration.zero) return 0;
+    return ((elapsed.inMilliseconds + 59999) ~/ 60000) *
+        pickupWaitingCentsPerMinute;
+  }
+
+  String pickupWaitingFeeLabel({DateTime? now}) =>
+      '${(pickupWaitingChargeCents(now: now) / 100).toStringAsFixed(2)} €';
+
   bool get isActive => _status != null &&
       _status != DemoTripStatus.finished &&
       _status != DemoTripStatus.cancelled;
@@ -239,6 +280,8 @@ class DemoTripStore extends ChangeNotifier {
     _dispatcherChatMessages.clear();
     _paused = false;
     _pilotAccepted = false;
+    _arrivalAt = null;
+    _departureFromPickupAt = null;
     _tripRating = null;
     _serviceRating = null;
     _passengerRatingByPilot = null;
@@ -252,6 +295,7 @@ class DemoTripStore extends ChangeNotifier {
         (_status != DemoTripStatus.requested &&
          _status != DemoTripStatus.assigned)) return false;
     _status = DemoTripStatus.cancelled;
+    if (_arrivalAt != null) _departureFromPickupAt ??= DateTime.now();
     _pilotAccepted = false;
     _paused = false;
     notifyListeners();
@@ -300,6 +344,9 @@ class DemoTripStore extends ChangeNotifier {
       _ => null,
     };
     if (next == null) return false;
+    if (next == DemoTripStatus.underway && _arrivalAt != null) {
+      _departureFromPickupAt ??= DateTime.now();
+    }
     _status = next;
     notifyListeners();
     return true;
@@ -335,6 +382,8 @@ class DemoTripStore extends ChangeNotifier {
       'status': status.name,
       'paused': _paused,
       'pilotAccepted': _pilotAccepted,
+      'arrivalAt': _arrivalAt?.toIso8601String(),
+      'departureFromPickupAt': _departureFromPickupAt?.toIso8601String(),
       'tripRating': _tripRating,
       'serviceRating': _serviceRating,
       'passengerRatingByPilot': _passengerRatingByPilot,
@@ -363,6 +412,18 @@ class DemoTripStore extends ChangeNotifier {
       final estimatedFareEur = data['estimatedFareEur'];
       final extrasRequireQuote = data['extrasRequireQuote'];
       final statusName = data['status'];
+      final arrivalAtRaw = data['arrivalAt'];
+      final departAtRaw = data['departureFromPickupAt'];
+      if ((arrivalAtRaw != null && arrivalAtRaw is! String) ||
+          (departAtRaw != null && departAtRaw is! String)) return false;
+      final arrivalParsed = arrivalAtRaw is String
+          ? DateTime.tryParse(arrivalAtRaw) : null;
+      final departParsed = departAtRaw is String
+          ? DateTime.tryParse(departAtRaw) : null;
+      if ((arrivalAtRaw != null && arrivalParsed == null) ||
+          (departAtRaw != null && departParsed == null) ||
+          (departParsed != null && (arrivalParsed == null ||
+           departParsed.isBefore(arrivalParsed)))) return false;
       if (from is! String || from.trim().isEmpty ||
           to is! String || to.trim().isEmpty ||
           from.trim().toLowerCase() == to.trim().toLowerCase() ||
@@ -437,6 +498,8 @@ class DemoTripStore extends ChangeNotifier {
       _status = status.first;
       _paused = data['paused'] == true &&
           (_status == DemoTripStatus.approaching || _status == DemoTripStatus.underway);
+      _arrivalAt = arrivalParsed;
+      _departureFromPickupAt = departParsed;
       _pilotAccepted = data['pilotAccepted'] == true &&
           (_status == DemoTripStatus.assigned ||
            _status == DemoTripStatus.approaching ||

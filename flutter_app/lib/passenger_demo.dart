@@ -743,20 +743,24 @@ class _PassengerDemoState extends State<PassengerDemo> {
         )),
       ),
       appBar: AppBar(
-        leading: Builder(builder: (menuContext) => IconButton(
-          key: const Key('passenger-open-drawer'),
-          tooltip: pdTr(context, 'Открыть меню', 'Atidaryti meniu', 'Open menu'),
-          icon: Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: const Color(0xFF111111),
-              border: Border.all(color: gold),
-              borderRadius: BorderRadius.circular(8),
+        leadingWidth: Navigator.of(context).canPop() ? 104 : 56,
+        leading: Row(children: [
+          if (Navigator.of(context).canPop()) const BackButton(),
+          Builder(builder: (menuContext) => IconButton(
+            key: const Key('passenger-open-drawer'),
+            tooltip: pdTr(context, 'Открыть меню', 'Atidaryti meniu', 'Open menu'),
+            icon: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                border: Border.all(color: gold),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.menu, color: gold),
             ),
-            child: const Icon(Icons.menu, color: gold),
-          ),
-          onPressed: () => Scaffold.of(menuContext).openDrawer(),
-        )),
+            onPressed: () => Scaffold.of(menuContext).openDrawer(),
+          )),
+        ]),
         title: Text(pdLabel(context, 'PRIVATE DRIVE · Пассажир')),
         actions: [
           const PdLanguageMenu(),

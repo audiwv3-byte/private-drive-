@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'demo_trip_store.dart';
 
 /// Pilot-only offline chat preview. No APIs, SMS, phone calls or persistence.
 /// The demo has no verified passenger contact details.
@@ -7,10 +8,12 @@ class PilotPassengerChatDemo extends StatefulWidget {
     super.key,
     required this.messages,
     required this.onSend,
+    this.tripStore,
   });
 
   final List<String> messages;
-  final ValueChanged<String> onSend;
+  final bool Function(String) onSend;
+  final DemoTripStore? tripStore;
 
   @override
   State<PilotPassengerChatDemo> createState() => _PilotPassengerChatDemoState();
@@ -24,10 +27,23 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
   void initState() {
     super.initState();
     _visibleMessages = List<String>.of(widget.messages);
+    widget.tripStore?.addListener(_refreshMessages);
+  }
+
+  void _refreshMessages() {
+    if (!mounted || widget.tripStore == null) return;
+    final store = widget.tripStore!;
+    setState(() {
+      _visibleMessages
+        ..clear()
+        ..addAll(store.pilotChatMessages)
+        ..addAll(store.passengerChatMessages.map((m) => 'Пассажир: $m'));
+    });
   }
 
   @override
   void dispose() {
+    widget.tripStore?.removeListener(_refreshMessages);
     _draft.dispose();
     super.dispose();
   }
@@ -35,9 +51,11 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
   void _send([String? quickReply]) {
     final value = (quickReply ?? _draft.text).trim();
     if (value.isEmpty) return;
-    widget.onSend(value);
+    if (!widget.onSend(value)) return;
     _draft.clear();
-    setState(() => _visibleMessages.add(value));
+    if (widget.tripStore == null) {
+      setState(() => _visibleMessages.add(value));
+    }
   }
 
   @override
@@ -53,7 +71,7 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
             const Padding(
               padding: EdgeInsets.all(12),
               child: Text(
-                'Локальный тестовый чат: сообщения не отправляются пассажиру.',
+                'Локальный чат DEMO: сообщения доступны пассажиру в этом приложении, но не передаются между телефонами.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: gold),
               ),

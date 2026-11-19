@@ -227,9 +227,9 @@ void main() {
     expect(find.byKey(const Key('pilot-global-offer')), findsOneWidget);
     expect(find.byKey(const Key('pilot-global-route')), findsOneWidget);
     expect(find.byKey(const Key('pilot-assigned-offer')), findsNothing);
-    expect(find.text('К пассажиру'), findsOneWidget);
+    expect(find.textContaining('Свайп вправо · К пассажиру'), findsOneWidget);
     expect(store.pilotAccepted, isFalse);
-    await tester.tap(find.byKey(const Key('pilot-global-accept')));
+    await tester.drag(find.byKey(const Key('pilot-global-accept')), const Offset(180, 0));
     await tester.pump();
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
 
@@ -240,7 +240,7 @@ void main() {
     await tester.tap(find.byKey(const Key('pilot-pause-trip')));
     await tester.pump();
     expect(find.text('Остановка · демо'), findsOneWidget);
-    expect(store.paused, isTrue);
+    expect(find.byKey(const Key('pilot-next-trip')), findsOneWidget);
     await tester.tap(find.byKey(const Key('pilot-pause-trip')));
     await tester.pump();
     await tester.drag(find.byKey(const Key('pilot-next-trip')),

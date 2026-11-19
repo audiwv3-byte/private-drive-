@@ -14,6 +14,7 @@ class DemoTrip {
     required this.departure,
     this.rideType = 'Трансфер',
     this.roundTrip = false,
+    this.advanceBooking = false,
     this.estimatedFareEur,
     this.estimatedFareCents,
     this.advanceBooking = false,
@@ -27,6 +28,7 @@ class DemoTrip {
   final DateTime departure;
   final String rideType;
   final bool roundTrip;
+  final bool advanceBooking;
   /// Approved known fare component only; null when no fixed fare exists.
   final int? estimatedFareEur;
   /// Taxi prices use exact cents; transfer prices remain whole euros.
@@ -270,6 +272,7 @@ class DemoTripStore extends ChangeNotifier {
     required List<String> services,
     String rideType = 'Трансфер',
     bool roundTrip = false,
+    bool advanceBooking = false,
     int? estimatedFareEur,
     int? estimatedFareCents,
     bool advanceBooking = false,
@@ -283,6 +286,7 @@ class DemoTripStore extends ChangeNotifier {
         (estimatedFareCents < 0 || estimatedFareCents > 100000000)) return false;
     if (!['Карта', 'PayPal', 'Банковский перевод',
       'Криптовалюта', 'Наличные'].contains(paymentMethod)) return false;
+    if (advanceBooking && paymentMethod == 'Наличные') return false;
     if (paymentMethod == 'Наличные' &&
         (advanceBooking ||
          departure.isAfter(DateTime.now().add(const Duration(minutes: 10))))) {
@@ -298,6 +302,7 @@ class DemoTripStore extends ChangeNotifier {
       departure: departure,
       rideType: rideType,
       roundTrip: roundTrip,
+      advanceBooking: advanceBooking,
       estimatedFareEur: estimatedFareEur,
       estimatedFareCents: estimatedFareCents,
       advanceBooking: advanceBooking,
@@ -410,6 +415,7 @@ class DemoTripStore extends ChangeNotifier {
       'departure': trip.departure.toIso8601String(),
       'rideType': trip.rideType,
       'roundTrip': trip.roundTrip,
+      'advanceBooking': trip.advanceBooking,
       'estimatedFareEur': trip.estimatedFareEur,
       'estimatedFareCents': trip.estimatedFareCents,
       'advanceBooking': trip.advanceBooking,
@@ -444,6 +450,7 @@ class DemoTripStore extends ChangeNotifier {
       final departure = data['departure'];
       final rideType = data['rideType'];
       final roundTrip = data['roundTrip'];
+      final advanceBooking = data['advanceBooking'] ?? false;
       final services = data['services'];
       final estimatedFareEur = data['estimatedFareEur'];
       final estimatedFareCents = data['estimatedFareCents'];
@@ -470,6 +477,8 @@ class DemoTripStore extends ChangeNotifier {
             'Криптовалюта', 'Наличные'].contains(payment) ||
           departure is! String ||
           rideType is! String || roundTrip is! bool ||
+          advanceBooking is! bool ||
+          (advanceBooking && payment == 'Наличные') ||
           services is! List || services.any((v) => v is! String) ||
           statusName is! String ||
           (estimatedFareEur != null &&
@@ -537,7 +546,7 @@ class DemoTripStore extends ChangeNotifier {
             (passengerRatingByPilot is! int || passengerRatingByPilot < 1 || passengerRatingByPilot > 5))) return false;
       _trip = DemoTrip(from: from.trim(), to: to.trim(),
         paymentMethod: payment, departure: parsedDate, rideType: rideType,
-        roundTrip: roundTrip,
+        roundTrip: roundTrip, advanceBooking: advanceBooking,
         estimatedFareEur: estimatedFareEur as int?,
         estimatedFareCents: estimatedFareCents as int?,
         advanceBooking: advanceBooking,

@@ -98,10 +98,9 @@ void main() {
     final day = tester.widget<TileLayer>(tileFinder);
     expect(day.urlTemplate, contains('tile.openstreetmap.org'));
     expect(day.fallbackUrl, isNull);
-    expect((day.tileProvider as NetworkTileProvider).cachingProvider,
-        isA<DemoDisabledTileCache>());
-    expect((day.tileProvider as NetworkTileProvider)
-        .cachingProvider!.isSupported, isFalse);
+    expect(day.tileProvider, isA<DemoDirectNetworkTileProvider>());
+    expect(day.tileProvider.headers['User-Agent'],
+        'PRIVATE DRIVE demo Android visual QA');
     expect(find.ancestor(of: tileFinder, matching: find.byType(ColorFiltered)),
         findsNothing);
     tester.widget<IconButton>(find.byKey(

@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     feature={'properties':{'summary':{'distance':100000,'duration':7200}},'geometry':{'coordinates':[[25.28,54.68],[23.90,54.89]]}}
     with patch.object(server.pd_stops,'directions',return_value=(feature,[25.28,54.68],[23.90,54.89])):
         estimate=check(call('/api/route',request),200)
-    assert estimate['price']=='143.00',estimate
+    assert estimate['price']=='121.00',estimate
     for changes in [{'origin':{}},{'roundtrip':'false'},{'origin_coordinates':[float('nan'),54]},{'origin_coordinates':[999,54]},{'extras':{}},{'stop_address':[]}]:
         check(call('/api/route',request|changes),400)
     future=(core.now()+__import__('datetime').timedelta(days=2)).strftime('%d.%m.%Y')

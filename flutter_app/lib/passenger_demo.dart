@@ -258,6 +258,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   @override
   void initState() {
     super.initState();
+    _knownPilotMessageCount = widget.tripStore?.pilotChatMessages.length ?? 0;
     widget.tripStore?.addListener(_onTripChanged);
     _tripWishes.addListener(_savePreferences);
     for (final track in _favoriteTracks) {
@@ -273,8 +274,35 @@ class _PassengerDemoState extends State<PassengerDemo> {
     }
   }
 
+  int _knownPilotMessageCount = 0;
+
   void _onTripChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final messages = widget.tripStore?.pilotChatMessages ?? const <String>[];
+    if (messages.length > _knownPilotMessageCount) {
+      final latest = messages.last;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          key: const Key('passenger-pilot-message-popup'),
+          content: Text('Сообщение пилота: $latest'),
+          action: SnackBarAction(
+            label: 'Открыть',
+            onPressed: () => _openOrders(),
+          ),
+        ));
+      });
+    }
+    _knownPilotMessageCount = messages.length;
+    setState(() {});
+  }
+
+  void _openOrders() {
+    final store = widget.tripStore;
+    if (store == null) return;
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => PassengerOrdersDemo(tripStore: store)));
   }
 
   void _createLocalTrip() {
@@ -561,9 +589,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-orders-button'),
               tooltip: 'Мои заказы',
               icon: const Icon(Icons.receipt_long_outlined),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(
-                builder: (_) => PassengerOrdersDemo(
-                  tripStore: widget.tripStore!))),
+              onPressed: _openOrders,
             ),
           IconButton(
             key: const Key('passenger-company-info'),
@@ -579,6 +605,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
           key: const Key('passenger-form'),
           padding: const EdgeInsets.all(16),
           children: [
+            if (widget.tripStore?.pilotChatMessages.isNotEmpty == true)
+              Card(
+                key: const Key('passenger-pilot-message-alert'),
+                child: ListTile(
+                  leading: const Icon(Icons.mark_chat_unread_outlined),
+                  title: const Text('Сообщение от пилота'),
+                  subtitle: Text(widget.tripStore!.pilotChatMessages.last,
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _openOrders,
+                ),
+              ),
             const Text('Тестовый заказ поездки', style: TextStyle(fontSize: 22)),
             const SizedBox(height: 6),
             const Text('Демонстрация. Не отправляет заказы и не списывает деньги.'),

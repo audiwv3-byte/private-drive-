@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/demo_trip_store.dart';
 
@@ -23,6 +24,7 @@ void main() {
     )));
     await tester.pump();
     expect(find.byKey(const Key('pilot-map-day-night')), findsOneWidget);
+    expect(find.text('ДЕНЬ'), findsOneWidget);
     expect(find.byKey(const Key('pilot-location-marker')), findsOneWidget);
     final icon = tester.widget<Icon>(
       find.byKey(const Key('pilot-location-marker')));
@@ -34,6 +36,7 @@ void main() {
     final toggle = tester.widget<IconButton>(
       find.byKey(const Key('pilot-map-day-night')));
     expect(toggle.tooltip, 'Дневная карта');
+    expect(find.text('НОЧЬ'), findsOneWidget);
     expect(store.status, DemoTripStatus.approaching);
     expect(find.byKey(const Key('pilot-location-marker')), findsOneWidget);
     expect(find.byKey(const Key('pilot-pickup-preview-pin')), findsOneWidget);
@@ -43,4 +46,23 @@ void main() {
       find.byKey(const Key('pilot-map-day-night'))).tooltip, 'Ночная карта');
     expect(store.status, DemoTripStatus.approaching);
   });
+  testWidgets('Pilot live tile layer uses real sources with day/night themes',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PilotDemo(enableMapTiles: true, loadMapTiles: true),
+    ));
+    final tile = find.byKey(const Key('pilot-map-tiles'));
+    expect(tile, findsOneWidget);
+    expect(tester.widget<TileLayer>(tile).urlTemplate,
+        contains('cartocdn.com/voyager'));
+    expect(find.ancestor(of: tile, matching: find.byType(ColorFiltered)),
+        findsNothing);
+    expect(find.byKey(const Key('pilot-map-theme-status')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('pilot-map-day-night')));
+    await tester.pump();
+    expect(find.text('НОЧЬ'), findsOneWidget);
+    expect(tester.widget<TileLayer>(tile).urlTemplate,
+        contains('cartocdn.com/dark_all'));
+  });
+
 }

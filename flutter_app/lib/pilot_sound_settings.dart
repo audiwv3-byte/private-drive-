@@ -22,7 +22,7 @@ class PilotSoundSettings extends ChangeNotifier {
     try {
       final prefs = SharedPreferencesAsync();
       enabled = await prefs.getBool(enabledKey) ?? true;
-      melody = (await prefs.getInt(melodyKey) ?? 0).clamp(0, 2);
+      melody = (await prefs.getInt(melodyKey) ?? 0).clamp(0, 2).toInt();
       notifyListeners();
     } catch (_) {
       // Missing storage does not disable order notifications.
@@ -31,7 +31,7 @@ class PilotSoundSettings extends ChangeNotifier {
 
   Future<void> update({bool? soundEnabled, int? selectedMelody}) async {
     if (soundEnabled != null) enabled = soundEnabled;
-    if (selectedMelody != null) melody = selectedMelody.clamp(0, 2);
+    if (selectedMelody != null) melody = selectedMelody.clamp(0, 2).toInt();
     notifyListeners();
     try {
       final prefs = SharedPreferencesAsync();

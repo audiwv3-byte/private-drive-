@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:private_drive/pilot_sound_settings.dart';
 import 'package:private_drive/pilot_offer_tone.dart';
 import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/pd_slide_to_confirm.dart';

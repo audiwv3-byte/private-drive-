@@ -98,6 +98,15 @@ class FakeGateway extends RemoteTripGateway {
 }
 
 void main() {
+  test('Safari map tiles have public HTTPS primary and fallback hosts', () {
+    expect(remoteDemoTileTemplate(false),
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+    expect(remoteDemoTileTemplate(true),
+      'https://tile.openstreetmap.de/{z}/{x}/{y}.png');
+    expect(remoteDemoTileTemplate(false).startsWith('https://'), isTrue);
+    expect(remoteDemoTileTemplate(true).startsWith('https://'), isTrue);
+  });
+
   test('Voice notification uses latest incoming role, never own message', () {
     final batch = <Map<String, dynamic>>[
       {'seq': 2, 'role': 'pilot', 'body': 'На месте'},

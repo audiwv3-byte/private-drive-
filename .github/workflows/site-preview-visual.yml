@@ -6,6 +6,7 @@ on:
     paths:
       - site_preview/**
       - test_website_public_readiness.py
+      - test_website_legal_pages.py
       - .github/workflows/site-preview-visual.yml
   workflow_dispatch:
 jobs:
@@ -22,7 +23,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Check corporate website content and links
-        run: python -m unittest -v test_website_public_readiness.py
+        run: python -m unittest -v test_website_public_readiness.py test_website_legal_pages.py
       - name: Install browser
         run: |
           npm install --no-save playwright@1.58.2

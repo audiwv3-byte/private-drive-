@@ -53,6 +53,35 @@ void main() {
     expect(find.byType(PilotDemo), findsNothing);
   });
 
+  testWidgets('Offline role hub opens pilot and dispatcher without passenger UI',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PrivateDriveDemo(enableMapTiles: false),
+    ));
+    await tester.pumpAndSettle();
+    final pilot = find.byKey(const Key('open-pilot-preview'));
+    final dispatcher = find.byKey(const Key('open-dispatcher-preview'));
+    expect(find.byKey(const Key('open-passenger-preview')), findsOneWidget);
+    expect(pilot, findsOneWidget);
+    expect(dispatcher, findsOneWidget);
+
+    await tester.ensureVisible(pilot);
+    await tester.tap(pilot);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pilot-map-surface')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-form')), findsNothing);
+    expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(dispatcher);
+    await tester.tap(dispatcher);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dispatcher-open-drawer')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-map-surface')), findsNothing);
+    expect(find.byKey(const Key('passenger-form')), findsNothing);
+  });
+
   testWidgets('Pilot gets only full-screen map surface and local trip controls',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: PilotDemo(enableMapTiles: false)));

@@ -1,12 +1,10 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'demo_interfaces.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
 import 'permissions_onboarding.dart';
 import 'company_info.dart';
+import 'pd_http_api.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 
@@ -69,33 +67,9 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     super.dispose();
   }
 
-  Future<Map<String, dynamic>> post(String path, Map<String, String> payload) async {
-    final base = Uri.tryParse(apiBaseUrl);
-    if (base == null || base.scheme != 'https' || base.host.isEmpty) {
-      throw const FormatException('Безопасный адрес API не настроен.');
-    }
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
-    try {
-      final request = await client.postUrl(base.resolve(path))
-          .timeout(const Duration(seconds: 10));
-      final bodyBytes = utf8.encode(jsonEncode(payload));
-      request.headers.contentType = ContentType.json;
-      // Isolated Python/WSGI login endpoints require explicit Content-Length.
-      request.contentLength = bodyBytes.length;
-      request.add(bodyBytes);
-      final response = await request.close().timeout(const Duration(seconds: 10));
-      final body = await utf8.decoder.bind(response).join();
-      final decoded = jsonDecode(body);
-      if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('Некорректный ответ сервера.');
-      }
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw HttpException('Запрос отклонён (HTTP ${response.statusCode}).');
-      }
-      return decoded;
-    } finally {
-      client.close(force: true);
-    }
+  Future<Map<String, dynamic>> post(String path, Map<String, String> payload) {
+    final uri = PdHttpApi.secureUri(apiBaseUrl, path);
+    return const PdHttpApi().postJson(uri, payload);
   }
 
   Future<void> requestCode() async {

@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import secrets
 import ssl
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlsplit
 
@@ -68,6 +69,7 @@ def make_private_gateway(iphone_ip, password, *, clock=None):
             ("Cache-Control", "no-store"),
             ("X-Content-Type-Options", "nosniff"),
             ("Referrer-Policy", "no-referrer"),
+            *((("WWW-Authenticate", 'Basic realm="PRIVATE DRIVE private test"'),) if status.startswith("401") else ()),
             ("Content-Security-Policy", "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"),
         ])
         return [body]
@@ -161,7 +163,24 @@ def serve_private_tls(bind_ip, iphone_ip, password, certfile, keyfile, port=8443
     server = HTTPServer((bind_ip, int(port)), Handler)
     server.socket = context.wrap_socket(server.socket, server_side=True)
     print("PRIVATE DRIVE private Safari test gateway running; only the whitelisted iPhone may connect.")
-    print("Test OTPs stay in the local process only. Stop with Ctrl+C; in-memory data is discarded.")
+    print("Test OTPs remain on this computer. Use the operator console; no SMS/email.")
+    print("Commands: code pilot@example.test | code passenger@example.test | stop")
+    def operator_console():
+        while True:
+            try:
+                command = input("pd-test> ").strip()
+            except EOFError:
+                return
+            if command == "stop":
+                server.shutdown()
+                return
+            if command.startswith("code "):
+                destination = command[5:].strip().lower()
+                if destination.endswith("@example.test"):
+                    print("Test OTP:", inbox.get(("email", destination), "not issued"))
+                else:
+                    print("Only @example.test identities are allowed")
+    threading.Thread(target=operator_console, daemon=True).start()
     try:
         server.serve_forever()
     finally:

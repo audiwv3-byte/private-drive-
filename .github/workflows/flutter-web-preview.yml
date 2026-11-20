@@ -75,6 +75,23 @@ jobs:
           flutter build web --release --dart-define=PD_NATIVE_AUTH_API_URL=
           test -s build/web/index.html
           test -s build/web/main.dart.js
+      - name: Prepare public-safe static preview for Netlify Drop
+        working-directory: private_drive_web_build
+        run: |
+          # The free test preview is a public offline demo. Do not ship secrets,
+          # production URLs, or a working SMS registration API.
+          printf 'User-agent: *\\nDisallow: /\\n' > build/web/robots.txt
+          printf '/* /index.html 200\\n' > build/web/_redirects
+          printf '/*\\n  X-Robots-Tag: noindex, nofollow, noarchive\\n  Referrer-Policy: no-referrer\\n  X-Content-Type-Options: nosniff\\n' > build/web/_headers
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('build/web')
+          assert (root / 'robots.txt').read_text().startswith('User-agent: *')
+          assert 'noindex' in (root / '_headers').read_text()
+          assert (root / 'index.html').is_file()
+          assert (root / 'main.dart.js').is_file()
+          print('Public demo static bundle prepared without SMS endpoint')
+          PY
       - name: Upload standalone Web preview artifact (not hosted)
         uses: actions/upload-artifact@v4
         with:

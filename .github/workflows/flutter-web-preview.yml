@@ -35,6 +35,7 @@ jobs:
           cp flutter_app/analysis_options.yaml private_drive_web_build/analysis_options.yaml
           mkdir -p private_drive_web_build/test
           cp flutter_app/test/pd_http_api_test.dart private_drive_web_build/test/pd_http_api_test.dart
+          cp flutter_app/test/remote_sync_demo_test.dart private_drive_web_build/test/remote_sync_demo_test.dart
           python3 -m pip install --quiet Pillow
           python3 - <<'PY'
           from pathlib import Path
@@ -63,12 +64,16 @@ jobs:
           pubspec.write_text(contents.replace(marker, marker + '\n    - assets/brand/private_drive_logo_transparent.png'))
           assert dest.stat().st_size > 10000
           PY
+      - name: Isolated browser CORS and two-role chat contract (no network tunnel)
+        run: |
+          PYTHONPATH=test_sync_server python3 -m unittest \
+            test_sync_server.test_browser_cors test_sync_server.test_chat_delivery -v
       - name: Flutter Web analysis and offline HTTP unit tests
         working-directory: private_drive_web_build
         run: |
           flutter pub get
           flutter analyze --no-fatal-infos
-          flutter test test/pd_http_api_test.dart
+          flutter test test/pd_http_api_test.dart test/remote_sync_demo_test.dart
       - name: Build isolated Safari sync preview (no SMS, payments or real orders)
         working-directory: private_drive_web_build
         run: |

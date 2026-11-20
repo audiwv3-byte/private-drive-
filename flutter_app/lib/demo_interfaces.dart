@@ -33,9 +33,18 @@ final Uri privateDriveWazeAppUri = Uri.parse('waze://');
 
 /// Standalone offline simulator with an on-device persisted demo order.
 class PrivateDriveDemo extends StatefulWidget {
-  const PrivateDriveDemo({super.key, this.enableMapTiles = true});
+  const PrivateDriveDemo({
+    super.key,
+    this.enableMapTiles = true,
+    this.passengerOnly = false,
+    this.onSignOut,
+  });
 
   final bool enableMapTiles;
+  /// Only the passenger cabin is reachable after a verified public SMS login.
+  /// The multi-role demo hub stays exclusive to offline development preview.
+  final bool passengerOnly;
+  final VoidCallback? onSignOut;
 
   @override
   State<PrivateDriveDemo> createState() => _PrivateDriveDemoState();
@@ -202,6 +211,15 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
     if (_restoringOrder) {
       return const Scaffold(body: Center(child: CircularProgressIndicator(
         key: Key('demo-order-restoring'))));
+    }
+    if (widget.passengerOnly) {
+      return PdPassengerLanguageScope(
+        child: PassengerRideEntry(
+          enableMapTiles: widget.enableMapTiles,
+          tripStore: _trip,
+          onSignOut: widget.onSignOut,
+        ),
+      );
     }
     return Scaffold(
       appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdTr(context, 'Демоверсия', 'Demonstracija', 'Demo')}')),

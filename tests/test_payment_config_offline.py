@@ -22,11 +22,13 @@ class OfflinePaymentConfigTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
-        configure = next(
+        functions = [
             node for node in tree.body
-            if isinstance(node, ast.FunctionDef) and node.name == "configure"
-        )
-        code = compile(ast.Module(body=[configure], type_ignores=[]), str(SOURCE), "exec")
+            if isinstance(node, ast.FunctionDef) and node.name in {"mode", "configure"}
+        ]
+        if len(functions) != 2:
+            raise AssertionError("Expected mode() and configure() in payment module")
+        code = compile(ast.Module(body=functions, type_ignores=[]), str(SOURCE), "exec")
         cls.stripe_stub = StripeStub()
         namespace = {"os": os, "stripe": cls.stripe_stub}
         exec(code, namespace)

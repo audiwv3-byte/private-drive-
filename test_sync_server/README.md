@@ -52,8 +52,11 @@ No public tunnel is started by CI. An optional, explicitly approved,
 Open the application's **test interface** → **Тестовая связь между
 устройствами**. On each phone use the same isolated HTTPS proxy URL and the
 distinct passenger, pilot or dispatcher token. Verify the sequence:
-passenger creates a dummy trip → dispatcher assigns `pilot_test` → pilot
-advances/pauses/resumes/finishes → passenger sees updated statuses. Reconnect
+for the optional Quick Tunnel launcher, a synthetic trip is created and
+assigned to `pilot_test` automatically before the URL is shown. Both phone
+sessions can immediately exchange messages in the isolated chat. The manual
+server-only setup above does not create this trip automatically. Pilot status
+transitions, if tested, must use the isolated API, not production dispatch. Reconnect
 after restarting the client to verify server-side recovery.
 
 ## Offline API smoke-test
@@ -103,7 +106,9 @@ py -3 test_sync_server/run_quick_tunnel.py
 
 The launcher explicitly refuses to run without the YES opt-in; it creates a
 temporary SQLite database, three independent random role credentials and a
-localhost-only backend, then starts cloudflared and prints the test HTTPS URL.
+localhost-only backend, then creates one **synthetic assigned chat trip** for
+passenger_test and pilot_test. It starts cloudflared and prints the test HTTPS
+URL, temporary tokens and the short test trip ID.
 It stops the server and tunnel automatically after 20 minutes or Ctrl+C and
 deletes the temporary database. The developer PC must stay running during
 the session. Do not paste real user addresses or production secrets.

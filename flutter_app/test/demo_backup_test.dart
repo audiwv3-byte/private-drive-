@@ -105,7 +105,7 @@ void main() {
       pilotSoundEnabled: true, pilotSoundMelody: 1, pilotAcceptCash: false,
     );
     expect(() => DemoBackupCodec.encode(injected), throwsFormatException);
-    expect(() => DemoBackupCodec.decode('x' * (DemoBackupCodec.maxSizeBytes + 1)),
+    expect(() => DemoBackupCodec.decode(List<String>.filled(DemoBackupCodec.maxSizeBytes + 1, 'x').join()),
         throwsFormatException);
   });
 

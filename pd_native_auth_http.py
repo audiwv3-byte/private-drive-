@@ -104,7 +104,7 @@ def make_native_auth_app(conn, secret, deliver, clock=None):
             return reply(start_response, "500 Internal Server Error", {"error": "session_unavailable"})
         return reply(start_response, "200 OK", {
             "verified": True, "channel": channel, "destination": destination,
-            **session
+            "role": get_role(conn, session["user_id"]), **session
         })
 
     return app

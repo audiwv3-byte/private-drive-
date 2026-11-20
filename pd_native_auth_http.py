@@ -11,6 +11,7 @@ import sqlite3
 import time
 from pd_native_auth import issue_code, verify_code
 from pd_native_auth_sessions import issue_session
+from pd_native_auth_roles import get_role
 
 MAX_BODY = 2048
 MAX_IP_REQUESTS_PER_MINUTE = 4

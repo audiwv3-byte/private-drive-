@@ -33,11 +33,14 @@ void main() {
     await tester.tap(find.byKey(const Key('open-offline-demo')));
     await tester.pumpAndSettle();
 
-    // Public offline preview now enters passenger-only mode directly.
-    // The previous multi-role selection hub is intentionally inaccessible.
-    expect(find.byKey(const Key('open-passenger-preview')), findsNothing);
-    expect(find.byKey(const Key('open-pilot-preview')), findsNothing);
-    expect(find.byKey(const Key('open-dispatcher-preview')), findsNothing);
+    // The offline-only hub exposes all three DEMO roles. This does not
+    // change the separate passenger-only and server-authorized admin shells.
+    expect(find.byKey(const Key('open-passenger-preview')), findsOneWidget);
+    expect(find.byKey(const Key('open-pilot-preview')), findsOneWidget);
+    expect(find.byKey(const Key('open-dispatcher-preview')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-entry-title')), findsNothing);
+    await tester.tap(find.byKey(const Key('open-passenger-preview')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-title')), findsOneWidget);
     expect(find.byKey(const Key('passenger-form')), findsNothing);
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));

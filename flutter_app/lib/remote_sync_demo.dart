@@ -8,6 +8,12 @@ import 'remote_sync_client.dart';
 import 'demo_map_tile_provider.dart';
 import 'message_voice.dart';
 
+/// Public raster tiles for the isolated map smoke test (no API key).
+/// The fallback is used only after visible tile load failures.
+String remoteDemoTileTemplate(bool backup) => backup
+    ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
+    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
 /// Returns the last *other-role* sender in a newly fetched message batch.
 /// The last message overall may be an echo of the current user's own reply.
 String? newestIncomingChatRole(
@@ -358,9 +364,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         TileLayer(
           key: ValueKey('remote-map-tiles-$_tileGeneration'),
           tileProvider: demoTileProvider(),
-          urlTemplate: _backupTiles
-              ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
-              : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          urlTemplate: remoteDemoTileTemplate(_backupTiles),
           userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
           errorTileCallback: (tile, error, stackTrace) {
             WidgetsBinding.instance.addPostFrameCallback((_) {

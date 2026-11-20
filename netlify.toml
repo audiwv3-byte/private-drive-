@@ -1,0 +1,27 @@
+[build]
+  publish = "private_drive_web_build/build/web"
+  command = '''
+test "$BRANCH" = feature/flutter-independent-auth &&
+work_dir="$(mktemp -d)" &&
+git clone --depth 1 --branch 3.50.0 https://github.com/flutter/flutter.git "$work_dir/flutter" &&
+export PATH="$work_dir/flutter/bin:$PATH" &&
+python3 -m venv "$work_dir/venv" &&
+. "$work_dir/venv/bin/activate" &&
+python3 -m pip install --quiet PyYAML &&
+python3 - <<'PY'
+from pathlib import Path
+import subprocess
+import yaml
+
+workflow_path = Path(".github/workflows/flutter-web-preview.yml")
+workflow = yaml.safe_load(workflow_path.read_text())
+steps = workflow["jobs"]["build-web-preview"]["steps"]
+for step in steps:
+    if "run" in step:
+        subprocess.run(
+            ["bash", "-eo", "pipefail", "-c", step["run"]],
+            cwd=step.get("working-directory", "."),
+            check=True,
+        )
+PY
+'''

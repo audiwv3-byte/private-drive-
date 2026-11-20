@@ -5,6 +5,7 @@ on:
       - feature/website-private-drive-preview
     paths:
       - site_preview/**
+      - test_website_public_readiness.py
       - .github/workflows/site-preview-visual.yml
   workflow_dispatch:
 jobs:
@@ -17,6 +18,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Check corporate website content and links
+        run: python -m unittest -v test_website_public_readiness.py
       - name: Install browser
         run: |
           npm install --no-save playwright@1.58.2

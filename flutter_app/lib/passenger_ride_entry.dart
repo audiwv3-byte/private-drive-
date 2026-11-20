@@ -12,10 +12,12 @@ class PassengerRideEntry extends StatelessWidget {
     super.key,
     this.enableMapTiles = true,
     required this.tripStore,
+    this.onSignOut,
   });
 
   final bool enableMapTiles;
   final DemoTripStore tripStore;
+  final VoidCallback? onSignOut;
 
   void _openExtra(BuildContext context, ExtraServiceType service) {
     Navigator.push(context, MaterialPageRoute<void>(
@@ -41,7 +43,16 @@ class PassengerRideEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Пассажир')}'),
-      actions: const [PdLanguageMenu()]),
+      actions: [
+        const PdLanguageMenu(),
+        if (onSignOut != null)
+          IconButton(
+            key: const Key('passenger-sign-out'),
+            tooltip: 'Выйти',
+            icon: const Icon(Icons.logout),
+            onPressed: onSignOut,
+          ),
+      ]),
     body: Stack(fit: StackFit.expand, children: [
       const VilniusEveningBackdrop(),
       SafeArea(child: Center(child: ConstrainedBox(

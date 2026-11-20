@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/painting.dart';
 import 'package:flutter_map/flutter_map.dart';
 
@@ -23,4 +24,7 @@ class DemoDirectNetworkTileProvider extends TileProvider {
   }
 }
 
-TileProvider demoTileProvider() => DemoDirectNetworkTileProvider();
+/// Browsers must use flutter_map's standard image transport. The Android-only
+/// headers and direct NetworkImage workaround must not be forced onto Safari.
+TileProvider demoTileProvider() =>
+    kIsWeb ? NetworkTileProvider() : DemoDirectNetworkTileProvider();

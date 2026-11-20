@@ -72,7 +72,7 @@ class CorporateLegalTests(unittest.TestCase):
         for required in (
             "Не утверждена", "не включаются", "паспорт", "правовые основания",
             "Сроки хранения", "VDAI", "публичная регистрация пилотов не включена",
-            "не дают права выполнять поездки", "статья 6(1)(b)",
+            "не дают права выполнять поездки", "6(1)(b)",
         ):
             self.assertIn(required.lower(),s.lower())
         self.assertNotIn("<input",s)

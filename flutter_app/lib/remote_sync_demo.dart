@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'remote_sync_client.dart';
+import 'demo_map_tile_provider.dart';
 import 'message_voice.dart';
 
 /// Returns the last *other-role* sender in a newly fetched message batch.
@@ -54,6 +55,10 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   int seq = 0;
   int chatSeq = 0;
   bool _loadedChatForTrip = false;
+  bool _backupTiles = false;
+  int _tileErrors = 0;
+  int _tileGeneration = 0;
+  String? _mapError;
   List<Map<String, dynamic>> chatMessages = [];
   LatLng? location;
   Map<String, dynamic>? trip;
@@ -339,6 +344,71 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     ])),
   );
 
+  /// Same public, keyless raster source on Safari and Android.
+  /// A tile failure is not a GPS permission failure: report it separately.
+  Widget _sharedMap() => Stack(children: [
+    FlutterMap(
+      key: const Key('remote-shared-map'),
+      mapController: map,
+      options: const MapOptions(
+        initialCenter: LatLng(54.6872, 25.2797),
+        initialZoom: 13,
+      ),
+      children: [
+        TileLayer(
+          key: ValueKey('remote-map-tiles-$_tileGeneration'),
+          tileProvider: demoTileProvider(),
+          urlTemplate: _backupTiles
+              ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
+              : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
+          errorTileCallback: (tile, error, stackTrace) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              setState(() {
+                _tileErrors++;
+                if (_tileErrors >= 3 && !_backupTiles) {
+                  _backupTiles = true;
+                  _tileErrors = 0;
+                  _tileGeneration++;
+                  _mapError = null;
+                } else if (_tileErrors >= 3) {
+                  _mapError = 'Тайлы карты недоступны. Проверь HTTPS и CORS в Safari.';
+                }
+              });
+            });
+          },
+        ),
+        if (location != null) MarkerLayer(markers: [
+          Marker(point: location!, width: 48, height: 48,
+            child: const Icon(Icons.navigation, size: 38)),
+        ]),
+        const RichAttributionWidget(attributions: [
+          TextSourceAttribution('© OpenStreetMap contributors'),
+        ]),
+      ],
+    ),
+    if (_mapError != null)
+      Positioned(top: 8, left: 8, right: 8,
+        child: Card(child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(_mapError!, key: const Key('remote-map-error')),
+            TextButton(
+              key: const Key('remote-map-retry'),
+              onPressed: () => setState(() {
+                _mapError = null;
+                _tileErrors = 0;
+                _backupTiles = false;
+                _tileGeneration++;
+              }),
+              child: const Text('Повторить загрузку карты'),
+            ),
+          ]),
+        )),
+      ),
+  ]);
+
   Widget passengerOrDispatcher() {
     final isPassenger = role == 'passenger';
     return Scaffold(
@@ -352,6 +422,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           const Text('Тестовый сервер · реальные заказы и оплата выключены'),
           const SizedBox(height: 12),
           Text(statusText, key: const Key('remote-trip-status')),
+          if (isPassenger && widget.enableMapTiles)
+            SizedBox(height: 240, child: _sharedMap()),
           if (trip != null)
             Text(trip!['origin'].toString() + ' → ' +
                 trip!['destination'].toString(),
@@ -398,23 +470,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     };
     return Scaffold(body: Stack(fit: StackFit.expand, children: [
       if (widget.enableMapTiles)
-        FlutterMap(
-          key: const Key('remote-pilot-map'), mapController: map,
-          options: const MapOptions(
-            initialCenter: LatLng(54.6872, 25.2797), initialZoom: 13),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'lt.privatedrive.privateDrive'),
-            if (location != null) MarkerLayer(markers: [
-              Marker(point: location!, width: 48, height: 48,
-                child: const Icon(Icons.navigation, size: 38)),
-            ]),
-            const RichAttributionWidget(attributions: [
-              TextSourceAttribution('© OpenStreetMap contributors'),
-            ]),
-          ],
-        )
+        KeyedSubtree(key: const Key('remote-pilot-map'), child: _sharedMap())
       else
         const ColoredBox(key: Key('remote-pilot-map'),
           color: Color(0xFF27332F)),

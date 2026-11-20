@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'permissions_onboarding.dart';
@@ -15,6 +14,8 @@ import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'demo_map_tile_provider.dart';
+import 'pd_http_api.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' show LatLng;
 
 /// Passenger preview: all trip, date, service and payment state stays in memory.
@@ -255,22 +256,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
     // The public Photon demo throttles rapid requests. Do not flood it
     // while someone enters each letter of a street or house number.
     _addressTimer = Timer(const Duration(milliseconds: 1100), () async {
-      HttpClient? client;
       try {
-        client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
-        client.userAgent = 'PRIVATE-DRIVE-Demo/0.2.20 (eurobaltictransfer@gmail.com)';
         final uri = Uri.https('photon.komoot.io', '/api/', {
           'q': query, 'limit': '5', 'lang': 'en',
           'lat': '54.6872', 'lon': '25.2797',
         });
-        final req = await client.getUrl(uri).timeout(const Duration(seconds: 9));
-        req.headers.set(HttpHeaders.acceptHeader, 'application/json');
-        final res = await req.close().timeout(const Duration(seconds: 9));
-        if (res.statusCode != 200) {
-          throw HttpException('Photon HTTP ${res.statusCode}', uri: uri);
-        }
-        final payload = jsonDecode(await utf8.decoder.bind(res).join()
-          .timeout(const Duration(seconds: 9))) as Map<String, dynamic>;
+        final payload = await const PdHttpApi().getJson(
+          uri, timeout: const Duration(seconds: 9));
         final found = <String>[];
         for (final raw in (payload['features'] as List<dynamic>? ?? const [])) {
           final feature = raw as Map<String, dynamic>;
@@ -305,8 +297,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
             }
           });
         }
-      } finally {
-        client?.close(force: true);
       }
     });
   }
@@ -660,18 +650,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _roadPoints = const [];
       _routeInfo = 'Построение дорожного маршрута · демо…';
     });
-    HttpClient? client;
     try {
-      client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
       final uri = Uri.https('router.project-osrm.org',
           '/route/v1/driving/${start.longitude},${start.latitude};${finish.longitude},${finish.latitude}',
           {'overview': 'full', 'geometries': 'geojson'});
-      final response = await (await client.getUrl(uri).timeout(
-        const Duration(seconds: 8))).close().timeout(
-        const Duration(seconds: 8));
-      if (response.statusCode != 200) throw const HttpException('Routing unavailable');
-      final decoded = jsonDecode(await utf8.decoder.bind(response).join()
-          .timeout(const Duration(seconds: 8))) as Map<String, dynamic>;
+      final decoded = await const PdHttpApi().getJson(
+          uri, timeout: const Duration(seconds: 8));
       final routes = decoded['routes'] as List<dynamic>?;
       if (routes == null || routes.isEmpty) throw const FormatException('No road route');
       final route = routes.first as Map<String, dynamic>;
@@ -698,8 +682,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
         _routeLoading = false;
         _routeInfo = 'Дорожный маршрут временно недоступен.';
       });
-    } finally {
-      client?.close(force: true);
     }
   }
 
@@ -760,21 +742,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
       }
       return;
     }
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+    final client = http.Client();
     try {
       final uri = Uri.parse(
         'https://tile.openstreetmap.org/10/583/325.png');
-      final req = await client.getUrl(uri).timeout(const Duration(seconds: 7));
-      req.headers.set(HttpHeaders.userAgentHeader,
-          'PRIVATE DRIVE DEMO Android map diagnostic');
-      final response = await req.close().timeout(const Duration(seconds: 7));
-      if (response.statusCode != HttpStatus.ok ||
-          response.headers.contentType?.mimeType != 'image/png') {
-        throw HttpException('HTTP ${response.statusCode}', uri: uri);
+      final response = await client.get(uri).timeout(const Duration(seconds: 7));
+      if (response.statusCode != 200 ||
+          !response.headers['content-type'].toString().contains('image/png')) {
+        throw Exception('HTTP ${response.statusCode}');
       }
-      // Fetch just the first chunk to establish an actual image body.
-      final first = await response.first.timeout(const Duration(seconds: 7));
-      if (first.isEmpty) throw const FormatException('Пустое изображение');
+      if (response.bodyBytes.isEmpty) {
+        throw const FormatException('Пустое изображение');
+      }
       if (mounted) setState(() {
         _mapNetworkError = null;
         _mapTilesFailed = false;
@@ -791,7 +770,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
         }
       });
     } finally {
-      client.close(force: true);
+      client.close();
       if (mounted) setState(() => _checkingMapNetwork = false);
     }
   }

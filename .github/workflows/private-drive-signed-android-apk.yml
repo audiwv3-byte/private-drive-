@@ -1,0 +1,137 @@
+name: PRIVATE DRIVE Android signed internal test APK
+
+on:
+  push:
+    branches: [feature/flutter-independent-auth]
+    paths:
+      - '.github/workflows/private-drive-signed-android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-android-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PD_SIGNING_KEYSTORE_B64: ${{ secrets.PD_ANDROID_SIGNING_KEYSTORE_B64 }}
+      PD_SIGNING_STORE_PASSWORD: ${{ secrets.PD_ANDROID_SIGNING_STORE_PASSWORD }}
+      PD_SIGNING_KEY_PASSWORD: ${{ secrets.PD_ANDROID_SIGNING_KEY_PASSWORD }}
+      PD_SIGNING_KEY_ALIAS: ${{ secrets.PD_ANDROID_SIGNING_KEY_ALIAS }}
+      PD_STAGING_AUTH_URL: https://private-drive-drbd.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Require private signing identity (never use public DEMO key)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in PD_SIGNING_KEYSTORE_B64 PD_SIGNING_STORE_PASSWORD PD_SIGNING_KEY_PASSWORD PD_SIGNING_KEY_ALIAS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing private Android signing secret: $name"
+              exit 1
+            fi
+          done
+      - name: Prepare native application and private signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
+          cp -R flutter_app/lib/. private_drive_build/lib/
+          cp -R flutter_app/assets private_drive_build/assets
+          cp -R flutter_app/test/. private_drive_build/test/
+          cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
+          cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
+          rm -f private_drive_build/test/widget_test.dart
+          python3 -m pip install --quiet Pillow
+          python3 flutter_app/tool/prepare_transparent_logo.py
+          cp flutter_app/assets/brand/private_drive_logo_transparent.png private_drive_build/assets/brand/
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          src=Path('flutter_app/assets/brand/private_drive_logo.webp')
+          assert hashlib.sha256(src.read_bytes()).hexdigest() == '550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f'
+          pub=Path('private_drive_build/pubspec.yaml')
+          s=pub.read_text()
+          marker='    - assets/brand/private_drive_logo.webp'
+          assert s.count(marker)==1
+          pub.write_text(s.replace(marker,marker+'\n    - assets/brand/private_drive_logo_transparent.png'))
+          gradle=Path('private_drive_build/android/app/build.gradle.kts')
+          s=gradle.read_text()
+          assert 'applicationId = "lt.privatedrive.private_drive"' in s
+          assert 'signingConfig = signingConfigs.getByName("debug")' in s
+          # A separate ID preserves older installations and local data.
+          s=s.replace('applicationId = "lt.privatedrive.private_drive"', 'applicationId = "lt.privatedrive.private_drive.internal"')
+          # Private credentials live only in job environment; no keystore in Git.
+          signing='''    signingConfigs {
+              create("pdInternal") {
+                  storeFile = file(System.getenv("PD_SIGNING_FILE"))
+                  storePassword = System.getenv("PD_SIGNING_STORE_PASSWORD")
+                  keyAlias = System.getenv("PD_SIGNING_KEY_ALIAS")
+                  keyPassword = System.getenv("PD_SIGNING_KEY_PASSWORD")
+              }
+          }
+          '''
+          assert 'buildTypes {' in s
+          s=s.replace('buildTypes {',signing+'buildTypes {',1)
+          s=s.replace('signingConfig = signingConfigs.getByName("debug")','signingConfig = signingConfigs.getByName("pdInternal")',1)
+          gradle.write_text(s)
+          manifest=Path('private_drive_build/android/app/src/main/AndroidManifest.xml')
+          m=manifest.read_text().replace('android:label="private_drive"','android:label="PRIVATE DRIVE"')
+          m=m.replace('android:icon="@mipmap/ic_launcher"','android:icon="@drawable/private_drive_logo"')
+          m=m.replace('<application', '''<uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>
+              <application''',1)
+          manifest.write_text(m)
+          drawable=manifest.parent/'res/drawable-nodpi'
+          drawable.mkdir(parents=True,exist_ok=True)
+          (drawable/'private_drive_logo.webp').write_bytes(src.read_bytes())
+          print('Full role source copied; distinct internal Android package configured')
+          PY
+          printf '%s' "$PD_SIGNING_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/private-drive-private.keystore"
+          chmod 600 "$RUNNER_TEMP/private-drive-private.keystore"
+          echo "PD_SIGNING_FILE=$RUNNER_TEMP/private-drive-private.keystore" >> "$GITHUB_ENV"
+      - name: Verify local role navigation, statics and isolated server contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s test_sync_server -p 'test_*.py' -v
+          cd private_drive_build
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: Build signed APK for isolated Android testing
+        shell: bash
+        working-directory: private_drive_build
+        run: |
+          set -euo pipefail
+          flutter build apk --release --dart-define="PD_NATIVE_AUTH_API_URL=$PD_STAGING_AUTH_URL"
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          test -s "$APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee ../private-drive-signature.txt
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | grep -E "^(package:|application-label:)" | tee ../private-drive-package.txt
+          grep "name='lt.privatedrive.private_drive.internal'" ../private-drive-package.txt
+          grep "application-label:'PRIVATE DRIVE'" ../private-drive-package.txt
+          mkdir -p ../private_drive_signed
+          cp "$APK" ../private_drive_signed/PRIVATE-DRIVE-internal.apk
+          cp ../private-drive-signature.txt ../private-drive-package.txt ../private_drive_signed/
+          (cd ../private_drive_signed && sha256sum PRIVATE-DRIVE-internal.apk > SHA256SUMS)
+      - name: Upload installable signed private test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-signed-internal-apk
+          path: private_drive_signed/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/private-drive-private.keystore"

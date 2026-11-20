@@ -6,6 +6,7 @@ Run only with explicit PD_DEMO_PUBLIC_TUNNEL=YES on a dedicated testing PC.
 from __future__ import annotations
 
 import http.client
+import json
 import os
 import queue
 import re
@@ -59,6 +60,42 @@ def wait_for_server(port, token, process, *, timeout=8):
     raise RuntimeError("Local demo server did not become healthy")
 
 
+def seed_synthetic_chat_trip(port, credentials):
+    """Prepare one fake assigned trip so both mobile clients can chat.
+
+    This never contacts production. The disposable SQLite database is removed
+    after the short test session.
+    """
+    def request(method, route, role, payload):
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+        headers = {"Authorization": "Bearer " + credentials[role]}
+        encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+        try:
+            conn.request(method, route, body=encoded, headers=headers)
+            response = conn.getresponse()
+            status = response.status
+            data = json.loads(response.read())
+        finally:
+            conn.close()
+        if status not in (200, 201):
+            raise RuntimeError("Cannot seed a synthetic chat trip (HTTP " + str(status) + ")")
+        return data
+
+    created = request("POST", "/v1/trips", "passenger", {
+        "from": "DEMO: синтетический адрес A",
+        "to": "DEMO: синтетический адрес B",
+        "payment": "Карта",
+    })["trip"]
+    assigned = request(
+        "POST", "/v1/trips/" + created["id"] + "/assign", "dispatcher",
+        {"pilot": "pilot_test", "version": created["version"]},
+    )["trip"]
+    if assigned["status"] != "assigned" or assigned["pilot"] != "pilot_test":
+        raise RuntimeError("Synthetic trip was not assigned to demo pilot")
+    return assigned["id"]
+
+
 def drain_tunnel_output(pipe, output):
     # cloudflared logs go only to memory, never to tracked files.
     try:
@@ -107,6 +144,7 @@ def main():
                 stderr=subprocess.DEVNULL,
             )
             wait_for_server(port, credentials["passenger"], server)
+            synthetic_trip_id = seed_synthetic_chat_trip(port, credentials)
             tunnel = subprocess.Popen(
                 [tunnel_binary, "tunnel", "--url", f"http://127.0.0.1:{port}"],
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -126,6 +164,7 @@ def main():
             print("\nPRIVATE DRIVE — temporary isolated demo (NOT PRODUCTION)")
             print("Expires automatically after 20 minutes, or stop with Ctrl+C.")
             print("HTTPS URL:", address)
+            print("Synthetic assigned trip ID:", synthetic_trip_id[:8] + "…")
             for role, token in credentials.items():
                 print(role.upper() + " TEST TOKEN:", token)
             print("Keep URL and role tokens private. Never use production details.")

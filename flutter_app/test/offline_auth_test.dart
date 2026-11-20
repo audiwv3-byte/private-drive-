@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:private_drive/main.dart';
+import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/brand_logo.dart';
 
 void main() {
@@ -74,4 +75,17 @@ void main() {
       find.widgetWithText(FilledButton, 'Получить код'),
     ).onPressed, isNull);
   });
+  testWidgets('Public SMS passenger shell never exposes pilot or dispatcher roles',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PrivateDriveDemo(passengerOnly: true, enableMapTiles: false),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-entry-transfer')), findsOneWidget);
+    expect(find.byKey(const Key('open-pilot-preview')), findsNothing);
+    expect(find.byKey(const Key('open-dispatcher-preview')), findsNothing);
+    expect(find.byKey(const Key('open-remote-sync-demo')), findsNothing);
+  });
+
 }

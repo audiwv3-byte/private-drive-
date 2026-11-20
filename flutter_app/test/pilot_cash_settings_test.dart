@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,12 +9,19 @@ import 'package:private_drive/demo_interfaces.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  // Historical cash orders remain usable after disabling NEW cash orders.
   DemoTripStore cashOrder() {
-    final store = DemoTripStore();
-    expect(store.create(
+    final source = DemoTripStore();
+    expect(source.create(
       from: 'Вильнюс', to: 'Аэропорт Вильнюса',
       departure: DateTime.now(),
-      paymentMethod: 'Наличные', services: const []), isTrue);
+      paymentMethod: 'Карта', services: const []), isTrue);
+    final saved = jsonDecode(source.toPersistedJson()!)
+        as Map<String, dynamic>;
+    source.dispose();
+    saved['paymentMethod'] = 'Наличные';
+    final store = DemoTripStore();
+    expect(store.restorePersistedJson(jsonEncode(saved)), isTrue);
     return store;
   }
 

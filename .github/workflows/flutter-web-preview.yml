@@ -69,16 +69,16 @@ jobs:
           flutter pub get
           flutter analyze --no-fatal-infos
           flutter test test/pd_http_api_test.dart
-      - name: Build standalone iPhone Safari browser preview (no SMS)
+      - name: Build isolated Safari sync preview (no SMS, payments or real orders)
         working-directory: private_drive_web_build
         run: |
-          flutter build web --release --dart-define=PD_NATIVE_AUTH_API_URL=
+          flutter build web --release --dart-define=PD_NATIVE_AUTH_API_URL= --dart-define=PD_ISOLATED_WEB_PREVIEW=true
           test -s build/web/index.html
           test -s build/web/main.dart.js
       - name: Prepare public-safe static preview for Netlify Drop
         working-directory: private_drive_web_build
         run: |
-          # The free test preview is a public offline demo. Do not ship secrets,
+          # The public test frontend requires a separately launched isolated HTTPS API and role tokens. Do not ship secrets,
           # production URLs, or a working SMS registration API.
           printf 'User-agent: *\\nDisallow: /\\n' > build/web/robots.txt
           printf '/* /index.html 200\\n' > build/web/_redirects
@@ -90,7 +90,7 @@ jobs:
           assert 'noindex' in (root / '_headers').read_text()
           assert (root / 'index.html').is_file()
           assert (root / 'main.dart.js').is_file()
-          print('Public demo static bundle prepared without SMS endpoint')
+          print('Public isolated sync demo prepared without SMS endpoint or role tokens')
           PY
       - name: Upload standalone Web preview artifact (not hosted)
         uses: actions/upload-artifact@v4

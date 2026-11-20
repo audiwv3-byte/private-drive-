@@ -95,7 +95,7 @@ class _DemoBackupPageState extends State<DemoBackupPage> {
       await _repository.restore(source);
       if (mounted) {
         setState(() {
-          _message = 'Данные восстановлены. Закрой и заново открой '
+          _message = 'Данные восстановлены. Полностью закрой приложение и открой его снова: '
               'офлайн DEMO, чтобы загрузились новые настройки и заказ.';
           _exportText = null; // An earlier export is now stale.
           _importController.clear();
@@ -131,14 +131,17 @@ class _DemoBackupPageState extends State<DemoBackupPage> {
         ),
         if (_exportText != null) ...[
           const SizedBox(height: 12),
-          TextField(
-            key: const Key('demo-backup-export-data'),
-            controller: TextEditingController(text: _exportText),
-            readOnly: true,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'JSON · версия 1 · SHA-256',
-              border: OutlineInputBorder(),
+          Semantics(
+            label: 'JSON · версия 1 · SHA-256',
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 110),
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  _exportText!,
+                  key: const Key('demo-backup-export-data'),
+                  maxLines: 3,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 8),

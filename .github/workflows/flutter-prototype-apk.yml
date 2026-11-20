@@ -158,7 +158,7 @@ jobs:
           PY
       - name: Verify two isolated HTTP chat sessions and message delivery
         run: |
-          python3 -m unittest discover -s test_sync_server -p 'test_chat_delivery.py' -v
+          python3 -m unittest discover -s test_sync_server -p 'test_*.py' -v
       - name: Verify live day/night raster tiles before building
         run: python3 flutter_app/tool/check_map_tiles.py
       - name: Analyze and build debug APK (no production secrets)

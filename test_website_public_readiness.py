@@ -37,6 +37,8 @@ class WebsiteReadinessTests(unittest.TestCase):
                 self.assertIn(href[1:],p.ids,href)
             elif href.startswith("mailto:"):
                 self.assertIn("eurobaltictransfer@gmail.com",href)
+            elif href in ("privacy.html", "terms.html", "pilot-privacy.html"):
+                self.assertTrue((ROOT / href).is_file(), href)
             else:
                 u=urlparse(href)
                 self.assertEqual(u.scheme,"https")
@@ -61,8 +63,11 @@ class WebsiteReadinessTests(unittest.TestCase):
 
     def test_legal_links_exist_in_source_templates(self):
         # Source templates exist; live URL availability and accuracy require manual review.
-        self.assertIn("https://wilsonpark.pythonanywhere.com/privacy?lang=ru",self.parser.links)
-        self.assertIn("https://wilsonpark.pythonanywhere.com/legal?lang=ru",self.parser.links)
+        for target in ("privacy.html", "terms.html", "pilot-privacy.html"):
+            self.assertIn(target, self.parser.links)
+        # Source documents stay in place; corporate pages reference the authoritative URLs.
+        self.assertIn("https://wilsonpark.pythonanywhere.com/privacy?lang=ru", (ROOT / "privacy.html").read_text())
+        self.assertIn("https://wilsonpark.pythonanywhere.com/legal?lang=ru", (ROOT / "terms.html").read_text())
         for name in ("privacy_ru.html","legal_ru.html"):
             self.assertTrue((ROOT.parent / "miniapp" / "templates" / name).exists())
 

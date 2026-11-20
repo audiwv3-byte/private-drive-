@@ -6,6 +6,7 @@ import 'remote_sync_demo.dart';
 import 'demo_interfaces.dart';
 import 'demo_backup_page.dart';
 import 'brand_logo.dart';
+import 'vilnius_evening_backdrop.dart';
 import 'app_language.dart';
 import 'permissions_onboarding.dart';
 import 'company_info.dart';
@@ -307,9 +308,12 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
             ),
           ],
         ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
+      body: Stack(
+        children: [
+          const Positioned.fill(child: VilniusEveningBackdrop()),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: ListView(
               padding: const EdgeInsets.all(24),
@@ -446,6 +450,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
             ),
           ),
         ),
+      ),
+        ],
       ),
     );
   }

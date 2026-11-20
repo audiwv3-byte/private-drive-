@@ -37,14 +37,16 @@ a:focus-visible{outline:2px solid #f7d48a;outline-offset:2px}@media(max-width:36
 </form>
 <p>После подключения изолированного сервера подтверждение email или телефона будет обязательным. Роль пилота потребует отдельного одобрения администратором. Этот макет не связывается с Telegram.</p>
 </main>
+<script src="./private-test-bootstrap.js"></script>
 <script type="module">
 import {makeRegistrationClient} from './registration-client.mjs';
 // No API URL, fetch, SMS, payment, or automatic activation.
 // Only a test harness explicitly injected on loopback can enable this page.
 const host = window.location.hostname;
 const local = host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
-const transport = local ? window.__PD_LOCAL_TEST_TRANSPORT__ : undefined;
-if (local && typeof transport === 'function') {
+const privateTest = window.location.protocol === 'https:' && host === 'pd-test.local' && window.__PD_PRIVATE_TEST_ENABLED__ === true;
+const transport = (local || privateTest) ? window.__PD_LOCAL_TEST_TRANSPORT__ : undefined;
+if ((local || privateTest) && typeof transport === 'function') {
   const client = makeRegistrationClient(transport);
   const form = document.getElementById('register');
   const request = document.getElementById('request-code');

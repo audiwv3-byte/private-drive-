@@ -59,6 +59,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   String message = '';
   String? sessionToken;
   String? signedInUserId;
+  String? signedInRole;
   DateTime? sessionExpiry;
 
   @override
@@ -140,10 +141,12 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       final userId = result['user_id'];
       final tokenType = result['token_type'];
       final expiresIn = result['expires_in'];
+      final role = result['role'];
       if (result['verified'] != true ||
           token is! String || token.length < 40 ||
           userId is! String || userId.isEmpty ||
           tokenType != 'Bearer' ||
+          (role != 'passenger' && role != 'admin') ||
           expiresIn is! int || expiresIn <= 0) {
         throw const FormatException('Сервер не выдал корректную сессию.');
       }
@@ -151,6 +154,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       setState(() {
         sessionToken = token;
         signedInUserId = userId;
+        signedInRole = role as String;
         sessionExpiry = DateTime.now().add(Duration(seconds: expiresIn));
         message = '';
         challengeId = null;
@@ -167,6 +171,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     setState(() {
       sessionToken = null;
       signedInUserId = null;
+      signedInRole = null;
       sessionExpiry = null;
       challengeId = null;
       code.clear();
@@ -184,12 +189,13 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         sessionExpiry != null &&
         DateTime.now().isBefore(sessionExpiry!);
     if (active) {
-      // A verified public phone login always enters the passenger cabin.
-      // Pilot/dispatcher are not selectable from this authenticated path.
-      // Roles must be granted by the backend, never by the client.
+      // Never infer administrator permissions from phone input or client state.
+      // A separate trusted SMS API must return the role after OTP verification.
+      final isAdmin = signedInRole == 'admin';
       return PrivateDriveDemo(
-        key: ValueKey('passenger-${signedInUserId!}'),
-        passengerOnly: true,
+        key: ValueKey('${isAdmin ? 'admin' : 'passenger'}-${signedInUserId!}'),
+        adminOnly: isAdmin,
+        passengerOnly: !isAdmin,
         onSignOut: signOut,
       );
     }

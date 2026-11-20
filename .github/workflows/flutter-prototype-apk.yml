@@ -227,7 +227,9 @@ jobs:
           cores: 2
           disable-animations: true
           emulator-boot-timeout: 600
-          script: bash -lc 'cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m'
+          script: |
+            bash -lc 'cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m'
+            bash flutter_app/tool/run_android_chat_smoke.sh
       - name: Confirm preserved installable APK is unchanged
         run: |
           test -s private_drive_release/private-drive-demo.apk

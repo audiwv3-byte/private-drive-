@@ -195,7 +195,6 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
           Wrap(spacing: 8, children: [
             for (final method in [
               'Карта', 'PayPal', 'Банковский перевод', 'Криптовалюта',
-              'Наличные',
             ])
               ChoiceChip(
                 key: Key('extra-payment-$method'),

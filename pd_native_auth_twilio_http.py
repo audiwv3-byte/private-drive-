@@ -151,7 +151,7 @@ def make_twilio_native_auth_app(conn, *, start_sms=start_verification,
         # Role is derived server-side from the already verified phone.
         # Existing pilot / production admin records are never modified.
         return reply(start_response, "200 OK", {
-            "verified": True, "role": role_for_phone(phone), **session
+            "verified": True, "role": get_role(conn, session["user_id"]), **session
         })
 
     return app

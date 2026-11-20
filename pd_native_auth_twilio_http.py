@@ -6,9 +6,7 @@ Twilio adapter refuses network requests unless TWILIO_VERIFY_ENABLED=true
 and valid server-side Twilio credentials are present.  Do not use an
 in-memory SQLite connection when multiple WSGI workers are running.
 """
-import io
 import json
-import os
 import secrets
 import sqlite3
 import time

@@ -20,8 +20,11 @@ assignment, production user database or real booking API**.
   corresponding role token. Tokens are held only in memory, and need to be
   entered again after restart. The trip itself is restored from the test
   SQLite service on reconnection; the client polls for updates every 3 sec.
-- The backend deliberately denies browser-origin requests; there is no CORS
-  and no browser admin panel. Requests never expose bearer tokens in logs.
+- Browser-origin requests are denied by default. A **single explicit**
+  `PD_DEMO_BROWSER_ORIGIN=https://your-test-netlify-host.netlify.app` allows
+  authenticated Safari Web preview calls with a restricted CORS preflight.
+  There is no wildcard origin, cookie auth or browser admin panel. Requests
+  never expose bearer tokens in logs.
 - The pilot's remote screen remains map-first. GPS is explicit opt-in and
   remains on-device; location coordinates are **not** sent to this test API.
 
@@ -188,3 +191,28 @@ signing/installing an iOS test build with an authorized Apple account,
 access to two physical devices, and a manually approved temporary HTTPS
 session. Production security/rate limits and real authentication are
 outside this synthetic test scope.
+
+## Safari Web preview (isolated API only)
+
+The test Netlify build uses `PD_ISOLATED_WEB_PREVIEW=true` and opens the
+`RemoteSyncDemo` screen instead of SMS authentication. Its public static
+bundle includes **no** bearer token and **no** server URL. Supply the exact
+HTTPS address and a temporary role token on the test screen.
+
+For a browser API call, the isolated backend must start with
+`PD_DEMO_BROWSER_ORIGIN` set to the **exact origin** of the test Web
+preview (HTTPS, hostname only, no trailing slash). A separate trusted HTTPS
+reverse proxy or the explicitly approved disposable tunnel must deliver the
+API. Native Android clients have no browser Origin header and continue to use
+independent role tokens. A preflight from an unapproved origin is rejected.
+
+Open the same synthetic trip from two devices: Safari passenger with the
+passenger token; Android pilot with the pilot token. The remote test screen
+polls server messages and trip status every 3 seconds. Its OSM map is shown
+for passenger and pilot, and a backup tile source plus an error/retry UI are
+provided. The ordinary offline DEMO cabins remain local and **do not** sync.
+
+**Important:** CI proves API and widget behavior with synthetic identities;
+it cannot certify real iPhone Safari image loading or physical-device delivery.
+Nothing in this workflow publishes to Netlify or production automatically.
+Do not enter real addresses, phone numbers, payments or production tokens.

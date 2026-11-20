@@ -280,13 +280,9 @@ class DemoTripStore extends ChangeNotifier {
         (estimatedFareEur < 0 || estimatedFareEur > 1000000)) return false;
     if (estimatedFareCents != null &&
         (estimatedFareCents < 0 || estimatedFareCents > 100000000)) return false;
+    // Never create a new cash order. Legacy cash snapshots remain readable.
     if (!['Карта', 'PayPal', 'Банковский перевод',
-      'Криптовалюта', 'Наличные'].contains(paymentMethod)) return false;
-    if (paymentMethod == 'Наличные' &&
-        (advanceBooking ||
-         departure.isAfter(DateTime.now().add(const Duration(minutes: 10))))) {
-      return false;
-    }
+      'Криптовалюта'].contains(paymentMethod)) return false;
     if (_disposed || isActive || a.isEmpty || b.isEmpty ||
         a.toLowerCase() == b.toLowerCase()) return false;
     _archivePreviousChat();

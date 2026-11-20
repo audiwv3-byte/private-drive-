@@ -26,6 +26,9 @@ jobs:
       - name: Generate isolated Web scaffold (never deploy)
         run: |
           flutter create --platforms=web --org=lt.privatedrive --project-name=private_drive private_drive_web_build
+          # The generated widget_test.dart references non-existent MyApp.
+          # Test only PRIVATE DRIVE's own HTTP test without touching Android.
+          rm -f private_drive_web_build/test/widget_test.dart
           cp -R flutter_app/lib/. private_drive_web_build/lib/
           cp -R flutter_app/assets private_drive_web_build/assets
           cp flutter_app/pubspec.yaml private_drive_web_build/pubspec.yaml

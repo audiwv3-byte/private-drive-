@@ -27,7 +27,25 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
 TOKEN = os.getenv('BOT_TOKEN', '').strip()
-ADMIN_IDS = {int(s) for s in os.getenv('ADMIN_IDS', '').split(',') if s.strip().isdigit()}
+# Native Flutter roles are separate from Telegram Mini App administrator rights.
+# Keep the sole Telegram owner ID in private deployment config, never Git.
+# Refuse ambiguous/multi-admin configuration rather than silently granting access.
+def _sole_telegram_admin_ids():
+    owner = os.getenv('PD_SOLE_TELEGRAM_ADMIN_ID', '').strip()
+    legacy = os.getenv('ADMIN_IDS', '').strip()
+    configured = owner or legacy
+    if not configured:
+        return frozenset()
+    entries = [part.strip() for part in configured.split(',')]
+    if len(entries) != 1 or not entries[0].isascii() or not entries[0].isdigit():
+        raise ValueError('Exactly one numeric Telegram administrator ID is required')
+    value = int(entries[0])
+    if value <= 0:
+        raise ValueError('Telegram administrator ID must be positive')
+    return frozenset((value,))
+
+
+ADMIN_IDS = _sole_telegram_admin_ids()
 ORS_API_KEY = os.getenv('ORS_API_KEY', '').strip()
 TZ = ZoneInfo('Europe/Vilnius')
 USERS_DB = ROOT / 'users.db'

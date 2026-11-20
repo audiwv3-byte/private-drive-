@@ -321,7 +321,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                           'Atidaryti bandomąsias sąsajas', 'Open demo interfaces')),
                     ),
                   ),
-                if (apiBaseUrl.isEmpty)
+                if (!kIsWeb && apiBaseUrl.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: OutlinedButton.icon(

@@ -1,6 +1,12 @@
 """Offline checks of test-tunnel safety gates; NEVER starts cloudflared."""
+import hashlib
+import tempfile
+import threading
 import unittest
-from run_quick_tunnel import URL_PATTERN, require_explicit_opt_in, MAX_SECONDS, choose_port
+from pathlib import Path
+from pd_demo_server import ApiServer, DemoStore
+from run_quick_tunnel import (URL_PATTERN, require_explicit_opt_in,
+    MAX_SECONDS, choose_port, seed_synthetic_chat_trip)
 
 
 class QuickTunnelSafetyTests(unittest.TestCase):
@@ -31,6 +37,34 @@ class QuickTunnelSafetyTests(unittest.TestCase):
         ).group(), "https://quiet-garden-123.trycloudflare.com")
         self.assertIsNone(URL_PATTERN.search("https://example.com"))
         self.assertLessEqual(MAX_SECONDS, 30 * 60)
+
+    def test_quick_tunnel_preseeds_chat_for_both_role_sessions(self):
+        # This test starts a loopback-only server, never Cloudflare or production.
+        tokens = {"passenger": "p" * 40, "pilot": "d" * 40,
+                  "dispatcher": "a" * 40}
+        credentials = {
+            hashlib.sha256(token.encode()).digest(): (role, role + "_test")
+            for role, token in tokens.items()
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            store = DemoStore(str(Path(directory) / "test.sqlite"))
+            server = ApiServer(("127.0.0.1", 0), store, credentials)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                trip_id = seed_synthetic_chat_trip(server.server_port, tokens)
+                passenger_trip = store.get(trip_id, "passenger", "passenger_test")
+                pilot_trip = store.get(trip_id, "pilot", "pilot_test")
+                self.assertEqual(passenger_trip["status"], "assigned")
+                self.assertEqual(passenger_trip["id"], pilot_trip["id"])
+                self.assertEqual(pilot_trip["pilot"], "pilot_test")
+                self.assertEqual(store.messages(trip_id, "passenger",
+                                                "passenger_test", 0), [])
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=3)
+                store.close()
 
     def test_local_ephemeral_port(self):
         port = choose_port()

@@ -273,6 +273,6 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
-    expect(find.text('Наличные'), findsOneWidget);
+    expect(find.byKey(const Key('payment-Наличные')), findsNothing);
   });
 }

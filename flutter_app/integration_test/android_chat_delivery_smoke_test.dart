@@ -17,7 +17,7 @@ void main() {
           'http://127.0.0.1:8765', 'p' * 40);
       final pilot = RemoteDemoClient(
           'http://127.0.0.1:8765', 'd' * 40);
-      final outsider = RemoteDemoClient(
+      final unknownClient = RemoteDemoClient(
           'http://127.0.0.1:8765', 'q' * 40);
       try {
         final owner = await passenger.get('/v1/me');
@@ -33,7 +33,12 @@ void main() {
         final tripId = trip['id'] as String;
         expect(tripId.length, 32);
         expect((pilotCurrent['trip'] as Map<String, dynamic>)['id'], tripId);
-        expect((await outsider.get('/v1/current'))['trip'], isNull);
+        try {
+          await unknownClient.get('/v1/current');
+          fail('An unknown token must be denied');
+        } on RemoteDemoException catch (e) {
+          expect(e.status, 401);
+        }
 
         final endpoint = '/v1/trips/$tripId/messages';
         const clientIdPassenger = '11111111111111111111111111111111';
@@ -75,18 +80,18 @@ void main() {
         expect((await passenger.get('$endpoint?after=$pilotSeq'))['messages'],
             isEmpty);
 
-        // Another passenger identity cannot read another user's trip.
+        // An unregistered token cannot read another user's trip.
         try {
-          await outsider.get(endpoint);
-          fail('Outsider must not access passenger/pilot chat');
+          await unknownClient.get(endpoint);
+          fail('Unknown token must not access passenger/pilot chat');
         } on RemoteDemoException catch (e) {
-          expect(e.status, 404);
+          expect(e.status, 401);
         }
         expect((await pilot.get(endpoint))['messages'], hasLength(2));
       } finally {
         passenger.close();
         pilot.close();
-        outsider.close();
+        unknownClient.close();
       }
     });
   });

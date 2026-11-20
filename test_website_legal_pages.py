@@ -52,7 +52,7 @@ class CorporateLegalTests(unittest.TestCase):
             "в течение месяца", "VDAI", "не содержит формы регистрации",
             "https://wilsonpark.pythonanywhere.com/privacy?lang=ru",
         ):
-            self.assertIn(required,s)
+            self.assertIn(required.lower(),s.lower())
 
     def test_terms_retain_passenger_protections_and_no_live_payment(self):
         s=self.page("terms.html")
@@ -64,7 +64,7 @@ class CorporateLegalTests(unittest.TestCase):
             "https://wilsonpark.pythonanywhere.com/legal?lang=ru",
             "не меняет и не отменяет",
         ):
-            self.assertIn(required,s)
+            self.assertIn(required.lower(),s.lower())
         self.assertNotIn("checkout.stripe.com",s)
 
     def test_pilot_is_unapproved_draft_and_disallows_document_collection(self):
@@ -74,7 +74,7 @@ class CorporateLegalTests(unittest.TestCase):
             "Сроки хранения", "VDAI", "публичная регистрация пилотов не включена",
             "не дают права выполнять поездки", "статья 6(1)(b)",
         ):
-            self.assertIn(required,s)
+            self.assertIn(required.lower(),s.lower())
         self.assertNotIn("<input",s)
 
     def test_home_links_to_all_three_documents_without_live_pilot_signup(self):

@@ -77,8 +77,11 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     try {
       final request = await client.postUrl(base.resolve(path))
           .timeout(const Duration(seconds: 10));
+      final bodyBytes = utf8.encode(jsonEncode(payload));
       request.headers.contentType = ContentType.json;
-      request.add(utf8.encode(jsonEncode(payload)));
+      // Isolated Python/WSGI login endpoints require explicit Content-Length.
+      request.contentLength = bodyBytes.length;
+      request.add(bodyBytes);
       final response = await request.close().timeout(const Duration(seconds: 10));
       final body = await utf8.decoder.bind(response).join();
       final decoded = jsonDecode(body);

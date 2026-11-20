@@ -1493,7 +1493,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             Wrap(
               spacing: 8,
               children: [
-                for (final method in ['Карта', 'PayPal', 'Банковский перевод', 'Криптовалюта', 'Наличные'])
+                for (final method in ['Карта', 'PayPal', 'Банковский перевод', 'Криптовалюта'])
                   ChoiceChip(
                     key: Key('payment-$method'),
                     label: Text(method == 'Карта'
@@ -1542,8 +1542,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             const Text(
               'Дополнительные остановки и изменение маршрута после заказа '
               'согласуются отдельно с диспетчером до выполнения. '
-              'Доплату можно согласовать наличными, только если пилот '
-              'разрешил их приём; иначе — безналично. '
+              'Доплата возможна только безналично по согласованию. '
               'Никаких автоматических списаний и изменений '
               'исходного способ оплаты.',
               key: Key('route-adjustment-payment-note'),

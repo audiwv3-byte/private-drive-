@@ -46,7 +46,7 @@ class WebsiteReadinessTests(unittest.TestCase):
             self.assertTrue((ROOT / src).is_file(),src)
 
     def test_correct_fares_and_no_unapproved_discounts(self):
-        for line in ("130 €","200 €","40 €","+15 €","0,66 € / км","0,79 € / км"):
+        for line in ("130 €","200 €","40 €","+15 €","0,66 € / км","0,79 € / км","предварительный заказ +3 €"):
             self.assertIn(line,self.content)
         self.assertNotIn("110 €",self.content)
         self.assertNotIn("10%",self.content)

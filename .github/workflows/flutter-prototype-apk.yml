@@ -87,6 +87,7 @@ jobs:
           assert '@drawable/private_drive_logo' in manifest.read_text()
           print(f"Brand asset verified ({len(data)} bytes), Android icon and splash replaced")
           PY
+          python3 flutter_app/tool/apply_native_brand_splash.py
           cp -R flutter_app/test/. private_drive_build/test/
           cp -R flutter_app/integration_test private_drive_build/integration_test
           python3 - <<'PY'

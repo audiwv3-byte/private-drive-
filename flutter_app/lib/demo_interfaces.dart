@@ -37,6 +37,7 @@ class PrivateDriveDemo extends StatefulWidget {
     super.key,
     this.enableMapTiles = true,
     this.passengerOnly = false,
+    this.adminOnly = false,
     this.onSignOut,
   });
 
@@ -44,6 +45,9 @@ class PrivateDriveDemo extends StatefulWidget {
   /// Only the passenger cabin is reachable after a verified public SMS login.
   /// The multi-role demo hub stays exclusive to offline development preview.
   final bool passengerOnly;
+  /// Accessible only when a trusted SMS server returns an administrator role.
+  /// This is a local demo console; real admin API authorization is separate.
+  final bool adminOnly;
   final VoidCallback? onSignOut;
 
   @override
@@ -211,6 +215,26 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
     if (_restoringOrder) {
       return const Scaffold(body: Center(child: CircularProgressIndicator(
         key: Key('demo-order-restoring'))));
+    }
+    if (widget.adminOnly) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('PRIVATE DRIVE · Администратор · DEMO'),
+          actions: [
+            if (widget.onSignOut != null)
+              IconButton(
+                key: const Key('admin-sign-out'),
+                tooltip: 'Выйти',
+                icon: const Icon(Icons.logout),
+                onPressed: widget.onSignOut,
+              ),
+          ],
+        ),
+        body: DemoDispatcherCabinet(
+          tripStore: _trip,
+          enableMapTiles: widget.enableMapTiles,
+        ),
+      );
     }
     if (widget.passengerOnly) {
       return PdPassengerLanguageScope(

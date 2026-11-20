@@ -77,9 +77,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pilot-map-surface')), findsOneWidget);
 
-    await tester.pageBack(); // Map -> pilot POWER cabin.
+    // The pilot map has no AppBar back button by design. Pop its route
+    // directly rather than using pageBack(), which requires a visible back
+    // control and would incorrectly constrain the fullscreen pilot UX.
+    Navigator.of(tester.element(find.byKey(const Key('pilot-map-surface'))))
+        .pop(); // Map -> pilot POWER cabin.
     await tester.pumpAndSettle();
-    await tester.pageBack(); // Pilot POWER cabin -> three-role hub.
+    Navigator.of(tester.element(find.byKey(const Key('pilot-power-toggle'))))
+        .pop(); // Pilot POWER cabin -> three-role hub.
     await tester.pumpAndSettle();
     await tester.ensureVisible(dispatcher);
     await tester.tap(dispatcher);

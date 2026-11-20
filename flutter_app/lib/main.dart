@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'remote_sync_demo.dart';
 import 'demo_interfaces.dart';
+import 'demo_backup_page.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
 import 'permissions_onboarding.dart';
@@ -318,6 +319,20 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       ),
                       child: Text(tr('Посмотреть тестовые интерфейсы',
                           'Atidaryti bandomąsias sąsajas', 'Open demo interfaces')),
+                    ),
+                  ),
+                if (apiBaseUrl.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: OutlinedButton.icon(
+                      key: const Key('open-demo-backup'),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) =>
+                          const DemoBackupPage()),
+                      ),
+                      icon: const Icon(Icons.backup_outlined),
+                      label: const Text('Резервная копия · DEMO'),
                     ),
                   ),
               ],

@@ -5,21 +5,32 @@ manual verification of the existing native_auth_users.id. No owner by default.
 """
 import hashlib
 import hmac
+import time
 
 
-def bootstrap_owner_postgres(conn, user_id, *, supplied_secret, configured_secret):
+def bootstrap_owner_postgres(conn, user_id, *, supplied_secret, configured_secret, now=None):
     if not isinstance(configured_secret, str) or len(configured_secret) < 32:
         raise ValueError("Strong bootstrap secret required")
     if not isinstance(supplied_secret, str) or not hmac.compare_digest(
             hashlib.sha256(supplied_secret.encode()).digest(),
             hashlib.sha256(configured_secret.encode()).digest()):
         raise PermissionError("Invalid bootstrap credentials")
+    now = int(time.time() if now is None else now)
     with conn.cursor() as cur:
         # Prevent concurrent initial provisioning from racing.
         cur.execute("SELECT pg_advisory_xact_lock(773144900)")
         cur.execute("SELECT 1 FROM native_auth_users WHERE id=%s", (user_id,))
         if not cur.fetchone():
             raise ValueError("Verified user_id not found")
+        cur.execute("""SELECT 1 FROM native_auth_users u
+            JOIN native_auth_sessions s ON s.user_id=u.id
+            WHERE u.id=%s AND u.channel='phone'
+              AND s.revoked_at IS NULL
+              AND s.created_at<=%s AND s.created_at>%s
+              AND s.expires_at>%s LIMIT 1""",
+            (user_id, now, now - 600, now))
+        if not cur.fetchone():
+            raise PermissionError("Recent verified native phone session required")
         cur.execute("SELECT 1 FROM native_auth_roles WHERE role='admin'")
         if cur.fetchone():
             raise PermissionError("Owner already exists")

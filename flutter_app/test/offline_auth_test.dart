@@ -75,6 +75,18 @@ void main() {
       find.widgetWithText(FilledButton, 'Получить код'),
     ).onPressed, isNull);
   });
+  testWidgets('Server-authorized admin shell shows dispatcher, not passenger or pilot',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: PrivateDriveDemo(adminOnly: true, enableMapTiles: false),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('dispatcher-open-drawer')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-entry-taxi')), findsNothing);
+    expect(find.byKey(const Key('open-pilot-preview')), findsNothing);
+    expect(find.byKey(const Key('open-passenger-preview')), findsNothing);
+  });
+
   testWidgets('Public SMS passenger shell never exposes pilot or dispatcher roles',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(

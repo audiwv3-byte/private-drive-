@@ -5,6 +5,19 @@ import 'package:private_drive/passenger_ride_entry.dart';
 import 'package:private_drive/passenger_extra_services.dart';
 
 void main() {
+  testWidgets('New extra-service orders never offer cash payment',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    await tester.pumpWidget(MaterialApp(home: PassengerExtraServices(
+      type: ExtraServiceType.jumpstart, tripStore: store)));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('extra-payment-Карта')), 160,
+      scrollable: find.byType(Scrollable).first);
+    expect(find.byKey(const Key('extra-payment-Наличные')), findsNothing);
+    expect(find.byKey(const Key('extra-payment-PayPal')), findsOneWidget);
+  });
+
   testWidgets('Passenger menu contains both standalone 20 EUR services',
       (tester) async {
     final store = DemoTripStore();

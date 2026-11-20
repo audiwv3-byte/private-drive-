@@ -14,11 +14,11 @@ void main() {
       (tester) async {
     await tester.runAsync(() async {
       final passenger = RemoteDemoClient(
-          'http://127.0.0.1:8765', 'p' * 40);
+          'http://127.0.0.1:8765', List.filled(40, 'p').join());
       final pilot = RemoteDemoClient(
-          'http://127.0.0.1:8765', 'd' * 40);
+          'http://127.0.0.1:8765', List.filled(40, 'd').join());
       final unknownClient = RemoteDemoClient(
-          'http://127.0.0.1:8765', 'q' * 40);
+          'http://127.0.0.1:8765', List.filled(40, 'q').join());
       try {
         final owner = await passenger.get('/v1/me');
         final driver = await pilot.get('/v1/me');

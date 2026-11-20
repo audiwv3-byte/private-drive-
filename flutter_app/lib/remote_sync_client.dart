@@ -1,8 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 
-/// Native client for an explicitly configured isolated demo server only.
-/// Credentials are supplied by the tester at runtime and never persisted.
+import 'package:http/http.dart' as http;
+
+/// Native and browser client for an explicitly configured isolated demo server.
+/// Test credentials are supplied at runtime and never persisted.
 abstract class RemoteTripGateway {
   Future<Map<String, dynamic>> get(String path);
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> data);
@@ -21,9 +22,7 @@ class RemoteDemoException implements Exception {
 class RemoteDemoClient implements RemoteTripGateway {
   RemoteDemoClient(String address, String token)
       : _base = _safeBase(address),
-        _token = _checkToken(token) {
-    _http.connectionTimeout = const Duration(seconds: 6);
-  }
+        _token = _checkToken(token);
 
   static Uri _safeBase(String address) {
     final uri = Uri.tryParse(address.trim());
@@ -53,7 +52,7 @@ class RemoteDemoClient implements RemoteTripGateway {
 
   final Uri _base;
   final String _token;
-  final HttpClient _http = HttpClient();
+  final http.Client _http = http.Client();
 
   Future<Map<String, dynamic>> _request(String method, String path,
       [Map<String, dynamic>? payload]) async {
@@ -61,38 +60,36 @@ class RemoteDemoClient implements RemoteTripGateway {
       throw const RemoteDemoException('Недопустимый путь API');
     }
     try {
-      final request = await _http.openUrl(method, _base.resolve(path))
-          .timeout(const Duration(seconds: 8));
-      request.followRedirects = false;
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $_token');
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      final request = http.Request(method, _base.resolve(path))
+        ..followRedirects = false
+        ..headers['Authorization'] = 'Bearer $_token'
+        ..headers['Accept'] = 'application/json';
       if (payload != null) {
-        // Python's isolated HTTP server rejects chunked uploads and requires
-        // a Content-Length. HttpClientRequest.write() can use chunked framing
-        // when no length is specified, even though the JSON itself is valid.
-        final bytes = utf8.encode(jsonEncode(payload));
-        request.headers.contentType = ContentType.json;
-        request.contentLength = bytes.length;
-        request.add(bytes);
+        request.headers['Content-Type'] = 'application/json; charset=utf-8';
+        request.bodyBytes = utf8.encode(jsonEncode(payload));
       }
-      final response = await request.close()
+      final streamed = await _http.send(request)
           .timeout(const Duration(seconds: 10));
-      if (response.statusCode >= 300 && response.statusCode < 400) {
+      if (streamed.statusCode >= 300 && streamed.statusCode < 400) {
         throw const RemoteDemoException('Перенаправления сервера запрещены');
       }
-      final body = await utf8.decoder.bind(response).join()
-          .timeout(const Duration(seconds: 10));
-      if (body.length > 128 * 1024) {
-        throw const RemoteDemoException('Слишком большой ответ сервера');
+      // Buffer at most 128 KiB, independent of any advertised Content-Length.
+      final bytes = <int>[];
+      await for (final chunk in streamed.stream.timeout(
+          const Duration(seconds: 10))) {
+        bytes.addAll(chunk);
+        if (bytes.length > 128 * 1024) {
+          throw const RemoteDemoException('Слишком большой ответ сервера');
+        }
       }
-      final data = jsonDecode(body);
+      final data = jsonDecode(utf8.decode(bytes));
       if (data is! Map<String, dynamic>) {
         throw const RemoteDemoException('Недопустимый ответ тестового сервера');
       }
-      if (response.statusCode >= 400) {
+      if (streamed.statusCode >= 400) {
         throw RemoteDemoException(
           data['error'] is String ? data['error'] as String : 'Ошибка API',
-          response.statusCode,
+          streamed.statusCode,
         );
       }
       return data;
@@ -115,6 +112,6 @@ class RemoteDemoClient implements RemoteTripGateway {
 
   @override
   void close() {
-    _http.close(force: true);
+    _http.close();
   }
 }

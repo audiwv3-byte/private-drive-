@@ -15,4 +15,4 @@ jobs:
         with:
           python-version: '3.13'
       - name: Test OTP and Twilio Verify adapters without production access
-        run: python -m unittest -v test_native_auth.py test_native_auth_http.py test_native_auth_sms.py test_native_auth_sessions.py test_twilio_verify.py
+        run: python -m unittest -v test_native_auth.py test_native_auth_http.py test_native_auth_sms.py test_native_auth_sessions.py test_twilio_verify.py test_native_auth_twilio_http.py

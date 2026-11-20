@@ -3,6 +3,7 @@ import 'demo_trip_store.dart';
 import 'passenger_demo.dart';
 import 'passenger_extra_services.dart';
 import 'vilnius_evening_backdrop.dart';
+import 'brand_logo.dart';
 import 'app_language.dart';
 
 /// The first screen after choosing the passenger role.
@@ -60,6 +61,23 @@ class PassengerRideEntry extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: ListView(shrinkWrap: true, children: [
+            const Center(
+              child: PrivateDriveBrandLogo(
+                size: 118, transparentBackground: true)),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: SizedBox(
+                key: const Key('passenger-entry-vilnius-panorama'),
+                height: 132,
+                child: Image.asset(
+                  'assets/brand/vilnius_cathedral_user_photo.webp',
+                  fit: BoxFit.cover,
+                  alignment: const Alignment(-0.48, 0),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(pdLabel(context, 'Выбери тип поездки'),
               key: const Key('passenger-entry-title'),
               textAlign: TextAlign.center,

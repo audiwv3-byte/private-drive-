@@ -67,8 +67,13 @@ class RemoteDemoClient implements RemoteTripGateway {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $_token');
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       if (payload != null) {
+        // Python's isolated HTTP server rejects chunked uploads and requires
+        // a Content-Length. HttpClientRequest.write() can use chunked framing
+        // when no length is specified, even though the JSON itself is valid.
+        final bytes = utf8.encode(jsonEncode(payload));
         request.headers.contentType = ContentType.json;
-        request.write(jsonEncode(payload));
+        request.contentLength = bytes.length;
+        request.add(bytes);
       }
       final response = await request.close()
           .timeout(const Duration(seconds: 10));

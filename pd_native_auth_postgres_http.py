@@ -45,6 +45,12 @@ def initialize_database(database_url):
             )""")
             cur.execute("""CREATE INDEX IF NOT EXISTS native_sessions_user
                 ON native_auth_sessions(user_id)""")
+            cur.execute("""CREATE TABLE IF NOT EXISTS native_auth_roles (
+                user_id TEXT PRIMARY KEY REFERENCES native_auth_users(id),
+                role TEXT NOT NULL CHECK(role IN ('passenger','pilot','admin'))
+            )""")
+            cur.execute("""CREATE UNIQUE INDEX IF NOT EXISTS native_auth_one_admin
+                ON native_auth_roles(role) WHERE role='admin'""")
 
 
 def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_phone=None,
@@ -165,13 +171,16 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
                     cur.execute("""SELECT id FROM native_auth_users
                         WHERE channel='phone' AND destination=%s""", (phone,))
                     uid = cur.fetchone()[0]
+                    cur.execute("""SELECT role FROM native_auth_roles WHERE user_id=%s""", (uid,))
+                    stored_role = cur.fetchone()
+                    stored_role = stored_role[0] if stored_role else "passenger"
                     token = secrets.token_urlsafe(48)
                     digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
                     cur.execute("""INSERT INTO native_auth_sessions
                         (token_hash,user_id,created_at,expires_at)
                         VALUES (%s,%s,%s,%s)""", (digest, uid, now, now + SESSION_TTL))
             return reply(start_response, "200 OK", {
-                "verified": True, "role": role_for_phone(phone), "user_id": uid,
+                "verified": True, "role": stored_role, "user_id": uid,
                 "access_token": token, "token_type": "Bearer",
                 "expires_in": SESSION_TTL,
             })

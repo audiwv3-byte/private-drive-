@@ -8,8 +8,10 @@ existing Telegram Mini App identity/authorization system.
 import hashlib
 import hmac
 import sqlite3
+import time
 
 ROLES = frozenset(("passenger", "pilot", "admin"))
+OWNER_BIND_WINDOW_SECONDS = 600
 
 
 def create_role_schema(conn):
@@ -32,12 +34,13 @@ def get_role(conn, user_id):
     return row[1] if row else None
 
 
-def bootstrap_owner(conn, user_id, *, supplied_secret, configured_secret):
+def bootstrap_owner(conn, user_id, *, supplied_secret, configured_secret, now=None):
     """Run only from trusted offline maintenance, NEVER from an HTTP handler.
 
     The configured secret is supplied securely by the operator at deployment.
     This method cannot select a user by phone and cannot create an account.
     Owner creation is one-time: if another admin exists, it refuses.
+    The candidate must have completed phone OTP within the last ten minutes.
     Caller must commit the transaction; failures leave no elevated roles.
     """
     if not isinstance(configured_secret, str) or len(configured_secret) < 32:
@@ -48,6 +51,17 @@ def bootstrap_owner(conn, user_id, *, supplied_secret, configured_secret):
         raise PermissionError("Invalid bootstrap credentials")
     if get_role(conn, user_id) is None:
         raise ValueError("The owner must have an existing verified account")
+    # Only recently OTP-verified native phone sessions qualify. A Telegram ID,
+    # username, client-provided role, or mere presence in the user table does not.
+    now = int(time.time() if now is None else now)
+    eligible = conn.execute("""SELECT 1 FROM native_auth_users u
+        JOIN native_auth_sessions s ON s.user_id=u.id
+        WHERE u.id=? AND u.channel='phone'
+          AND s.revoked_at IS NULL AND s.created_at<=?
+          AND s.created_at>? AND s.expires_at>? LIMIT 1""",
+        (user_id, now, now - OWNER_BIND_WINDOW_SECONDS, now)).fetchone()
+    if not eligible:
+        raise PermissionError("Recent verified native phone session required")
     if conn.execute("SELECT 1 FROM native_auth_roles WHERE role='admin'").fetchone():
         raise PermissionError("An administrator has already been provisioned")
     if get_role(conn, user_id) != "passenger":

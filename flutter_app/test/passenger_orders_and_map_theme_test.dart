@@ -154,26 +154,35 @@ void main() {
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
   });
 
-  testWidgets('Android passenger map uses keyless OSM tiles in both themes',
+  testWidgets('Android passenger map allows only primary or backup keyless OSM tiles in both themes',
       (tester) async {
+    // An unreachable tile endpoint can trigger the app's automatic switch
+    // before the first expectation. Both explicitly approved templates must
+    // remain keyless OSM PNG URLs: never accept CARTO or arbitrary hosts.
+    const approvedOsmTemplates = <String>{
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
+    };
+    void expectApprovedOsmTileLayer(TileLayer layer) {
+      expect(approvedOsmTemplates, contains(layer.urlTemplate));
+      expect(layer.fallbackUrl, isNull);
+      expect(layer.tileProvider, isA<DemoDirectNetworkTileProvider>());
+      expect(layer.tileProvider.headers['User-Agent'],
+          'PRIVATE DRIVE demo Android visual QA');
+    }
+
     await tester.pumpWidget(const MaterialApp(
       home: PassengerDemo(enableMapTiles: true),
     ));
     final tileFinder = find.byKey(const Key('passenger-map-tiles'));
     expect(tileFinder, findsOneWidget);
-    final day = tester.widget<TileLayer>(tileFinder);
-    expect(day.urlTemplate, contains('tile.openstreetmap.org'));
-    expect(day.fallbackUrl, isNull);
-    expect(day.tileProvider, isA<DemoDirectNetworkTileProvider>());
-    expect(day.tileProvider.headers['User-Agent'],
-        'PRIVATE DRIVE demo Android visual QA');
+    expectApprovedOsmTileLayer(tester.widget<TileLayer>(tileFinder));
     expect(find.ancestor(of: tileFinder, matching: find.byType(ColorFiltered)),
         findsOneWidget);
     tester.widget<IconButton>(find.byKey(
         const Key('passenger-map-day-night'))).onPressed!();
     await tester.pump();
-    final night = tester.widget<TileLayer>(tileFinder);
-    expect(night.urlTemplate, contains('tile.openstreetmap.org'));
+    expectApprovedOsmTileLayer(tester.widget<TileLayer>(tileFinder));
     expect(find.text('ДЕНЬ'), findsNothing);
     expect(find.text('НОЧЬ'), findsNothing);
     expect(find.ancestor(of: tileFinder, matching: find.byType(ColorFiltered)),

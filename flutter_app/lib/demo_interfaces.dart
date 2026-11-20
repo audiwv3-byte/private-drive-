@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -21,6 +20,7 @@ import 'demo_trip_store.dart';
 import 'demo_dispatcher_cabinet.dart';
 import 'company_info.dart';
 import 'remote_sync_demo.dart';
+import 'pd_http_api.dart';
 export 'passenger_demo.dart' show PassengerDemo;
 import 'package:flutter_map/flutter_map.dart';
 import 'demo_map_tile_provider.dart';
@@ -429,23 +429,12 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     setState(() {
       _pickupRoutingInfo = 'Построение маршрута по дорогам…';
     });
-    HttpClient? client;
     try {
-      client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 5);
       final uri = Uri.https('router.project-osrm.org',
         '/route/v1/driving/${from.longitude},${from.latitude};'
         '${to.longitude},${to.latitude}',
         {'overview': 'full', 'geometries': 'geojson'});
-      final request = await client.getUrl(uri)
-          .timeout(const Duration(seconds: 7));
-      final response = await request.close()
-          .timeout(const Duration(seconds: 7));
-      if (response.statusCode != 200) {
-        throw const HttpException('Routing unavailable');
-      }
-      final decoded = jsonDecode(await utf8.decoder.bind(response).join()
-          .timeout(const Duration(seconds: 7))) as Map<String, dynamic>;
+      final decoded = await const PdHttpApi().getJson(uri);
       final routes = decoded['routes'] as List<dynamic>?;
       if (routes == null || routes.isEmpty) {
         throw const FormatException('No road route');
@@ -474,8 +463,6 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         setState(() => _pickupRoutingInfo =
           'Дорожный маршрут недоступен · проверь интернет и GPS');
       }
-    } finally {
-      client?.close(force: true);
     }
   }
 

@@ -27,7 +27,62 @@ a:focus-visible{outline:2px solid #f7d48a;outline-offset:2px}
 <label class="field" for="email">Email для подтверждения</label><input id="email" type="email" name="email" placeholder="name@example.com" disabled>
 <label class="field" for="phone">Телефон (позже — подтверждение)</label><input id="phone" type="tel" name="phone" placeholder="+370..." disabled>
 <label class="consent"><input type="checkbox" disabled> Согласен с обработкой персональных данных согласно <a href="https://wilsonpark.pythonanywhere.com/privacy?lang=ru" target="_blank" rel="noopener noreferrer">политике конфиденциальности</a></label>
-<button type="button" disabled aria-disabled="true">Регистрация станет доступна после безопасного подключения API</button>
+<button id="request-code" type="button" disabled aria-disabled="true">Запросить тестовый код</button>
+<div id="otp-step" hidden>
+<label class="field" for="otp">Тестовый код из локального тестового хранилища</label>
+<input id="otp" type="text" inputmode="numeric" maxlength="6" autocomplete="off" disabled>
+<button id="verify-code" type="button" disabled>Проверить тестовый код</button>
+</div>
+<p id="registration-status" role="status" aria-live="polite">Регистрация отключена за пределами локального теста.</p>
 </form>
 <p>После подключения изолированного сервера подтверждение email или телефона будет обязательным. Роль пилота потребует отдельного одобрения администратором. Этот макет не связывается с Telegram.</p>
-</main></body></html>
+</main>
+<script type="module">
+import {makeRegistrationClient} from './registration-client.mjs';
+// No API URL, fetch, SMS, payment, or automatic activation.
+// Only a test harness explicitly injected on loopback can enable this page.
+const host = window.location.hostname;
+const local = host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
+const transport = local ? window.__PD_LOCAL_TEST_TRANSPORT__ : undefined;
+if (local && typeof transport === 'function') {
+  const client = makeRegistrationClient(transport);
+  const form = document.getElementById('register');
+  const request = document.getElementById('request-code');
+  const verify = document.getElementById('verify-code');
+  const otp = document.getElementById('otp');
+  const status = document.getElementById('registration-status');
+  for (const field of form.querySelectorAll('input')) field.disabled = false;
+  request.disabled = false;
+  request.removeAttribute('aria-disabled');
+  request.addEventListener('click', async () => {
+    const email = document.getElementById('email');
+    const name = document.getElementById('fullname');
+    const consent = form.querySelector('input[type="checkbox"]');
+    if (!name.value.trim() || !email.checkValidity() || !email.value.trim() || !consent.checked) {
+      status.textContent = 'Заполни имя, email и подтверди согласие.';
+      return;
+    }
+    request.disabled = true;
+    try {
+      const role = form.querySelector('input[name="role"]:checked').value;
+      await client.requestCode({role, channel:'email', destination:email.value});
+      document.getElementById('otp-step').hidden = false;
+      verify.disabled = false;
+      status.textContent = 'Код создан локально. Реальные сообщения не отправлялись.';
+    } catch (_) { status.textContent = 'Тестовый запрос отклонён.'; }
+    finally { request.disabled = false; }
+  });
+  verify.addEventListener('click', async () => {
+    verify.disabled = true;
+    try {
+      const result = await client.verifyCode(otp.value.trim());
+      status.textContent = result.role === 'pilot'
+        ? 'Тест завершён. Пилот ожидает одобрения, доступ не предоставлен.'
+        : 'Тест завершён. Пассажир проверен только в изолированной памяти.';
+    } catch (_) {
+      status.textContent = 'Неверный или истёкший тестовый код.';
+      verify.disabled = false;
+    }
+  });
+}
+</script></body></html>

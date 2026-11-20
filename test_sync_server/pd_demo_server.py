@@ -253,8 +253,9 @@ class ApiServer(ThreadingHTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address, store, credentials):
+    def __init__(self, address, store, credentials, *, browser_origin=None):
         self.store, self.credentials = store, credentials
+        self.browser_origin = browser_origin
         super().__init__(address, ApiHandler)
 
 
@@ -272,8 +273,15 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self._browser_headers()
         self.end_headers()
         self.wfile.write(data)
+
+    def _browser_headers(self):
+        self.send_header("Vary", "Origin")
+        origin = self.headers.get("Origin")
+        if origin and origin == self.server.browser_origin:
+            self.send_header("Access-Control-Allow-Origin", origin)
 
     def _auth(self):
         header = self.headers.get("Authorization", "")
@@ -302,7 +310,8 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def _request(self, method):
         try:
-            if self.headers.get("Origin"):
+            origin = self.headers.get("Origin")
+            if origin is not None and origin != self.server.browser_origin:
                 raise TripError("browser_origin_not_allowed", 403)
             role, actor = self._auth()
             path = urlsplit(self.path)
@@ -377,6 +386,23 @@ class ApiHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         self._request("POST")
 
+    def do_OPTIONS(self):
+        origin = self.headers.get("Origin")
+        method = self.headers.get("Access-Control-Request-Method")
+        headers = self.headers.get("Access-Control-Request-Headers", "")
+        requested_headers = {word.strip().lower() for word in headers.split(",") if word.strip()}
+        if (not origin or origin != self.server.browser_origin
+                or method not in ("GET", "POST")
+                or not requested_headers <= {"authorization", "content-type"}
+                or not urlsplit(self.path).path.startswith("/v1/")):
+            self._reply(403, {"error": "browser_preflight_not_allowed"})
+            return
+        self.send_response(204)
+        self._browser_headers()
+        self.send_header("Access-Control-Allow-Methods", "GET, POST")
+        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+        self.end_headers()
+
 
 def demo_credentials():
     result = {}
@@ -402,8 +428,15 @@ def serve():
     path = os.environ.get("PD_DEMO_DB", "")
     if not path or path == ":memory:":
         raise RuntimeError("Explicit throwaway PD_DEMO_DB file path required")
+    browser_origin = os.environ.get("PD_DEMO_BROWSER_ORIGIN") or None
+    if browser_origin:
+        parsed = urlsplit(browser_origin)
+        if (parsed.scheme != "https" or not parsed.hostname
+                or browser_origin != f"https://{parsed.hostname}"
+                or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for char in parsed.hostname)):
+            raise RuntimeError("PD_DEMO_BROWSER_ORIGIN must be one HTTPS origin without a path")
     store = DemoStore(path)
-    server = ApiServer((host, port), store, demo_credentials())
+    server = ApiServer((host, port), store, demo_credentials(), browser_origin=browser_origin)
     try:
         server.serve_forever()
     finally:

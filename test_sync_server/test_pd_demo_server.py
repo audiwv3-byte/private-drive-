@@ -5,6 +5,7 @@ import os
 import tempfile
 import threading
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from pd_demo_server import ApiServer, DemoStore, demo_credentials, TripError
@@ -57,6 +58,29 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertEqual(value["trip"]["status"], "requested")
         return value["trip"]
+
+    def test_browser_origin_requires_opt_in_and_role_token(self):
+        origin = "https://luxury-mochi-84e459.netlify.app"
+        self.assertEqual(self.req("GET", "/v1/me", headers={"Origin": origin})[0], 403)
+        self.server.browser_origin = origin
+        headers = {
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization, content-type",
+        }
+        with closing(http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=3)) as conn:
+            conn.request("OPTIONS", "/v1/trips", headers=headers)
+            response = conn.getresponse()
+            self.assertEqual(response.status, 204)
+            self.assertEqual(response.getheader("Access-Control-Allow-Origin"), origin)
+            response.read()
+        self.assertEqual(self.req("GET", "/v1/me", token="wrong", headers={"Origin": origin})[0], 401)
+        status, created = self.req("POST", "/v1/trips", headers={"Origin": origin},
+                                   payload={"from": "Demo A", "to": "Demo B"})
+        self.assertEqual(status, 201)
+        self.assertEqual(self.req("GET", "/v1/current", role="dispatcher")[1]["trip"]["id"],
+                         created["trip"]["id"])
+        self.assertEqual(self.req("GET", "/v1/me", headers={"Origin": origin + ".example"})[0], 403)
 
     def test_full_lifecycle_replay_and_restart(self):
         trip = self.create()

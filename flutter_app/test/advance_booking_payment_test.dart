@@ -24,15 +24,16 @@ void main() {
     expect(restored.trip!.advanceBooking, isTrue);
   });
 
-  test('Immediate cash ride remains allowed for cash-enabled pilot', () {
+  test('New immediate cash ride is forbidden for every pilot', () {
     final store = DemoTripStore();
     addTearDown(store.dispose);
     expect(store.create(from: 'А', to: 'Б', departure: DateTime.now(),
-      paymentMethod: 'Наличные', services: const []), isTrue);
-    expect(store.trip!.advanceBooking, isFalse);
-    expect(store.assignPilot(), isFalse);
+      paymentMethod: 'Наличные', services: const []), isFalse);
+    expect(store.trip, isNull);
     store.setPilotAcceptsCash(true);
-    expect(store.assignPilot(), isTrue);
+    expect(store.create(from: 'А', to: 'Б', departure: DateTime.now(),
+      paymentMethod: 'Наличные', services: const []), isFalse);
+    expect(store.trip, isNull);
   });
 
   test('After booking, services and payment are immutable', () {

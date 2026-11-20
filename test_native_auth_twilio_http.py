@@ -92,7 +92,9 @@ class TwilioHttpTests(unittest.TestCase):
             "role": "passenger",
         })
         self.assertEqual(status, 200)
-        self.assertEqual(admin["role"], "admin")
+        self.assertEqual(admin["role"], "passenger")
+        # Phone allowlists no longer confer administrator rights; offline
+        # owner bootstrap is required after verifying an existing account.
         self.assertEqual(authenticate_session(
             self.db, admin["access_token"], now=self.now)["destination"], admin_phone)
         self.assertEqual(call("/native-auth/verify-code", {

@@ -74,7 +74,9 @@ class BrowserCorsTests(unittest.TestCase):
                 "Access-Control-Request-Headers": "authorization, x-extra",
             })
         self.assertEqual(status, 403)
-        self.assertNotIn("Access-Control-Allow-Origin", headers)
+        # Trusted origin may read the explicit preflight rejection, but not use
+        # an unauthorized method or request header.
+        self.assertEqual(headers["Access-Control-Allow-Origin"], ORIGIN)
 
     def test_safari_and_android_separate_tokens_share_one_chat(self):
         # Safari attaches Origin; Android/native HTTP clients do not.

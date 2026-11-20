@@ -1,0 +1,25 @@
+name: PRIVATE DRIVE isolated registration tests
+on:
+  push:
+    branches:
+      - feature/website-private-drive-preview
+    paths:
+      - pd_test_registration.py
+      - test_pd_test_registration.py
+      - pd_native_auth.py
+      - pd_native_auth_http.py
+      - pd_native_auth_sessions.py
+      - .github/workflows/website-registration-tests.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-registration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Test isolated registration and existing authentication modules
+        run: python -m unittest -v test_pd_test_registration.py test_native_auth.py test_native_auth_http.py test_native_auth_sessions.py

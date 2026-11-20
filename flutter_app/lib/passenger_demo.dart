@@ -771,7 +771,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
         _mapTilesFailed = false;
       });
     } on Exception catch (error) {
-      // A direct OSM probe may fail on the device even when CARTO works.
+      // A direct OSM probe may fail on the device even when alternate OSM tiles work.
       // Switch providers rather than covering an otherwise usable map.
       if (mounted) setState(() {
         _lastTileError = 'Сеть: ${error.runtimeType}';
@@ -925,9 +925,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             child: TileLayer(
                             key: const Key('passenger-map-tiles'),
                             tileProvider: demoTileProvider(),
-                            // Both modes use keyless OSM; only day may use backup.
+                            // Both modes use keyless OSM raster tiles; fallback is for isolated tests.
                             urlTemplate: _useBackupTiles
-                                ? 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+                                ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
                                 : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
                             errorTileCallback: (tile, error, stackTrace) {
@@ -944,7 +944,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                   _mapTileErrors++;
                                   if (_mapTileErrors >= 3) {
                                     if (!_useBackupTiles) {
-                                      // Retry with CARTO on Safari and Android;
+                                      // Temporary Safari test fallback: OSM.de requires no CARTO API key;
                                       // retry automatically with CARTO light.
                                       _useBackupTiles = true;
                                       _mapTileErrors = 0;
@@ -975,7 +975,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                           const RichAttributionWidget(
                             attributions: [
                               TextSourceAttribution('© OpenStreetMap contributors'),
-                              TextSourceAttribution('© CARTO'),
+                              TextSourceAttribution('© OpenStreetMap.de'),
                             ],
                           ),
                         ],

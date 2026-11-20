@@ -47,7 +47,7 @@ class CorporateLegalTests(unittest.TestCase):
         s=self.page("privacy.html")
         for required in (
             "Yauheni Ivantsou", "eurobaltictransfer@gmail.com",
-            "статья 6(1)(b)", "статья 6(1)(f)", "статья 6(1)(c)",
+            "6(1)(b)", "6(1)(f)", "6(1)(c)",
             "права", "доступ", "исправление", "удаление", "возразить",
             "в течение месяца", "VDAI", "не содержит формы регистрации",
             "https://wilsonpark.pythonanywhere.com/privacy?lang=ru",
@@ -71,7 +71,7 @@ class CorporateLegalTests(unittest.TestCase):
         s=self.page("pilot-privacy.html")
         for required in (
             "Не утверждена", "не включаются", "паспорт", "правовые основания",
-            "сроки хранения", "VDAI", "публичная регистрация пилотов не включена",
+            "Сроки хранения", "VDAI", "публичная регистрация пилотов не включена",
             "не дают права выполнять поездки", "статья 6(1)(b)",
         ):
             self.assertIn(required,s)

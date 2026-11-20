@@ -1,23 +1,28 @@
-"""PRIVATE DRIVE separate opt-in SMS test WSGI entrypoint.
+"""Separate PRIVATE DRIVE test SMS WSGI service backed by Render PostgreSQL.
 
-Only the isolated Render-style service should import this module.
-DO NOT mount under the production site or Telegram application.
-
-Never add a real admin number or Twilio credentials to source control.
-Render Free has ephemeral storage, so this entrypoint refuses its unsafe
-filesystem layout. Use a separate persistent disk (or redesign for a durable
-external database) before handling real phone numbers.
+Only the dedicated isolated test Web Service imports this module. This module
+never mounts the Telegram Mini App, production site, or payment processing.
 """
 import os
-from pd_native_sms_isolated_config import make_isolated_sms_app
 
-# A persistent Render disk mounted at /var/data is required for SQLite.
-# Fail closed: Render's default /opt/render filesystem is ephemeral.
-path = os.environ.get("PD_NATIVE_SMS_DB", "")
-if not path.startswith("/var/data/"):
-    raise RuntimeError(
-        "Refusing SMS auth without isolated persistent SQLite under /var/data/"
-    )
+from pd_native_auth_postgres_http import make_app
+
 if os.environ.get("PD_NATIVE_SMS_ISOLATED") != "YES":
     raise RuntimeError("Isolated SMS deployment requires explicit opt-in")
-application, _isolated_connection = make_isolated_sms_app()
+
+database_url = os.environ.get("DATABASE_URL", "")
+if not database_url:
+    raise RuntimeError("Missing separate PostgreSQL DATABASE_URL")
+
+live = (
+    os.environ.get("PD_NATIVE_SMS_LIVE") == "YES"
+    and os.environ.get("TWILIO_VERIFY_ENABLED", "").lower() == "true"
+    and all(os.environ.get(key) for key in (
+        "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_VERIFY_SERVICE_SID"))
+)
+
+application = make_app(
+    database_url,
+    admin_phone=os.environ.get("PD_NATIVE_ADMIN_PHONE") or None,
+    live=live,
+)

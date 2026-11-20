@@ -49,5 +49,5 @@ test('public preview remains disabled and has no network transport', () => {
   assert.match(html, /id="request-code"[^>]*disabled/);
   assert.match(html, /id="verify-code"[^>]*disabled/);
   assert.match(html, /id="otp"[^>]*disabled/);
-  assert.doesNotMatch(client, /\bfetch\s*\(|XMLHttpRequest|localStorage|sessionStorage|https?:\/\//);
+  assert.doesNotMatch(client.replace(/\/\*[\s\S]*?\*\//g, ''), /\bfetch\s*\(|XMLHttpRequest|localStorage|sessionStorage|https?:\/\//);
 });

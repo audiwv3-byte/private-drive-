@@ -192,6 +192,38 @@ access to two physical devices, and a manually approved temporary HTTPS
 session. Production security/rate limits and real authentication are
 outside this synthetic test scope.
 
+## One-shot Safari ↔ Android demo using the existing Windows PC
+
+The test-only Quick Tunnel launcher now **automatically** sets
+`PD_DEMO_BROWSER_ORIGIN=https://luxury-mochi-84e459.netlify.app`.
+No Netlify setting, DNS record or production server changes are needed.
+Do not set any alternative `PD_DEMO_BROWSER_ORIGIN` value; the launcher
+fails closed rather than exposing the demo to another browser host.
+
+From a current checkout of `feature/flutter-independent-auth`, run
+the following in Windows PowerShell, after installing the official
+`cloudflared` client and Python 3:
+
+```powershell
+$env:PD_DEMO_PUBLIC_TUNNEL = "YES"
+py -3 test_sync_server/run_quick_tunnel.py
+```
+
+The terminal prints the temporary Cloudflare HTTPS URL and disposable
+`PASSENGER TEST TOKEN` / `PILOT TEST TOKEN`. Enter the URL and passenger
+token in **Safari** at
+`https://luxury-mochi-84e459.netlify.app`. The existing Android demo
+pilot's isolated chat uses the **same URL** and the **pilot token**.
+Never paste these tokens into public chat, GitHub, screenshots or a
+production app, and never send real customer data. The test ends after
+20 minutes and removes the disposable SQLite database. The desktop
+running the script must remain online during the test.
+
+Neither GitHub Actions nor the Netlify static site runs a persistent
+HTTP API. The isolated server cannot work across phones until a
+dedicated testing machine starts it. CI synthetic messaging tests do
+not prove the actual two-device session or Safari tile rendering.
+
 ## Safari Web preview (isolated API only)
 
 The test Netlify build uses `PD_ISOLATED_WEB_PREVIEW=true` and opens the

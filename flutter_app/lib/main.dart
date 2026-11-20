@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:http/http.dart' as http;
 import 'remote_sync_demo.dart';
 import 'demo_interfaces.dart';
@@ -81,6 +82,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   String? signedInUserId;
   String? signedInRole;
   String? selectedStaffRole;
+  bool showVerifiedIdentity = false;
   DateTime? sessionExpiry;
 
   @override
@@ -152,6 +154,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         sessionToken = token;
         signedInUserId = userId;
         signedInRole = role as String;
+        showVerifiedIdentity = true;
         sessionExpiry = DateTime.now().add(Duration(seconds: expiresIn));
         message = '';
         challengeId = null;
@@ -170,6 +173,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       signedInUserId = null;
       signedInRole = null;
       selectedStaffRole = null;
+      showVerifiedIdentity = false;
       sessionExpiry = null;
       challengeId = null;
       code.clear();
@@ -187,6 +191,60 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         sessionExpiry != null &&
         DateTime.now().isBefore(sessionExpiry!);
     if (active) {
+      if (showVerifiedIdentity) {
+        // The ID comes only from the completed server-side OTP verification.
+        // Never expose the bearer token or infer privileges from an ID.
+        return Scaffold(
+          appBar: AppBar(title: const Text('PRIVATE DRIVE · Аккаунт')),
+          body: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    const Icon(Icons.verified_user_outlined,
+                      size: 56, color: gold),
+                    const SizedBox(height: 16),
+                    const Text('Телефон подтверждён',
+                      key: Key('native-account-verified'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    const Text('Твой ID в PRIVATE DRIVE:'),
+                    SelectableText(signedInUserId!,
+                      key: const Key('native-verified-user-id')),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      key: const Key('native-copy-user-id'),
+                      onPressed: () => Clipboard.setData(
+                        ClipboardData(text: signedInUserId!)),
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Скопировать ID'),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Этот ID не предоставляет права администратора. '
+                      'Назначение главного администратора выполняется отдельно '
+                      'и только на защищённом сервере. Никому не передавай '
+                      'SMS-код или токен входа.'),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      key: const Key('native-continue-to-cabin'),
+                      onPressed: () => setState(() => showVerifiedIdentity = false),
+                      child: const Text('Перейти в приложение'),
+                    ),
+                    TextButton(
+                      onPressed: signOut,
+                      child: const Text('Выйти'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
       final hasBothCabinets = signedInRole == 'pilot_dispatcher';
       final role = hasBothCabinets ? selectedStaffRole : signedInRole;
       if (role == null) {

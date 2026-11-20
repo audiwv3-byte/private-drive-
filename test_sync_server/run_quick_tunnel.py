@@ -22,11 +22,15 @@ from pathlib import Path
 
 URL_PATTERN = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com\b")
 MAX_SECONDS = 20 * 60
+# The ONLY browser origin allowed for the existing disposable Netlify preview.
+SAFARI_PREVIEW_ORIGIN = "https://luxury-mochi-84e459.netlify.app"
 
 
 def require_explicit_opt_in(env, find_executable=shutil.which):
     if env.get("PD_DEMO_PUBLIC_TUNNEL") != "YES":
         raise RuntimeError("Public test tunnel disabled; set PD_DEMO_PUBLIC_TUNNEL=YES explicitly")
+    if env.get("PD_DEMO_BROWSER_ORIGIN") not in (None, SAFARI_PREVIEW_ORIGIN):
+        raise RuntimeError("Browser origin must match the existing isolated Safari preview")
     if any(env.get(k) for k in ("PD_DEMO_PASSENGER_TOKEN", "PD_DEMO_PILOT_TOKEN", "PD_DEMO_DISPATCHER_TOKEN")):
         raise RuntimeError("Remove pre-existing PD_DEMO_*_TOKEN variables: generated throwaway tokens are required")
     binary = find_executable("cloudflared")
@@ -134,6 +138,7 @@ def main():
             "PD_DEMO_HOST": "127.0.0.1",
             "PD_DEMO_PORT": str(port),
             "PD_DEMO_DB": str(Path(temp) / "synthetic.sqlite"),
+            "PD_DEMO_BROWSER_ORIGIN": SAFARI_PREVIEW_ORIGIN,
         })
         for role, token in credentials.items():
             env[f"PD_DEMO_{role.upper()}_TOKEN"] = token
@@ -168,7 +173,11 @@ def main():
             for role, token in credentials.items():
                 print(role.upper() + " TEST TOKEN:", token)
             print("Keep URL and role tokens private. Never use production details.")
-            print("Android only: install the verified PRIVATE DRIVE DEMO APK on both phones.")
+            print("Allowed Safari origin:", SAFARI_PREVIEW_ORIGIN)
+            print("iPHONE SAFARI: open", SAFARI_PREVIEW_ORIGIN)
+            print("  enter HTTPS URL and PASSENGER TEST TOKEN, then connect.")
+            print("A public HTTPS tunnel does not authenticate users: use dummy data only.")
+            print("ANDROID PILOT: use the already installed demo APK's isolated test chat.")
             print("PHONE A (PASSENGER): open passenger cabin -> test chat,")
             print("  enter HTTPS URL and PASSENGER TEST TOKEN, then connect.")
             print("PHONE B (PILOT): open pilot cabin -> left menu -> test chat,")
@@ -177,7 +186,7 @@ def main():
             print("Send a made-up message A -> B, then reply B -> A.")
             print("Never enter personal addresses, real orders or real payment data.")
             print("No manual trip creation or pilot assignment is needed.")
-            print("iPhone: native app requires legitimate Apple code signing before installation.")
+            print("Safari Web needs no iOS installation. It cannot view production trips.")
             print("All data and local SQLite are deleted when this process exits.\n")
             sys.stdout.flush()
             deadline = time.monotonic() + MAX_SECONDS

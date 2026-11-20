@@ -12,6 +12,7 @@ import sqlite3
 import time
 
 from pd_native_auth import native_phone_role_resolver, normalize_destination
+from pd_native_auth_roles import get_role
 from pd_native_auth_sessions import issue_session
 from pd_twilio_verify import start_verification, check_verification, VerifyError
 

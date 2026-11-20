@@ -16,6 +16,8 @@ jobs:
   build-ios-unsigned:
     runs-on: macos-15-intel
     timeout-minutes: 60
+    env:
+      PD_STAGING_NATIVE_AUTH_API_URL: ${{ vars.PD_STAGING_NATIVE_AUTH_API_URL }}
     defaults:
       run:
         working-directory: flutter_app
@@ -53,7 +55,7 @@ jobs:
           flutter pub get
           flutter test --no-pub
           flutter analyze --no-fatal-infos
-          flutter build ios --debug --no-codesign
+          flutter build ios --debug --no-codesign --dart-define="PD_NATIVE_AUTH_API_URL=$PD_STAGING_NATIVE_AUTH_API_URL"
 
       - name: Upload unsigned Debug artifact (not installable)
         uses: actions/upload-artifact@v4
@@ -66,7 +68,7 @@ jobs:
       - name: Compile unsigned iOS Release (not distributable)
         run: |
           set -euo pipefail
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign --dart-define="PD_NATIVE_AUTH_API_URL=$PD_STAGING_NATIVE_AUTH_API_URL"
 
       - name: Upload unsigned Release artifact (not installable)
         uses: actions/upload-artifact@v4

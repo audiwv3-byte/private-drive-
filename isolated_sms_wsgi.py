@@ -24,5 +24,7 @@ live = (
 application = make_app(
     database_url,
     admin_phone=os.environ.get("PD_NATIVE_ADMIN_PHONE") or None,
+    dispatcher_phone=os.environ.get("PD_NATIVE_DISPATCHER_PHONE") or None,
+    pilot_phone=os.environ.get("PD_NATIVE_PILOT_PHONE") or None,
     live=live,
 )

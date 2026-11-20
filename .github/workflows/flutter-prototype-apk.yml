@@ -1,4 +1,4 @@
-name: PRIVATE DRIVE Flutter prototype APK
+name: PRIVATE DRIVE Android release compilation
 
 on:
   push:
@@ -14,9 +14,11 @@ permissions:
   contents: read
 
 jobs:
-  build-debug-apk:
+  build-android-release:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      PD_STAGING_NATIVE_AUTH_API_URL: ${{ vars.PD_STAGING_NATIVE_AUTH_API_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -87,23 +89,13 @@ jobs:
           PY
           cp -R flutter_app/test/. private_drive_build/test/
           cp -R flutter_app/integration_test private_drive_build/integration_test
-          # Isolate test app from any future production package and keep its
-          # PUBLIC demo-only debug signature stable across GitHub Action runs.
-          mkdir -p "$HOME/.android"
-          base64 --decode flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
-          chmod 600 "$HOME/.android/debug.keystore"
-          keytool -list -storetype JKS -keystore "$HOME/.android/debug.keystore" -storepass android -alias AndroidDebugKey >/dev/null
           python3 - <<'PY'
           from pathlib import Path
           app = Path("private_drive_build/android/app/build.gradle.kts")
-          data = app.read_text()
-          original = 'applicationId = "lt.privatedrive.private_drive"'
-          assert original in data, "expected generated package ID"
-          data = data.replace(original,
-              'applicationId = "lt.privatedrive.private_drive.demo"')
-          app.write_text(data)
-          assert 'applicationId = "lt.privatedrive.private_drive.demo"' in app.read_text()
-          print("Isolated package ID: lt.privatedrive.private_drive.demo")
+          contents = app.read_text()
+          debug_signing = 'signingConfig = signingConfigs.getByName("debug")'
+          assert contents.count(debug_signing) == 1
+          app.write_text(contents.replace(debug_signing, ""))
           PY
           cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
           # The generated transparent artwork is shared by native sign-in and
@@ -161,49 +153,23 @@ jobs:
           python3 -m unittest discover -s test_sync_server -p 'test_*.py' -v
       - name: Verify live day/night raster tiles before building
         run: python3 flutter_app/tool/check_map_tiles.py
-      - name: Analyze and build debug APK (no production secrets)
+      - name: Analyze, run widget tests and compile Android release bundle
         working-directory: private_drive_build
         run: |
           flutter pub get
           flutter analyze --no-fatal-infos
           flutter test
-          flutter build apk --debug
-          # Prove that versionCode and logo shipped inside this exact APK.
-          python3 - <<'PY'
-          from pathlib import Path
-          from zipfile import ZipFile
-          import subprocess
-          apk = Path("build/app/outputs/flutter-apk/app-debug.apk")
-          assert apk.is_file() and apk.stat().st_size > 1000000
-          with ZipFile(apk) as z:
-              entries = z.namelist()
-              copies = [name for name in entries if "private_drive_logo" in name and name.endswith(".webp")]
-              assert len(copies) >= 2, f"expected native and Flutter copies: {copies}"
-              assert any("private_drive_splash_logo" in name for name in entries), "scaled native splash missing"
-              from hashlib import sha256
-              expected = "550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f"
-              for name in copies:
-                  if "splash_logo" in name: continue
-                  assert sha256(z.read(name)).hexdigest() == expected, f"incorrect logo in {name}"
-              print("Verified original approved logo in APK:", copies)
-          info = subprocess.check_output(["flutter", "--version"], text=True).strip().splitlines()[0]
-          print("Verified branded APK:", apk.stat().st_size, "bytes", info)
-          PY
-      - name: Preserve the actual installable demo APK before integration tests
-        run: |
-          # flutter test integration_test/... rebuilds app-debug.apk as an
-          # instrumentation test harness. Never distribute that test binary.
-          mkdir -p private_drive_release
-          cp private_drive_build/build/app/outputs/flutter-apk/app-debug.apk private_drive_release/private-drive-demo.apk
-          sha256sum private_drive_release/private-drive-demo.apk | tee private_drive_release/private-drive-demo.sha256
-          test "$(stat -c %s private_drive_release/private-drive-demo.apk)" -gt 100000000
-      - name: Upload installable demo APK after widget tests
+          flutter build appbundle --release --dart-define="PD_NATIVE_AUTH_API_URL=$PD_STAGING_NATIVE_AUTH_API_URL"
+          mkdir -p ../private_drive_release
+          cp build/app/outputs/bundle/release/app-release.aab ../private_drive_release/private-drive-android.aab
+          cd ../private_drive_release
+          unzip -tq private-drive-android.aab
+          sha256sum private-drive-android.aab > private-drive-android.sha256
+      - name: Upload unsigned Android release bundle
         uses: actions/upload-artifact@v4
         with:
-          name: private-drive-android-demo-widget-tested
-          path: |
-            private_drive_release/private-drive-demo.apk
-            private_drive_release/private-drive-demo.sha256
+          name: private-drive-android-unsigned-release
+          path: private_drive_release/
           if-no-files-found: error
           retention-days: 7
       # Flutter/Gradle compilation has already finished. Gradle daemons can
@@ -240,17 +206,3 @@ jobs:
           script: |
             timeout --kill-after=20s 5m bash -lc 'cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m'
             timeout --kill-after=20s 5m bash flutter_app/tool/run_android_chat_smoke.sh
-      - name: Confirm preserved installable APK is unchanged
-        run: |
-          test -s private_drive_release/private-drive-demo.apk
-          sha256sum --check private_drive_release/private-drive-demo.sha256
-          test "$(stat -c %s private_drive_release/private-drive-demo.apk)" -gt 100000000
-      - name: Upload verified installable demo APK (not test harness)
-        uses: actions/upload-artifact@v4
-        with:
-          name: private-drive-android-demo-installable-apk
-          path: |
-            private_drive_release/private-drive-demo.apk
-            private_drive_release/private-drive-demo.sha256
-          if-no-files-found: error
-          retention-days: 7

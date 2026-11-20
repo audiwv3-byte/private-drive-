@@ -54,6 +54,22 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(self.login(app, "+37062222222")["role"], "passenger")
         self.assertEqual(self.login(app, "+37063333333")["role"], "passenger")
 
+    def test_staff_roles_are_provisioned_only_on_the_server(self):
+        config = dict(self.config, PD_NATIVE_PILOT_PHONE="+37061111111",
+                      PD_NATIVE_DISPATCHER_PHONE="+37062222222")
+        app, db = self.new_app(config)
+        self.addCleanup(db.close)
+        self.assertEqual(self.login(app, "+37061111111")["role"], "pilot")
+        self.assertEqual(self.login(app, "+37062222222")["role"], "dispatcher")
+        self.assertEqual(self.login(app, "+37063333333")["role"], "passenger")
+
+    def test_existing_admin_can_also_be_provisioned_as_pilot(self):
+        config = dict(self.config, PD_NATIVE_ADMIN_PHONE="+37061111111",
+                      PD_NATIVE_PILOT_PHONE="+37061111111")
+        app, db = self.new_app(config)
+        self.addCleanup(db.close)
+        self.assertEqual(self.login(app, "+37061111111")["role"], "pilot_dispatcher")
+
     def test_admin_not_enabled_without_private_setting(self):
         app, db = self.new_app(self.config)
         self.addCleanup(db.close)

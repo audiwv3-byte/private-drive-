@@ -1,12 +1,6 @@
 name: PRIVATE DRIVE Flutter Web test preview
 
 on:
-  push:
-    branches:
-      - feature/flutter-independent-auth
-    paths:
-      - 'flutter_app/**'
-      - '.github/workflows/flutter-web-preview.yml'
   workflow_dispatch:
 
 permissions:

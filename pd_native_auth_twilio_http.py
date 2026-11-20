@@ -11,7 +11,7 @@ import secrets
 import sqlite3
 import time
 
-from pd_native_auth import normalize_destination
+from pd_native_auth import native_phone_role_resolver, normalize_destination
 from pd_native_auth_sessions import issue_session
 from pd_twilio_verify import start_verification, check_verification, VerifyError
 
@@ -34,7 +34,8 @@ def _schema(conn):
 
 def make_twilio_native_auth_app(conn, *, start_sms=start_verification,
                                 check_sms=check_verification, clock=None,
-                                admin_phone=None):
+                                admin_phone=None, dispatcher_phone=None,
+                                pilot_phone=None):
     """Construct a *separate*, explicitly mounted test WSGI app.
 
     Tests inject fake provider functions. By default, provider functions
@@ -45,10 +46,8 @@ def make_twilio_native_auth_app(conn, *, start_sms=start_verification,
     if not callable(start_sms) or not callable(check_sms):
         raise TypeError("SMS provider callbacks required")
     clock = clock or time.time
-    # Fail closed: no administrator exists until the server operator explicitly
-    # provisions one number. This argument is NEVER read from a client request.
-    if admin_phone is not None:
-        admin_phone = normalize_destination("phone", admin_phone)
+    role_for_phone = native_phone_role_resolver(
+        admin_phone=admin_phone, dispatcher_phone=dispatcher_phone, pilot_phone=pilot_phone)
     _schema(conn)
     conn.commit()
     ip_requests = {}
@@ -150,9 +149,8 @@ def make_twilio_native_auth_app(conn, *, start_sms=start_verification,
                          {"error": "session_unavailable"})
         # Role is derived server-side from the already verified phone.
         # Existing pilot / production admin records are never modified.
-        role = "admin" if admin_phone is not None and phone == admin_phone else "passenger"
         return reply(start_response, "200 OK", {
-            "verified": True, "role": role, **session
+            "verified": True, "role": role_for_phone(phone), **session
         })
 
     return app

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'remote_sync_demo.dart';
 import 'demo_interfaces.dart';
 import 'demo_backup_page.dart';
@@ -21,7 +22,9 @@ Future<void> main() async {
 }
 
 class PrivateDriveApp extends StatelessWidget {
-  const PrivateDriveApp({super.key});
+  const PrivateDriveApp({super.key, this.enableOfflinePreview = false});
+
+  final bool enableOfflinePreview;
 
   @override
   Widget build(BuildContext context) {
@@ -40,14 +43,25 @@ class PrivateDriveApp extends StatelessWidget {
       ),
       home: kIsWeb && isolatedWebPreview
           ? const RemoteSyncDemo()
-          : const PdPermissionsFirstLaunch(child: NativeSignInScreen()),
+          : PdPermissionsFirstLaunch(
+              child: NativeSignInScreen(enableOfflinePreview: enableOfflinePreview),
+            ),
       ),
     );
   }
 }
 
 class NativeSignInScreen extends StatefulWidget {
-  const NativeSignInScreen({super.key});
+  const NativeSignInScreen({
+    super.key,
+    this.authApiUrl = apiBaseUrl,
+    this.enableOfflinePreview = false,
+    this.httpClient,
+  });
+
+  final String authApiUrl;
+  final bool enableOfflinePreview;
+  final http.Client? httpClient;
 
   @override
   State<NativeSignInScreen> createState() => _NativeSignInScreenState();
@@ -66,6 +80,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   String? sessionToken;
   String? signedInUserId;
   String? signedInRole;
+  String? selectedStaffRole;
   DateTime? sessionExpiry;
 
   @override
@@ -76,8 +91,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   }
 
   Future<Map<String, dynamic>> post(String path, Map<String, String> payload) {
-    final uri = PdHttpApi.secureUri(apiBaseUrl, path);
-    return const PdHttpApi().postJson(uri, payload);
+    final uri = PdHttpApi.secureUri(widget.authApiUrl, path);
+    return const PdHttpApi().postJson(uri, payload, client: widget.httpClient);
   }
 
   Future<void> requestCode() async {
@@ -128,7 +143,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
           token is! String || token.length < 40 ||
           userId is! String || userId.isEmpty ||
           tokenType != 'Bearer' ||
-          (role != 'passenger' && role != 'admin') ||
+          !const {'passenger', 'admin', 'pilot', 'dispatcher', 'pilot_dispatcher'}.contains(role) ||
           expiresIn is! int || expiresIn <= 0) {
         throw const FormatException('Сервер не выдал корректную сессию.');
       }
@@ -154,6 +169,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       sessionToken = null;
       signedInUserId = null;
       signedInRole = null;
+      selectedStaffRole = null;
       sessionExpiry = null;
       challengeId = null;
       code.clear();
@@ -171,14 +187,49 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         sessionExpiry != null &&
         DateTime.now().isBefore(sessionExpiry!);
     if (active) {
-      // Never infer administrator permissions from phone input or client state.
-      // A separate trusted SMS API must return the role after OTP verification.
-      final isAdmin = signedInRole == 'admin';
+      final hasBothCabinets = signedInRole == 'pilot_dispatcher';
+      final role = hasBothCabinets ? selectedStaffRole : signedInRole;
+      if (role == null) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('PRIVATE DRIVE'),
+            actions: [
+              IconButton(
+                tooltip: 'Выйти',
+                icon: const Icon(Icons.logout),
+                onPressed: signOut,
+              ),
+            ],
+          ),
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FilledButton(
+                  key: const Key('authorized-open-pilot'),
+                  onPressed: () => setState(() => selectedStaffRole = 'pilot'),
+                  child: const Text('Кабина пилота'),
+                ),
+                FilledButton(
+                  key: const Key('authorized-open-dispatcher'),
+                  onPressed: () => setState(() => selectedStaffRole = 'dispatcher'),
+                  child: const Text('Кабинет диспетчера'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return PrivateDriveDemo(
-        key: ValueKey('${isAdmin ? 'admin' : 'passenger'}-${signedInUserId!}'),
-        adminOnly: isAdmin,
-        passengerOnly: !isAdmin,
+        key: ValueKey('$role-${signedInUserId!}'),
+        storageScope: signedInUserId,
+        adminOnly: role == 'admin' || role == 'dispatcher',
+        pilotOnly: role == 'pilot',
+        passengerOnly: role == 'passenger',
         onSignOut: signOut,
+        onBackToCabinets: hasBothCabinets
+            ? () => setState(() => selectedStaffRole = null)
+            : null,
       );
     }
     return Scaffold(
@@ -218,12 +269,12 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
-                  'Версия 0.2.23 · сборка 2026112021 · ДЕМО',
+                  'Версия 0.2.24 · сборка 2026112022',
                   key: Key('app-demo-version'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),
                 ),
-                if (apiBaseUrl.isEmpty)
+                if (widget.enableOfflinePreview && widget.authApiUrl.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: FilledButton(
@@ -273,7 +324,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                 const SizedBox(height: 8),
                 if (challengeId == null)
                   FilledButton(
-                    onPressed: busy || apiBaseUrl.isEmpty || !_acknowledgedLegal
+                    onPressed: busy || widget.authApiUrl.isEmpty || !_acknowledgedLegal
                         ? null : requestCode,
                     child: Text(tr('Получить код', 'Gauti kodą', 'Get code')),
                   )
@@ -310,17 +361,16 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     padding: const EdgeInsets.only(top: 16),
                     child: Text(message, textAlign: TextAlign.center),
                   ),
-                if (apiBaseUrl.isEmpty)
+                if (widget.authApiUrl.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 20),
                     child: Text(
-                      'Тестовая сборка: сервер авторизации не подключён. '
-                      'Отправка SMS выключена.',
+                      'В этой сборке сервер авторизации не подключён.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: gold),
                     ),
                   ),
-                if (!kIsWeb && apiBaseUrl.isEmpty)
+                if (!kIsWeb && widget.enableOfflinePreview && widget.authApiUrl.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: OutlinedButton.icon(

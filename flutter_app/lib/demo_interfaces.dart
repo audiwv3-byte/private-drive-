@@ -37,7 +37,10 @@ class PrivateDriveDemo extends StatefulWidget {
     this.enableMapTiles = true,
     this.passengerOnly = false,
     this.adminOnly = false,
+    this.pilotOnly = false,
+    this.storageScope,
     this.onSignOut,
+    this.onBackToCabinets,
   });
 
   final bool enableMapTiles;
@@ -47,7 +50,10 @@ class PrivateDriveDemo extends StatefulWidget {
   /// Accessible only when a trusted SMS server returns an administrator role.
   /// This is a local demo console; real admin API authorization is separate.
   final bool adminOnly;
+  final bool pilotOnly;
+  final String? storageScope;
   final VoidCallback? onSignOut;
+  final VoidCallback? onBackToCabinets;
 
   @override
   State<PrivateDriveDemo> createState() => _PrivateDriveDemoState();
@@ -70,7 +76,10 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
       return null;
     }
   }
-  static const _orderKey = 'pd_offline_demo_order_v1';
+  String get _orderKey {
+    final user = widget.storageScope;
+    return user == null ? 'pd_offline_demo_order_v1' : 'pd_local_order_v1.$user';
+  }
   Future<void> _saveQueue = Future<void>.value();
   String? _lastSavedSnapshot;
 
@@ -215,10 +224,21 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
       return const Scaffold(body: Center(child: CircularProgressIndicator(
         key: Key('demo-order-restoring'))));
     }
+    if (widget.pilotOnly) {
+      return PilotCabin(
+        enableMapTiles: widget.enableMapTiles,
+        tripStore: _trip,
+        onSignOut: widget.onSignOut,
+        onBackToCabinets: widget.onBackToCabinets,
+      );
+    }
     if (widget.adminOnly) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('PRIVATE DRIVE · Администратор · DEMO'),
+          title: const Text('PRIVATE DRIVE · Диспетчер'),
+          leading: widget.onBackToCabinets == null
+              ? null
+              : BackButton(onPressed: widget.onBackToCabinets),
           actions: [
             if (widget.onSignOut != null)
               IconButton(

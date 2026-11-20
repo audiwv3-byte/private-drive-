@@ -26,7 +26,7 @@ void main() {
     view.devicePixelRatio = 1;
     addTearDown(view.resetPhysicalSize);
     addTearDown(view.resetDevicePixelRatio);
-    await tester.pumpWidget(const PrivateDriveApp());
+    await tester.pumpWidget(const PrivateDriveApp(enableOfflinePreview: true));
     await tester.pumpAndSettle();
     final demoEntry = find.byKey(const Key('open-offline-demo'));
     expect(demoEntry.hitTestable(), findsOneWidget);

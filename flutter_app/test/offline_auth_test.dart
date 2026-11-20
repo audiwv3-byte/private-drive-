@@ -1,6 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:private_drive/pilot_cabin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:private_drive/main.dart';
 import 'package:private_drive/demo_interfaces.dart';
@@ -30,8 +35,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
     expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
-    expect(find.textContaining('0.2.23'), findsOneWidget);
-    expect(find.textContaining('2026112021'), findsOneWidget);
+    expect(find.textContaining('0.2.24'), findsOneWidget);
+    expect(find.textContaining('2026112022'), findsOneWidget);
     expect(find.byIcon(Icons.local_taxi_outlined), findsNothing);
   });
 
@@ -46,6 +51,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('Получить код'), 120,
       scrollable: find.byType(Scrollable).first);
     expect(find.text('Получить код'), findsOneWidget);
+    expect(find.byKey(const Key('open-offline-demo')), findsNothing);
 
     final button = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Получить код'),
@@ -99,5 +105,72 @@ void main() {
     expect(find.byKey(const Key('open-dispatcher-preview')), findsNothing);
     expect(find.byKey(const Key('open-remote-sync-demo')), findsNothing);
   });
+
+  for (final role in ['passenger', 'pilot', 'dispatcher', 'pilot_dispatcher']) {
+    testWidgets('Verified server role opens the authorized cabin: $role',
+        (tester) async {
+      final client = MockClient((request) async {
+        final payload = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(payload.containsKey('role'), isFalse);
+        if (request.url.path.endsWith('/request-code')) {
+          return http.Response('{"challenge_id":"synthetic"}', 202);
+        }
+        expect(request.url.path, '/native-auth/verify-code');
+        expect(payload['code'], '123456');
+        return http.Response(jsonEncode({
+          'verified': true,
+          'access_token': List.filled(48, 'x').join(),
+          'user_id': 'synthetic-account',
+          'token_type': 'Bearer',
+          'expires_in': 60,
+          'role': role,
+        }), 200);
+      });
+      addTearDown(client.close);
+      await tester.pumpWidget(MaterialApp(
+        home: NativeSignInScreen(authApiUrl: 'https://example.test', httpClient: client),
+      ));
+      await tester.enterText(find.byType(TextField).first, '+37060000000');
+      final legal = find.byKey(const Key('native-legal-acknowledgement'));
+      await tester.ensureVisible(legal);
+      await tester.tap(legal);
+      await tester.pumpAndSettle();
+      final requestCode = find.text('Получить код');
+      await tester.scrollUntilVisible(requestCode, 120,
+          scrollable: find.byType(Scrollable).first);
+      await tester.tap(requestCode);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '123456');
+      final verify = find.text('Подтвердить');
+      await tester.ensureVisible(verify);
+      await tester.tap(verify);
+      await tester.pumpAndSettle();
+
+      final pilot = find.byKey(const Key('authorized-open-pilot'));
+      final dispatcher = find.byKey(const Key('authorized-open-dispatcher'));
+      final dispatcherDrawer = find.byKey(const Key('dispatcher-open-drawer'));
+      if (role == 'pilot_dispatcher') {
+        await tester.tap(pilot);
+        await tester.pumpAndSettle();
+        expect(find.byType(PilotCabin), findsOneWidget);
+        expect(dispatcherDrawer, findsNothing);
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        await tester.tap(dispatcher);
+        await tester.pumpAndSettle();
+        expect(dispatcherDrawer, findsOneWidget);
+      } else {
+        expect(pilot, findsNothing);
+        expect(dispatcher, findsNothing);
+        expect(find.byType(PilotCabin),
+            role == 'pilot' ? findsOneWidget : findsNothing);
+        expect(dispatcherDrawer,
+            role == 'dispatcher' ? findsOneWidget : findsNothing);
+      }
+      expect(find.byKey(const Key('passenger-entry-taxi')),
+          role == 'passenger' ? findsOneWidget : findsNothing);
+      expect(find.byKey(const Key('open-offline-demo')), findsNothing);
+    });
+  }
 
 }

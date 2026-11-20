@@ -12,7 +12,7 @@ import time
 
 import psycopg
 
-from pd_native_auth import normalize_destination
+from pd_native_auth import native_phone_role_resolver, normalize_destination
 from pd_twilio_verify import VerifyError, start_verification, check_verification
 
 TTL = 300
@@ -47,12 +47,13 @@ def initialize_database(database_url):
                 ON native_auth_sessions(user_id)""")
 
 
-def make_app(database_url, *, admin_phone=None, live=False,
+def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_phone=None,
+             live=False,
              start_sms=None, check_sms=None, clock=None):
     if not database_url or not database_url.startswith(("postgresql://", "postgres://")):
         raise ValueError("A private PostgreSQL DATABASE_URL is required")
-    if admin_phone:
-        admin_phone = normalize_destination("phone", admin_phone)
+    role_for_phone = native_phone_role_resolver(
+        admin_phone=admin_phone, dispatcher_phone=dispatcher_phone, pilot_phone=pilot_phone)
     if live:
         if not (start_sms and check_sms):
             start_sms = start_sms or start_verification
@@ -169,9 +170,8 @@ def make_app(database_url, *, admin_phone=None, live=False,
                     cur.execute("""INSERT INTO native_auth_sessions
                         (token_hash,user_id,created_at,expires_at)
                         VALUES (%s,%s,%s,%s)""", (digest, uid, now, now + SESSION_TTL))
-            role = "admin" if admin_phone and phone == admin_phone else "passenger"
             return reply(start_response, "200 OK", {
-                "verified": True, "role": role, "user_id": uid,
+                "verified": True, "role": role_for_phone(phone), "user_id": uid,
                 "access_token": token, "token_type": "Bearer",
                 "expires_in": SESSION_TTL,
             })

@@ -31,6 +31,25 @@ def normalize_destination(channel, destination):
     return value
 
 
+def native_phone_role_resolver(*, admin_phone=None, dispatcher_phone=None, pilot_phone=None):
+    """Resolve roles for verified phones using only trusted server configuration."""
+    admin, dispatcher, pilot = (
+        normalize_destination("phone", phone) if phone is not None else None
+        for phone in (admin_phone, dispatcher_phone, pilot_phone)
+    )
+
+    def role_for_phone(phone):
+        is_admin = phone == admin
+        can_dispatch = is_admin or phone == dispatcher
+        if phone == pilot:
+            return "pilot_dispatcher" if can_dispatch else "pilot"
+        if is_admin:
+            return "admin"
+        return "dispatcher" if can_dispatch else "passenger"
+
+    return role_for_phone
+
+
 def create_schema(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS native_auth_challenges (
         id TEXT PRIMARY KEY,

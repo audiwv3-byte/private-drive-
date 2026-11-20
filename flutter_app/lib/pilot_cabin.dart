@@ -19,10 +19,14 @@ class PilotCabin extends StatefulWidget {
     this.enableMapTiles = true,
     this.tripStore,
     this.onOfferAlert,
+    this.onSignOut,
+    this.onBackToCabinets,
   });
 
   final bool enableMapTiles;
   final DemoTripStore? tripStore;
+  final VoidCallback? onSignOut;
+  final VoidCallback? onBackToCabinets;
   /// Test-only hook to verify alert repetition without device audio.
   final VoidCallback? onOfferAlert;
 
@@ -175,7 +179,20 @@ class _PilotCabinState extends State<PilotCabin> {
     final accent = _onLine ? green : red;
 
     return Scaffold(
-      appBar: AppBar(title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Кабина пилота')}')),
+      appBar: AppBar(
+        title: Text('PRIVATE DRIVE · ${pdLabel(context, 'Кабина пилота')}'),
+        leading: widget.onBackToCabinets == null
+            ? null
+            : BackButton(onPressed: widget.onBackToCabinets),
+        actions: [
+          if (widget.onSignOut != null)
+            IconButton(
+              tooltip: 'Выйти',
+              icon: const Icon(Icons.logout),
+              onPressed: widget.onSignOut,
+            ),
+        ],
+      ),
       body: Stack(
         fit: StackFit.expand,
         children: [

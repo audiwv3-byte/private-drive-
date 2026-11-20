@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from pd_demo_server import ApiServer, DemoStore
 from run_quick_tunnel import (URL_PATTERN, require_explicit_opt_in,
-    MAX_SECONDS, choose_port, seed_synthetic_chat_trip)
+    MAX_SECONDS, SAFARI_PREVIEW_ORIGIN, choose_port, seed_synthetic_chat_trip)
 
 
 class QuickTunnelSafetyTests(unittest.TestCase):
@@ -30,6 +30,23 @@ class QuickTunnelSafetyTests(unittest.TestCase):
         self.assertEqual(require_explicit_opt_in(
             {"PD_DEMO_PUBLIC_TUNNEL": "YES"},
             find_executable=lambda _: "/fake/cloudflared"), "/fake/cloudflared")
+
+    def test_browser_origin_only_allows_existing_safari_netlify_preview(self):
+        self.assertEqual(SAFARI_PREVIEW_ORIGIN,
+                         "https://luxury-mochi-84e459.netlify.app")
+        self.assertEqual(require_explicit_opt_in({
+            "PD_DEMO_PUBLIC_TUNNEL": "YES",
+            "PD_DEMO_BROWSER_ORIGIN": SAFARI_PREVIEW_ORIGIN,
+        }, find_executable=lambda _: "/fake/cloudflared"), "/fake/cloudflared")
+        for origin in ("https://evil.example",
+                       "http://luxury-mochi-84e459.netlify.app",
+                       "https://luxury-mochi-84e459.netlify.app.evil.example"):
+            with self.subTest(origin=origin):
+                with self.assertRaisesRegex(RuntimeError, "Browser origin"):
+                    require_explicit_opt_in({
+                        "PD_DEMO_PUBLIC_TUNNEL": "YES",
+                        "PD_DEMO_BROWSER_ORIGIN": origin,
+                    }, find_executable=lambda _: "/fake/cloudflared")
 
     def test_temporary_random_cloudflare_url_pattern(self):
         self.assertEqual(URL_PATTERN.search(

@@ -57,6 +57,68 @@ class TwilioHttpTests(unittest.TestCase):
         self.assertNotIn("123456", str(self.db.execute(
             "SELECT * FROM native_twilio_challenges").fetchall()))
 
+    def test_preprovisioned_admin_only_after_verified_sms(self):
+        admin_phone = "+37061111111"  # synthetic test number, not user's phone
+        app = make_twilio_native_auth_app(
+            self.db,
+            start_sms=lambda phone: self.sent.append(phone),
+            check_sms=lambda phone, code: code == "123456",
+            clock=lambda: self.now,
+            admin_phone=admin_phone,
+        )
+        def call(route, payload):
+            raw = json.dumps(payload).encode()
+            statuses = []
+            body = b"".join(app({
+                "REQUEST_METHOD": "POST", "PATH_INFO": route,
+                "CONTENT_TYPE": "application/json",
+                "CONTENT_LENGTH": str(len(raw)),
+                "wsgi.input": io.BytesIO(raw),
+                "REMOTE_ADDR": "127.0.0.1",
+            }, lambda status, headers: statuses.append(status)))
+            return int(statuses[0][:3]), json.loads(body)
+        _, started = call("/native-auth/request-code", {
+            "channel": "phone", "destination": admin_phone,
+            "role": "passenger",
+        })
+        status, refused = call("/native-auth/verify-code", {
+            "challenge_id": started["challenge_id"], "code": "000000",
+            "role": "admin",
+        })
+        self.assertEqual(status, 401)
+        self.assertNotIn("access_token", refused)
+        status, admin = call("/native-auth/verify-code", {
+            "challenge_id": started["challenge_id"], "code": "123456",
+            "role": "passenger",
+        })
+        self.assertEqual(status, 200)
+        self.assertEqual(admin["role"], "admin")
+        self.assertEqual(authenticate_session(
+            self.db, admin["access_token"], now=self.now)["destination"], admin_phone)
+        self.assertEqual(call("/native-auth/verify-code", {
+            "challenge_id": started["challenge_id"], "code": "123456",
+        })[0], 401)
+        # A different new phone stays passenger even if it claims admin in JSON.
+        _, started_other = call("/native-auth/request-code", {
+            "channel": "phone", "destination": "+37062222222",
+            "role": "admin",
+        })
+        status, other = call("/native-auth/verify-code", {
+            "challenge_id": started_other["challenge_id"],
+            "code": "123456", "role": "admin",
+        })
+        self.assertEqual(status, 200)
+        self.assertEqual(other["role"], "passenger")
+        self.assertNotEqual(admin["user_id"], other["user_id"])
+
+    def test_admin_setting_is_off_by_default_and_validated(self):
+        self.assertEqual(self.begin("+37061111111")[0], 202)
+        self.assertEqual(self.confirm(
+            self.db.execute("SELECT id FROM native_twilio_challenges").fetchone()[0]
+        )[1]["role"], "passenger")
+        with self.assertRaises(ValueError):
+            make_twilio_native_auth_app(self.db, admin_phone="admin")
+
     def test_reuses_existing_passenger_account_no_pilot_escalation(self):
         _, first = self.begin()
         _, first_session = self.confirm(first["challenge_id"])

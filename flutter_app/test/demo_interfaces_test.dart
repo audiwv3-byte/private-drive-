@@ -68,11 +68,18 @@ void main() {
     await tester.ensureVisible(pilot);
     await tester.tap(pilot);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('pilot-map-surface')), findsOneWidget);
+    // The pilot starts offline in the dedicated POWER cabin. The map is
+    // deliberately opened only after the pilot opts into the local shift.
+    expect(find.byKey(const Key('pilot-power-toggle')), findsOneWidget);
     expect(find.byKey(const Key('passenger-form')), findsNothing);
     expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);
+    await tester.tap(find.byKey(const Key('pilot-power-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pilot-map-surface')), findsOneWidget);
 
-    await tester.pageBack();
+    await tester.pageBack(); // Map -> pilot POWER cabin.
+    await tester.pumpAndSettle();
+    await tester.pageBack(); // Pilot POWER cabin -> three-role hub.
     await tester.pumpAndSettle();
     await tester.ensureVisible(dispatcher);
     await tester.tap(dispatcher);

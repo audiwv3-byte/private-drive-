@@ -67,6 +67,19 @@ class DemoBackupCodec {
     if (!_keysAreAllowed(data, _orderFields)) {
       throw const FormatException('Неизвестные поля заказа');
     }
+    final archived = data['archivedChats'];
+    if (archived is List) {
+      const allowedChatFields = <String>{
+        'from', 'to', 'pilotMessages', 'passengerMessages',
+        'dispatcherMessages',
+      };
+      for (final item in archived) {
+        if (item is! Map<String, dynamic> ||
+            !_keysAreAllowed(item, allowedChatFields)) {
+          throw const FormatException('Неизвестные поля архива переписки');
+        }
+      }
+    }
     final store = DemoTripStore();
     try {
       if (!store.restorePersistedJson(raw)) {

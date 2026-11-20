@@ -315,7 +315,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) =>
-                          const PrivateDriveDemo(passengerOnly: true)),
+                          const PrivateDriveDemo()),
                       ),
                       child: Text(tr('Посмотреть тестовые интерфейсы',
                           'Atidaryti bandomąsias sąsajas', 'Open demo interfaces')),

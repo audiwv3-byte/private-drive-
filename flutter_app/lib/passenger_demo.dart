@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'permissions_onboarding.dart';
 import 'message_voice.dart';
@@ -742,6 +743,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
       }
       return;
     }
+    // Browser image elements may display OSM tiles even when cross-origin
+    // fetch() is blocked by CORS (notably on iPhone Safari). Do not use a
+    // binary HTTP probe to decide whether the browser can render the map.
+    // TileLayer's errorTileCallback remains the actual visual health check.
+    if (kIsWeb) {
+      if (mounted) setState(() {
+        _checkingMapNetwork = false;
+        _mapNetworkError = null;
+      });
+      return;
+    }
     final client = http.Client();
     try {
       final uri = Uri.parse(
@@ -914,7 +926,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             key: const Key('passenger-map-tiles'),
                             tileProvider: demoTileProvider(),
                             // Both modes use keyless OSM; only day may use backup.
-                            urlTemplate: !_nightMap && _useBackupTiles
+                            urlTemplate: _useBackupTiles
                                 ? 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
                                 : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
@@ -931,8 +943,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                   _lastTileError = error.toString();
                                   _mapTileErrors++;
                                   if (_mapTileErrors >= 3) {
-                                    if (!_nightMap && !_useBackupTiles) {
-                                      // OSM can fail on real Android networks;
+                                    if (!_useBackupTiles) {
+                                      // Retry with CARTO on Safari and Android;
                                       // retry automatically with CARTO light.
                                       _useBackupTiles = true;
                                       _mapTileErrors = 0;

@@ -1,13 +1,14 @@
 """Opt-in Twilio Verify WSGI adapter for isolated PRIVATE DRIVE SMS sign-in.
 
-No production mounts, no payments, no privileged roles.  This module only
-receives a verified phone and issues the existing passenger session.  The
+No production mounts or payments. New phone accounts default to passenger;
+pre-authorized admin phone may be assigned only by trusted server configuration.  The
 Twilio adapter refuses network requests unless TWILIO_VERIFY_ENABLED=true
 and valid server-side Twilio credentials are present.  Do not use an
 in-memory SQLite connection when multiple WSGI workers are running.
 """
 import io
 import json
+import os
 import secrets
 import sqlite3
 import time
@@ -34,7 +35,8 @@ def _schema(conn):
 
 
 def make_twilio_native_auth_app(conn, *, start_sms=start_verification,
-                                check_sms=check_verification, clock=None):
+                                check_sms=check_verification, clock=None,
+                                admin_phone=None):
     """Construct a *separate*, explicitly mounted test WSGI app.
 
     Tests inject fake provider functions. By default, provider functions
@@ -45,6 +47,10 @@ def make_twilio_native_auth_app(conn, *, start_sms=start_verification,
     if not callable(start_sms) or not callable(check_sms):
         raise TypeError("SMS provider callbacks required")
     clock = clock or time.time
+    # Fail closed: no administrator exists until the server operator explicitly
+    # provisions one number. This argument is NEVER read from a client request.
+    if admin_phone is not None:
+        admin_phone = normalize_destination("phone", admin_phone)
     _schema(conn)
     conn.commit()
     ip_requests = {}
@@ -144,9 +150,11 @@ def make_twilio_native_auth_app(conn, *, start_sms=start_verification,
             conn.rollback()
             return reply(start_response, "500 Internal Server Error",
                          {"error": "session_unavailable"})
-        # Existing privileged users are not modified or enumerated.
+        # Role is derived server-side from the already verified phone.
+        # Existing pilot / production admin records are never modified.
+        role = "admin" if admin_phone is not None and phone == admin_phone else "passenger"
         return reply(start_response, "200 OK", {
-            "verified": True, "role": "passenger", **session
+            "verified": True, "role": role, **session
         })
 
     return app

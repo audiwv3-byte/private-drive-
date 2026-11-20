@@ -54,7 +54,7 @@ class ConfigTests(unittest.TestCase):
         owner = self.login(app, "+37061111111")
         self.assertEqual(owner["role"], "passenger")
         secret = "offline-owner-provision-test-key-0123456789"
-        bootstrap_owner(db, owner["user_id"], supplied_secret=secret, configured_secret=secret)
+        bootstrap_owner(db, owner["user_id"], supplied_secret=secret, configured_secret=secret, now=1000)
         db.commit()
         self.assertEqual(get_role(db, owner["user_id"]), "admin")
         self.assertEqual(self.login(app, "+37062222222")["role"], "passenger")

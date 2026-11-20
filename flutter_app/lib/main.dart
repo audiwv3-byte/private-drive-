@@ -181,52 +181,13 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         sessionExpiry != null &&
         DateTime.now().isBefore(sessionExpiry!);
     if (active) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('PRIVATE DRIVE'),
-          actions: [
-            IconButton(
-              key: const Key('native-permission-settings'),
-              tooltip: 'Разрешения приложения',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const PdPermissionSettingsPage(),
-                ),
-              ),
-            ),
-          ],
-        ),
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.verified_user_outlined, color: gold, size: 64),
-                    const SizedBox(height: 20),
-                    Text(tr('Вход выполнен', 'Prisijungta', 'Signed in'),
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Text(tr('Аккаунт подтверждён. Это тестовый экран авторизации. Кабина пилота и интерфейс пассажира подключаются отдельно.',
-                            'Paskyra patvirtinta. Tai bandomasis prisijungimo ekranas.',
-                            'Account verified. This is a demo sign-in screen.'),
-                        textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    Text('Аккаунт: ${signedInUserId!}', textAlign: TextAlign.center),
-                    const SizedBox(height: 24),
-                    FilledButton(onPressed: signOut,
-                      child: Text(tr('Выйти', 'Atsijungti', 'Sign out'))),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+      // A verified public phone login always enters the passenger cabin.
+      // Pilot/dispatcher are not selectable from this authenticated path.
+      // Roles must be granted by the backend, never by the client.
+      return PrivateDriveDemo(
+        key: ValueKey('passenger-${signedInUserId!}'),
+        passengerOnly: true,
+        onSignOut: signOut,
       );
     }
     return Scaffold(

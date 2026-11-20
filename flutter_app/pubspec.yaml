@@ -72,6 +72,8 @@ flutter:
   assets:
     - assets/brand/private_drive_logo.webp
     - assets/brand/vilnius_cathedral_user_photo.webp
+    - assets/brand/private_drive_gold_square_transparent.webp
+    - assets/brand/private_drive_vilnius_bright.webp
 
   # To add assets to your application, add an assets section, like this:
   # assets:

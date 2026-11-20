@@ -17,7 +17,7 @@ jobs:
     runs-on: macos-15-intel
     timeout-minutes: 60
     env:
-      PD_STAGING_NATIVE_AUTH_API_URL: ${{ vars.PD_STAGING_NATIVE_AUTH_API_URL }}
+      PD_STAGING_NATIVE_AUTH_API_URL: https://private-drive-drbd.onrender.com
     defaults:
       run:
         working-directory: flutter_app

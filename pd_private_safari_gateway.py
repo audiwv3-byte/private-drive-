@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 import secrets
 import ssl
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlsplit
 
 from pd_test_registration import make_test_registration_app
@@ -92,7 +92,7 @@ def make_private_gateway(iphone_ip, password, *, clock=None):
         if method == "GET" and route == "/private-test-bootstrap.js":
             return respond(start_response, "200 OK", BOOTSTRAP, "text/javascript; charset=utf-8")
         if method == "POST" and route in ("/test-registration/request-code", "/test-registration/verify-code"):
-            if environ.get("HTTP_ORIGIN") != "https://" + HOSTNAME or environ.get("HTTP_X_PD_TEST") != "1":
+            if environ.get("HTTP_ORIGIN") != "https://" + environ.get("HTTP_HOST", "") or environ.get("HTTP_X_PD_TEST") != "1":
                 return respond(start_response, "403 Forbidden", '{"error":"origin_denied"}')
             try:
                 size = int(environ.get("CONTENT_LENGTH", "0"))
@@ -158,7 +158,7 @@ def serve_private_tls(bind_ip, iphone_ip, password, certfile, keyfile, port=8443
         do_POST = handle_request
         def log_message(self, format, *args):
             pass  # Never log OTPs, identifiers, request paths or credentials.
-    server = ThreadingHTTPServer((bind_ip, int(port)), Handler)
+    server = HTTPServer((bind_ip, int(port)), Handler)
     server.socket = context.wrap_socket(server.socket, server_side=True)
     print("PRIVATE DRIVE private Safari test gateway running; only the whitelisted iPhone may connect.")
     print("Test OTPs stay in the local process only. Stop with Ctrl+C; in-memory data is discarded.")

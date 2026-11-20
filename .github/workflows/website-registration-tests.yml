@@ -13,6 +13,7 @@ on:
       - site_preview/registration.html
       - site_preview/registration-client.mjs
       - test_registration_client.mjs
+      - test_registration_visual.cjs
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,5 +30,18 @@ jobs:
           node-version: '22'
       - name: Test browser registration adapter without network
         run: node --test test_registration_client.mjs
+      - name: Install headless Chromium for offline visual tests
+        run: |
+          npm install --no-save playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Test mobile browser registration and capture screenshots
+        run: node test_registration_visual.cjs
+      - name: Upload test screenshots and JSON audit
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: private-drive-registration-mobile-audit
+          path: site_preview/registration-screenshots/
+          retention-days: 14
       - name: Test isolated registration and existing authentication modules
         run: python -m unittest -v test_pd_test_registration.py test_native_auth.py test_native_auth_http.py test_native_auth_sessions.py

@@ -6,7 +6,7 @@ import 'remote_sync_demo.dart';
 import 'demo_interfaces.dart';
 import 'demo_backup_page.dart';
 import 'brand_logo.dart';
-import 'vilnius_evening_backdrop.dart';
+import 'private_drive_bright_backdrop.dart';
 import 'app_language.dart';
 import 'permissions_onboarding.dart';
 import 'company_info.dart';
@@ -310,7 +310,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         ),
       body: Stack(
         children: [
-          const Positioned.fill(child: VilniusEveningBackdrop()),
+          const Positioned.fill(child: PrivateDriveBrightBackdrop()),
           SafeArea(
             child: Center(
               child: ConstrainedBox(
@@ -319,7 +319,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
               padding: const EdgeInsets.all(24),
               children: [
                 const SizedBox(height: 16),
-                const PrivateDriveBrandLogo(size: 132, transparentBackground: true),
+                const PrivateDriveBrandLogo(size: 156, transparentBackground: true),
                 const SizedBox(height: 18),
                 Text(tr('Добро пожаловать', 'Sveiki atvykę', 'Welcome'),
                     textAlign: TextAlign.center,

@@ -24,12 +24,17 @@ void main() {
     addTearDown(store.dispose);
     await tester.pumpWidget(MaterialApp(home: PassengerRideEntry(
       enableMapTiles: false, tripStore: store)));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-entry-jumpstart')), 160,
+      scrollable: find.byType(Scrollable).first);
     expect(find.byKey(const Key('passenger-entry-jumpstart')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-entry-delivery')), 160,
       scrollable: find.byType(Scrollable).first);
     expect(find.byKey(const Key('passenger-entry-delivery')), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('passenger-entry-jumpstart')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-entry-jumpstart')), -160,
+      scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const Key('passenger-entry-jumpstart')));
     await tester.pumpAndSettle();
     expect(find.text('Запуск автомобиля'), findsWidgets);

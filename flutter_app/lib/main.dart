@@ -218,11 +218,24 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
-                  'Версия 0.2.22 · сборка 2026111922 · ДЕМО',
+                  'Версия 0.2.23 · сборка 2026112021 · ДЕМО',
                   key: Key('app-demo-version'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),
                 ),
+                if (apiBaseUrl.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: FilledButton(
+                      key: const Key('open-offline-demo'),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const PrivateDriveDemo(),
+                        ),
+                      ),
+                      child: const Text('Открыть тестовые кабинеты'),
+                    ),
+                  ),
                 const SizedBox(height: 20),
                 TextField(
                   controller: destination,
@@ -305,20 +318,6 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       'Отправка SMS выключена.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: gold),
-                    ),
-                  ),
-                if (apiBaseUrl.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: OutlinedButton(
-                      key: const Key('open-offline-demo'),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) =>
-                          const PrivateDriveDemo()),
-                      ),
-                      child: Text(tr('Посмотреть тестовые интерфейсы',
-                          'Atidaryti bandomąsias sąsajas', 'Open demo interfaces')),
                     ),
                   ),
                 if (!kIsWeb && apiBaseUrl.isEmpty)

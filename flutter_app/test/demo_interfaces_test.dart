@@ -21,16 +21,16 @@ void main() {
   testWidgets('Offline entry requires taxi or transfer choice before booking',
       (tester) async {
     expect(apiBaseUrl, isEmpty);
+    final view = tester.view;
+    view.physicalSize = const Size(390, 560);
+    view.devicePixelRatio = 1;
+    addTearDown(view.resetPhysicalSize);
+    addTearDown(view.resetDevicePixelRatio);
     await tester.pumpWidget(const PrivateDriveApp());
     await tester.pumpAndSettle();
-    // ListView lazily builds off-screen children: scroll until the demo entry
-    // is in the widget tree before attempting to tap it.
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('open-offline-demo')),
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.byKey(const Key('open-offline-demo')));
+    final demoEntry = find.byKey(const Key('open-offline-demo'));
+    expect(demoEntry.hitTestable(), findsOneWidget);
+    await tester.tap(demoEntry);
     await tester.pumpAndSettle();
 
     // The offline-only hub exposes all three DEMO roles. This does not
@@ -39,6 +39,9 @@ void main() {
     expect(find.byKey(const Key('open-pilot-preview')), findsOneWidget);
     expect(find.byKey(const Key('open-dispatcher-preview')), findsOneWidget);
     expect(find.byKey(const Key('passenger-entry-title')), findsNothing);
+    view.resetPhysicalSize();
+    view.resetDevicePixelRatio();
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-title')), findsOneWidget);

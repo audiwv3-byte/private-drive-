@@ -24,6 +24,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Verify committed iOS project and safe metadata
@@ -35,43 +36,16 @@ jobs:
           test -f pubspec.yaml
           grep -Fq 'PRODUCT_BUNDLE_IDENTIFIER = lt.privatedrive.privateDrive;' ios/Runner.xcodeproj/project.pbxproj
           grep -Fq '<string>PRIVATE DRIVE</string>' ios/Runner/Info.plist
-          grep -Eq '^version: [0-9]+\.[0-9]+\.[0-9]+\+[0-9]+
+          grep -Eq '^version: [0-9]+\.[0-9]+\.[0-9]+\+[0-9]+$' pubspec.yaml
           test ! -e ios/Flutter/Generated.xcconfig
           test ! -e ios/Flutter/flutter_export_environment.sh
           echo "Committed iOS project verified: PRIVATE DRIVE / $(grep '^version:' pubspec.yaml)"
 
-      - name: Resolve packages, analyze and compile unsigned iOS Debug
+      - name: Prepare transparent PD artwork
         run: |
-          set -euo pipefail
-          flutter pub get
-          flutter test --no-pub
-          flutter analyze --no-fatal-infos
-          flutter build ios --debug --no-codesign
-
-      - name: Upload unsigned Debug artifact (not installable)
-        uses: actions/upload-artifact@v4
-        with:
-          name: private-drive-ios-unsigned-debug
-          path: flutter_app/build/ios/iphoneos/Runner.app
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Compile unsigned iOS Release (not distributable)
-        run: |
-          set -euo pipefail
-          flutter build ios --release --no-codesign
-
-      - name: Upload unsigned Release artifact (not installable)
-        uses: actions/upload-artifact@v4
-        with:
-          name: private-drive-ios-unsigned-release
-          path: flutter_app/build/ios/iphoneos/Runner.app
-          if-no-files-found: error
-          retention-days: 7
- pubspec.yaml
-          test ! -e ios/Flutter/Generated.xcconfig
-          test ! -e ios/Flutter/flutter_export_environment.sh
-          echo 'Committed iOS project verified: PRIVATE DRIVE / 0.1.0+1'
+          python3 -m venv "$RUNNER_TEMP/pd-ios-assets"
+          "$RUNNER_TEMP/pd-ios-assets/bin/python" -m pip install --quiet Pillow
+          "$RUNNER_TEMP/pd-ios-assets/bin/python" tool/prepare_transparent_logo.py
 
       - name: Resolve packages, analyze and compile unsigned iOS Debug
         run: |

@@ -297,46 +297,6 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
                       label: Text(pdLabel(context, 'Пассажир')),
                     ),
                     const SizedBox(height: 12),
-                    if (_trip.trip != null) ...[
-                      OutlinedButton.icon(
-                        key: const Key('open-my-orders'),
-                        onPressed: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) =>
-                            PdPassengerLanguageScope(
-                              child: PassengerOrdersDemo(tripStore: _trip)))),
-                        icon: const Icon(Icons.receipt_long_outlined),
-                        label: Text(pdLabel(context, 'Мои заказы · управление')),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    FilledButton.icon(
-                      key: const Key('open-dispatcher-preview'),
-                      onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => DemoDispatcherCabinet(
-                          tripStore: _trip,
-                          enableMapTiles: widget.enableMapTiles,
-                        ))),
-                      icon: const Icon(Icons.support_agent),
-                      label: Text(pdLabel(context, 'Кабинет диспетчера · демо')),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      key: const Key('open-remote-sync-demo'),
-                      onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const RemoteSyncDemo())),
-                      icon: const Icon(Icons.sync_alt),
-                      label: Text(pdLabel(context, 'Тестовая связь между устройствами')),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      key: const Key('open-company-info'),
-                      onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(
-                          builder: (_) => const CompanyInfoPage())),
-                      icon: const Icon(Icons.info_outline),
-                      label: Text(pdLabel(context, 'О компании · Контакты · Соглашение')),
-                    ),
-                    const SizedBox(height: 12),
                     FilledButton.icon(
                       key: const Key('open-pilot-preview'),
                       onPressed: () async {
@@ -352,6 +312,46 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
                       },
                       icon: const Icon(Icons.navigation_outlined),
                       label: Text(pdLabel(context, 'Кабина пилота')),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      key: const Key('open-dispatcher-preview'),
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => DemoDispatcherCabinet(
+                          tripStore: _trip,
+                          enableMapTiles: widget.enableMapTiles,
+                        ))),
+                      icon: const Icon(Icons.support_agent),
+                      label: Text(pdLabel(context, 'Кабинет диспетчера · демо')),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_trip.trip != null) ...[
+                      OutlinedButton.icon(
+                        key: const Key('open-my-orders'),
+                        onPressed: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) =>
+                            PdPassengerLanguageScope(
+                              child: PassengerOrdersDemo(tripStore: _trip)))),
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: Text(pdLabel(context, 'Мои заказы · управление')),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    OutlinedButton.icon(
+                      key: const Key('open-remote-sync-demo'),
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const RemoteSyncDemo())),
+                      icon: const Icon(Icons.sync_alt),
+                      label: Text(pdLabel(context, 'Тестовая связь между устройствами')),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      key: const Key('open-company-info'),
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(
+                          builder: (_) => const CompanyInfoPage())),
+                      icon: const Icon(Icons.info_outline),
+                      label: Text(pdLabel(context, 'О компании · Контакты · Соглашение')),
                     ),
                   ],
                 ),

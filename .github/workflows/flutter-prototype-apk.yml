@@ -16,7 +16,7 @@ permissions:
 jobs:
   build-debug-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -197,6 +197,15 @@ jobs:
           cp private_drive_build/build/app/outputs/flutter-apk/app-debug.apk private_drive_release/private-drive-demo.apk
           sha256sum private_drive_release/private-drive-demo.apk | tee private_drive_release/private-drive-demo.sha256
           test "$(stat -c %s private_drive_release/private-drive-demo.apk)" -gt 100000000
+      - name: Upload installable demo APK after widget tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-android-demo-widget-tested
+          path: |
+            private_drive_release/private-drive-demo.apk
+            private_drive_release/private-drive-demo.sha256
+          if-no-files-found: error
+          retention-days: 7
       # Flutter/Gradle compilation has already finished. Gradle daemons can
       # retain multiple GB on the 7 GB GitHub-hosted runner; stop them before
       # booting Android so adb can fork and query the emulator reliably.
@@ -212,6 +221,7 @@ jobs:
           sudo chmod 666 /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Render passenger and pilot maps on real Android emulator
+        timeout-minutes: 22
         uses: reactivecircus/android-emulator-runner@v2
         with:
           # Android 35 Pixel 6 failed to finish booting on the free runner
@@ -228,8 +238,8 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 600
           script: |
-            bash -lc 'cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m'
-            bash flutter_app/tool/run_android_chat_smoke.sh
+            timeout --kill-after=20s 5m bash -lc 'cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m'
+            timeout --kill-after=20s 5m bash flutter_app/tool/run_android_chat_smoke.sh
       - name: Confirm preserved installable APK is unchanged
         run: |
           test -s private_drive_release/private-drive-demo.apk
@@ -239,6 +249,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: private-drive-android-demo-installable-apk
-          path: private_drive_release/private-drive-demo.apk
+          path: |
+            private_drive_release/private-drive-demo.apk
+            private_drive_release/private-drive-demo.sha256
           if-no-files-found: error
           retention-days: 7

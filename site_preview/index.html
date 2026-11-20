@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090b0d">
-  <meta name="description" content="PRIVATE DRIVE — такси и индивидуальные трансферы. Предпросмотр обновлённой главной страницы.">
+  <meta name="description" content="PRIVATE DRIVE — городские поездки, индивидуальные трансферы и дополнительные услуги в Вильнюсе и Литве.">
   <title>PRIVATE DRIVE — Такси и трансферы</title>
   <style>
     :root{color-scheme:dark;--bg:#080908;--panel:#121310;--ink:#f7f1e7;--muted:#b9ad98;--gold:#dbb66a;--gold-hi:#f6dfaa;--line:#55452c;--soft:#1a1b18}
@@ -12,7 +12,6 @@
     body:before{content:"";position:fixed;pointer-events:none;inset:0;z-index:30;opacity:.08;background-image:repeating-linear-gradient(0deg,transparent 0 3px,#c69e5f10 4px 5px);mix-blend-mode:screen}
     a{color:inherit}a:focus-visible,button:focus-visible{outline:3px solid var(--gold-hi);outline-offset:4px}button{font:inherit}
     .wrap{width:min(1200px,calc(100% - 52px));margin:auto}
-    .preview{background:#342819;border-bottom:1px solid #80633a;padding:7px 20px;color:#f8e3b3;text-align:center;font-size:11px;letter-spacing:.17em;font-weight:650}
     .top{position:sticky;top:0;z-index:20;background:#0a0b0aef;backdrop-filter:blur(24px);border-bottom:1px solid #64503688}
     .top-inner{min-height:98px;display:flex;align-items:center;justify-content:space-between;gap:28px}
     .brand{display:flex;gap:13px;align-items:center;text-decoration:none;min-width:216px}
@@ -60,13 +59,12 @@
   </style>
 </head>
 <body>
-  <div class="preview" role="status">ТЕСТОВЫЙ МАКЕТ · НЕ ПРИНИМАЕТ РЕАЛЬНЫЕ ЗАКАЗЫ И ПЛАТЕЖИ</div>
   <header class="top"><div class="wrap top-inner">
     <a class="brand" href="#top" aria-label="PRIVATE DRIVE — на главную">
       <img src="assets/private-drive-gold-car.webp" alt="Золотой фирменный логотип PD с автомобилем" width="58" height="58">
       <span><strong>PRIVATE DRIVE</strong><small>PREMIUM TRANSFERS</small></span>
     </a>
-    <nav aria-label="Основное меню"><a href="#taxi">Такси</a><a href="#transfers">Трансферы</a><a href="#extras">Услуги</a><a href="#registration">Регистрация</a></nav>
+    <nav aria-label="Основное меню"><a href="#taxi">Такси</a><a href="#transfers">Трансферы</a><a href="#extras">Услуги</a><a href="#registration">Регистрация</a><a href="#contact">Контакты</a></nav>
     <a class="button secondary" href="#registration">Начать</a>
   </div></header>
   <main id="top">
@@ -76,7 +74,7 @@
         <h1 id="hero-title">Ваша поездка.<br><em>Наше внимание.</em></h1>
         <p class="lede">PRIVATE DRIVE объединяет городские поездки, индивидуальные трансферы и полезные услуги в одном сервисе. Комфорт, понятные условия и внимательное сопровождение.</p>
         <div class="actions"><a class="button" href="#taxi">Выбрать поездку <span aria-hidden="true">↗</span></a><a class="button secondary" href="#registration">Регистрация <span aria-hidden="true">→</span></a></div>
-        <div class="trust"><span>Заказ через приложение</span><span>Тариф до подтверждения</span><span>Поддержка диспетчера</span></div>
+        <div class="trust"><span>Городские поездки и трансферы</span><span>Условия до подтверждения</span><span>Связь с командой</span></div>
       </div>
       <div class="hero-art" aria-label="Фирменный стиль PRIVATE DRIVE"><div class="halo"><img src="assets/private-drive-gold-car.webp" alt="Золотая монограмма PD, надпись PRIVATE DRIVE и автомобиль"></div><span class="art-caption">PRIVATE DRIVE · PREMIUM SERVICE</span></div>
     </div></section>
@@ -103,7 +101,7 @@
     </div></section>
 
     <section id="extras" class="section"><div class="wrap">
-      <div class="section-head"><div><span class="eyebrow">03 / Дополнительные услуги</span><h2>Больше, чем поездка</h2></div><p>Заказываются отдельно или согласовываются с диспетчером. Никаких автоматических списаний в этом макете.</p></div>
+      <div class="section-head"><div><span class="eyebrow">03 / Дополнительные услуги</span><h2>Больше, чем поездка</h2></div><p>Заказываются отдельно или согласовываются с диспетчером. Стоимость дополнительных услуг согласовывается до подтверждения заказа.</p></div>
       <div class="grid">
         <article class="card"><div class="mark">✦</div><h3>Встреча с табличкой</h3><p>Поможем найти пилота в аэропорту или в согласованной точке встречи.</p><div class="price">+15 €</div></article>
         <article class="card"><div class="mark">⚡</div><h3>Запуск автомобиля</h3><p>Помощь при разряженном аккумуляторе.</p><div class="price">20 €</div></article>
@@ -113,20 +111,20 @@
     </div></section>
 
     <section id="registration" class="section alt"><div class="wrap">
-      <div class="section-head"><div><span class="eyebrow">04 / Регистрация</span><h2>Ваш PRIVATE DRIVE</h2></div><p>Действующие формы и заказы не переносим в макет. После согласования подключим этот дизайн к существующему сервису.</p></div>
+      <div class="section-head"><div><span class="eyebrow">04 / Регистрация</span><h2>Ваш PRIVATE DRIVE</h2></div><p>Независимая онлайн-регистрация пассажира и пилота готовится и пока недоступна. Запрос на подключение можно отправить по электронной почте.</p></div>
       <div class="registration">
-        <article class="card"><span class="pill">ПАССАЖИР</span><h3>Путешествуй с комфортом</h3><p>Выбор маршрута, способа оплаты, дополнительных услуг и управление заказом.</p><a class="button secondary" href="https://t.me/EuroBalticTransferBot?start=register" rel="noopener noreferrer" target="_blank">Действующая регистрация через Telegram</a></article>
-        <article class="card"><span class="pill">ПИЛОТ</span><h3>Присоединяйся к команде</h3><p>Заявка пилота, данные автомобиля и проверка документов администратором.</p><a class="button secondary" href="https://wilsonpark.pythonanywhere.com/" rel="noopener noreferrer" target="_blank">Открыть действующий сервис</a></article>
+        <article class="card"><span class="pill">ПАССАЖИР</span><h3>Путешествуй с комфортом</h3><p>Выбор маршрута, способа оплаты, дополнительных услуг и управление заказом.</p><a class="button secondary" href="mailto:eurobaltictransfer@gmail.com?subject=PRIVATE%20DRIVE%20%E2%80%94%20%D0%BF%D0%B0%D1%81%D1%81%D0%B0%D0%B6%D0%B8%D1%80">Связаться по регистрации</a></article>
+        <article class="card"><span class="pill">ПИЛОТ</span><h3>Присоединяйся к команде</h3><p>Заявка пилота, данные автомобиля и проверка документов администратором.</p><a class="button secondary" href="mailto:eurobaltictransfer@gmail.com?subject=PRIVATE%20DRIVE%20%E2%80%94%20%D0%BF%D0%B8%D0%BB%D0%BE%D1%82">Отправить запрос пилота</a></article>
       </div>
-      <p class="fine">В этом макете оформление заказов и оплата недоступны. Действующие способы безналичной оплаты необходимо проверить в сервисе перед публикацией.</p>
+      <p class="fine">Эта информационная страница не принимает онлайн-заказы и оплату. Работа личных кабинетов будет объявлена отдельно после проверки безопасности.</p>
     </div></section>
   </main>
-  <footer><div class="wrap legal">
+  <footer id="contact"><div class="wrap legal">
     <strong>PRIVATE DRIVE</strong>
     <a href="https://wilsonpark.pythonanywhere.com/privacy?lang=ru" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a>
     <a href="https://wilsonpark.pythonanywhere.com/legal?lang=ru" target="_blank" rel="noopener noreferrer">Условия поездки, оплаты и возвратов</a>
     <a href="mailto:eurobaltictransfer@gmail.com">Контакты</a>
-    <span>Дизайн для согласования · действующий сайт не изменён</span>
+    <span>Вильнюс, Литва · PRIVATE DRIVE</span>
   </div></footer>
 </body>
 </html>

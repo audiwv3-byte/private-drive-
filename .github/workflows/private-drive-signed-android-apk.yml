@@ -96,6 +96,7 @@ jobs:
           (drawable/'private_drive_logo.webp').write_bytes(src.read_bytes())
           print('Full role source copied; distinct internal Android package configured')
           PY
+          python3 flutter_app/tool/apply_native_brand_splash.py
           printf '%s' "$PD_SIGNING_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/private-drive-private.keystore"
           chmod 600 "$RUNNER_TEMP/private-drive-private.keystore"
           echo "PD_SIGNING_FILE=$RUNNER_TEMP/private-drive-private.keystore" >> "$GITHUB_ENV"

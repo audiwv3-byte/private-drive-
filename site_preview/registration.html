@@ -13,7 +13,7 @@ fieldset{border:0;padding:0;margin:26px 0 16px}legend{font-weight:700;margin-bot
 label.field{display:block;margin:14px 0 6px;font-weight:600;font-size:14px}input[type=text],input[type=email],input[type=tel]{display:block;width:100%;min-height:48px;border:1px solid #806b4c;background:#151510;color:white;border-radius:6px;padding:10px 12px;font-size:16px}
 input[type=radio],input[type=checkbox]{flex-shrink:0}input:focus-visible{outline:2px solid #f7d48a;outline-offset:2px}.consent{display:flex;gap:10px;align-items:flex-start;margin:18px 0;color:#e1d2b7;font-size:14px;min-width:0;overflow-wrap:anywhere}
 button{width:100%;min-height:50px;background:#b39357;color:#13110b;border:0;border-radius:6px;font-weight:700;font-size:16px;opacity:.75}
-a:focus-visible{outline:2px solid #f7d48a;outline-offset:2px}
+a:focus-visible{outline:2px solid #f7d48a;outline-offset:2px}@media(max-width:360px){.roles{gap:7px}.role{padding:9px 6px;gap:5px;font-size:13px;white-space:nowrap}}
 </style></head><body><main>
 <a href="index.html">← На главную PRIVATE DRIVE</a>
 <h1>Регистрация</h1><small>ПАССАЖИР · ПИЛОТ</small>
@@ -54,6 +54,7 @@ if (local && typeof transport === 'function') {
   for (const field of form.querySelectorAll('input')) field.disabled = false;
   request.disabled = false;
   request.removeAttribute('aria-disabled');
+  status.textContent = 'Локальный тест: реальные сообщения не отправляются.';
   request.addEventListener('click', async () => {
     const email = document.getElementById('email');
     const name = document.getElementById('fullname');

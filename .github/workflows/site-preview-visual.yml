@@ -49,7 +49,7 @@ jobs:
                 clientWidth:document.documentElement.clientWidth,
                 images:[...document.images].map(x=>({loaded:x.complete&&x.naturalWidth>0,width:x.naturalWidth,src:x.getAttribute('src')})),
                 sections:['taxi','transfers','extras','registration'].map(id=>({id,present:!!document.getElementById(id)})),
-                nav:[...document.querySelectorAll('nav a')].map(x=>({text:x.textContent,visible:x.getBoundingClientRect().width>0}))
+                nav:[...document.querySelectorAll('.top nav a')].map(x=>{const b=x.getBoundingClientRect(),p=x.closest('nav').getBoundingClientRect();return {text:x.textContent.trim(),visible:b.width>0&&b.height>0,insideViewport:b.left>=-1&&b.right<=innerWidth+1,insideMenu:b.left>=p.left-1&&b.right<=p.right+1}}),navFits:document.querySelector('.top nav').scrollWidth<=document.querySelector('.top nav').clientWidth
               }));
               await page.screenshot({path:'site_preview/screenshots/'+name+'.png',fullPage:true});
               output.push({name,width,height,...report});
@@ -58,7 +58,7 @@ jobs:
             await browser.close();
             fs.writeFileSync('site_preview/screenshots/audit.json',JSON.stringify(output,null,2));
             console.log(JSON.stringify(output,null,2));
-            if(output.some(x=>x.scrollWidth>x.clientWidth||x.images.some(i=>!i.loaded)||x.sections.some(s=>!s.present)))process.exitCode=1;
+            if(output.some(x=>x.scrollWidth>x.clientWidth||x.images.some(i=>!i.loaded)||x.sections.some(s=>!s.present)||!x.navFits||x.nav.length!==5||!x.nav.some(n=>n.text==='Контакты')||x.nav.some(n=>!n.visible||!n.insideViewport||!n.insideMenu)))process.exitCode=1;
           })().catch(e=>{console.error(e);process.exitCode=1});
           JS
           node visual-check.cjs

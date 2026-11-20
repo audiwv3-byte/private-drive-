@@ -127,6 +127,10 @@ void main() {
         }), 200);
       });
       addTearDown(client.close);
+      tester.view.physicalSize = const Size(800, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(MaterialApp(
         home: NativeSignInScreen(authApiUrl: 'https://example.test', httpClient: client),
       ));
@@ -138,11 +142,18 @@ void main() {
       final requestCode = find.text('Получить код');
       await tester.scrollUntilVisible(requestCode, 120,
           scrollable: find.byType(Scrollable).first);
+      expect(tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Получить код'),
+      ).onPressed, isNotNull);
       await tester.tap(requestCode);
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).last, '123456');
+      final otp = find.widgetWithText(TextField, 'Код подтверждения');
+      expect(otp, findsOneWidget);
+      await tester.enterText(otp, '123456');
+      await tester.pumpAndSettle();
       final verify = find.text('Подтвердить');
-      await tester.ensureVisible(verify);
+      await tester.scrollUntilVisible(verify, 120,
+          scrollable: find.byType(Scrollable).first);
       await tester.tap(verify);
       await tester.pumpAndSettle();
 

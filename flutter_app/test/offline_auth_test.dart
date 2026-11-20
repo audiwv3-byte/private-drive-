@@ -156,6 +156,14 @@ void main() {
           scrollable: find.byType(Scrollable).first);
       await tester.tap(verify);
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('native-account-verified')), findsOneWidget);
+      expect(find.byKey(const Key('native-verified-user-id')), findsOneWidget);
+      expect(find.text('synthetic-account'), findsOneWidget);
+      expect(find.byKey(const Key('native-copy-user-id')), findsOneWidget);
+      expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);
+      expect(find.byType(PilotCabin), findsNothing);
+      await tester.tap(find.byKey(const Key('native-continue-to-cabin')));
+      await tester.pumpAndSettle();
 
       final pilot = find.byKey(const Key('authorized-open-pilot'));
       final dispatcher = find.byKey(const Key('authorized-open-dispatcher'));

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,7 +66,13 @@ class _PdPermissionsFirstLaunchState extends State<PdPermissionsFirstLaunch> {
   @override
   void initState() {
     super.initState();
-    _restore();
+    // Browser permissions are managed by Safari at the point GPS is used.
+    // Do not invoke Android's permission_handler prompts on Web.
+    if (kIsWeb) {
+      _completed = true;
+    } else {
+      _restore();
+    }
   }
 
   Future<void> _restore() async {

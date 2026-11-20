@@ -49,7 +49,7 @@ jobs:
           cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
           rm -f private_drive_build/test/widget_test.dart
           python3 -m pip install --quiet Pillow
-          python3 flutter_app/tool/prepare_transparent_logo.py
+          (cd flutter_app && python3 tool/prepare_transparent_logo.py)
           cp flutter_app/assets/brand/private_drive_logo_transparent.png private_drive_build/assets/brand/
           python3 - <<'PY'
           from pathlib import Path

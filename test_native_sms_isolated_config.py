@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from pd_native_sms_isolated_config import make_isolated_sms_app
+from pd_native_auth_roles import bootstrap_owner, get_role
 
 
 class ConfigTests(unittest.TestCase):
@@ -50,7 +51,12 @@ class ConfigTests(unittest.TestCase):
         config = dict(self.config, PD_NATIVE_ADMIN_PHONE="+37061111111")
         app, db = self.new_app(config)
         self.addCleanup(db.close)
-        self.assertEqual(self.login(app, "+37061111111")["role"], "admin")
+        owner = self.login(app, "+37061111111")
+        self.assertEqual(owner["role"], "passenger")
+        secret = "offline-owner-provision-test-key-0123456789"
+        bootstrap_owner(db, owner["user_id"], supplied_secret=secret, configured_secret=secret)
+        db.commit()
+        self.assertEqual(get_role(db, owner["user_id"]), "admin")
         self.assertEqual(self.login(app, "+37062222222")["role"], "passenger")
         self.assertEqual(self.login(app, "+37063333333")["role"], "passenger")
 
@@ -59,8 +65,8 @@ class ConfigTests(unittest.TestCase):
                       PD_NATIVE_DISPATCHER_PHONE="+37062222222")
         app, db = self.new_app(config)
         self.addCleanup(db.close)
-        self.assertEqual(self.login(app, "+37061111111")["role"], "pilot")
-        self.assertEqual(self.login(app, "+37062222222")["role"], "dispatcher")
+        self.assertEqual(self.login(app, "+37061111111")["role"], "passenger")
+        self.assertEqual(self.login(app, "+37062222222")["role"], "passenger")
         self.assertEqual(self.login(app, "+37063333333")["role"], "passenger")
 
     def test_existing_admin_can_also_be_provisioned_as_pilot(self):
@@ -68,7 +74,7 @@ class ConfigTests(unittest.TestCase):
                       PD_NATIVE_PILOT_PHONE="+37061111111")
         app, db = self.new_app(config)
         self.addCleanup(db.close)
-        self.assertEqual(self.login(app, "+37061111111")["role"], "pilot_dispatcher")
+        self.assertEqual(self.login(app, "+37061111111")["role"], "passenger")
 
     def test_admin_not_enabled_without_private_setting(self):
         app, db = self.new_app(self.config)

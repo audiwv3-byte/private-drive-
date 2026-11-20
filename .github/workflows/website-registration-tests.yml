@@ -14,6 +14,9 @@ on:
       - site_preview/registration-client.mjs
       - test_registration_client.mjs
       - test_registration_visual.cjs
+      - pd_private_safari_gateway.py
+      - test_private_safari_gateway.py
+      - docs/private-safari-registration-test.md
   workflow_dispatch:
 permissions:
   contents: read
@@ -44,4 +47,4 @@ jobs:
           path: site_preview/registration-screenshots/
           retention-days: 14
       - name: Test isolated registration and existing authentication modules
-        run: python -m unittest -v test_pd_test_registration.py test_native_auth.py test_native_auth_http.py test_native_auth_sessions.py
+        run: python -m unittest -v test_pd_test_registration.py test_native_auth.py test_native_auth_http.py test_native_auth_sessions.py test_private_safari_gateway.py

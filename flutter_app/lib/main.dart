@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'remote_sync_demo.dart';
 import 'demo_interfaces.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
@@ -7,6 +9,9 @@ import 'company_info.dart';
 import 'pd_http_api.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
+// Opt-in only for the isolated static Safari/Android browser test artifact.
+// No production auth URL, payment gateway or automatic backend connection.
+const isolatedWebPreview = bool.fromEnvironment('PD_ISOLATED_WEB_PREVIEW');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +37,9 @@ class PrivateDriveApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFF111111),
       ),
-      home: const PdPermissionsFirstLaunch(child: NativeSignInScreen()),
+      home: kIsWeb && isolatedWebPreview
+          ? const RemoteSyncDemo()
+          : const PdPermissionsFirstLaunch(child: NativeSignInScreen()),
       ),
     );
   }

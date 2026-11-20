@@ -82,6 +82,10 @@ class CorporateLegalTests(unittest.TestCase):
         for p in ("privacy.html","terms.html","pilot-privacy.html"):
             self.assertIn('href="'+p+'"',home)
         self.assertNotIn('href="registration.html"',home)
+        for name in ("privacy.html", "terms.html", "pilot-privacy.html"):
+            self.assertIn('href="' + name + '" target="_blank" rel="noopener noreferrer"', home)
+        self.assertIn('id="contact"',home)
+        self.assertIn("Запросить поездку",home)
         self.assertIn("пока недоступна",home)
 
 if __name__=="__main__":

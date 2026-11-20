@@ -128,34 +128,48 @@ eligibility/terms before selecting it. A tailnet requires its client
 on the server PC and both phones, and HTTPS certificates enabled. This
 project does not enroll devices or alter Tailscale access policies.
 
-## Two-phone manual verification (without production)
+## Проверка связи на двух физических Android-телефонах (только DEMO)
 
-1. Run the isolated launcher on a throwaway development PC, then keep it
-   open. Do not use the live PythonAnywhere host or real account details.
-2. On Android, install the debug APK from the matching feature-branch CI
-   artifacts. Open the test interface, select remote sync, supply the HTTPS
-   URL and the PASSENGER role token printed by the launcher. Create an
-   invented route, for example 'Тест A' -> 'Тест B'.
-3. For dispatcher assignment use a separate test client (e.g. a second
-   Android debug device/emulator) with the DISPATCHER token. Assign
-   'pilot_test'. A pilot client with the PILOT token advances, pauses,
-   resumes and finishes the fake trip. Roles must never share a token.
-4. The present iOS CI produces **unsigned** Debug/Release builds; an iPhone
-   cannot install them without legitimate Apple code signing. As a partial
-   iPhone network-only check, create an Apple Shortcut with 'Get Contents
-   of URL' pointing to the HTTPS_URL + '/v1/current', choose GET, add
-   header 'Authorization' = 'Bearer ' + the appropriate *test* token,
-   and inspect the returned JSON status. This does NOT validate the iOS
-   Flutter interface. Avoid sharing shortcuts containing token values.
-5. Refresh the passenger view after each stage and confirm the status
-   changes. Reopen the native test screen and re-enter credentials: the
-   synthetic trip is restored from the temporary server SQLite while
-   the launcher remains running. A full server restart resets this
-   disposable launcher database by design; persistent SQLite restart
-   recovery is covered separately by automated server tests.
-6. Verify wrong-token 401, forbidden role 403, unassigned pilot 404, stale
-   version 409, and a stopped tunnel becoming unreachable. Stop with
-   Ctrl+C and dispose of the temporary role tokens.
+**Предусловия:** на обоих Android установлена проверенная APK из ветки
+`feature/flutter-independent-auth`. На отдельном тестовом Windows-ПК
+имеются Python 3 и официальный `cloudflared`. Этот ПК не является
+production-сервером. Два телефона могут находиться в разных сетях.
+
+1. В PowerShell из корня тестового репозитория запусти
+   `$env:PD_DEMO_PUBLIC_TUNNEL = "YES"; py -3 test_sync_server/run_quick_tunnel.py`.
+   Включение публичного HTTPS-туннеля требует этой **явной** команды; CI
+   туннель не запускает. Не публикуй URL и токены в чатах или скриншотах.
+2. После появления `HTTPS URL` тестовый сервер уже создал **один
+   вымышленный заказ** и назначил `pilot_test`. Создавать заказ, нажимать
+   «Оплатить» или назначать пилота вручную **не нужно**.
+3. Телефон A: войди в кабинет **пассажира**, открой **«Тестовая связь между
+   устройствами»**, укажи адрес `HTTPS URL`, затем `PASSENGER TEST TOKEN`.
+   Нажми **«Подключить тестовый чат»**.
+4. Телефон B: открой **Кабину пилота**, левое меню → тестовый чат.
+   Используй **тот же HTTPS URL**, но `PILOT TEST TOKEN`.
+   Нажми **«Подключить тестовый чат»**.
+5. Оба телефона должны показать один и тот же сокращённый ID тестового заказа.
+   Отправь **«Тест: пассажир на месте»** из A и убедись, что текст виден
+   в B. Затем отправь **«Тест: пилот подъезжает»** из B и убедись, что
+   текст виден в A. Обнови обе переписки: сообщения не должны дублироваться.
+6. Закрой и открой экран тестового чата, подключись заново с теми же
+   временными токенами — оба сообщения должны восстановиться из SQLite
+   текущего сеанса. После полной перезагрузки лаунчера данные
+   **не восстанавливаются**: создаётся новый одноразовый сеанс.
+7. Заверши тест клавишами `Ctrl+C` на ПК (или дождись автоматического
+   завершения через 20 минут). Убедись, что HTTPS URL больше не отвечает.
+   Лаунчер завершает процессы и удаляет временную SQLite-базу.
+
+**Критерии приёмки:** оба клиента подключились по HTTPS, получили один заказ,
+обменялись сообщениями в обе стороны, не увидели дубликатов, восстановили
+историю при переподключении и потеряли доступ после завершения сеанса.
+
+**Ограничения:** Quick Tunnel — временный **публичный** HTTPS-адрес, а не
+приватная VPN. Cloudflare терминирует TLS. Для эксперимента используй только
+одноразовые токены и вымышленные сообщения; не вводи реальные имена,
+маршруты, адреса, телефоны, платежи или ключи. Реальное соединение двух
+физических телефонов **не подтверждается одними CI-тестами**. Доступ к ним
+и ручной запуск сеанса нужны отдельно.
 
 ## Automated offline networking checks
 

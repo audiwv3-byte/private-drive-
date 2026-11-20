@@ -1,0 +1,30 @@
+name: PRIVATE DRIVE corporate preview package (offline only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-only:
+    if: github.ref == 'refs/heads/feature/website-private-drive-preview'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check corporate website and static legal documents
+        run: python -m unittest -v test_website_public_readiness.py test_website_legal_pages.py test_build_corporate_preview.py
+      - name: Package offline preview (do not deploy)
+        run: python build_corporate_preview.py
+      - name: Upload preview ZIP for private review only
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-corporate-offline-preview
+          path: build/private-drive-corporate-preview.zip
+          retention-days: 7
+          if-no-files-found: error

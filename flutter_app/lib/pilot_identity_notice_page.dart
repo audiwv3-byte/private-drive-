@@ -21,11 +21,11 @@ class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
   String _language = 'RU';
   bool _acknowledged = false;
 
-  String _tr(String ru, String lt, String en) => switch (_language) {
-        'LT' => lt,
-        'EN' => en,
-        _ => ru,
-      };
+  String _tr(String ru, String lt, String en) {
+    if (_language == 'LT') return lt;
+    if (_language == 'EN') return en;
+    return ru;
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(

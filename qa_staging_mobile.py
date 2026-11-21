@@ -25,12 +25,12 @@ with sync_playwright() as p:
         page.goto(URL, wait_until="domcontentloaded", timeout=30000)
         page.locator(".hero-gallery").scroll_into_view_if_needed()
         info = page.evaluate("""() => {
-           const ids = ['pd-user-logo-4.webp','pd-user-photo-6.webp','pd-user-photo-7.webp'];
+           const ids = ['pd-user-logo-4-original.webp','pd-user-photo-6-original.webp','pd-user-photo-7-original.webp'];
            const pics = ids.map(id => [...document.querySelectorAll('img')].find(x=>x.src.includes(id)));
            const hero = document.querySelector('.hero');
            const gallery = document.querySelector('.hero-gallery');
            return {viewport:innerWidth, pageWidth:document.documentElement.scrollWidth,
-              images:pics.map(img=>({found:!!img,loaded:!!img && img.complete && img.naturalWidth>0})),
+              images:pics.map(img=>({found:!!img,loaded:!!img && img.complete && img.naturalWidth>=864})),
               galleryWidth:gallery?.getBoundingClientRect().width||0,
               heroWidth:hero?.getBoundingClientRect().width||0,
               booking:!!document.querySelector('#passenger-preview'),

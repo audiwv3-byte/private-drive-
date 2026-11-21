@@ -67,7 +67,20 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertTrue(logo.data.startswith(bytes.fromhex("89504e470d0a1a0a")))
         # PNG has transparency metadata (indexed transparency or RGBA).
         self.assertTrue(b"tRNS" in logo.data or logo.data[25] in (4, 6))
-        for path in ("/", "/pilot-registration", "/dispatch/login"):
+        home = client.get("/")
+        self.assertEqual(home.status_code, 200)
+        for name in ("pd-user-logo-4.webp", "pd-user-photo-6.webp", "pd-user-photo-7.webp"):
+            self.assertIn(name.encode(), home.data)
+            result = client.get("/assets/" + name)
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result.mimetype, "image/webp")
+            self.assertGreater(len(result.data), 900)
+            self.assertEqual(result.data[:4], b"RIFF")
+            self.assertEqual(result.data[8:12], b"WEBP")
+        self.assertNotIn(b"commons.wikimedia.org", home.data)
+        self.assertNotIn(b"wanderin.ge", home.data)
+        self.assertNotIn("commons.wikimedia.org", home.headers["Content-Security-Policy"])
+        for path in ("/pilot-registration", "/dispatch/login"):
             result = client.get(path)
             self.assertEqual(result.status_code, 200)
             self.assertIn(b'/pd-logo-transparent.png', result.data)
@@ -81,6 +94,10 @@ class DispatcherStagingTests(unittest.TestCase):
         pilot = client.get("/pilot-registration").data.decode("utf-8")
         login = client.get("/dispatch/login").data.decode("utf-8")
         self.assertIn("width:160px", home)
+        self.assertIn("hero-gallery", home)
+        self.assertIn("@media(max-width:420px)", home)
+        self.assertIn("grid-template-columns:1fr;gap:12px", home)
+        self.assertIn("https://t.me/PrivateDraive", home)
         self.assertIn("height:auto;aspect-ratio:1/1;object-fit:contain", home)
         self.assertIn("width:min(160px,100%)", home)
         self.assertIn("max-width:100%;aspect-ratio:1;object-fit:contain", pilot)

@@ -97,6 +97,7 @@ jobs:
           assert Path('private_drive_build/assets/brand/private_drive_gold_square_transparent.webp').is_file(), 'Do not remove transparent in-app art'
           print('Opaque black-and-gold PD launcher icon restored; transparent in-app logo unchanged.')
           # Keep production entry point and public assets unchanged.
+          # Camera preview launcher icon is isolated from the in-app transparency.
           PY
       - name: Run static analysis and widget tests
         working-directory: private_drive_build

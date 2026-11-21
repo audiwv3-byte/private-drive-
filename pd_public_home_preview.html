@@ -168,7 +168,7 @@ footer{border-top:1px solid var(--line);padding:26px 5vw;color:#a8aeb4;display:f
     body:JSON.stringify({
       origin,destination,origin_coordinates:selected.origin,
       destination_coordinates:selected.destination,
-      category:$("car-category").value,roundtrip:mode==="Трансфер"&&false
+      category:$("car-category").value,roundtrip:false
     })
    });
    const data=await response.json();

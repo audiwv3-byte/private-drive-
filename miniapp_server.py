@@ -921,3 +921,7 @@ pd_crypto_manual.register(app, core, auth, cents_for_order)
 
 import pd_tips_widget
 pd_tips_widget.register(app)
+
+# Browser-only dispatcher shell. Disabled until staging credentials are configured.
+import pd_web_dispatcher
+pd_web_dispatcher.register(app, core)

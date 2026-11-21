@@ -74,6 +74,20 @@ class DispatcherStagingTests(unittest.TestCase):
             self.assertIn(b'/pd-logo.jpg', result.data)
         self.assertEqual(client.get("/dispatch").status_code, 302)
 
+    def test_logo_size_and_aspect_ratio_mobile_desktop(self):
+        with patch.dict(os.environ, self.env(), clear=True):
+            app = create_app()
+        client = app.test_client()
+        home = client.get("/").data.decode("utf-8")
+        pilot = client.get("/pilot-registration").data.decode("utf-8")
+        login = client.get("/dispatch/login").data.decode("utf-8")
+        self.assertIn("width:160px", home)
+        self.assertIn("height:auto;aspect-ratio:1/1;object-fit:contain", home)
+        self.assertIn("width:min(160px,100%)", home)
+        self.assertIn("max-width:100%;aspect-ratio:1;object-fit:contain", pilot)
+        self.assertIn("max-width:100%;aspect-ratio:1;object-fit:contain", login)
+        self.assertIn("width=\"112\" height=\"112\"", login)
+
     def test_pilot_registration_public_preview_has_no_upload_backend(self):
         with patch.dict(os.environ, self.env(), clear=True):
             app = create_app()

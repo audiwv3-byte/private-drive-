@@ -49,12 +49,13 @@ def create_app():
                                  "Content-Security-Policy": "default-src 'none'; img-src 'self' https://tile.openstreetmap.org https://unpkg.com data:; connect-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
 
     # Only three exact owner-approved media files are publicly served on this test service.
+    @app.get("/assets/pd-user-photo-6-original.webp")
     @app.get("/assets/pd-user-photo-6.webp")
     @app.get("/assets/pd-user-photo-7.webp")
     @app.get("/assets/pd-user-logo-4.webp")
     def approved_brand_media():
         filename = request.path.rsplit("/", 1)[-1]
-        allowed = frozenset(("pd-user-photo-6.webp", "pd-user-photo-7.webp", "pd-user-logo-4.webp"))
+        allowed = frozenset(("pd-user-photo-6.webp", "pd-user-photo-6-original.webp", "pd-user-photo-7.webp", "pd-user-logo-4.webp"))
         if filename not in allowed:
             return "Not found", 404
         media_path = Path(__file__).parent / "assets" / filename

@@ -42,6 +42,13 @@ with sync_playwright() as p:
         })""")
         assert info["pageWidth"] <= width + 2, f"Horizontal overflow at {width}: {info}"
         assert info["serviceCards"] == 3 and info["fareCards"] == 4, info
+        # Main banner must use the owner's saved RAV4 photo with no unrelated person.
+        assert page.locator('.pd-hero-img[src="/assets/pd-user-photo-6-original.webp"]').count() == 1
+        assert page.locator('.pd-hero-img[src="/assets/pd-approved-hero.webp"]').count() == 0
+        hero = page.locator(".pd-hero-img")
+        hero.scroll_into_view_if_needed()
+        assert hero.evaluate("(img) => img.complete && img.naturalWidth >= 800")
+
         # Approved screenshot uses light sections, dark/navy hero and compact footer.
         visual = page.evaluate("""() => ({
             sectionBg: getComputedStyle(document.querySelector('.pd-section')).backgroundColor,

@@ -71,5 +71,57 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertEqual(client.get("/dispatch").status_code, 302)
 
 
+# External HTTPS smoke test runs in Render's build environment, never on production.
+# Disabled by default. No plaintext test password is stored in the repository.
+@unittest.skipUnless(os.environ.get("PD_DISPATCH_HTTPS_SMOKE") == "1", "external smoke test disabled")
+class DispatcherHTTPSIntegrationTests(unittest.TestCase):
+    def test_real_https_login_logout(self):
+        from http.cookiejar import CookieJar
+        from urllib.parse import urlencode
+        from urllib.request import build_opener, HTTPCookieProcessor, Request
+        import ssl
+
+        base = "https://private-drive-dispatcher-staging.onrender.com"
+        password = os.environ.get("PD_DISPATCH_SMOKE_PASSWORD", "")
+        self.assertTrue(len(password) >= 24, "Missing isolated synthetic test password")
+        opener = build_opener(HTTPCookieProcessor(CookieJar()))
+
+        def get(path):
+            with opener.open(base + path, timeout=40) as r:
+                return r.status, r.url, r.read().decode("utf-8")
+
+        def post(path, csrf, pw=None):
+            form = {"csrf": csrf}
+            if pw is not None:
+                form["password"] = pw
+            req = Request(base + path, data=urlencode(form).encode(),
+                          headers={"Content-Type": "application/x-www-form-urlencoded"},
+                          method="POST")
+            with opener.open(req, timeout=40) as r:
+                return r.status, r.url, r.read().decode("utf-8")
+
+        status, address, login = get("/dispatch/login")
+        self.assertEqual(status, 200)
+        self.assertIn("Вход диспетчера", login)
+        csrf_match = re.search(r'name="csrf" value="([^"]+)"', login)
+        self.assertIsNotNone(csrf_match, "Missing CSRF token on live login")
+        csrf = csrf_match.group(1)
+        status, address, dashboard = post("/dispatch/login", csrf, password)
+        self.assertEqual(status, 200)
+        self.assertTrue(address.endswith("/dispatch"))
+        self.assertIn("Карта автопарка", dashboard)
+        logout_match = re.search(r'name="csrf" value="([^"]+)"', dashboard)
+        self.assertIsNotNone(logout_match)
+        status, address, after_logout = post("/dispatch/logout", logout_match.group(1))
+        self.assertEqual(status, 200)
+        self.assertTrue(address.endswith("/dispatch/login"))
+        self.assertIn("Вход диспетчера", after_logout)
+        status, address, no_access = get("/dispatch")
+        self.assertEqual(status, 200)
+        self.assertTrue(address.endswith("/dispatch/login"))
+        self.assertNotIn("Карта автопарка", no_access)
+        print("LIVE_HTTPS_SMOKE_OK: login page 200, login 200, dashboard 200, logout 200, unauthorized redirected")
+
+
 if __name__ == "__main__":
     unittest.main()

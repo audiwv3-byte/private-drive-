@@ -65,7 +65,14 @@ class PdHttpApi {
 
   Map<String, dynamic> _decode(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw PdHttpStatusException(response.statusCode);
+      String? errorCode;
+      try {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is Map<String, dynamic> && decoded['error'] is String) {
+          errorCode = decoded['error'] as String;
+        }
+      } catch (_) { /* An HTML error page must still become an HTTP error. */ }
+      throw PdHttpStatusException(response.statusCode, errorCode: errorCode);
     }
     final body = jsonDecode(utf8.decode(response.bodyBytes));
     if (body is! Map<String, dynamic>) {
@@ -76,9 +83,10 @@ class PdHttpApi {
 }
 
 class PdHttpStatusException implements Exception {
-  const PdHttpStatusException(this.statusCode);
+  const PdHttpStatusException(this.statusCode, {this.errorCode});
 
   final int statusCode;
+  final String? errorCode;
 
   @override
   String toString() => 'Запрос отклонён (HTTP $statusCode).';

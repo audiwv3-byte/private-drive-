@@ -1,9 +1,18 @@
-# PRIVATE DRIVE 0.2.25 — internal photo review QA
+# PRIVATE DRIVE 0.2.26 — internal photo review and guest entry QA
 
 Branch: feature/flutter-independent-auth. No production deployment, paid SMS,
 real booking or payment activation is part of this change.
 
 ## Implemented
+
+- Internal QA only: explicit guest entry opens the passenger cabin without
+  requesting an OTP, claiming phone verification or exposing staff roles.
+  Guest state is stored in a separate local scope, not under an authenticated
+  user's ID. Signed-in pilot/dispatcher access remains server-authorized.
+- Phone sign-in errors preserve the server error code and explain disabled
+  SMS, invalid phone numbers and request cooldown instead of a generic error.
+- The emulator check taps through optional permissions and the guest button
+  in the actual APK, then asserts the passenger Taxi/Transfer screen is visible.
 
 - Still camera capture from an explicit user gesture; local preview and retake.
 - Explicit authenticated HTTPS upload with redirect following disabled.

@@ -76,6 +76,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   final destination = TextEditingController();
   final code = TextEditingController();
   bool busy = false;
+  bool _guest = false;
   bool _acknowledgedLegal = false;
   // Authentication belongs to the Russian-only shared/native shell.
   // Passenger language selection is available inside the passenger cabin.
@@ -121,8 +122,18 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         challengeId = id;
         message = 'Код запрошен. Введи полученный код подтверждения.';
       });
+    } on PdHttpStatusException catch (error) {
+      if (mounted) setState(() => message = switch (error.errorCode) {
+        'sms_disabled' => 'Вход по SMS сейчас отключён на тестовом сервере. '
+            'Код не отправлен. Во внутренней сборке можно продолжить как гость.',
+        'sms_unavailable' => 'Сервис SMS временно недоступен. Код не отправлен. Повтори позже.',
+        'invalid_phone' => 'Проверь номер: укажи код страны, например +370, и номер телефона.',
+        'try_later' => 'Слишком частые запросы. Подожди минуту и повтори.',
+        _ => 'Сервер входа временно недоступен. Повтори позже.',
+      });
     } catch (_) {
-      if (mounted) setState(() => message = 'Не удалось запросить код. Проверь подключение и данные.');
+      if (mounted) setState(() => message = 'Сервер входа не ответил вовремя. '
+          'Повтори запрос позже или продолжи как гость во внутренней сборке.');
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -173,6 +184,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
 
   void signOut() {
     setState(() {
+      _guest = false;
       sessionToken = null;
       signedInUserId = null;
       signedInRole = null;
@@ -188,6 +200,25 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   @override
   Widget build(BuildContext context) {
     const gold = Color(0xFFDDC184);
+    if (const bool.fromEnvironment('PD_INTERNAL_QA') && _guest) {
+      return Scaffold(
+        body: SafeArea(child: Column(children: [
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('Гостевой доступ · внутренний тест. '
+              'Телефон не подтверждён. Заказы сохраняются только на этом устройстве.',
+              key: Key('internal-guest-status'), textAlign: TextAlign.center),
+          ),
+          Expanded(child: PrivateDriveDemo(
+            key: const ValueKey('internal-guest-passenger'),
+            passengerOnly: true,
+            storageScope: 'internal-guest',
+            onSignOut: signOut,
+            onBackToCabinets: signOut,
+          )),
+        ])),
+      );
+    }
     // The token remains only in process memory; app restart requires sign-in.
     // Server revocation and durable secure storage are separate future steps.
     final active = sessionToken != null &&
@@ -375,7 +406,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
-                  'Версия 0.2.25 · сборка 2026112101',
+                  'Версия 0.2.26 · сборка 2026112102',
                   key: Key('app-demo-version'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),
@@ -393,6 +424,20 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       child: const Text('Открыть тестовые кабинеты'),
                     ),
                   ),
+                if (const bool.fromEnvironment('PD_INTERNAL_QA')) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    key: const Key('internal-guest-entry'),
+                    onPressed: busy ? null : () {
+                      signOut();
+                      setState(() => _guest = true);
+                    },
+                    icon: const Icon(Icons.person_outline),
+                    label: const Text('Продолжить как гость'),
+                  ),
+                  const Text('Пассажирский кабинет без SMS. Только внутренняя сборка.',
+                    textAlign: TextAlign.center),
+                ],
                 const SizedBox(height: 20),
                 TextField(
                   controller: destination,

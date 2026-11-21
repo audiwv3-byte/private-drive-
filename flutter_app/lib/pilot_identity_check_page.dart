@@ -20,13 +20,16 @@ class PdSystemPilotCameraPermission implements PdPilotCameraPermission {
 }
 
 /// Identity-check UX proposal only: no camera preview, photos or verification.
+/// The non-verifying QA bypass is compiled only into explicitly flagged builds.
 class PdPilotIdentityCheckPage extends StatefulWidget {
   const PdPilotIdentityCheckPage({
     super.key,
     this.cameraPermission = const PdSystemPilotCameraPermission(),
+    this.onContinueWithoutVerification,
   });
 
   final PdPilotCameraPermission cameraPermission;
+  final VoidCallback? onContinueWithoutVerification;
 
   @override
   State<PdPilotIdentityCheckPage> createState() =>
@@ -107,6 +110,18 @@ class _PdPilotIdentityCheckPageState extends State<PdPilotIdentityCheckPage> {
                 Text(_result!, key: const Key('pilot-identity-result')),
               ],
               const SizedBox(height: 20),
+              if (const bool.fromEnvironment('PD_INTERNAL_QA') &&
+                  widget.onContinueWithoutVerification != null) ...[
+                OutlinedButton.icon(
+                  key: const Key('pilot-identity-qa-skip'),
+                  onPressed: widget.onContinueWithoutVerification,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('Продолжить без проверки лица'),
+                ),
+                const Text('Только внутренняя тестовая сборка. Личность не подтверждена. '
+                    'Дополнительные права не выдаются.'),
+                const SizedBox(height: 16),
+              ],
               const Text(
                 'Статус: проверка личности не выполнена. '
                 'Реальный процесс будет доступен после защищённой '

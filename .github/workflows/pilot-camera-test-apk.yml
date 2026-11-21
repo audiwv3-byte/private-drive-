@@ -58,7 +58,7 @@ jobs:
           text = text.replace('android:label="private_drive"',
               'android:label="PD CAMERA TEST"')
           text = text.replace('android:icon="@mipmap/ic_launcher"',
-              'android:icon="@drawable/private_drive_logo"')
+              'android:icon="@drawable/private_drive_app_icon"')
           permissions = '''<uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
@@ -76,6 +76,23 @@ jobs:
           print('Isolated camera-preview ID configured; no production credentials.')
           PY
           python3 flutter_app/tool/apply_native_brand_splash.py
+          # Launcher icon only: original opaque black-and-gold logo fills its
+          # own square frame. The transparent in-app/splash assets stay intact.
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps
+          source = Path('flutter_app/assets/brand/private_drive_logo.webp')
+          destination = Path('private_drive_build/android/app/src/main/res/drawable-nodpi/private_drive_app_icon.webp')
+          with Image.open(source) as original:
+              icon = ImageOps.fit(original.convert('RGB'), (512, 512),
+                                  method=Image.Resampling.LANCZOS)
+              assert icon.getpixel((0, 0)) is not None
+              icon.save(destination, format='WEBP', lossless=True)
+          manifest = Path('private_drive_build/android/app/src/main/AndroidManifest.xml').read_text()
+          assert 'android:icon="@drawable/private_drive_app_icon"' in manifest
+          assert destination.is_file() and destination.stat().st_size > 10000
+          print('Opaque black-and-gold PD launcher icon restored; transparent in-app logo unchanged.')
+          PY
       - name: Run static analysis and widget tests
         working-directory: private_drive_build
         run: |

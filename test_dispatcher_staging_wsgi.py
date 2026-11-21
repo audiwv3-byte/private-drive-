@@ -66,6 +66,8 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertGreater(len(logo.data), 2500)
         self.assertTrue(logo.data.startswith(bytes.fromhex("ffd8")))
         self.assertTrue(logo.data.endswith(bytes.fromhex("ffd9")))
+        # The replacement includes the complete, uncropped 160x160 emblem.
+        self.assertIn(bytes.fromhex("ffc000110800a000a0"), logo.data)
         for path in ("/", "/pilot-registration", "/dispatch/login"):
             result = client.get(path)
             self.assertEqual(result.status_code, 200)

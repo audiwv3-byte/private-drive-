@@ -89,6 +89,17 @@ class DispatcherStagingTests(unittest.TestCase):
 # Disabled by default. No plaintext test password is stored in the repository.
 @unittest.skipUnless(os.environ.get("PD_DISPATCH_HTTPS_SMOKE") == "1", "external smoke test disabled")
 class DispatcherHTTPSIntegrationTests(unittest.TestCase):
+    def test_public_pilot_registration_https(self):
+        from urllib.request import urlopen
+        url = "https://private-drive-dispatcher-staging.onrender.com/pilot-registration"
+        with urlopen(url, timeout=40) as response:
+            page = response.read().decode("utf-8")
+            self.assertEqual(response.status, 200)
+            self.assertIn("Регистрация пилота", page)
+            self.assertIn("ТЕСТОВЫЙ МАКЕТ", page)
+            self.assertIn('type="file"', page)
+        print("PILOT_REGISTRATION_HTTPS_OK: status 200, correct page loaded")
+
     def test_real_https_login_logout(self):
         from http.cookiejar import CookieJar
         from urllib.parse import urlencode

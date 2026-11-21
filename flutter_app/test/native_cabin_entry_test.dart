@@ -71,6 +71,19 @@ void main() {
     expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
   });
 
+  testWidgets('QA photo skip returns to selection without entering pilot cabin', (tester) async {
+    await pumpEntry(tester);
+    await tap(tester, 'entry-pilot');
+    final skip = find.byKey(const Key('pilot-identity-notice-qa-skip'));
+    if (const bool.fromEnvironment('PD_INTERNAL_QA')) {
+      await tap(tester, 'pilot-identity-notice-qa-skip');
+      expect(find.byKey(const Key('entry-cabin-selection')), findsOneWidget);
+    } else {
+      expect(skip, findsNothing);
+    }
+    expect(find.byType(PilotCabin), findsNothing);
+  });
+
   testWidgets('passenger never sees photo and guest never receives staff rights', (tester) async {
     await pumpEntry(tester);
     await tap(tester, 'entry-passenger');

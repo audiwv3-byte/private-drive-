@@ -50,6 +50,11 @@ class PrivateDriveApp extends StatelessWidget {
       ),
       home: kIsWeb && isolatedWebPreview
           ? const RemoteSyncDemo()
+          : enableOfflinePreview
+          // Explicit developer harness only. Normal launch starts with cabins.
+          ? const PdPermissionsFirstLaunch(
+              child: NativeSignInScreen(enableOfflinePreview: true),
+            )
           : PdNativeCabinEntry(
               signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
                 enableOfflinePreview: enableOfflinePreview,

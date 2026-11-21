@@ -8,6 +8,7 @@ import 'message_voice.dart';
 import 'app_language.dart';
 import 'demo_trip_store.dart';
 import 'taxi_fare.dart';
+import 'pd_pickup_fee.dart';
 import 'demo_rating_panel.dart';
 import 'company_info.dart';
 import 'passenger_orders_demo.dart';
@@ -88,6 +89,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _luggageHelp = false;
   List<LatLng> _roadPoints = const [];
   int? _pickupEtaMinutes;
+  int? _pickupRoadMetres;
   int _pickupEtaGeneration = 0;
   String? _pickupEtaRouteKey;
   DateTime? _pickupEtaRequestedAt;
@@ -106,11 +108,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
         !lastFix.isAfter(DateTime.now()) &&
         DateTime.now().difference(lastFix) < const Duration(minutes: 2);
     final pickup = trip == null ? null :
-        (_pickedPickup ?? _resolvedAddresses[trip.from.trim()]);
+        (_pickedPickup ?? _resolve(trip.from));
     if (!eligible || pickup == null) {
       _pickupEtaGeneration++;
       _pickupEtaRouteKey = null;
       _pickupEtaMinutes = null;
+      _pickupRoadMetres = null;
       return;
     }
     final lat = store!.pilotLatitude!;
@@ -124,6 +127,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _pickupEtaRouteKey = key;
     _pickupEtaRequestedAt = DateTime.now();
     _pickupEtaMinutes = null;
+    _pickupRoadMetres = null;
     final request = ++_pickupEtaGeneration;
     try {
       final uri = Uri.https('router.project-osrm.org',
@@ -133,17 +137,27 @@ class _PassengerDemoState extends State<PassengerDemo> {
         uri, timeout: const Duration(seconds: 8));
       final routes = json['routes'] as List<dynamic>?;
       if (routes == null || routes.isEmpty) throw const FormatException('No route');
-      final duration = (routes.first as Map<String, dynamic>)['duration'];
-      if (duration is! num || !duration.isFinite || duration < 0) {
-        throw const FormatException('No duration');
+      final roadRoute = routes.first as Map<String, dynamic>;
+      final duration = roadRoute['duration'];
+      final distance = roadRoute['distance'];
+      if (duration is! num || !duration.isFinite || duration < 0 ||
+          distance is! num || !distance.isFinite ||
+          distance < 0 || distance > 2000000) {
+        throw const FormatException('Invalid route distance or duration');
       }
       if (!mounted || request != _pickupEtaGeneration) return;
       // OSRM driving duration excludes live traffic and is only indicative.
-      setState(() => _pickupEtaMinutes =
-          (duration.toDouble() / 60).ceil().clamp(1, 1440));
+      setState(() {
+        _pickupEtaMinutes =
+            (duration.toDouble() / 60).ceil().clamp(1, 1440);
+        _pickupRoadMetres = distance.round();
+      });
     } catch (_) {
       if (!mounted || request != _pickupEtaGeneration) return;
-      setState(() => _pickupEtaMinutes = null);
+      setState(() {
+        _pickupEtaMinutes = null;
+        _pickupRoadMetres = null;
+      });
     }
   }
 
@@ -1269,6 +1283,24 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 key: const Key('passenger-pickup-eta'),
                 style: const TextStyle(
                   color: Color(0xFFDDC184), fontWeight: FontWeight.w700,
+                ),
+              ),
+            if (store != null && store.isActive &&
+                store.trip?.rideType == 'Такси')
+              Text(
+                pilotPosition == null ||
+                        !(store.status == DemoTripStatus.approaching ||
+                          store.status == DemoTripStatus.assigned &&
+                          store.pilotAccepted) ||
+                        _pickupRoadMetres == null
+                    ? 'Дальняя подача: расчёт после выбора пилота и получения дорожного маршрута'
+                    : 'Подача по дороге: ${(_pickupRoadMetres! / 1000).toStringAsFixed(1)} км · '
+                      'доплата ${PdPickupFee.euros(PdPickupFee.calculateCents(roadMetres: _pickupRoadMetres!))} '
+                      '(сверх 5 км по 0,40 €/км). '
+                      'Только предварительный расчёт: доплата не включена в заказ и требует согласия пассажира.',
+                key: const Key('passenger-long-pickup-quote'),
+                style: const TextStyle(
+                  color: Color(0xFFDDC184), fontSize: 12,
                 ),
               ),
             if (store != null && store.isActive)

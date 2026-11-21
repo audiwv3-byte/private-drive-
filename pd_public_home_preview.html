@@ -18,12 +18,90 @@ section{padding:42px 5vw}h2{font:500 30px Georgia,serif;color:var(--gold)}
 .notice{color:#e8c88f;border-left:3px solid var(--gold);padding-left:13px}
 footer{border-top:1px solid var(--line);padding:26px 5vw;color:#a8aeb4;display:flex;flex-wrap:wrap;gap:15px;justify-content:space-between}
 @media(max-width:750px){.hero{grid-template-columns:1fr;min-height:0;padding:55px 20px}.hero-logo{width:min(160px,100%)}.cards{grid-template-columns:1fr}nav{gap:11px;font-size:13px}.logo{font-size:18px}.logo img{width:52px;height:52px}}
+
+/* Passenger ordering preview: local-only data and an OSM map, no booking API. */
+.order-section{padding:28px 5vw 54px;background:#0d1014}
+.order-shell{display:grid;grid-template-columns:minmax(300px,.84fr) minmax(0,1.16fr);gap:18px;align-items:stretch}
+.order-panel,.order-map{background:#16191e;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.order-panel{padding:24px}.order-panel h2{margin:0 0 9px}.order-tabbar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:22px 0}
+.order-tab{border:1px solid #6c5834;background:#111419;color:#e4d6b9;padding:12px;border-radius:9px;font-weight:700;cursor:pointer}
+.order-tab[aria-selected=true]{background:linear-gradient(100deg,#a98143,#eac884);color:#17110a}
+.order-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.order-field{min-width:0}.order-field.full{grid-column:1/-1}
+.order-field label{display:block;font-size:13px;margin-bottom:5px;color:#ddcda9}
+.order-field input,.order-field select{width:100%;background:#0b0e12;color:#f7f4ed;border:1px solid #695638;padding:11px 12px;border-radius:9px;font:inherit;min-height:45px}
+.order-field input:focus-visible,.order-field select:focus-visible{outline:2px solid #e7bf71;outline-offset:1px}
+.order-controls{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+.order-controls button{cursor:pointer;border:1px solid var(--gold);background:#17130d;color:#f2d18a;padding:10px 12px;border-radius:9px;font:inherit}
+.order-controls button.primary{background:linear-gradient(90deg,#ad8349,#f1d38d);color:#17110b;font-weight:700}
+.order-hint{font-size:12px;margin:12px 0 0;color:#d5b77d}.order-result{min-height:27px;margin-top:14px;color:#f3deaa;overflow-wrap:anywhere}
+.order-map{display:flex;flex-direction:column;min-height:530px}.order-map-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 15px;font-size:13px;color:#e7d3a6}
+.order-map iframe{display:block;width:100%;flex:1;min-height:410px;border:0;background:#283039}
+.order-map small{padding:10px 15px;font-size:12px;color:#b5b9bf}
+@media(max-width:850px){.order-shell{grid-template-columns:1fr}.order-map{min-height:350px}.order-map iframe{min-height:320px}}
+@media(max-width:420px){.order-panel{padding:15px}.order-form-grid{grid-template-columns:1fr}.order-field.full{grid-column:1}}
 </style></head><body>
-<header><a class="logo" href="/"><img src="/pd-logo-transparent.png" alt="Фирменный золотой логотип PRIVATE DRIVE с автомобилем">PRIVATE DRIVE</a><nav aria-label="Главное меню"><a href="#about">О нас</a><a href="#services">Услуги</a><a href="#faq">FAQ</a><a href="/pilot-registration">Стать пилотом</a><a href="/dispatch/login">Диспетчерская</a><a href="#contacts">Контакты</a></nav></header>
+<header><a class="logo" href="/"><img src="/pd-logo-transparent.png" alt="Фирменный золотой логотип PRIVATE DRIVE с автомобилем">PRIVATE DRIVE</a><nav aria-label="Главное меню"><a href="#order">Заказать</a><a href="#about">О нас</a><a href="#services">Услуги</a><a href="#faq">FAQ</a><a href="/pilot-registration">Стать пилотом</a><a href="/dispatch/login">Диспетчерская</a><a href="#contacts">Контакты</a></nav></header>
 <main><div class="hero"><div><p>PRIVATE DRIVE · Литва и международные трансферы</p><h1>Комфортные поездки. <em>Индивидуальный подход.</em></h1><p>Такси, трансферы из аэропорта и поездки по предварительному заказу. Встречаем, сопровождаем и заботимся о комфорте пассажиров.</p>
-<a class="btn" href="https://t.me/EuroBalticTransferBot" rel="noopener">Открыть Telegram-бот</a><a class="btn outline" href="/pilot-registration">Регистрация пилота</a></div><img class="hero-logo" src="/pd-logo-transparent.png" alt="PRIVATE DRIVE — PD и автомобиль"></div>
-<section id="about"><h2>О PRIVATE DRIVE</h2><p>Персональный сервис пассажирских перевозок и трансферов. Это предварительный просмотр корпоративного сайта в фирменном чёрно-золотом стиле.</p><p class="notice">Тестовая страница: онлайн-расчёт, приложения в магазинах и реальные заказы отсюда пока не подключены.</p></section>
+<a class="btn" href="#order">Выбрать поездку</a><a class="btn outline" href="https://t.me/EuroBalticTransferBot" rel="noopener">Telegram-бот</a><a class="btn outline" href="/pilot-registration">Регистрация пилота</a></div><img class="hero-logo" src="/pd-logo-transparent.png" alt="PRIVATE DRIVE — PD и автомобиль"></div>
+<section id="order" class="order-section" aria-label="Форма поездки и трансфера">
+<div class="order-shell">
+<div class="order-panel">
+<h2>Заказать поездку</h2><p>Выбери тип поездки, укажи адреса и время подачи. Пока это тестовый предпросмотр без отправки заказа.</p>
+<div class="order-tabbar" role="tablist" aria-label="Тип поездки">
+<button class="order-tab" id="trip-tab" role="tab" type="button" aria-selected="true">Поездка</button>
+<button class="order-tab" id="transfer-tab" role="tab" type="button" aria-selected="false">Трансфер</button>
+</div>
+<form id="passenger-preview" autocomplete="off">
+<div class="order-form-grid">
+<div class="order-field full"><label for="pickup-address">Откуда</label><input id="pickup-address" name="pickup" placeholder="Улица, дом или аэропорт" maxlength="220" autocomplete="street-address"></div>
+<div class="order-field full"><label for="dropoff-address">Куда</label><input id="dropoff-address" name="dropoff" placeholder="Адрес назначения" maxlength="220"></div>
+<div class="order-field"><label for="pickup-date">Дата подачи</label><input id="pickup-date" name="date" type="date"></div>
+<div class="order-field"><label for="pickup-time">Время подачи</label><input id="pickup-time" name="time" type="time"></div>
+<div class="order-field full"><label for="car-category">Класс автомобиля</label><select id="car-category" name="category"><option value="comfort">Комфорт</option><option value="economy">Эконом</option><option value="business">Бизнес</option><option value="minivan">Минивэн</option></select></div>
+</div>
+<div class="order-controls"><button type="button" id="use-location">◎ Моё местоположение</button><button type="button" id="swap-address">⇄ Поменять адреса</button><button class="primary" type="button" id="preview-route">Показать маршрут</button></div>
+<p class="order-hint">Геолокация запрашивается только после нажатия. На тестовом сайте она используется исключительно в твоём браузере. Цена и подтверждение заказа появятся после подключения серверных API.</p>
+<div class="order-result" id="order-status" role="status" aria-live="polite">Выбери адреса. Карта справа интерактивная.</div>
+</form></div>
+<div class="order-map"><div class="order-map-head"><strong>Карта · Вильнюс</strong><span>OpenStreetMap</span></div>
+<iframe id="order-map-frame" title="Интерактивная карта для поездки" loading="lazy" referrerpolicy="no-referrer" src="https://www.openstreetmap.org/export/embed.html?bbox=25.179%2C54.637%2C25.419%2C54.743&amp;layer=mapnik"></iframe>
+<small>© Участники OpenStreetMap. Карта интерактивная; построение маршрута открывается отдельно по нажатию.</small></div>
+</div></section>
+<section id="about"><h2>О PRIVATE DRIVE</h2><p>Персональный сервис пассажирских перевозок и трансферов. Это предварительный просмотр корпоративного сайта в фирменном чёрно-золотом стиле.</p><p class="notice">Тестовая страница: форма маршрута и карта работают в режиме предпросмотра. Автоматический расчёт стоимости и реальные заказы ещё не подключены.</p></section>
 <section id="services"><h2>Услуги</h2><div class="cards"><div class="card"><h3>Городские поездки</h3><p>Предварительный заказ по Вильнюсу.</p></div><div class="card"><h3>Аэропорты и трансферы</h3><p>Поездки между городами и трансферы по маршруту.</p></div><div class="card"><h3>Дополнительные услуги</h3><p>Встреча с табличкой, дополнительные остановки, индивидуальные запросы.</p></div></div></section>
-<section id="faq"><h2>Частые вопросы</h2><p>Как заказать поездку? Пока через Telegram-бот PRIVATE DRIVE. Веб-форма заказа будет подключена позже.</p></section>
+<section id="faq"><h2>Частые вопросы</h2><p>Можно заполнить форму «Поездка / Трансфер» для просмотра маршрута. Для настоящего заказа пока используй Telegram-бот PRIVATE DRIVE.</p></section>
 <section id="contacts"><h2>Контакты</h2><p>Электронная почта: <a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a></p><p>Telegram: <a href="https://t.me/PrivateDriveTransfer" rel="noopener">@PrivateDriveTransfer</a></p></section></main>
-<footer><span>© PRIVATE DRIVE · тестовый предпросмотр</span><span>Действующее приложение и продакшн не затронуты</span></footer></body></html>
+<footer><span>© PRIVATE DRIVE · тестовый предпросмотр</span><span>Действующее приложение и продакшн не затронуты</span></footer><script>
+(()=>{
+const $=id=>document.getElementById(id);
+let mode="Поездка";
+const msg=$("order-status");
+for(const [id,name] of [["trip-tab","Поездка"],["transfer-tab","Трансфер"]]){
+ $(id).addEventListener("click",()=>{mode=name;$("trip-tab").setAttribute("aria-selected",String(name==="Поездка"));$("transfer-tab").setAttribute("aria-selected",String(name==="Трансфер"));msg.textContent="Режим: "+mode+". Заполни адреса для просмотра маршрута."});
+}
+$("passenger-preview").addEventListener("submit",e=>e.preventDefault());
+$("swap-address").addEventListener("click",()=>{const a=$("pickup-address"),b=$("dropoff-address");[a.value,b.value]=[b.value,a.value]});
+$("use-location").addEventListener("click",()=>{
+ if(!navigator.geolocation){msg.textContent="Геолокация не поддерживается браузером. Введи адрес вручную.";return}
+ msg.textContent="Запрашиваем разрешение на местоположение…";
+ navigator.geolocation.getCurrentPosition(({coords})=>{
+  const lat=coords.latitude,lon=coords.longitude;
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)) {msg.textContent="Не удалось определить координаты.";return}
+  $("pickup-address").value=lat.toFixed(6)+", "+lon.toFixed(6);
+  const pad=.018;
+  const bbox=[lon-pad,lat-pad,lon+pad,lat+pad].join(",");
+  $("order-map-frame").src="https://www.openstreetmap.org/export/embed.html?bbox="+encodeURIComponent(bbox)+"&layer=mapnik&marker="+encodeURIComponent(lat+","+lon);
+  msg.textContent="Местоположение определено. Координаты подставлены в поле «Откуда».";
+ },e=>{msg.textContent=e.code===1?"Доступ к геолокации не разрешён. Введи адрес вручную.":"Местоположение недоступно. Введи адрес вручную."},{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+});
+$("preview-route").addEventListener("click",()=>{
+ const a=$("pickup-address").value.trim(), b=$("dropoff-address").value.trim();
+ if(!a||!b){msg.textContent="Для просмотра маршрута заполни оба адреса.";return}
+ const params=new URLSearchParams({api:"1",origin:a,destination:b,travelmode:"driving"});
+ const url="https://www.google.com/maps/dir/?"+params.toString();
+ msg.textContent="Маршрут «"+mode+"» откроется в Google Картах. Это не заказ и не расчёт стоимости.";
+ const link=document.createElement("a");link.href=url;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Открыть маршрут на карте";link.style.cssText="display:block;color:#f2d18a;text-decoration:underline;margin-top:6px";
+ msg.appendChild(link);
+});
+})();
+</script></body></html>

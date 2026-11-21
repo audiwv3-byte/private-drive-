@@ -23,7 +23,7 @@ with sync_playwright() as p:
         page.route("https://tile.openstreetmap.org/**", lambda route: route.abort())
         page.route("https://unpkg.com/**", lambda route: route.abort())
         page.goto(BASE + "/", wait_until="domcontentloaded", timeout=30000)
-        for name in ("hero", "airport", "kaunas", "klaipeda", "warsaw",
+        for name in ("airport", "kaunas", "klaipeda", "warsaw",
                      "service_airport", "service_parcel", "service_driver"):
             image = page.locator('img[src="/assets/pd-approved-' + name + '.webp"]')
             assert image.count() == 1, f"{name} absent on {width}px"

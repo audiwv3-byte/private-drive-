@@ -19,13 +19,9 @@ LOGIN = """<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="view
 <input id="password" type="password" name="password" autocomplete="current-password" required maxlength="512">
 <button>Войти</button></form><small>Доступ только для уполномоченного администратора.</small></main></html>"""
 
-HOME = """<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PRIVATE DRIVE — диспетчерская</title>
-<style>body{background:#101114;color:#ecd7a1;font:16px system-ui;margin:0;padding:24px}header{display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #ae935b}button{padding:12px 20px;background:#b89a57;color:#111;border:0;border-radius:8px;cursor:pointer}main{max-width:960px;margin:80px auto;text-align:center;padding:50px 20px;border:1px dashed #6e6045;border-radius:18px}p{color:#ccc}</style>
-<header><h1>PRIVATE DRIVE · Диспетчерская</h1>
-<form method="post" action="{{ url_for('pd_dispatch_logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Выйти</button></form></header>
-<main><h2>Кабинет диспетчера</h2><p>Рабочая область пока пустая.</p>
-<p>Сюда последовательно добавим заказы, пилотов, GPS и оплаты.</p></main></html>"""
+# Dashboard template belongs to the isolated test interface.
+from pathlib import Path
+HOME = Path(__file__).with_name("pd_dispatcher_dashboard.html").read_text(encoding="utf-8")
 
 
 def register(app, core):

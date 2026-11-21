@@ -1,0 +1,191 @@
+"""Isolated, read-only route preview for PRIVATE DRIVE staging.
+
+Never imports Telegram app, customer database or payments. Live directions and
+autocomplete require a SEPARATE staging ORS_API_KEY; fail closed otherwise.
+"""
+import json
+import math
+import os
+import re
+import time
+import urllib.parse
+import urllib.request
+from collections import defaultdict, deque
+from decimal import Decimal, ROUND_HALF_UP
+
+from flask import jsonify, request
+import pd_fixed_prices
+
+_BASE_URL = "https://api.openrouteservice.org"
+_LIMITS = defaultdict(deque)
+
+
+def _rate_limit(action, count=15):
+    addr = request.remote_addr or "unknown"
+    key = (action, addr)
+    now = time.monotonic()
+    history = _LIMITS[key]
+    while history and history[0] < now - 60:
+        history.popleft()
+    if len(history) >= count:
+        return False
+    history.append(now)
+    return True
+
+
+def _request_json(url, payload=None):
+    # Caller constructs only hardcoded ORS endpoints, never follows user URLs.
+    key = os.getenv("PD_STAGING_ORS_API_KEY", "").strip()
+    if not key:
+        raise RuntimeError("staging geocoding not configured")
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {"User-Agent": "PrivateDriveStaging/1.0", "Authorization": key}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers)
+    with urllib.request.urlopen(req, timeout=8) as response:
+        if response.status != 200:
+            raise RuntimeError("routing unavailable")
+        raw = response.read(400_001)
+        if len(raw) > 400_000:
+            raise RuntimeError("routing response too large")
+    return json.loads(raw)
+
+
+def _coordinates(value):
+    if not isinstance(value, list) or len(value) != 2:
+        return None
+    if any(type(x) not in (float, int) or not math.isfinite(x) for x in value):
+        return None
+    lon, lat = value
+    if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+        return None
+    return [round(lon, 6), round(lat, 6)]
+
+
+def _text(value, minlen=3, maxlen=160):
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(value.strip().split())
+    if not minlen <= len(cleaned) <= maxlen or any(ord(x) < 32 for x in cleaned):
+        return None
+    return cleaned
+
+
+def _config_decimal(name, default):
+    try:
+        number = Decimal(os.getenv(name, default))
+        if not number.is_finite() or number < 0 or number > 10000:
+            return Decimal(default)
+        return number
+    except Exception:
+        return Decimal(default)
+
+
+def estimate(km, minutes, route_data):
+    """Matching core.quote's default formula, never claiming production config."""
+    fixed = pd_fixed_prices.base(route_data)
+    if fixed:
+        return Decimal(fixed), "fixed"
+    base = _config_decimal("PD_STAGING_BASE_FARE_EUR", "8")
+    rate_km = _config_decimal("PD_STAGING_RATE_PER_KM_EUR", "0.9")
+    rate_min = _config_decimal("PD_STAGING_RATE_PER_MIN_EUR", "0.0")
+    minimum = _config_decimal("PD_STAGING_MIN_FARE_EUR", "25")
+    factor = _config_decimal("PD_STAGING_ROUNDTRIP_FACTOR", "2")
+    demand = _config_decimal("PD_STAGING_DEMAND_MULTIPLIER", "1")
+    empty = _config_decimal("PD_STAGING_EMPTY_RETURN_FACTOR", "0")
+    km = Decimal(str(km))
+    minutes = Decimal(str(minutes))
+    if not (0 < km < 5000 and 0 < minutes < 10000):
+        raise ValueError("invalid route summary")
+    price = max(minimum, base + rate_km * km + rate_min * minutes)
+    if route_data.get("roundtrip"):
+        price *= factor
+    price = price * demand + empty * rate_km * km
+    return price.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), "distance"
+
+
+def register(app):
+    @app.get("/preview/api/suggest")
+    def suggest():
+        if not _rate_limit("suggest", 15):
+            return jsonify(error="Слишком много запросов"), 429
+        text = _text(request.args.get("q", ""))
+        if not text:
+            return jsonify(error="Введите не менее 3 символов"), 400
+        if not os.getenv("PD_STAGING_ORS_API_KEY"):
+            return jsonify(available=False, suggestions=[], reason="Сервис подсказок пока не подключён"), 200
+        url = _BASE_URL + "/geocode/autocomplete?" + urllib.parse.urlencode({
+            "text": text, "size": 5, "focus.point.lat": 54.6872,
+            "focus.point.lon": 25.2797
+        })
+        try:
+            doc = _request_json(url)
+            suggestions = []
+            for feature in doc.get("features", [])[:8]:
+                if not isinstance(feature, dict):
+                    continue
+                props = feature.get("properties") or {}
+                geometry = feature.get("geometry") or {}
+                label = _text(props.get("label"), 2, 200)
+                point = _coordinates(geometry.get("coordinates"))
+                if label and point:
+                    suggestions.append({"label": label, "coordinates": point})
+                if len(suggestions) == 5:
+                    break
+            return jsonify(available=True, suggestions=suggestions)
+        except Exception:
+            return jsonify(available=False, suggestions=[], reason="Подсказки временно недоступны"), 503
+
+    @app.post("/preview/api/route")
+    def route_preview():
+        if not _rate_limit("route", 8):
+            return jsonify(error="Слишком много запросов"), 429
+        if request.content_length is not None and request.content_length > 2048:
+            return jsonify(error="Слишком большой запрос"), 413
+        d = request.get_json(silent=True)
+        if not isinstance(d, dict):
+            return jsonify(error="Некорректный запрос"), 400
+        origin = _text(d.get("origin"), 2, 200)
+        destination = _text(d.get("destination"), 2, 200)
+        start = _coordinates(d.get("origin_coordinates"))
+        end = _coordinates(d.get("destination_coordinates"))
+        if not origin or not destination or origin.casefold() == destination.casefold():
+            return jsonify(error="Укажи два разных адреса"), 400
+        if not start or not end or start == end:
+            return jsonify(error="Выбери оба адреса из подсказок или используй GPS"), 400
+        if d.get("roundtrip") not in (True, False):
+            return jsonify(error="Неверный тип поездки"), 400
+        category = d.get("category")
+        if category not in ("comfort", "economy", "business", "minivan"):
+            return jsonify(error="Выбери класс автомобиля"), 400
+        if not os.getenv("PD_STAGING_ORS_API_KEY"):
+            return jsonify(available=False, reason="Маршрутизация пока не подключена"), 200
+        try:
+            geojson = _request_json(_BASE_URL + "/v2/directions/driving-car/geojson",
+                                    {"coordinates": [start, end]})
+            feature = geojson["features"][0]
+            summary = feature["properties"]["summary"]
+            coords = feature["geometry"]["coordinates"]
+            km = float(summary["distance"]) / 1000.0
+            minutes = float(summary["duration"]) / 60.0
+            if not isinstance(coords, list) or not 2 <= len(coords) <= 15000:
+                raise ValueError("invalid geometry")
+            # Preserve geometry and route even when class-specific tariffs are unknown.
+            result = {"available": True, "km": round(km, 2),
+                      "minutes": round(minutes), "road_coordinates": coords,
+                      "price": None, "currency": "EUR",
+                      "note": "Без учёта пробок. Данные для предпросмотра, без заказа."}
+            if category == "comfort":
+                price, source = estimate(km, minutes, {
+                    "origin": origin, "destination": destination,
+                    "roundtrip": d["roundtrip"]
+                })
+                result["price"] = str(price.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+                result["price_source"] = source
+                result["note"] += " Тариф по тестовым настройкам, не оферта."
+            else:
+                result["note"] += " Тариф этого класса ещё не настроен."
+            return jsonify(result)
+        except Exception:
+            return jsonify(available=False, reason="Маршрут временно недоступен"), 503

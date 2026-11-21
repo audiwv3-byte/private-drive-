@@ -103,6 +103,13 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertNotIn(b'fetch("/api/', page.data)
         self.assertEqual(client.post("/", data={"pickup": "synthetic"}).status_code, 405)
 
+    def test_report_staging_ors_configuration_without_secret(self):
+        # Build log reveals only presence, never key content or fragment.
+        import os
+        configured = bool(os.environ.get("PD_STAGING_ORS_API_KEY", "").strip())
+        print("PD_STAGING_ORS_CONFIGURED=" + ("YES" if configured else "NO"), flush=True)
+        self.assertIsInstance(configured, bool)
+
     def test_staging_route_no_key_does_not_create_orders(self):
         from pd_public_route_preview import estimate
         from decimal import Decimal

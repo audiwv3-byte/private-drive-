@@ -25,15 +25,24 @@ class PilotCockpitOverlay extends StatefulWidget {
 
 class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
   bool _expanded = false;
+  bool _statisticsVisible = false;
   static const gold = Color(0xFFDDC184);
   static const background = Color(0xEE10151D);
 
-  void _openStatistics(PilotStatisticSection section) {
-    Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(
-        builder: (_) => PilotStatisticsPage(section: section),
-      ),
-    );
+  Future<void> _openStatistics(PilotStatisticSection section) async {
+    if (_statisticsVisible) return;
+    // The cockpit is a root OverlayEntry and otherwise appears above routes.
+    // Temporarily hide its entire surface while a details route is open.
+    setState(() => _statisticsVisible = true);
+    try {
+      await Navigator.of(context, rootNavigator: true).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => PilotStatisticsPage(section: section),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _statisticsVisible = false);
+    }
   }
 
   int? get _fare {
@@ -55,6 +64,7 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
     return AnimatedBuilder(
       animation: store ?? _NoopListenable.instance,
       builder: (context, _) {
+        if (_statisticsVisible) return const SizedBox.shrink();
         final awaiting = store?.status == DemoTripStatus.assigned &&
             store?.pilotAccepted == false &&
             store?.cashOrderNeedsOtherPilot != true;

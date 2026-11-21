@@ -46,7 +46,7 @@ def create_app():
         return Response(page, content_type="text/html; charset=utf-8",
                         headers={"Cache-Control": "no-store",
                                  "X-Content-Type-Options": "nosniff",
-                                 "Content-Security-Policy": "default-src 'none'; img-src 'self' https://tile.openstreetmap.org https://unpkg.com https://www.wanderin.ge data:; connect-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+                                 "Content-Security-Policy": "default-src 'none'; img-src 'self' https://tile.openstreetmap.org https://unpkg.com https://commons.wikimedia.org data:; connect-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
 
     @app.get("/pd-logo-transparent.png")
     def pd_logo_asset():

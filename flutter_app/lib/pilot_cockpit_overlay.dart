@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
-import 'pd_slide_to_confirm.dart';
+import 'pd_two_way_offer_slider.dart';
 import 'demo_trip_store.dart';
 import 'app_language.dart';
 import 'pilot_statistics_page.dart';
@@ -218,26 +218,14 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                             Text('${pdLabel(context, 'Оплата')} · ${pdLabel(context, trip.paymentMethod)}',
                               style: const TextStyle(fontSize: 12)),
                             const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: PdSlideToConfirm(
-                                    key: const Key('pilot-global-accept'),
-                                    thumbKey: const Key('pilot-global-accept-handle'),
-                                    label: pdLabel(context, 'Принять'),
-                                    enabled: awaiting,
-                                    onConfirmed: widget.onAccept,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: OutlinedButton(
-                                    key: const Key('pilot-global-decline'),
-                                    onPressed: widget.onDecline,
-                                    child: Text(pdLabel(context, 'Отклонить')),
-                                  ),
-                                ),
-                              ],
+                            PdTwoWayOfferSlider(
+                              key: const Key('pilot-global-offer-swipe'),
+                              acceptKey: const Key('pilot-global-accept'),
+                              handleKey: const Key('pilot-global-accept-handle'),
+                              declineKey: const Key('pilot-global-decline'),
+                              enabled: awaiting,
+                              onAccept: widget.onAccept,
+                              onDecline: widget.onDecline,
                             ),
                           ],
                         ),

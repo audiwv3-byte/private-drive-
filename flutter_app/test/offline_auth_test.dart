@@ -183,6 +183,24 @@ void main() {
         await tester.tap(pilot);
         await tester.pumpAndSettle();
         expect(find.byType(PilotCabin), findsOneWidget);
+        if (const bool.fromEnvironment('PD_INTERNAL_QA')) {
+          final photoEntry = find.byKey(const Key('pilot-open-identity-check'));
+          await tester.ensureVisible(photoEntry);
+          await tester.tap(photoEntry);
+          await tester.pumpAndSettle();
+          final qaSkip = find.byKey(const Key('pilot-identity-notice-qa-skip'));
+          expect(qaSkip, findsOneWidget);
+          await tester.tap(qaSkip);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('authorized-role-selection')),
+              findsOneWidget,
+              reason: 'QA photo flow must never strand the pilot');
+          // Leaving photo check does not change the server role.
+          expect(tester.widget<FilledButton>(pilot).onPressed, isNotNull);
+          await tester.tap(pilot);
+          await tester.pumpAndSettle();
+          expect(find.byType(PilotCabin), findsOneWidget);
+        }
         await tester.tap(find.byType(BackButton).first);
         await tester.pumpAndSettle();
       }

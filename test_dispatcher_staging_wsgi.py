@@ -108,6 +108,30 @@ class DispatcherStagingTests(unittest.TestCase):
         import os
         configured = bool(os.environ.get("PD_STAGING_ORS_API_KEY", "").strip())
         print("PD_STAGING_ORS_CONFIGURED=" + ("YES" if configured else "NO"), flush=True)
+        if configured:
+            import pd_public_route_preview as preview
+            import urllib.parse
+            autocomplete_url = "https://api.openrouteservice.org/geocode/autocomplete?" + urllib.parse.urlencode({
+                "text": "Vilnius", "size": 2, "focus.point.lat": 54.6872,
+                "focus.point.lon": 25.2797
+            })
+            try:
+                autocomplete = preview._request_json(autocomplete_url)
+                okay = bool(isinstance(autocomplete.get("features"), list) and
+                            any(x.get("geometry", {}).get("coordinates") for x in autocomplete["features"]))
+                print("PD_STAGING_ORS_AUTOCOMPLETE=" + ("OK" if okay else "INVALID_RESPONSE"), flush=True)
+            except Exception as exc:
+                print("PD_STAGING_ORS_AUTOCOMPLETE=FAILED_" + type(exc).__name__, flush=True)
+            try:
+                directions = preview._request_json("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+                    "coordinates": [[25.2797, 54.6872], [25.3130, 54.6980]]
+                })
+                feature = directions["features"][0]
+                distance = feature["properties"]["summary"]["distance"]
+                okay = isinstance(distance, (int, float)) and 0 < distance < 30000
+                print("PD_STAGING_ORS_ROUTE=" + ("OK" if okay else "INVALID_RESPONSE"), flush=True)
+            except Exception as exc:
+                print("PD_STAGING_ORS_ROUTE=FAILED_" + type(exc).__name__, flush=True)
         self.assertIsInstance(configured, bool)
 
     def test_staging_route_no_key_does_not_create_orders(self):

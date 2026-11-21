@@ -1,61 +1,64 @@
-"""Responsive browser check for the isolated PRIVATE DRIVE staging homepage."""
+"""Playwright mobile regression for isolated PRIVATE DRIVE preview, no actual orders."""
 from pathlib import Path
 from urllib.request import urlopen
 from playwright.sync_api import sync_playwright
 import time
 
-URL = "http://127.0.0.1:8765/"
-for _ in range(40):
+BASE = "http://127.0.0.1:8765"
+for _ in range(50):
     try:
-        with urlopen(URL, timeout=1) as response:
+        with urlopen(BASE + "/", timeout=1) as response:
             if response.status == 200:
                 break
     except Exception:
-        time.sleep(0.5)
+        time.sleep(0.4)
 else:
-    raise AssertionError("Local staging server not available")
+    raise AssertionError("staging Flask unavailable")
 
 Path("mobile-qa-screenshots").mkdir(exist_ok=True)
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     for width, height in [(320, 720), (390, 844), (768, 1024), (1280, 850)]:
-        page = browser.new_page(viewport={"width":width,"height":height}, device_scale_factor=1)
+        page = browser.new_page(viewport={"width":width, "height":height}, device_scale_factor=1)
         page.route("https://tile.openstreetmap.org/**", lambda route: route.abort())
         page.route("https://unpkg.com/**", lambda route: route.abort())
-        page.goto(URL, wait_until="domcontentloaded", timeout=30000)
-        # Lazy service photos must be scrolled into view before checking naturalWidth.
-        for name in ("pd-user-photo-6-original.webp", "pd-user-photo-7-original.webp"):
-            images = page.locator('img[src*="' + name + '"]')
-            images.first.scroll_into_view_if_needed()
-            images.first.evaluate("(img) => img.loading='eager'")
-            page.wait_for_function("""(id) => {
-              const img=[...document.querySelectorAll('img')].find(x=>x.src.includes(id));
-              return img && img.complete && img.naturalWidth>=864;
-            }""",arg=name,timeout=12000)
-        page.locator(".hero-stage").scroll_into_view_if_needed()
-        info = page.evaluate("""() => {
-           const ids = ['pd-user-logo-4-original.webp','pd-user-photo-6-original.webp','pd-user-photo-7-original.webp'];
-           const pics = ids.map(id => [...document.querySelectorAll('img')].find(x=>x.src.includes(id)));
-           const hero = document.querySelector('.hero');
-           const gallery = document.querySelector('.hero-stage');
-           return {viewport:innerWidth, pageWidth:document.documentElement.scrollWidth,
-              images:pics.map((img,i)=>({found:!!img,loaded:!!img && img.complete && img.naturalWidth>=864})),
-              galleryWidth:gallery?.getBoundingClientRect().width||0,
-              heroWidth:hero?.getBoundingClientRect().width||0,
-              booking:!!document.querySelector('#passenger-preview'),
-              map:!!document.querySelector('#order-live-map')};
-        }""")
-        assert info["pageWidth"] <= width+2, f"Horizontal overflow {width}: {info}"
-        assert all(i["loaded"] for i in info["images"]), f"Image loading failed {width}: {info}"
-        assert info["galleryWidth"] > 120, f"Gallery clipped {width}: {info}"
-        assert info["booking"] and info["map"], f"Existing functionality missing {width}: {info}"
-        assert page.locator(".mock-two-services .mock-service-card").count() == 4, "Four visual service cards missing"
-        page.locator("#quick-from").fill("Vilnius")
-        page.locator("#quick-to").fill("Kaunas")
-        page.locator("#quick-trip-form button").click()
-        assert page.locator("#pickup-address").input_value() == "Vilnius", "Quick origin did not copy"
-        assert page.locator("#dropoff-address").input_value() == "Kaunas", "Quick destination did not copy"
+        page.goto(BASE + "/", wait_until="domcontentloaded", timeout=30000)
+        for name in ("hero", "airport", "kaunas", "klaipeda", "warsaw",
+                     "service_airport", "service_parcel", "service_driver"):
+            image = page.locator('img[src="/assets/pd-approved-' + name + '.webp"]')
+            assert image.count() == 1, f"{name} absent on {width}px"
+            image.scroll_into_view_if_needed()
+            image.evaluate("(img) => img.loading = 'eager'")
+            page.wait_for_function("""(name) => {
+              const image=document.querySelector('img[src="/assets/pd-approved-' + name + '.webp"]');
+              return image && image.complete && image.naturalWidth > 300;
+            }""", arg=name, timeout=10000)
+        info = page.evaluate("""() => ({
+           viewport:innerWidth, pageWidth:document.documentElement.scrollWidth,
+           serviceCards:document.querySelectorAll('.pd-services-three .pd-img-card').length,
+           fareCards:document.querySelectorAll('.pd-destinations .fare-link').length,
+           booking:!!document.getElementById('passenger-preview'),
+           map:!!document.getElementById('order-live-map')
+        })""")
+        assert info["pageWidth"] <= width + 2, f"Horizontal overflow at {width}: {info}"
+        assert info["serviceCards"] == 3 and info["fareCards"] == 4, info
+        assert info["booking"] and info["map"], info
+        page.locator('a.fare-link[data-to="Каунас"]').click()
+        assert page.locator("#quick-from").input_value() == "Вильнюс"
+        assert page.locator("#quick-to").input_value() == "Каунас"
+        page.locator("#quick-date").fill("2026-12-04")
+        page.locator("#quick-time").fill("14:30")
+        page.locator('#quick-trip-form button').click()
+        assert page.locator("#pickup-address").input_value() == "Вильнюс"
+        assert page.locator("#dropoff-address").input_value() == "Каунас"
+        assert page.locator("#route-details").get_attribute("open") is not None
+        assert page.locator("#pickup-date").input_value() == "2026-12-04"
+        page.locator("header a[href='/services']").click()
+        assert page.url.endswith("/services")
+        assert page.locator("#jumpstart").count() == 1
+        assert page.locator("#sober").count() == 1
+        page.goto(BASE + "/", wait_until="domcontentloaded")
         page.screenshot(path=f"mobile-qa-screenshots/home-{width}.png", full_page=True)
-        print(f"MOBILE_QA_OK width={width} no_overflow=true photos_loaded=3 quick_order_works=true booking_and_map_present=true",flush=True)
+        print(f"MOBILE_QA_OK width={width} images=8 services=3 fares=4 no_overflow=true quick_booking=true services_page=true", flush=True)
         page.close()
     browser.close()

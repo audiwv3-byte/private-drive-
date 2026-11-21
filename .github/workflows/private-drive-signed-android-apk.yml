@@ -88,6 +88,8 @@ jobs:
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-feature android:name="android.hardware.camera" android:required="false"/>
               <queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>
               <application''',1)
           manifest.write_text(m)

@@ -78,7 +78,7 @@ class DispatcherStagingTests(unittest.TestCase):
             self.assertEqual(result.data[:4], b"RIFF")
             self.assertEqual(result.data[8:12], b"WEBP")
         self.assertGreaterEqual(home.data.count(b'width="864" height="1536"'), 2)
-        self.assertIn(b'width="1254" height="1254"', home.data)
+        self.assertIn(b'src="/assets/pd-user-logo-4-original.webp"', home.data)
         self.assertIn(b"pd-approved-mock1-hero.webp", home.data)
         mock = client.get("/assets/pd-approved-mock1-hero.webp")
         self.assertEqual(mock.status_code, 200)

@@ -119,6 +119,8 @@ void main() {
     );
     expect(powerOnIcon.color, const Color(0xFF34E88A));
 
+    await tester.ensureVisible(find.byKey(const Key('pilot-open-map')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('pilot-open-map')));
     await tester.pumpAndSettle();
     expect(find.byType(PilotDemo), findsOneWidget);

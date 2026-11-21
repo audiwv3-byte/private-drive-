@@ -1,0 +1,137 @@
+name: PRIVATE DRIVE complete Android internal QA APK
+
+on:
+  push:
+    branches: [feature/flutter-independent-auth]
+    paths:
+      - '.github/workflows/full-native-android-qa-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-full-native-qa-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Build separate full native Android project, with no production credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
+          cp -R flutter_app/lib/. private_drive_build/lib/
+          cp -R flutter_app/assets private_drive_build/assets
+          cp -R flutter_app/test/. private_drive_build/test/
+          cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
+          cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
+          rm -f private_drive_build/test/widget_test.dart
+          python3 -m pip install --quiet Pillow
+          (cd flutter_app && python3 tool/prepare_transparent_logo.py)
+          cp flutter_app/assets/brand/private_drive_logo_transparent.png private_drive_build/assets/brand/
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          src = Path('flutter_app/assets/brand/private_drive_logo.webp')
+          assert hashlib.sha256(src.read_bytes()).hexdigest() == '550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f'
+          pub = Path('private_drive_build/pubspec.yaml')
+          text = pub.read_text()
+          marker = '    - assets/brand/private_drive_logo.webp'
+          assert text.count(marker) == 1
+          pub.write_text(text.replace(marker, marker + '\n    - assets/brand/private_drive_logo_transparent.png'))
+          gradle = Path('private_drive_build/android/app/build.gradle.kts')
+          text = gradle.read_text()
+          original = 'applicationId = "lt.privatedrive.private_drive"'
+          assert original in text
+          text = text.replace(original,
+              'applicationId = "lt.privatedrive.private_drive.full_qa"')
+          gradle.write_text(text)
+          manifest = Path('private_drive_build/android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          assert '<application' in text
+          text = text.replace('android:label="private_drive"',
+              'android:label="PRIVATE DRIVE"')
+          text = text.replace('android:icon="@mipmap/ic_launcher"',
+              'android:icon="@drawable/private_drive_app_icon"')
+          permissions = '''<uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-feature android:name="android.hardware.camera" android:required="false"/>
+              <queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>
+              '''
+          text = text.replace('<application', permissions + '<application', 1)
+          assert 'android.permission.RECORD_AUDIO' not in text
+          manifest.write_text(text)
+          drawable = manifest.parent / 'res/drawable-nodpi'
+          drawable.mkdir(parents=True, exist_ok=True)
+          (drawable / 'private_drive_logo.webp').write_bytes(src.read_bytes())
+          print('Isolated full-native QA ID configured; no production credentials.')
+          PY
+          python3 flutter_app/tool/apply_native_brand_splash.py
+          # Launcher icon only: original opaque black-and-gold logo fills its
+          # own square frame. The transparent in-app/splash assets stay intact.
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps
+          source = Path('flutter_app/assets/brand/private_drive_logo.webp')
+          destination = Path('private_drive_build/android/app/src/main/res/drawable-nodpi/private_drive_app_icon.webp')
+          with Image.open(source) as original:
+              icon = ImageOps.fit(original.convert('RGB'), (512, 512),
+                                  method=Image.Resampling.LANCZOS)
+              assert icon.getpixel((0, 0)) is not None
+              icon.save(destination, format='WEBP', lossless=True)
+          manifest = Path('private_drive_build/android/app/src/main/AndroidManifest.xml').read_text()
+          assert 'android:icon="@drawable/private_drive_app_icon"' in manifest
+          assert destination.is_file() and destination.stat().st_size > 10000
+          with Image.open(destination) as launcher:
+              assert launcher.mode == 'RGB', 'Launcher must remain opaque'
+              assert launcher.size == (512, 512), 'Launcher must fill icon frame'
+          assert Path('private_drive_build/assets/brand/private_drive_gold_square_transparent.webp').is_file(), 'Do not remove transparent in-app art'
+          print('Opaque black-and-gold PD launcher icon restored; transparent in-app logo unchanged.')
+          # Keep production entry point and public assets unchanged.
+          # Full QA launcher icon is isolated from the in-app transparency.
+          PY
+      - name: Run static analysis and full widget tests
+        working-directory: private_drive_build
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: Compile full main.dart debug APK with isolated staging authentication
+        working-directory: private_drive_build
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --debug --target lib/main.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com
+          APK=build/app/outputs/flutter-apk/app-debug.apk
+          test -s "$APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
+          grep "name='lt.privatedrive.private_drive.full_qa'" ../full-qa-apk-badging.txt
+          grep "application-label:'PRIVATE DRIVE'" ../full-qa-apk-badging.txt
+          "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
+          grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt
+          if grep -q "android.permission.RECORD_AUDIO" ../full-qa-apk-permissions.txt; then
+            echo "::error::Unexpected RECORD_AUDIO permission"
+            exit 1
+          fi
+          mkdir -p ../full_native_qa_apk
+          cp "$APK" ../full_native_qa_apk/PRIVATE-DRIVE-full-qa-debug.apk
+          cp ../full-qa-apk-signature.txt ../full-qa-apk-badging.txt ../full-qa-apk-permissions.txt ../full_native_qa_apk/
+          (cd ../full_native_qa_apk && sha256sum PRIVATE-DRIVE-full-qa-debug.apk > SHA256SUMS)
+      - name: Upload installable full-native QA Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-full-native-qa-apk
+          path: full_native_qa_apk/
+          if-no-files-found: error
+          retention-days: 7

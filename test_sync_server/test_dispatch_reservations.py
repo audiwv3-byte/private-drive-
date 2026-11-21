@@ -111,8 +111,10 @@ class ReservationTests(unittest.TestCase):
         self.fleet.set_approval("pilot_1", authenticated_dispatcher="dispatcher_1",
                                 approved=True)
         self.clock.now += 90
+        # The offer expires in 20 seconds; expiry takes precedence over
+        # the stale GPS rejection when the acceptance arrives too late.
         self.assertEqual(self.engine.respond("trip_a",
-                         authenticated_pilot_id="pilot_1", accept=True), "pilot_unavailable")
+                         authenticated_pilot_id="pilot_1", accept=True), "expired")
         self.fleet.update_presence(authenticated_pilot="pilot_1",
                                    gps=(54.7, 25.3))
         self.assertEqual(self.engine.respond("trip_a",

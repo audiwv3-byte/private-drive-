@@ -1,0 +1,32 @@
+name: PRIVATE DRIVE staging mobile visual QA
+on:
+  push:
+    branches: [feature/web-dispatcher-browser-auth]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  responsive-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install test browser
+        run: |
+          python -m pip install 'Flask==3.0.3' 'Werkzeug==3.1.9' playwright
+          python -m playwright install --with-deps chromium
+      - name: Visual mobile regression against isolated local staging
+        env:
+          PD_DISPATCH_STAGING_ONLY: "1"
+        run: |
+          python -m flask --app pd_dispatcher_staging_wsgi:application run --host 127.0.0.1 --port 8765 >/tmp/pd-staging.log 2>&1 &
+          python qa_staging_mobile.py
+      - name: Save screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-mobile-qa
+          path: mobile-qa-screenshots/*.png
+          if-no-files-found: ignore

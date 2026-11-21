@@ -230,7 +230,7 @@ void main() {
     expect(find.text('К пассажиру'), findsOneWidget);
     expect(find.byKey(const Key('pilot-global-accept')), findsOneWidget);
     await tester.drag(find.byKey(const Key('pilot-global-accept-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-global-accept'))).width - 52), 0));
+      Offset(tester.getSize(find.byKey(const Key('pilot-global-offer-swipe'))).width * 0.48, 0));
     await tester.pump();
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
 

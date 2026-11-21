@@ -4,6 +4,7 @@ on:
   push:
     branches: [feature/flutter-independent-auth]
     paths:
+      - 'flutter_app/**'
       - '.github/workflows/full-native-android-qa-apk.yml'
   workflow_dispatch:
 

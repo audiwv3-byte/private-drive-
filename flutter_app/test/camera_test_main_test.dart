@@ -18,6 +18,18 @@ void main() {
 
     await tester.tap(find.byKey(const Key('isolated-camera-open-identity')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('pilot-identity-notice-page')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-identity-check-page')), findsNothing);
+    final proceed = tester.widget<FilledButton>(
+      find.byKey(const Key('pilot-identity-notice-continue')),
+    );
+    expect(proceed.onPressed, isNull);
+    await tester.ensureVisible(find.byKey(const Key('pilot-identity-notice-acknowledge')));
+    await tester.tap(find.byKey(const Key('pilot-identity-notice-acknowledge')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('pilot-identity-notice-continue')));
+    await tester.tap(find.byKey(const Key('pilot-identity-notice-continue')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('pilot-identity-check-page')), findsOneWidget);
     expect(find.byKey(const Key('pilot-identity-request-camera')), findsOneWidget);
     expect(find.byKey(const Key('pilot-identity-unverified-status')), findsOneWidget);

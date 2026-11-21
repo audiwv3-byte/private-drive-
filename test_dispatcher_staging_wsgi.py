@@ -88,6 +88,22 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertIn("max-width:100%;aspect-ratio:1;object-fit:contain", login)
         self.assertIn("width=\"112\" height=\"112\"", login)
 
+    def test_passenger_trip_transfer_map_and_geo_are_preview_only(self):
+        with patch.dict(os.environ, self.env(), clear=True):
+            app = create_app()
+        client = app.test_client()
+        page = client.get("/")
+        self.assertEqual(page.status_code, 200)
+        for value in ("Поездка", "Трансфер", "pickup-address", "dropoff-address",
+                      "use-location", "navigator.geolocation", "order-map-frame",
+                      "openstreetmap.org/export/embed.html", "pickup-date",
+                      "pickup-time", "car-category", "preview-route"):
+            self.assertIn(value.encode(), page.data)
+        self.assertIn("frame-src https://www.openstreetmap.org", page.headers["Content-Security-Policy"])
+        self.assertIn("form-action 'none'", page.headers["Content-Security-Policy"])
+        self.assertNotIn(b'fetch("/api/', page.data)
+        self.assertEqual(client.post("/", data={"pickup": "synthetic"}).status_code, 405)
+
     def test_pilot_registration_public_preview_has_no_upload_backend(self):
         with patch.dict(os.environ, self.env(), clear=True):
             app = create_app()

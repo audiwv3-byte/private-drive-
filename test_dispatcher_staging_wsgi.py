@@ -121,7 +121,7 @@ class DispatcherStagingTests(unittest.TestCase):
                             any(x.get("geometry", {}).get("coordinates") for x in autocomplete["features"]))
                 print("PD_STAGING_ORS_AUTOCOMPLETE=" + ("OK" if okay else "INVALID_RESPONSE"), flush=True)
             except Exception as exc:
-                print("PD_STAGING_ORS_AUTOCOMPLETE=FAILED_" + type(exc).__name__, flush=True)
+                print("PD_STAGING_ORS_AUTOCOMPLETE=FAILED_" + type(exc).__name__ + ("_HTTP" + str(exc.code) if hasattr(exc, "code") else ""), flush=True)
             try:
                 directions = preview._request_json("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
                     "coordinates": [[25.2797, 54.6872], [25.3130, 54.6980]]
@@ -131,7 +131,7 @@ class DispatcherStagingTests(unittest.TestCase):
                 okay = isinstance(distance, (int, float)) and 0 < distance < 30000
                 print("PD_STAGING_ORS_ROUTE=" + ("OK" if okay else "INVALID_RESPONSE"), flush=True)
             except Exception as exc:
-                print("PD_STAGING_ORS_ROUTE=FAILED_" + type(exc).__name__, flush=True)
+                print("PD_STAGING_ORS_ROUTE=FAILED_" + type(exc).__name__ + ("_HTTP" + str(exc.code) if hasattr(exc, "code") else ""), flush=True)
         self.assertIsInstance(configured, bool)
 
     def test_staging_route_no_key_does_not_create_orders(self):

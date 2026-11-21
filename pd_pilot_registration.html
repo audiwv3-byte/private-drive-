@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>PRIVATE DRIVE — Регистрация пилота (тест)</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0c10;--p:#15191e;--b:#5f4d2d;--g:#d9b66b;--t:#f5f1e8;--m:#acb0b6}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#25221c,#0a0c10 55%);color:var(--t);font:14px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}
+header{border-bottom:1px solid var(--b);background:#101216ee;padding:18px max(18px,calc((100vw - 1100px)/2));display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.logo{color:var(--g);font:700 24px Georgia,serif;letter-spacing:.18em}.logo span{font:11px system-ui;display:block;letter-spacing:.28em}
+header a{color:var(--g);text-decoration:none;border:1px solid var(--b);border-radius:8px;padding:9px 13px}
+main{max-width:1040px;margin:32px auto;padding:0 16px 40px}h1{font:500 clamp(27px,4vw,38px) Georgia,serif;color:var(--g);margin:0 0 8px}p.lead{color:var(--m);margin:0 0 22px}
+.notice{border:1px solid #886731;background:#2b251a;border-radius:10px;color:#f1cf8c;padding:13px 16px;margin:0 0 20px}
+fieldset{border:1px solid var(--b);background:linear-gradient(145deg,#171b22,#101318);border-radius:14px;padding:20px;margin:0 0 16px;min-width:0}legend{color:var(--g);padding:0 10px;font-size:17px;font-weight:650}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.field{min-width:0}label{display:block;color:#e3d9c5;margin:0 0 6px}
+input,select{width:100%;border:1px solid #685839;border-radius:8px;background:#0a0d12;color:#f8f5eb;padding:12px;font:inherit;min-height:45px}
+input[type=file]{padding:10px;font-size:12px}input::placeholder{color:#889099}input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #f3d58a;outline-offset:2px}
+.help{display:block;font-size:12px;color:var(--m);margin:5px 0 0}.full{grid-column:1/-1}
+.doc{padding:12px;border:1px dashed #71603b;border-radius:10px;background:#151719}.doc small{color:#bfc1c4}
+.choice{display:flex;align-items:flex-start;gap:9px;margin:16px 0}.choice input{width:18px;min-height:18px;flex:none;margin-top:3px;accent-color:var(--g)}
+.actions{margin-top:22px}.submit{background:linear-gradient(90deg,#d9b16a,#f3d78c);color:#1c1710;border:0;border-radius:9px;font-weight:750;padding:14px 22px;min-width:250px;opacity:.65;cursor:not-allowed}
+#demo-result{color:var(--g);margin-top:12px}footer{border-top:1px solid var(--b);color:#aaa;text-align:center;padding:20px}
+@media(max-width:650px){.grid{grid-template-columns:1fr}fieldset{padding:15px}.submit{width:100%}main{margin-top:20px}}
+</style></head>
+<body><header><div class="logo">PD<span>PRIVATE DRIVE</span></div><a href="/dispatch/login">Диспетчерская</a></header>
+<main><h1>Регистрация пилота</h1><p class="lead">Заявка на подключение к PRIVATE DRIVE. Отдельная форма для будущего публичного сайта.</p>
+<div class="notice" role="status"><strong>ТЕСТОВЫЙ МАКЕТ.</strong> Анкеты и фотографии не принимаются сервером, SMS не отправляются. Не вводи реальные паспортные данные, банковские реквизиты и не загружай настоящие документы.</div>
+<form id="pilot-form" autocomplete="off" novalidate>
+<fieldset><legend>01 · Личные данные</legend><div class="grid">
+<div class="field"><label for="full-name">ФИО *</label><input id="full-name" name="full_name" placeholder="Имя Фамилия" maxlength="160"></div>
+<div class="field"><label for="phone">Телефон *</label><input id="phone" name="phone" type="tel" placeholder="+370 6XX XXXXX" inputmode="tel"></div>
+<div class="field"><label for="email">Email *</label><input id="email" name="email" type="email" placeholder="example@email.com"></div>
+<div class="field"><label for="sms">Код подтверждения по SMS</label><input id="sms" disabled placeholder="Подключим после настройки SMS"><small class="help">SMS-подтверждение пока выключено. Никаких сообщений не отправляем.</small></div>
+</div></fieldset>
+<fieldset><legend>02 · Водительское удостоверение и автомобиль</legend><div class="grid">
+<div class="field"><label for="license-type">Категория прав *</label><select id="license-type" name="license_type"><option value="">Выбери категорию</option><option>B</option><option>B + другие категории</option><option>Другая</option></select></div>
+<div class="field"><label for="experience">Стаж вождения (лет) *</label><input id="experience" name="experience_years" type="number" min="0" max="70" placeholder="Например, 5"></div>
+<div class="field"><label for="make">Марка *</label><input id="make" name="car_make" placeholder="Toyota"></div>
+<div class="field"><label for="model">Модель *</label><input id="model" name="car_model" placeholder="RAV4"></div>
+<div class="field"><label for="year">Год выпуска *</label><input id="year" name="car_year" inputmode="numeric" maxlength="4" placeholder="2020"></div>
+<div class="field"><label for="plate">Госномер *</label><input id="plate" name="plate" maxlength="18" placeholder="ABC 123"></div>
+</div></fieldset>
+<fieldset><legend>03 · Документы и фотоконтроль</legend><div class="grid">
+<div class="doc"><label for="file-license">Водительское удостоверение *</label><input id="file-license" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"><small>Изображение/PDF, до 10 МБ · только локальный просмотр</small></div>
+<div class="doc"><label for="file-id">Паспорт или ID-карта *</label><input id="file-id" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"><small>Изображение/PDF, до 10 МБ · только локальный просмотр</small></div>
+<div class="doc"><label for="file-car">Свидетельство о регистрации авто *</label><input id="file-car" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"><small>Изображение/PDF, до 10 МБ · только локальный просмотр</small></div>
+<div class="doc"><label for="file-permit">Разрешение/лицензия на перевозки *</label><input id="file-permit" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"><small>Изображение/PDF, до 10 МБ · только локальный просмотр</small></div>
+<div class="full"><small class="help">Проверка документов администратором и обязательный фотоконтроль будут подключены после внедрения защищённого хранилища и политики хранения данных.</small></div>
+</div></fieldset>
+<fieldset><legend>04 · Выплаты и согласие</legend><div class="grid"><div class="field full"><label for="iban">Банковский счёт (IBAN)</label><input id="iban" name="iban" disabled placeholder="Добавляется после одобрения анкеты в защищённом кабинете"><small class="help">Полный номер банковской карты не собираем. Для выплат предусмотрим IBAN и защищённую проверку реквизитов.</small></div></div>
+<label class="choice"><input id="terms" type="checkbox"><span>Я ознакомился с <a style="color:var(--g)" href="#" id="terms-link">условиями PRIVATE DRIVE</a> и согласен с обработкой персональных данных для рассмотрения заявки.</span></label>
+<small class="help">Юридические документы и процесс обработки согласий необходимо утвердить до начала реального приёма анкет.</small></fieldset>
+<div class="actions"><button class="submit" type="button" disabled>Отправить на модерацию — скоро</button><p id="demo-result" aria-live="polite">Форма только для согласования дизайна и состава полей.</p></div>
+</form></main>
+<footer>PRIVATE DRIVE · тестовый интерфейс · eurobaltictransfer@gmail.com · Telegram: @EuroBalticTransferBot</footer>
+<script>
+document.querySelectorAll('input[type="file"]').forEach(input=>input.addEventListener('change',()=>{const f=input.files && input.files[0];if(f&&f.size>10*1024*1024){input.value='';alert('Файл не должен превышать 10 МБ.')}else if(f&&!['image/jpeg','image/png','image/webp','application/pdf'].includes(f.type)){input.value='';alert('Разрешены только JPG, PNG, WEBP и PDF.')}}));
+document.getElementById('pilot-form').addEventListener('submit',e=>e.preventDefault());
+document.getElementById('terms-link').addEventListener('click',e=>{e.preventDefault();document.getElementById('demo-result').textContent='Юридические условия будут доступны перед запуском регистрации.'});
+</script>
+</body></html>

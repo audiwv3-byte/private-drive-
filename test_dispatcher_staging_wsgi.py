@@ -139,20 +139,20 @@ class DispatcherStagingTests(unittest.TestCase):
         from decimal import Decimal
         with patch.dict(os.environ, self.env(), clear=True):
             app = create_app()
-        client = app.test_client()
-        result = client.get("/preview/api/suggest?q=Vilnius")
-        self.assertEqual(result.status_code, 200)
-        self.assertFalse(result.get_json()["available"])
-        data = {"origin": "Vilnius, Lithuania", "destination": "Kaunas, Lithuania",
-                "origin_coordinates": [25.2797, 54.6872],
-                "destination_coordinates": [23.9036, 54.8985],
-                "category": "comfort", "roundtrip": False}
-        response = client.post("/preview/api/route", json=data)
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.get_json()["available"])
-        self.assertEqual(client.post("/api/order", json=data).status_code, 404)
-        self.assertEqual(estimate(100, 90, data)[0], Decimal("110.00"))
-        self.assertEqual(client.post("/preview/api/route", json=dict(data, category="invalid")).status_code, 400)
+            client = app.test_client()
+            result = client.get("/preview/api/suggest?q=Vilnius")
+            self.assertEqual(result.status_code, 200)
+            self.assertFalse(result.get_json()["available"])
+            data = {"origin": "Vilnius, Lithuania", "destination": "Kaunas, Lithuania",
+                    "origin_coordinates": [25.2797, 54.6872],
+                    "destination_coordinates": [23.9036, 54.8985],
+                    "category": "comfort", "roundtrip": False}
+            response = client.post("/preview/api/route", json=data)
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(response.get_json()["available"])
+            self.assertEqual(client.post("/api/order", json=data).status_code, 404)
+            self.assertEqual(estimate(100, 90, data)[0], Decimal("110.00"))
+            self.assertEqual(client.post("/preview/api/route", json=dict(data, category="invalid")).status_code, 400)
 
     def test_mocked_ors_route_for_supported_and_unsupported_classes(self):
         import pd_public_route_preview

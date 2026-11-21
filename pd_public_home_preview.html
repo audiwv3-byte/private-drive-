@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>PRIVATE DRIVE — премиальные поездки и трансферы</title>
+<title>PRIVATE DRIVE — премиальные поездки и трансферы</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{color-scheme:dark;--gold:#d7b46e;--bg:#090b0f;--panel:#14171b;--line:#51422b;--muted:#b8b8bc}*{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:#f8f7f4;font:15px/1.6 system-ui,Arial,sans-serif}
@@ -35,9 +35,9 @@ footer{border-top:1px solid var(--line);padding:26px 5vw;color:#a8aeb4;display:f
 .order-controls button.primary{background:linear-gradient(90deg,#ad8349,#f1d38d);color:#17110b;font-weight:700}
 .order-hint{font-size:12px;margin:12px 0 0;color:#d5b77d}.order-result{min-height:27px;margin-top:14px;color:#f3deaa;overflow-wrap:anywhere}
 .order-map{display:flex;flex-direction:column;min-height:530px}.order-map-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 15px;font-size:13px;color:#e7d3a6}
-.order-map iframe{display:block;width:100%;flex:1;min-height:410px;border:0;background:#283039}
+#order-live-map{display:block;width:100%;flex:1;min-height:410px;background:#202b32}.order-field .suggestions{display:grid;gap:4px;margin-top:5px}.suggestions button{background:#25292f;color:#f7e5ba;border:1px solid #5d4d31;padding:9px;text-align:left;border-radius:7px;cursor:pointer}.suggestions button:hover{border-color:#e4ba6a}.order-map .leaflet-container{z-index:0}
 .order-map small{padding:10px 15px;font-size:12px;color:#b5b9bf}
-@media(max-width:850px){.order-shell{grid-template-columns:1fr}.order-map{min-height:350px}.order-map iframe{min-height:320px}}
+@media(max-width:850px){.order-shell{grid-template-columns:1fr}.order-map{min-height:350px}#order-live-map{min-height:320px}}
 @media(max-width:420px){.order-panel{padding:15px}.order-form-grid{grid-template-columns:1fr}.order-field.full{grid-column:1}}
 </style></head><body>
 <header><a class="logo" href="/"><img src="/pd-logo-transparent.png" alt="Фирменный золотой логотип PRIVATE DRIVE с автомобилем">PRIVATE DRIVE</a><nav aria-label="Главное меню"><a href="#order">Заказать</a><a href="#about">О нас</a><a href="#services">Услуги</a><a href="#faq">FAQ</a><a href="/pilot-registration">Стать пилотом</a><a href="/dispatch/login">Диспетчерская</a><a href="#contacts">Контакты</a></nav></header>
@@ -53,55 +53,140 @@ footer{border-top:1px solid var(--line);padding:26px 5vw;color:#a8aeb4;display:f
 </div>
 <form id="passenger-preview" autocomplete="off">
 <div class="order-form-grid">
-<div class="order-field full"><label for="pickup-address">Откуда</label><input id="pickup-address" name="pickup" placeholder="Улица, дом или аэропорт" maxlength="220" autocomplete="street-address"></div>
-<div class="order-field full"><label for="dropoff-address">Куда</label><input id="dropoff-address" name="dropoff" placeholder="Адрес назначения" maxlength="220"></div>
+<div class="order-field full"><label for="pickup-address">Откуда</label><input id="pickup-address" name="pickup" placeholder="Улица, дом или аэропорт" maxlength="220" autocomplete="off"><div class="suggestions" id="pickup-suggestions" aria-live="polite"></div></div>
+<div class="order-field full"><label for="dropoff-address">Куда</label><input id="dropoff-address" name="dropoff" placeholder="Адрес назначения" maxlength="220"><div class="suggestions" id="dropoff-suggestions" aria-live="polite"></div></div>
 <div class="order-field"><label for="pickup-date">Дата подачи</label><input id="pickup-date" name="date" type="date"></div>
 <div class="order-field"><label for="pickup-time">Время подачи</label><input id="pickup-time" name="time" type="time"></div>
 <div class="order-field full"><label for="car-category">Класс автомобиля</label><select id="car-category" name="category"><option value="comfort">Комфорт</option><option value="economy">Эконом</option><option value="business">Бизнес</option><option value="minivan">Минивэн</option></select></div>
 </div>
 <div class="order-controls"><button type="button" id="use-location">◎ Моё местоположение</button><button type="button" id="swap-address">⇄ Поменять адреса</button><button class="primary" type="button" id="preview-route">Показать маршрут</button></div>
-<p class="order-hint">Геолокация запрашивается только после нажатия. На тестовом сайте она используется исключительно в твоём браузере. Цена и подтверждение заказа появятся после подключения серверных API.</p>
+<p class="order-hint">Геолокация запрашивается только после нажатия. На тестовом сайте она используется исключительно в твоём браузере. Предварительная стоимость для класса Комфорт появится, когда подключён тестовый сервис маршрутов. Заказы и платежи отключены.</p>
 <div class="order-result" id="order-status" role="status" aria-live="polite">Выбери адреса. Карта справа интерактивная.</div>
 </form></div>
 <div class="order-map"><div class="order-map-head"><strong>Карта · Вильнюс</strong><span>OpenStreetMap</span></div>
-<iframe id="order-map-frame" title="Интерактивная карта для поездки" loading="lazy" referrerpolicy="no-referrer" src="https://www.openstreetmap.org/export/embed.html?bbox=25.179%2C54.637%2C25.419%2C54.743&amp;layer=mapnik"></iframe>
-<small>© Участники OpenStreetMap. Карта интерактивная; построение маршрута открывается отдельно по нажатию.</small></div>
+<div id="order-live-map" role="region" aria-label="Интерактивная карта маршрута с приближением и передвижением"></div>
+<small>© Участники OpenStreetMap. Маршрут строится непосредственно на карте после выбора адресов.</small></div>
 </div></section>
 <section id="about"><h2>О PRIVATE DRIVE</h2><p>Персональный сервис пассажирских перевозок и трансферов. Это предварительный просмотр корпоративного сайта в фирменном чёрно-золотом стиле.</p><p class="notice">Тестовая страница: форма маршрута и карта работают в режиме предпросмотра. Автоматический расчёт стоимости и реальные заказы ещё не подключены.</p></section>
 <section id="services"><h2>Услуги</h2><div class="cards"><div class="card"><h3>Городские поездки</h3><p>Предварительный заказ по Вильнюсу.</p></div><div class="card"><h3>Аэропорты и трансферы</h3><p>Поездки между городами и трансферы по маршруту.</p></div><div class="card"><h3>Дополнительные услуги</h3><p>Встреча с табличкой, дополнительные остановки, индивидуальные запросы.</p></div></div></section>
 <section id="faq"><h2>Частые вопросы</h2><p>Можно заполнить форму «Поездка / Трансфер» для просмотра маршрута. Для настоящего заказа пока используй Telegram-бот PRIVATE DRIVE.</p></section>
 <section id="contacts"><h2>Контакты</h2><p>Электронная почта: <a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a></p><p>Telegram: <a href="https://t.me/PrivateDriveTransfer" rel="noopener">@PrivateDriveTransfer</a></p><p>Instagram: <a href="https://www.instagram.com/privatedraive/" target="_blank" rel="noopener noreferrer">@privatedraive</a></p></section></main>
-<footer><span>© PRIVATE DRIVE · тестовый предпросмотр</span><span>Действующее приложение и продакшн не затронуты</span></footer><script>
+<footer><span>© PRIVATE DRIVE · тестовый предпросмотр</span><span>Действующее приложение и продакшн не затронуты</span></footer><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
 (()=>{
-const $=id=>document.getElementById(id);
-let mode="Поездка";
-const msg=$("order-status");
-for(const [id,name] of [["trip-tab","Поездка"],["transfer-tab","Трансфер"]]){
- $(id).addEventListener("click",()=>{mode=name;$("trip-tab").setAttribute("aria-selected",String(name==="Поездка"));$("transfer-tab").setAttribute("aria-selected",String(name==="Трансфер"));msg.textContent="Режим: "+mode+". Заполни адреса для просмотра маршрута."});
-}
-$("passenger-preview").addEventListener("submit",e=>e.preventDefault());
-$("swap-address").addEventListener("click",()=>{const a=$("pickup-address"),b=$("dropoff-address");[a.value,b.value]=[b.value,a.value]});
-$("use-location").addEventListener("click",()=>{
- if(!navigator.geolocation){msg.textContent="Геолокация не поддерживается браузером. Введи адрес вручную.";return}
- msg.textContent="Запрашиваем разрешение на местоположение…";
- navigator.geolocation.getCurrentPosition(({coords})=>{
-  const lat=coords.latitude,lon=coords.longitude;
-  if(!Number.isFinite(lat)||!Number.isFinite(lon)) {msg.textContent="Не удалось определить координаты.";return}
-  $("pickup-address").value=lat.toFixed(6)+", "+lon.toFixed(6);
-  const pad=.018;
-  const bbox=[lon-pad,lat-pad,lon+pad,lat+pad].join(",");
-  $("order-map-frame").src="https://www.openstreetmap.org/export/embed.html?bbox="+encodeURIComponent(bbox)+"&layer=mapnik&marker="+encodeURIComponent(lat+","+lon);
-  msg.textContent="Местоположение определено. Координаты подставлены в поле «Откуда».";
- },e=>{msg.textContent=e.code===1?"Доступ к геолокации не разрешён. Введи адрес вручную.":"Местоположение недоступно. Введи адрес вручную."},{enableHighAccuracy:true,timeout:12000,maximumAge:0});
-});
-$("preview-route").addEventListener("click",()=>{
- const a=$("pickup-address").value.trim(), b=$("dropoff-address").value.trim();
- if(!a||!b){msg.textContent="Для просмотра маршрута заполни оба адреса.";return}
- const params=new URLSearchParams({api:"1",origin:a,destination:b,travelmode:"driving"});
- const url="https://www.google.com/maps/dir/?"+params.toString();
- msg.textContent="Маршрут «"+mode+"» откроется в Google Картах. Это не заказ и не расчёт стоимости.";
- const link=document.createElement("a");link.href=url;link.target="_blank";link.rel="noopener noreferrer";link.textContent="Открыть маршрут на карте";link.style.cssText="display:block;color:#f2d18a;text-decoration:underline;margin-top:6px";
- msg.appendChild(link);
-});
+ const $=id=>document.getElementById(id);
+ const status=$("order-status");
+ const fields={origin:$("pickup-address"),destination:$("dropoff-address")};
+ const lists={origin:$("pickup-suggestions"),destination:$("dropoff-suggestions")};
+ const selected={origin:null,destination:null};
+ let mode="Поездка";
+ let map=null,routeLine=null,markers=[];
+ if(window.L){
+  map=L.map("order-live-map",{zoomControl:true}).setView([54.6872,25.2797],11);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
+   maxZoom:19,attribution:"&copy; OpenStreetMap contributors"
+  }).addTo(map);
+ } else {
+  $("order-live-map").textContent="Карта временно недоступна. Можно указать адреса вручную.";
+ }
+ const setStatus=s=>{status.textContent=s};
+ function clearRoute(){
+  if(map&&routeLine){map.removeLayer(routeLine);routeLine=null}
+  if(map){markers.forEach(m=>map.removeLayer(m));markers=[]}
+ }
+ function showMarker(lonLat){
+  if(map){const marker=L.marker([lonLat[1],lonLat[0]]).addTo(map);markers.push(marker);map.setView([lonLat[1],lonLat[0]],13)}
+ }
+ function resetField(name){selected[name]=null;clearRoute()}
+ for(const name of ["origin","destination"]){
+  const input=fields[name],list=lists[name];
+  let timer=0,revision=0;
+  input.addEventListener("input",()=>{
+   resetField(name);
+   clearTimeout(timer);list.replaceChildren();
+   const value=input.value.trim();const rev=++revision;
+   if(value.length<3)return;
+   timer=setTimeout(async()=>{
+    try{
+     const resp=await fetch("/preview/api/suggest?q="+encodeURIComponent(value),{
+      method:"GET",credentials:"omit",headers:{"Accept":"application/json"}
+     });
+     const data=await resp.json();
+     if(rev!==revision)return;
+     list.replaceChildren();
+     if(!data.available){setStatus(data.reason||"Подсказки адресов временно недоступны.");return}
+     for(const item of data.suggestions||[]){
+      if(!Array.isArray(item.coordinates)||item.coordinates.length!==2)continue;
+      const b=document.createElement("button");
+      b.type="button";b.textContent=item.label;
+      b.addEventListener("click",()=>{
+       input.value=item.label;selected[name]=item.coordinates;
+       clearRoute();showMarker(item.coordinates);list.replaceChildren();
+       setStatus("Адрес выбран. Теперь выбери второй адрес.");
+      });list.appendChild(b);
+     }
+    }catch{if(rev===revision)setStatus("Нет связи с сервисом подсказок адресов.")}
+   },400);
+  });
+ }
+ for(const [id,value] of [["trip-tab","Поездка"],["transfer-tab","Трансфер"]]){
+  $(id).addEventListener("click",()=>{
+   mode=value;clearRoute();
+   $("trip-tab").setAttribute("aria-selected",String(value==="Поездка"));
+   $("transfer-tab").setAttribute("aria-selected",String(value==="Трансфер"));
+   setStatus("Режим: "+value+". Выбери адреса.");
+  });
+ }
+ $("passenger-preview").addEventListener("submit",e=>e.preventDefault());
+ $("swap-address").addEventListener("click",()=>{
+  [fields.origin.value,fields.destination.value]=[fields.destination.value,fields.origin.value];
+  [selected.origin,selected.destination]=[selected.destination,selected.origin];
+  lists.origin.replaceChildren();lists.destination.replaceChildren();clearRoute();
+ });
+ $("use-location").addEventListener("click",()=>{
+  if(!navigator.geolocation){setStatus("Геолокация не поддерживается браузером.");return}
+  setStatus("Запрашиваем разрешение на местоположение…");
+  navigator.geolocation.getCurrentPosition(({coords})=>{
+   const lat=coords.latitude,lon=coords.longitude;
+   if(!Number.isFinite(lat)||!Number.isFinite(lon)){setStatus("Координаты недоступны.");return}
+   const point=[Number(lon.toFixed(6)),Number(lat.toFixed(6))];
+   selected.origin=point;fields.origin.value=lat.toFixed(6)+", "+lon.toFixed(6);
+   clearRoute();showMarker(point);
+   setStatus("Координаты подставлены в «Откуда». Выбери адрес назначения.");
+  },e=>setStatus(e.code===1?"Доступ к местоположению не разрешён.":"GPS сейчас недоступен."),
+  {enableHighAccuracy:true,timeout:12000,maximumAge:0});
+ });
+ $("preview-route").addEventListener("click",async()=>{
+  const origin=fields.origin.value.trim(),destination=fields.destination.value.trim();
+  if(!origin||!destination){setStatus("Заполни оба адреса.");return}
+  if(!selected.origin||!selected.destination){setStatus("Выбери оба адреса из подсказок или используй GPS для точки отправления.");return}
+  setStatus("Рассчитываем маршрут…");clearRoute();
+  try{
+   const response=await fetch("/preview/api/route",{
+    method:"POST",credentials:"omit",
+    headers:{"Content-Type":"application/json","Accept":"application/json"},
+    body:JSON.stringify({
+      origin,destination,origin_coordinates:selected.origin,
+      destination_coordinates:selected.destination,
+      category:$("car-category").value,roundtrip:mode==="Трансфер"&&false
+    })
+   });
+   const data=await response.json();
+   if(!data.available){setStatus(data.reason||data.error||"Маршрут временно недоступен.");return}
+   const coords=data.road_coordinates;
+   if(map&&Array.isArray(coords)&&coords.length>1){
+    const latLngs=coords.filter(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite))
+                       .map(p=>[p[1],p[0]]);
+    if(latLngs.length>1){routeLine=L.polyline(latLngs,{color:"#e3b767",weight:5,opacity:.9}).addTo(map);
+      markers.push(L.marker(latLngs[0]).addTo(map),L.marker(latLngs[latLngs.length-1]).addTo(map));
+      map.fitBounds(routeLine.getBounds(),{padding:[32,32]});
+    }
+   }
+   const value=data.price!==null&&data.price!==undefined?
+    "Предварительная стоимость: "+data.price+" € (базовый тестовый тариф Комфорт).":
+    "Для этого класса стоимость пока не настроена.";
+   setStatus("Расстояние: "+data.km+" км · Время: "+data.minutes+" мин. "+value+" "+data.note);
+  }catch{setStatus("Не удалось получить маршрут. Попробуй позже.")}
+ });
 })();
 </script></body></html>

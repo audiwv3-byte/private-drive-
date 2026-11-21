@@ -51,13 +51,13 @@ jobs:
           original = 'applicationId = "lt.privatedrive.private_drive"'
           assert original in text
           text = text.replace(original,
-              'applicationId = "lt.privatedrive.private_drive.full_qa"')
+              'applicationId = "lt.privatedrive.private_drive.photo_qa"')
           gradle.write_text(text)
           manifest = Path('private_drive_build/android/app/src/main/AndroidManifest.xml')
           text = manifest.read_text()
           assert '<application' in text
           text = text.replace('android:label="private_drive"',
-              'android:label="PRIVATE DRIVE"')
+              'android:label="PRIVATE DRIVE QA"')
           text = text.replace('android:icon="@mipmap/ic_launcher"',
               'android:icon="@drawable/private_drive_app_icon"')
           permissions = '''<uses-permission android:name="android.permission.INTERNET"/>
@@ -122,8 +122,8 @@ jobs:
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
-          grep "name='lt.privatedrive.private_drive.full_qa'" ../full-qa-apk-badging.txt
-          grep "application-label:'PRIVATE DRIVE'" ../full-qa-apk-badging.txt
+          grep "name='lt.privatedrive.private_drive.photo_qa'" ../full-qa-apk-badging.txt
+          grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt
           if grep -q "android.permission.RECORD_AUDIO" ../full-qa-apk-permissions.txt; then
@@ -133,6 +133,7 @@ jobs:
           mkdir -p ../full_native_qa_apk
           cp "$APK" ../full_native_qa_apk/PRIVATE-DRIVE-full-qa-debug.apk
           cp ../full-qa-apk-signature.txt ../full-qa-apk-badging.txt ../full-qa-apk-permissions.txt ../full_native_qa_apk/
+          cp ../docs/native-photo-review-qa.md ../full_native_qa_apk/README.md
           (cd ../full_native_qa_apk && sha256sum PRIVATE-DRIVE-full-qa-debug.apk > SHA256SUMS)
       - name: Upload installable full-native QA Android APK
         uses: actions/upload-artifact@v4
@@ -165,9 +166,9 @@ jobs:
           script: |
             adb install -r apk/PRIVATE-DRIVE-full-qa-debug.apk
             adb logcat -c
-            adb shell am start -W -n lt.privatedrive.private_drive.full_qa/lt.privatedrive.private_drive.MainActivity
+            adb shell am start -W -n lt.privatedrive.private_drive.photo_qa/lt.privatedrive.private_drive.MainActivity
             sleep 12
-            adb shell pidof lt.privatedrive.private_drive.full_qa
+            adb shell pidof lt.privatedrive.private_drive.photo_qa
             adb logcat -d > android-launch-log.txt
             if grep -E 'FATAL EXCEPTION|Unhandled Exception|E/flutter.*\[ERROR' android-launch-log.txt; then exit 1; fi
             adb shell uiautomator dump /sdcard/pd-window.xml

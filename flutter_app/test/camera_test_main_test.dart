@@ -20,11 +20,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pilot-identity-notice-page')), findsOneWidget);
     expect(find.byKey(const Key('pilot-identity-check-page')), findsNothing);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -1200));
+    await tester.pumpAndSettle();
     final proceed = tester.widget<FilledButton>(
       find.byKey(const Key('pilot-identity-notice-continue')),
     );
     expect(proceed.onPressed, isNull);
-    await tester.ensureVisible(find.byKey(const Key('pilot-identity-notice-acknowledge')));
+    await tester.drag(find.byType(ListView).last, const Offset(0, -1200));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('pilot-identity-notice-acknowledge')));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('pilot-identity-notice-continue')));

@@ -261,6 +261,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
           enableMapTiles: widget.enableMapTiles,
           tripStore: _trip,
           onSignOut: widget.onSignOut,
+          onBackToCabinets: widget.onBackToCabinets,
         ),
       );
     }

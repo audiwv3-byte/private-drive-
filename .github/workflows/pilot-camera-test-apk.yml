@@ -91,6 +91,10 @@ jobs:
           manifest = Path('private_drive_build/android/app/src/main/AndroidManifest.xml').read_text()
           assert 'android:icon="@drawable/private_drive_app_icon"' in manifest
           assert destination.is_file() and destination.stat().st_size > 10000
+          with Image.open(destination) as launcher:
+              assert launcher.mode == 'RGB', 'Launcher must remain opaque'
+              assert launcher.size == (512, 512), 'Launcher must fill icon frame'
+          assert Path('private_drive_build/assets/brand/private_drive_gold_square_transparent.webp').is_file(), 'Do not remove transparent in-app art'
           print('Opaque black-and-gold PD launcher icon restored; transparent in-app logo unchanged.')
           PY
       - name: Run static analysis and widget tests

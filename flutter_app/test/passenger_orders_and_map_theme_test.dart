@@ -129,14 +129,18 @@ void main() {
       home: PassengerDemo(enableMapTiles: false, tripStore: store),
     ));
     await tester.tap(find.byKey(const Key('passenger-open-drawer')));
-    await tester.pumpAndSettle();
+    // Requested trips show a continuously rotating PD waiting indicator:
+    // pumpAndSettle must not be used while that indicator is active.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.byKey(const Key('passenger-navigation-drawer')), findsOneWidget);
     expect(find.byKey(const Key('passenger-drawer-history')), findsOneWidget);
     expect(find.byKey(const Key('passenger-drawer-language')), findsOneWidget);
     expect(tester.widget<ListTile>(
       find.byKey(const Key('passenger-drawer-profile'))).enabled, isFalse);
     await tester.tap(find.byKey(const Key('passenger-drawer-history')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 450));
     expect(find.byKey(const Key('passenger-order-card')), findsOneWidget);
   });
 

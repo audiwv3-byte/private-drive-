@@ -60,7 +60,7 @@ footer{border-top:1px solid var(--line);padding:26px 5vw;color:#a8aeb4;display:f
 <div class="order-field full"><label for="car-category">Класс автомобиля</label><select id="car-category" name="category"><option value="comfort">Комфорт</option><option value="economy">Эконом</option><option value="business">Бизнес</option><option value="minivan">Минивэн</option></select></div>
 </div>
 <div class="order-controls"><button type="button" id="use-location">◎ Моё местоположение</button><button type="button" id="swap-address">⇄ Поменять адреса</button><button class="primary" type="button" id="preview-route">Показать маршрут</button></div>
-<p class="order-hint">Геолокация запрашивается только после нажатия. На тестовом сайте она используется исключительно в твоём браузере. Предварительная стоимость для класса Комфорт появится, когда подключён тестовый сервис маршрутов. Заказы и платежи отключены.</p>
+<p class="order-hint">Геолокация запрашивается только после нажатия. Координаты остаются в браузере до нажатия «Показать маршрут»; затем выбранные точки передаются тестовому серверу и, если подключён, сервису OpenRouteService. Предварительная стоимость для класса Комфорт появится, когда подключён тестовый сервис маршрутов. Заказы и платежи отключены.</p>
 <div class="order-result" id="order-status" role="status" aria-live="polite">Выбери адреса. Карта справа интерактивная.</div>
 </form></div>
 <div class="order-map"><div class="order-map-head"><strong>Карта · Вильнюс</strong><span>OpenStreetMap</span></div>

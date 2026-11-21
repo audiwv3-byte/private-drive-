@@ -28,12 +28,15 @@ void main() {
     expect(find.byKey(const Key('pilot-identity-notice-contact')), findsOneWidget);
     expect(find.byKey(const Key('pilot-identity-request-camera')), findsNothing);
     expect(camera.requests, 0);
+    await tester.drag(find.byType(ListView).last, const Offset(0, -1200));
+    await tester.pumpAndSettle();
     final disabled = tester.widget<FilledButton>(
       find.byKey(const Key('pilot-identity-notice-continue')),
     );
     expect(disabled.onPressed, isNull);
 
-    await tester.ensureVisible(find.byKey(const Key('pilot-identity-notice-acknowledge')));
+    await tester.drag(find.byType(ListView).last, const Offset(0, -1200));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('pilot-identity-notice-acknowledge')));
     await tester.pumpAndSettle();
     expect(camera.requests, 0);
@@ -58,7 +61,8 @@ void main() {
       await tester.pumpWidget(const MaterialApp(
         home: PdPilotIdentityNoticePage(),
       ));
-      await tester.ensureVisible(find.byKey(const Key('pilot-identity-notice-acknowledge')));
+      await tester.drag(find.byType(ListView).last, const Offset(0, -1200));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('pilot-identity-notice-acknowledge')));
       await tester.pumpAndSettle();
 
@@ -67,12 +71,6 @@ void main() {
       await tester.tap(find.text(language).last);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining(language == 'LT'
-          ? 'Vairuotojo tapatybės patikra'
-          : 'Pilot identity verification'), findsOneWidget);
-      expect(find.textContaining(language == 'LT'
-          ? 'nuotraukos'
-          : 'photos'), findsWidgets);
       expect(tester.widget<CheckboxListTile>(
         find.byKey(const Key('pilot-identity-notice-acknowledge')),
       ).value, isFalse);
@@ -80,6 +78,15 @@ void main() {
         find.byKey(const Key('pilot-identity-notice-continue')),
       ).onPressed, isNull);
       expect(find.byKey(const Key('pilot-identity-request-camera')), findsNothing);
+
+      await tester.drag(find.byType(ListView).last, const Offset(0, 1200));
+      await tester.pumpAndSettle();
+      expect(find.textContaining(language == 'LT'
+          ? 'Vairuotojo tapatybės patikra'
+          : 'Pilot identity verification'), findsOneWidget);
+      expect(find.textContaining(language == 'LT'
+          ? 'nuotraukos'
+          : 'photo'), findsWidgets);
     });
   }
 }

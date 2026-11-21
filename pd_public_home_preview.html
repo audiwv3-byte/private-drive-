@@ -161,16 +161,68 @@ main{max-width:1550px}
 @media(max-width:850px){.mock-one-header{display:grid;grid-template-columns:1fr auto}.mock-one-header nav{grid-row:2;grid-column:1/-1;max-width:100%;width:100%;padding-bottom:8px}.hero.mock-one-hero{grid-template-columns:1fr;min-height:0;gap:15px}.hero-stage{min-height:220px;justify-content:center}.hero-stage-art{width:min(100%,560px);max-height:290px}.mock-about{grid-template-columns:1fr 1fr}.app-preview{grid-column:1/-1}.fare-strip{grid-template-columns:repeat(3,1fr)}.fare-strip article:nth-child(3){border-right:0}}
 @media(max-width:600px){.hero.mock-one-hero{padding:32px 17px 16px}.mock-one-hero h1{font-size:clamp(33px,8.2vw,49px)}.mock-one-hero p{font-size:14px}.hero-stage{min-height:155px}.hero-stage-art{width:min(100%,460px);max-height:260px}.hero-actions .btn{width:100%}.mock-services,.mock-prices{padding-left:13px;padding-right:13px}.mock-service-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.mock-service-card{min-height:202px;padding:12px 9px}.mock-service-card h3{font-size:17px}.mock-service-card p{font-size:11px}.fare-strip{grid-template-columns:repeat(2,1fr)}.fare-strip article{border-bottom:1px solid #49371f}.fare-strip article:nth-child(2),.fare-strip article:nth-child(4){border-right:0}.fare-strip article:nth-child(3){border-right:1px solid #49371f}.mock-about{grid-template-columns:1fr}.about-visual{height:170px}.app-preview{grid-column:auto}.ornament-heading:before,.ornament-heading:after{width:18px;margin:0 6px}.mock-contacts{display:grid;grid-template-columns:1fr}.order-shell{grid-template-columns:1fr}}
 @media(max-width:360px){.mock-one-header{grid-template-columns:1fr}.header-contact{justify-self:start}.hero-checks{font-size:11px;gap:10px}.mock-service-grid{grid-template-columns:1fr 1fr}.mock-service-card{min-height:210px}.mock-service-card h3{font-size:15px}.mock-service-card p{font-size:11px}}
+
+/* Exact structure and typography based on the owner's approved mockup #2 (IMG_6439.jpeg).
+   All visible photography stays on the owner's already-saved assets. */
+.mock-one-header{background:#090909}
+.mock-one-header .logo img{border-radius:50%}
+.hero.mock-two-hero{grid-template-columns:minmax(0,1fr) minmax(280px,1fr);gap:12px;min-height:465px;padding:32px clamp(18px,3.5vw,54px);background:radial-gradient(circle at 78% 50%,#342314,#0a0809 63%,#060606);overflow:hidden}
+.mock-two-hero:before{display:none!important}
+.mock-two-hero .hero-copy{z-index:3;position:relative}
+.mock-two-hero .hero-eyebrow{font:11px system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;padding-top:0;border-top:0}
+.mock-two-hero h1{font:400 clamp(33px,4.2vw,62px)/1.09 Georgia,serif;color:#f2d395;max-width:720px;margin:16px 0}
+.mock-two-hero h1 em{color:#f4d695}
+.mock-two-hero .mock-two-lead{font-size:17px;color:#f2eee8;margin:0 0 15px}
+.mock-two-benefits{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:7px;font-size:14px;color:#f0e4cc}
+.mock-two-benefits li:before{content:"◉";color:#dcb86f;margin-right:10px;font-size:11px}
+.mock-two-stage{position:relative;display:flex;gap:9px;justify-content:center;align-items:center;min-height:390px;max-height:450px;overflow:hidden}
+.mock-two-stage .hero-main-photo{width:min(58%,305px);height:auto;max-height:445px;object-fit:cover;object-position:center 54%;border:1px solid #926d35;border-radius:13px;filter:none;box-shadow:0 12px 34px #0009}
+.mock-two-stage .hero-secondary-photo{width:min(40%,210px);height:auto;max-height:346px;object-fit:cover;object-position:center 54%;border:1px solid #926d35;border-radius:13px;box-shadow:0 12px 34px #0009}
+.mock-two-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-block:1px solid #775529;background:#0d0c0b;padding:17px clamp(11px,2vw,30px)}
+.mock-two-strip span{color:#e5c184;text-align:center;border-right:1px solid #594122;padding:6px 10px;font-size:13px}.mock-two-strip span:last-child{border:0}
+.mock-two-services .mock-service-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+.mock-two-services .mock-service-card{min-height:280px;padding:0;border-radius:12px;text-decoration:none;justify-content:flex-end}
+.mock-two-services .mock-service-card>img{height:100%;object-position:center 55%;filter:brightness(.8)}
+.mock-two-services .mock-service-card:after{background:linear-gradient(0deg,#070709 2%,#100e0ad4 34%,#0a090910 85%)}
+.mock-two-services .mock-service-card>div{padding:16px;min-height:116px}
+.mock-two-services .mock-service-card h3{font-size:clamp(18px,1.7vw,24px);color:#f1ce89;margin:4px 0 8px}
+.mock-two-services .mock-service-card p{max-width:24ch;padding-right:17px}
+.mock-service-arrow{position:absolute;right:13px;bottom:16px;border:1px solid #b38a4a;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;color:#f0cb7c}
+.mock-two-quick{margin:18px clamp(12px,3vw,46px);border:1px solid #83602f;background:linear-gradient(120deg,#1b1713,#211b14,#121012);padding:20px;border-radius:13px}
+.mock-two-quick h2{margin:0 0 15px;font:400 27px Georgia,serif;color:#f2d08a}
+#quick-trip-form{display:grid;grid-template-columns:1.1fr 1.1fr .8fr .7fr auto;gap:9px;align-items:end}
+#quick-trip-form label{display:grid;gap:5px;color:#e3c590;font-size:11px;min-width:0}
+#quick-trip-form input{width:100%;background:#121315;color:#f9f4e9;border:1px solid #695230;border-radius:7px;min-width:0;padding:10px;height:44px;font:14px system-ui,sans-serif}
+#quick-trip-form button.btn{height:44px;margin:0;border-radius:7px;font-size:13px;white-space:nowrap;cursor:pointer}
+.mock-two-quick>p{font-size:11px;color:#c8b891;margin:11px 0 0}
+@media(max-width:1000px){.mock-two-services .mock-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.mock-two-strip{grid-template-columns:repeat(3,minmax(0,1fr))}#quick-trip-form{grid-template-columns:repeat(2,minmax(0,1fr))}#quick-trip-form button.btn{grid-column:1/-1}}
+@media(max-width:850px){.hero.mock-two-hero{grid-template-columns:1fr;gap:12px;min-height:0}.mock-two-stage{min-height:290px;max-height:360px;justify-content:center}.mock-two-stage .hero-main-photo{max-height:340px}.mock-two-stage .hero-secondary-photo{max-height:270px}.mock-two-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.hero.mock-two-hero{padding:28px 15px 16px}.mock-two-hero h1{font-size:clamp(34px,8vw,46px)}.mock-two-hero .mock-two-lead{font-size:15px}.mock-two-stage{min-height:260px;max-height:310px}.mock-two-stage .hero-main-photo{max-height:285px}.mock-two-stage .hero-secondary-photo{max-height:230px}.mock-two-services .mock-service-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.mock-two-services .mock-service-card{min-height:230px}.mock-two-services .mock-service-card>div{padding:11px}.mock-two-services .mock-service-card h3{font-size:17px}.mock-two-strip span{font-size:11px}.mock-two-quick{padding:16px 12px}#quick-trip-form{grid-template-columns:1fr}}
+@media(max-width:360px){.mock-two-services .mock-service-grid{grid-template-columns:1fr}.mock-two-stage{min-height:235px}.mock-two-hero h1{font-size:33px}}
+
 </style></head><body>
 <header class="mock-one-header"><a class="logo" href="/" aria-label="PRIVATE DRIVE — главная"><img src="/assets/pd-user-logo-4-original.webp" alt="Утверждённый золотой логотип PD" width="70" height="70"><span><strong>PRIVATE DRIVE</strong><small>Премиум-перевозки в Литве и Европе</small></span></a><nav aria-label="Главное меню"><a href="#top">Главная</a><a href="#services">Услуги</a><a href="#prices">Направления</a><a href="#about">О компании</a><a href="#documents">Документы</a><a href="#contacts">Контакты</a><a href="/pilot-registration">Пилотам</a><a href="/dispatch/login">Диспетчерская</a></nav><a class="header-contact" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Написать нам</a></header><main id="top">
-<div class="hero mock-one-hero"><div class="hero-copy"><span class="hero-eyebrow">PRIVATE DRIVE</span><h1>Такси · Трансферы ·<br><em>Персональный водитель</em></h1><p>Комфортные и безопасные поездки по Вильнюсу, Литве и Европе. Персональный сервис, пунктуальность и индивидуальный подход.</p><div class="hero-checks"><span>◇ Безопасно</span><span>◷ Пунктуально</span><span>♢ Комфортно</span></div><div class="hero-actions"><a class="btn" href="#order">Рассчитать поездку</a><a class="btn outline" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Написать в Telegram</a></div></div><div class="hero-stage" aria-label="Toyota RAV4 и водитель из утверждённого макета №1"><img class="hero-stage-art" src="/assets/pd-approved-mock1-hero.webp" alt="Toyota RAV4 с персональным водителем на фоне вечернего Вильнюса — фрагмент утверждённого макета №1" width="420" height="258" fetchpriority="high" decoding="async"></div></div><section id="services" class="mock-services"><h2 class="ornament-heading">Наши услуги</h2><div class="mock-service-grid">
-<article class="mock-service-card"><img src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4, Вильнюс" loading="lazy" decoding="async" width="864" height="1536"><div><span class="service-symbol">◈</span><h3>Такси по городу</h3><p>Комфортные поездки по Вильнюсу</p></div></article>
-<article class="mock-service-card card-gradient-flight"><div><span class="service-symbol">✈</span><h3>Трансферы в аэропорт</h3><p>Вильнюс (VNO) и другие аэропорты</p></div></article>
-<article class="mock-service-card card-gradient-road"><div><span class="service-symbol">⌖</span><h3>Междугородние поездки</h3><p>Каунас, Клайпеда, Паланга, Тракай и др.</p></div></article>
-<article class="mock-service-card card-gradient-eu"><div><span class="service-symbol">✦</span><h3>Поездки по Европе</h3><p>Польша, Германия, Латвия, Эстония и др. — по согласованию</p></div></article>
-<article class="mock-service-card card-gradient-driver"><div><span class="service-symbol">♙</span><h3>Персональный водитель</h3><p>Индивидуальный подход к каждому заказу</p></div></article>
-<article class="mock-service-card"><img src="/assets/pd-user-photo-7-original.webp" alt="Toyota RAV4 PRIVATE DRIVE" loading="lazy" decoding="async" width="864" height="1536"><div><span class="service-symbol">♛</span><h3>Дополнительные услуги</h3><p>Табличка в аэропорту, помощь с багажом, пожелания</p></div></article>
-</div></section><section id="prices" class="mock-prices"><h2 class="ornament-heading">Популярные направления</h2><div class="fare-strip">
+<div class="hero mock-two-hero"><div class="hero-copy">
+<span class="hero-eyebrow">PRIVATE DRIVE · ВИЛЬНЮС · ЛИТВА · ЕВРОПА</span>
+<h1>Ваш личный водитель <em>в Литве и Европе</em></h1>
+<p class="mock-two-lead">Такси · Трансферы · Персональные поездки</p>
+<ul class="mock-two-benefits"><li>Комфорт и безопасность</li><li>Пунктуальность и надёжность</li><li>Индивидуальный подход</li><li>Фиксированные тарифы на популярные направления</li></ul>
+<div class="hero-actions"><a class="btn" href="#quick-order">Забронировать поездку</a><a class="btn outline" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Написать в Telegram</a></div>
+</div><div class="hero-stage mock-two-stage" aria-label="Toyota RAV4 на оригинальных материалах PRIVATE DRIVE">
+<img class="hero-stage-art hero-main-photo" src="/assets/pd-user-photo-7-original.webp" alt="Toyota RAV4 в Вильнюсе — утверждённая фотография" width="864" height="1536" fetchpriority="high" decoding="async">
+<img class="hero-secondary-photo" src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 — оригинальная фотография PRIVATE DRIVE" width="864" height="1536" loading="lazy" decoding="async">
+</div></div>
+<div class="mock-two-strip"><span>✈ Встреча в аэропорту VNO</span><span>◇ Междугородние трансферы</span><span>✧ Комфортные поездки</span><span>♧ Индивидуальные маршруты</span><span>✦ Дополнительные услуги</span></div><section id="services" class="mock-services mock-two-services"><h2 class="ornament-heading">Наши услуги</h2><div class="mock-service-grid">
+<a href="#quick-order" class="mock-service-card"><img src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 — трансферы в аэропорт" loading="lazy" width="864" height="1536"><div><h3>Трансфер в аэропорт</h3><p>Вильнюс (VNO) и другие аэропорты по согласованию</p><span class="mock-service-arrow">↗</span></div></a>
+<a href="#prices" class="mock-service-card"><img src="/assets/pd-user-photo-7-original.webp" alt="Toyota RAV4 — междугородние поездки" loading="lazy" width="864" height="1536"><div><h3>Междугородние поездки</h3><p>Каунас, Клайпеда, Паланга, Тракай, Друскининкай</p><span class="mock-service-arrow">↗</span></div></a>
+<a href="#quick-order" class="mock-service-card"><img src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 Hybrid — комфортные поездки" loading="lazy" width="864" height="1536"><div><h3>Комфортные поездки</h3><p>Персональный сервис, комфорт и конфиденциальность</p><span class="mock-service-arrow">↗</span></div></a>
+<a href="#contacts" class="mock-service-card"><img src="/assets/pd-user-photo-7-original.webp" alt="PRIVATE DRIVE — дополнительные услуги" loading="lazy" width="864" height="1536"><div><h3>Особые услуги</h3><p>Табличка при встрече, помощь с багажом, пожелания</p><span class="mock-service-arrow">↗</span></div></a>
+</div></section>
+<section id="quick-order" class="mock-two-quick"><h2>Быстрый заказ</h2><form id="quick-trip-form">
+<label>Откуда<input id="quick-from" placeholder="Вильнюс" autocomplete="off" maxlength="220" required></label>
+<label>Куда<input id="quick-to" placeholder="Аэропорт (VNO)" autocomplete="off" maxlength="220" required></label>
+<label>Дата<input id="quick-date" type="date"></label><label>Время<input id="quick-time" type="time"></label>
+<button type="submit" class="btn">Найти маршрут</button></form><p>Тестовый предпросмотр — подтверждение заказа и оплата отключены.</p></section><section id="prices" class="mock-prices"><h2 class="ornament-heading">Популярные направления</h2><div class="fare-strip">
 <article><span class="fare-symbol">✈</span><h3>Вильнюс ↔ Аэропорт</h3><strong>40 €</strong><small>В одну сторону</small></article>
 <article><span class="fare-symbol">◆</span><h3>Вильнюс → Каунас</h3><strong>130 €</strong><small>Трансфер · одна сторона</small></article>
 <article><span class="fare-symbol">⇄</span><h3>Вильнюс ↔ Каунас</h3><strong>200 €</strong><small>Трансфер · туда-обратно</small></article>
@@ -190,7 +242,7 @@ main{max-width:1550px}
 <div class="order-field full"><label for="dropoff-address">Куда</label><input id="dropoff-address" name="dropoff" placeholder="Адрес назначения" maxlength="220"><div class="suggestions" id="dropoff-suggestions" aria-live="polite"></div></div>
 <div class="order-field"><label for="pickup-date">Дата подачи</label><input id="pickup-date" name="date" type="date"></div>
 <div class="order-field"><label for="pickup-time">Время подачи</label><input id="pickup-time" name="time" type="time"></div>
-<div class="order-field full"><label for="car-category">Класс автомобиля</label><select id="car-category" name="category"><option value="comfort">Комфорт</option><option value="economy">Эконом</option><option value="business">Бизнес</option><option value="minivan">Минивэн</option></select></div>
+<div class="order-field full"><label for="car-category">Класс автомобиля</label><select id="car-category" name="category"><option value="comfort">Комфорт</option></select></div>
 </div>
 <div class="order-controls"><button type="button" id="use-location">◎ Моё местоположение</button><button type="button" id="swap-address">⇄ Поменять адреса</button><button class="primary" type="button" id="preview-route">Показать маршрут</button></div>
 <p class="order-hint">Геолокация запрашивается только после нажатия. Координаты остаются в браузере до нажатия «Показать маршрут»; затем выбранные точки передаются тестовому серверу и, если подключён, сервису OpenRouteService. Предварительная стоимость для класса Комфорт появится, когда подключён тестовый сервис маршрутов. Заказы и платежи отключены.</p>
@@ -208,6 +260,21 @@ main{max-width:1550px}
 (()=>{
  const $=id=>document.getElementById(id);
  const status=$("order-status");
+
+ const quickTripForm=document.getElementById("quick-trip-form");
+ if(quickTripForm){
+   quickTripForm.addEventListener("submit",e=>{
+     e.preventDefault();
+     for(const [src,dst] of [["quick-from","pickup-address"],["quick-to","dropoff-address"],
+                             ["quick-date","pickup-date"],["quick-time","pickup-time"]]){
+       const s=document.getElementById(src),t=document.getElementById(dst);
+       if(s&&t){t.value=s.value.trim();t.dispatchEvent(new Event("input",{bubbles:true}));}
+     }
+     document.getElementById("order-status").textContent="Адреса перенесены. Выбери адреса из подсказок, чтобы построить маршрут на карте.";
+     document.getElementById("order").scrollIntoView({behavior:"smooth",block:"start"});
+   });
+ }
+
  const fields={origin:$("pickup-address"),destination:$("dropoff-address")};
  const lists={origin:$("pickup-suggestions"),destination:$("dropoff-suggestions")};
  const selected={origin:null,destination:null};

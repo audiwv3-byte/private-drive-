@@ -39,6 +39,14 @@ def create_app():
     )
     register(app, core)
 
+    @app.get("/")
+    def home_preview():
+        page = Path(__file__).with_name("pd_public_home_preview.html").read_text(encoding="utf-8")
+        return Response(page, content_type="text/html; charset=utf-8",
+                        headers={"Cache-Control": "no-store",
+                                 "X-Content-Type-Options": "nosniff",
+                                 "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+
     @app.get("/pd-logo.jpg")
     def pd_logo_asset():
         payload = Path(__file__).parent.joinpath("assets/pd-logo-compact.b64").read_text(encoding="ascii").strip()

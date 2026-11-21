@@ -3,6 +3,7 @@ import 'brand_logo.dart';
 import 'pd_slide_to_confirm.dart';
 import 'demo_trip_store.dart';
 import 'app_language.dart';
+import 'pilot_statistics_page.dart';
 
 /// In-app root overlay: follows the pilot while any pilot route is open.
 /// Displays only local synthetic data; does not receive production jobs.
@@ -26,6 +27,14 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
   bool _expanded = false;
   static const gold = Color(0xFFDDC184);
   static const background = Color(0xEE10151D);
+
+  void _openStatistics(PilotStatisticSection section) {
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PilotStatisticsPage(section: section),
+      ),
+    );
+  }
 
   int? get _fare {
     final trip = widget.tripStore?.trip;
@@ -105,33 +114,38 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                               padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
-                                children: const [
+                                children: [
                                   _PilotStatisticTile(
                                     tileKey: 'pilot-stat-income',
+                                    onTap: () => _openStatistics(PilotStatisticSection.income),
                                     icon: Icons.euro,
                                     title: 'Доход',
                                     value: 'Нет данных',
                                   ),
                                   _PilotStatisticTile(
                                     tileKey: 'pilot-stat-acceptance',
+                                    onTap: () => _openStatistics(PilotStatisticSection.acceptance),
                                     icon: Icons.call_received,
                                     title: 'Принятие заказов',
                                     value: 'Нет данных',
                                   ),
                                   _PilotStatisticTile(
                                     tileKey: 'pilot-stat-rating',
+                                    onTap: () => _openStatistics(PilotStatisticSection.rating),
                                     icon: Icons.star_outline,
                                     title: 'Рейтинг пилота',
                                     value: 'Нет данных',
                                   ),
                                   _PilotStatisticTile(
                                     tileKey: 'pilot-stat-level',
+                                    onTap: () => _openStatistics(PilotStatisticSection.level),
                                     icon: Icons.workspace_premium_outlined,
                                     title: 'Уровень пилота',
                                     value: 'Нет данных',
                                   ),
                                   _PilotStatisticTile(
                                     tileKey: 'pilot-stat-rewards',
+                                    onTap: () => _openStatistics(PilotStatisticSection.rewards),
                                     icon: Icons.card_giftcard_outlined,
                                     title: 'Поощрения',
                                     value: 'Нет данных',
@@ -238,38 +252,52 @@ class _PilotStatisticTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.value,
+    required this.onTap,
   });
 
   final String tileKey;
   final IconData icon;
   final String title;
   final String value;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      key: Key(tileKey),
-      margin: const EdgeInsets.only(top: 7),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.only(top: 7),
+      child: Material(
         color: const Color(0xFF1D2733),
-        border: Border.all(color: const Color(0x667D683F)),
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: _PilotCockpitOverlayState.gold, size: 19),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(title, style: const TextStyle(fontSize: 12)),
+        child: InkWell(
+          key: Key(tileKey),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0x667D683F)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: _PilotCockpitOverlayState.gold, size: 19),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(title, style: const TextStyle(fontSize: 12)),
+                ),
+                const SizedBox(width: 4),
+                Text(value, style: const TextStyle(
+                  color: Color(0xFFDDC184),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                )),
+                const SizedBox(width: 3),
+                const Icon(Icons.chevron_right, color: Color(0xFFDDC184),
+                  size: 17),
+              ],
+            ),
           ),
-          const SizedBox(width: 4),
-          Text(value, style: const TextStyle(
-            color: Color(0xFFDDC184),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          )),
-        ],
+        ),
       ),
     );
   }

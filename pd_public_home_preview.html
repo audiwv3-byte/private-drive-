@@ -97,9 +97,86 @@ nav a,.btn,.order-tab,.order-controls button{min-height:44px;display:inline-flex
  .hero-photo-6{width:40%!important;max-width:154px!important;max-height:280px!important}
  .hero-gallery .hero-logo{width:56px!important;height:56px!important}
 }
+
+/* Owner-approved reference IMG_6441.jpeg, mockup 1. Scope to staging; preserve forms/map. */
+:root{--gold:#e8c57b;--muted:#ccc1ae;--line:#75552b}
+body{background:#050505;color:#f7f3ed}
+.mock-one-header{background:#070708;display:flex;align-items:center;gap:18px;justify-content:space-between;padding:12px clamp(16px,3vw,46px)}
+.mock-one-header .logo{display:flex;align-items:center;gap:10px;font-size:19px;letter-spacing:.1em;flex:none}
+.mock-one-header .logo img{height:50px;width:50px;object-fit:contain}
+.mock-one-header .logo span{display:flex;flex-direction:column;line-height:1.15}
+.mock-one-header .logo small{font:9px/1.6 system-ui,sans-serif;letter-spacing:.06em;color:#e8cb95}
+.mock-one-header nav{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.mock-one-header nav a{font-size:12px;color:#eae4db;white-space:nowrap}
+.mock-one-header nav a:first-child{border-bottom:1px solid var(--gold);color:#ffe1a0}
+.header-contact{background:linear-gradient(100deg,#b88d44,#ffde94);padding:10px 14px;color:#18100a;font-size:12px;font-weight:800;border-radius:6px;white-space:nowrap}
+main{max-width:1550px}
+.hero.mock-one-hero{display:grid;grid-template-columns: minmax(0,1.03fr) minmax(320px,.97fr);gap:0;min-height:440px;padding:35px clamp(20px,4vw,56px);background:radial-gradient(ellipse at 77% 49%,#44321e,#0a090a 55%,#060606 88%);border-bottom:1px solid #483720;position:relative;overflow:hidden}
+.mock-one-hero:before{display:none!important}
+.hero-copy{position:relative;z-index:2;align-self:center}
+.hero-eyebrow{font:13px Georgia,serif;color:#eed29b;letter-spacing:.11em;border-top:2px solid #b58b47;padding-top:14px}
+.mock-one-hero h1{font:400 clamp(39px,4.1vw,62px)/1.02 Georgia,serif;max-width:820px;margin:18px 0;color:#f3dba4}
+.mock-one-hero h1 em{color:#f1cf84}
+.mock-one-hero p{font-size:16px;line-height:1.5;max-width:540px;color:#f5eee5}
+.hero-checks{display:flex;gap:clamp(10px,2vw,34px);flex-wrap:wrap;color:#f5dfb4;font-size:13px;margin:25px 0 18px}
+.hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.hero-actions .btn{margin:0;font-size:13px;padding:12px 17px}
+.hero-stage{min-width:0;display:flex;align-items:center;justify-content:flex-end;position:relative;overflow:hidden;min-height:345px}
+.hero-stage-art{width:min(100%,650px);height:auto;max-height:390px;object-fit:contain;object-position:right bottom;filter:drop-shadow(0 10px 24px #0009)}
+.mock-services,.mock-prices{padding:24px clamp(15px,3vw,46px);background:#070708}
+.ornament-heading{text-align:center;color:#ebca86;font:400 clamp(25px,2.5vw,36px) Georgia,serif;margin:0 auto 20px}
+.ornament-heading:before,.ornament-heading:after{content:"";display:inline-block;width:clamp(14px,5vw,65px);height:1px;background:#997138;vertical-align:middle;margin:0 14px}
+.mock-service-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.mock-service-card{min-width:0;min-height:245px;position:relative;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:linear-gradient(160deg,#31333a,#15120e 65%,#080809);border:1px solid #846338;border-radius:10px;padding:16px 13px}
+.mock-service-card:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 5%,#0b0a09b8 50%,#080809fa 100%);pointer-events:none}
+.mock-service-card>img{position:absolute;width:100%;height:100%;inset:0;object-fit:cover;object-position:50% 40%}
+.mock-service-card>div{position:relative;z-index:1}.mock-service-card h3{font:400 19px/1.12 Georgia,serif;color:#f4d39a;margin:5px 0}
+.mock-service-card p{font-size:12px;line-height:1.4;color:#eee6dc;margin:7px 0}
+.service-symbol{font-size:23px;color:#ffd58c}
+.card-gradient-flight{background:linear-gradient(150deg,#74603a,#171b22 53%,#100e0c)}
+.card-gradient-road{background:linear-gradient(155deg,#384b39,#293c27 50%,#0b0e0c)}
+.card-gradient-eu{background:linear-gradient(145deg,#173969,#252d3f 42%,#0e1019)}
+.card-gradient-driver{background:linear-gradient(145deg,#565249,#242424 48%,#090909)}
+.mock-prices{padding-top:20px;padding-bottom:33px}
+.fare-strip{border:1px solid #896a38;border-radius:11px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));overflow:hidden;background:#0c0c0e}
+.fare-strip article{min-width:0;padding:12px 9px;text-align:center;border-right:1px solid #49371f}.fare-strip article:last-child{border:0}
+.fare-symbol{color:#f5d38b;font-size:23px}.fare-strip h3{font-size:12px;font-weight:500;color:#f2eee7;margin:7px 0}
+.fare-strip strong{color:#ebc67a;font:500 27px Georgia,serif;display:block}.fare-strip small{display:block;color:#c1b8ae;font-size:11px}
+.fare-caption{font-size:11px;text-align:center;margin:10px 0;color:#bbac90}
+.mock-about{background:linear-gradient(125deg,#16120b,#080809);padding:20px clamp(15px,3vw,46px);display:grid;grid-template-columns:minmax(180px,.75fr) minmax(240px,1.3fr) minmax(170px,.6fr);gap:24px;align-items:center;border-block:1px solid #4c3619}
+.about-visual{height:210px;overflow:hidden;border-radius:9px;border:1px solid #6e512e}
+.about-visual img{width:100%;height:100%;object-fit:cover;object-position:50% 57%}
+.about-copy h2{color:#ecc982;margin:0 0 14px;font:400 26px Georgia,serif}
+.about-copy ul{list-style:none;padding:0;margin:0}.about-copy li{font-size:13px;margin:9px 0;color:#e7decf}
+.about-copy li:before{content:"✓";color:#edbe6e;margin-right:11px}
+.app-preview{padding:15px;text-align:center;border:1px solid #755326;border-radius:16px;background:#0b0a0a}
+.app-preview img{display:block;margin:auto;width:85px;height:85px;object-fit:contain}
+.app-preview strong{display:block;color:#e4c783;font:20px Georgia,serif}
+.app-preview p{font-size:12px;margin:8px 0}.app-preview a{font-size:12px}
+.order-section{padding-top:32px}.mock-faq,.mock-docs{background:#0b0b0e;padding:25px clamp(15px,3vw,46px)}
+.mock-docs h2{font:400 26px Georgia,serif;color:#e5c17b}.mock-contacts{padding:19px clamp(15px,3vw,46px);background:#080807;display:flex;flex-wrap:wrap;gap:14px 25px;align-items:center;justify-content:space-between;border-top:1px solid #6b4c28}
+.mock-contacts div{display:flex;flex-direction:column}.mock-contacts strong{font:23px Georgia,serif;color:#f4d18e}.mock-contacts small{font-size:11px;color:#d4b77f}
+.mock-contacts a{font-size:13px;overflow-wrap:anywhere}
+@media(max-width:1150px){.mock-service-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.mock-service-card{min-height:230px}.mock-one-header nav{overflow-x:auto;flex-wrap:nowrap;max-width:100%}}
+@media(max-width:850px){.mock-one-header{display:grid;grid-template-columns:1fr auto}.mock-one-header nav{grid-row:2;grid-column:1/-1;max-width:100%;width:100%;padding-bottom:8px}.hero.mock-one-hero{grid-template-columns:1fr;min-height:0;gap:15px}.hero-stage{min-height:220px;justify-content:center}.hero-stage-art{width:min(100%,560px);max-height:290px}.mock-about{grid-template-columns:1fr 1fr}.app-preview{grid-column:1/-1}.fare-strip{grid-template-columns:repeat(3,1fr)}.fare-strip article:nth-child(3){border-right:0}}
+@media(max-width:600px){.hero.mock-one-hero{padding:32px 17px 16px}.mock-one-hero h1{font-size:clamp(33px,8.2vw,49px)}.mock-one-hero p{font-size:14px}.hero-stage{min-height:155px}.hero-stage-art{width:min(100%,460px);max-height:260px}.hero-actions .btn{width:100%}.mock-services,.mock-prices{padding-left:13px;padding-right:13px}.mock-service-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.mock-service-card{min-height:202px;padding:12px 9px}.mock-service-card h3{font-size:17px}.mock-service-card p{font-size:11px}.fare-strip{grid-template-columns:repeat(2,1fr)}.fare-strip article{border-bottom:1px solid #49371f}.fare-strip article:nth-child(2),.fare-strip article:nth-child(4){border-right:0}.fare-strip article:nth-child(3){border-right:1px solid #49371f}.mock-about{grid-template-columns:1fr}.about-visual{height:170px}.app-preview{grid-column:auto}.ornament-heading:before,.ornament-heading:after{width:18px;margin:0 6px}.mock-contacts{display:grid;grid-template-columns:1fr}.order-shell{grid-template-columns:1fr}}
+@media(max-width:360px){.mock-one-header{grid-template-columns:1fr}.header-contact{justify-self:start}.hero-checks{font-size:11px;gap:10px}.mock-service-grid{grid-template-columns:1fr 1fr}.mock-service-card{min-height:210px}.mock-service-card h3{font-size:15px}.mock-service-card p{font-size:11px}}
 </style></head><body>
-<header><a class="logo" href="/"><img src="/assets/pd-user-logo-4-original.webp" alt="Утверждённый пользователем логотип PRIVATE DRIVE, фото №4">PRIVATE DRIVE</a><nav aria-label="Главное меню"><a href="#order">Заказать</a><a href="#prices">Тарифы</a><a href="#about">О нас</a><a href="#services">Услуги</a><a href="#faq">FAQ</a><a href="/pilot-registration">Стать пилотом</a><a href="/dispatch/login">Диспетчерская</a><a href="#contacts">Контакты</a></nav></header>
-<main><div class="hero"><div><p style="letter-spacing:.2em;font-size:12px;color:#e9c27c">PRIVATE DRIVE · ВИЛЬНЮС · ЛИТВА · ЕВРОПА</p><h1>Такси и трансферы <em>на Toyota RAV4</em></h1><p>Комфортные поездки по Вильнюсу, встреча в аэропорту и междугородние маршруты. Фиксированные цены на популярные направления и персональный сервис.</p><p style="font-size:13px">✓ Комфорт и безопасность　✓ По предварительному заказу　✓ Индивидуальный подход</p><a class="btn" href="#order">Рассчитать маршрут</a><a class="btn outline" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Написать в Telegram</a><p style="font-size:11px">Фирменное оформление PRIVATE DRIVE. Сайт работает в тестовом режиме, реальные заказы и платежи отключены.</p></div><div class="hero-gallery"><img class="hero-photo-7" decoding="async" fetchpriority="high" src="/assets/pd-user-photo-7-original.webp" alt="Toyota RAV4 в Вильнюсе, утверждённое фото №7" width="864" height="1536"><img class="hero-photo-6" decoding="async" loading="lazy" src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 у Кафедрального собора Вильнюса, утверждённое фото №6" width="864" height="1536"><img class="hero-logo" decoding="async" src="/assets/pd-user-logo-4-original.webp" alt="Утверждённый фирменный логотип №4" width="1254" height="1254"></div></div><div class="trust-grid"><div><strong>Toyota RAV4 Hybrid</strong><p>Комфорт в городе и на трассе</p></div><div><strong>Прозрачные тарифы</strong><p>Фиксированные цены на основные маршруты</p></div><div><strong>Поездки по Литве</strong><p>Вильнюс, Каунас, Тракай и другие города</p></div><div><strong>Индивидуальный подход</strong><p>Учитываем пожелания пассажиров</p></div></div><section id="order" class="order-section" aria-label="Форма поездки и трансфера">
+<header class="mock-one-header"><a class="logo" href="/" aria-label="PRIVATE DRIVE — главная"><img src="/assets/pd-user-logo-4-original.webp" alt="Утверждённый золотой логотип PD" width="70" height="70"><span><strong>PRIVATE DRIVE</strong><small>Премиум-перевозки в Литве и Европе</small></span></a><nav aria-label="Главное меню"><a href="#top">Главная</a><a href="#services">Услуги</a><a href="#prices">Направления</a><a href="#about">О компании</a><a href="#documents">Документы</a><a href="#contacts">Контакты</a><a href="/pilot-registration">Пилотам</a><a href="/dispatch/login">Диспетчерская</a></nav><a class="header-contact" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Написать нам</a></header><main id="top">
+<div class="hero mock-one-hero"><div class="hero-copy"><span class="hero-eyebrow">PRIVATE DRIVE</span><h1>Такси · Трансферы ·<br><em>Персональный водитель</em></h1><p>Комфортные и безопасные поездки по Вильнюсу, Литве и Европе. Персональный сервис, пунктуальность и индивидуальный подход.</p><div class="hero-checks"><span>◇ Безопасно</span><span>◷ Пунктуально</span><span>♢ Комфортно</span></div><div class="hero-actions"><a class="btn" href="#order">Рассчитать поездку</a><a class="btn outline" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Написать в Telegram</a></div></div><div class="hero-stage" aria-label="Toyota RAV4 и водитель из утверждённого макета №1"><img class="hero-stage-art" src="/assets/pd-approved-mock1-hero.webp" alt="Toyota RAV4 с персональным водителем на фоне вечернего Вильнюса — фрагмент утверждённого макета №1" width="420" height="258" fetchpriority="high" decoding="async"></div></div><section id="services" class="mock-services"><h2 class="ornament-heading">Наши услуги</h2><div class="mock-service-grid">
+<article class="mock-service-card"><img src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4, Вильнюс" loading="lazy" decoding="async" width="864" height="1536"><div><span class="service-symbol">◈</span><h3>Такси по городу</h3><p>Комфортные поездки по Вильнюсу</p></div></article>
+<article class="mock-service-card card-gradient-flight"><div><span class="service-symbol">✈</span><h3>Трансферы в аэропорт</h3><p>Вильнюс (VNO) и другие аэропорты</p></div></article>
+<article class="mock-service-card card-gradient-road"><div><span class="service-symbol">⌖</span><h3>Междугородние поездки</h3><p>Каунас, Клайпеда, Паланга, Тракай и др.</p></div></article>
+<article class="mock-service-card card-gradient-eu"><div><span class="service-symbol">✦</span><h3>Поездки по Европе</h3><p>Польша, Германия, Латвия, Эстония и др. — по согласованию</p></div></article>
+<article class="mock-service-card card-gradient-driver"><div><span class="service-symbol">♙</span><h3>Персональный водитель</h3><p>Индивидуальный подход к каждому заказу</p></div></article>
+<article class="mock-service-card"><img src="/assets/pd-user-photo-7-original.webp" alt="Toyota RAV4 PRIVATE DRIVE" loading="lazy" decoding="async" width="864" height="1536"><div><span class="service-symbol">♛</span><h3>Дополнительные услуги</h3><p>Табличка в аэропорту, помощь с багажом, пожелания</p></div></article>
+</div></section><section id="prices" class="mock-prices"><h2 class="ornament-heading">Популярные направления</h2><div class="fare-strip">
+<article><span class="fare-symbol">✈</span><h3>Вильнюс ↔ Аэропорт</h3><strong>40 €</strong><small>В одну сторону</small></article>
+<article><span class="fare-symbol">◆</span><h3>Вильнюс → Каунас</h3><strong>130 €</strong><small>Трансфер · одна сторона</small></article>
+<article><span class="fare-symbol">⇄</span><h3>Вильнюс ↔ Каунас</h3><strong>200 €</strong><small>Трансфер · туда-обратно</small></article>
+<article><span class="fare-symbol">◇</span><h3>Такси Вильнюс → Каунас</h3><strong>90 €</strong><small>Отдельный тариф такси</small></article>
+<article><span class="fare-symbol">✧</span><h3>Встреча с табличкой</h3><strong>+15 €</strong><small>Дополнительная услуга</small></article>
+</div><p class="fare-caption">Тарифы для согласованных направлений. Условия конкретного заказа подтверждаются отдельно.</p></section><section id="about" class="mock-about"><div class="about-visual"><img src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 PRIVATE DRIVE в Вильнюсе" loading="lazy" width="864" height="1536"></div><div class="about-copy"><h2>Почему выбирают PRIVATE DRIVE</h2><ul><li>Персональный комфорт и современные автомобили</li><li>Опытный водитель (пилот)</li><li>Фиксированные и прозрачные цены на выбранные направления</li><li>Индивидуальный подход к пожеланиям пассажира</li><li>Удобная связь в Telegram</li></ul></div><div class="app-preview"><img src="/assets/pd-user-logo-4-original.webp" alt="Логотип PRIVATE DRIVE" width="115" height="115"><strong>PRIVATE DRIVE</strong><p>Приложение готовится к тестированию</p><a href="#order">Посмотреть маршрут</a></div></section><section id="order" class="order-section" aria-label="Форма поездки и трансфера">
 <div class="order-shell">
 <div class="order-panel">
 <h2>Заказать поездку</h2><p>Выбери тип поездки, укажи адреса и время подачи. Пока это тестовый предпросмотр без отправки заказа.</p>
@@ -123,10 +200,9 @@ nav a,.btn,.order-tab,.order-controls button{min-height:44px;display:inline-flex
 <div id="order-live-map" role="region" aria-label="Интерактивная карта маршрута с приближением и передвижением"></div>
 <small>© Участники OpenStreetMap. Маршрут строится непосредственно на карте после выбора адресов.</small></div>
 </div></section>
-<section id="prices"><h2>Популярные направления и тарифы</h2><div class="price-cards"><div class="price-item">Вильнюс ↔ Аэропорт VNO<strong>40 €</strong><p>Одна сторона</p></div><div class="price-item">Трансфер Вильнюс → Каунас<strong>130 €</strong><p>Одна сторона</p></div><div class="price-item">Трансфер Вильнюс ↔ Каунас<strong>200 €</strong><p>Туда и обратно</p></div><div class="price-item">Такси Вильнюс → Каунас<strong>90 €</strong><p>Отдельный тариф такси</p></div><div class="price-item">Встреча с табличкой<strong>+15 €</strong><p>Дополнительная услуга</p></div></div><p class="order-hint">Подтверждённые фиксированные цены на указанные направления. Условия заказа уточняются перед подтверждением.</p></section><section id="about"><h2>О PRIVATE DRIVE</h2><p>Персональный сервис пассажирских перевозок и трансферов. Это предварительный просмотр корпоративного сайта в фирменном чёрно-золотом стиле.</p><p class="notice">Тестовая страница: форма маршрута и карта работают в режиме предпросмотра. Автоматический расчёт стоимости и реальные заказы ещё не подключены.</p></section>
-<section id="services"><h2>Услуги</h2><div class="cards"><div class="card"><h3>Городские поездки</h3><p>Предварительный заказ по Вильнюсу.</p></div><div class="card"><h3>Аэропорты и трансферы</h3><p>Поездки между городами и трансферы по маршруту.</p></div><div class="card"><h3>Дополнительные услуги</h3><p>Встреча с табличкой, дополнительные остановки, индивидуальные запросы.</p></div></div></section>
-<section id="faq"><h2>Частые вопросы</h2><p>Можно заполнить форму «Поездка / Трансфер» для просмотра маршрута. Для настоящего заказа пока используй Telegram-бот PRIVATE DRIVE.</p></section>
-<section id="contacts"><h2>Контакты</h2><p>Электронная почта: <a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a></p><p>Telegram для связи: <a href="https://t.me/PrivateDraive" rel="noopener">@PrivateDraive</a></p><p>Instagram: <a href="https://www.instagram.com/privatedraive/" target="_blank" rel="noopener noreferrer">@privatedraive</a></p></section></main>
+<section id="faq" class="mock-faq"><h2 class="ornament-heading">Частые вопросы</h2><p>Тестовый сайт позволяет посмотреть форму, карту и предварительный маршрут. Настоящие заказы сейчас согласуются через Telegram. Оплата на сайте отключена.</p></section>
+<section id="documents" class="mock-docs"><h2>Документы</h2><p>Юридическая информация будет опубликована после проверки документов и реквизитов. Действующий сайт и приложение не затрагиваются.</p></section>
+<section id="contacts" class="mock-contacts"><div><strong>PRIVATE DRIVE</strong><small>Премиум-перевозки в Литве и Европе</small></div><a href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Telegram @PrivateDraive</a><a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a><a href="https://www.instagram.com/privatedraive/" target="_blank" rel="noopener noreferrer">Instagram</a></section></main>
 <footer><span>© PRIVATE DRIVE · тестовый предпросмотр</span><span>Действующее приложение и продакшн не затронуты</span></footer><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (()=>{

@@ -16,7 +16,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from flask import jsonify, request
 import pd_fixed_prices
 
-_BASE_URL = "https://api.openrouteservice.org"
+_DIRECTIONS_BASE_URL = "https://api.heigit.org/openrouteservice"
+_GEOCODE_BASE_URL = "https://api.heigit.org/pelias/v1"
 _LIMITS = defaultdict(deque)
 
 
@@ -115,7 +116,7 @@ def register(app):
             return jsonify(error="Введите не менее 3 символов"), 400
         if not os.getenv("PD_STAGING_ORS_API_KEY"):
             return jsonify(available=False, suggestions=[], reason="Сервис подсказок пока не подключён"), 200
-        url = _BASE_URL + "/geocode/autocomplete?" + urllib.parse.urlencode({
+        url = _GEOCODE_BASE_URL + "/autocomplete?" + urllib.parse.urlencode({
             "text": text, "size": 5, "focus.point.lat": 54.6872,
             "focus.point.lon": 25.2797
         })
@@ -162,7 +163,7 @@ def register(app):
         if not os.getenv("PD_STAGING_ORS_API_KEY"):
             return jsonify(available=False, reason="Маршрутизация пока не подключена"), 200
         try:
-            geojson = _request_json(_BASE_URL + "/v2/directions/driving-car/geojson",
+            geojson = _request_json(_DIRECTIONS_BASE_URL + "/v2/directions/driving-car/geojson",
                                     {"coordinates": [start, end]})
             feature = geojson["features"][0]
             summary = feature["properties"]["summary"]

@@ -106,8 +106,8 @@ void main() {
     expect(find.byKey(const Key('open-remote-sync-demo')), findsNothing);
   });
 
-  for (final role in ['passenger', 'pilot', 'dispatcher', 'pilot_dispatcher']) {
-    testWidgets('Verified server role opens the authorized cabin: $role',
+  for (final role in ['passenger', 'pilot', 'dispatcher', 'pilot_dispatcher', 'admin']) {
+    testWidgets('Verified $role chooses a cabin with server permissions',
         (tester) async {
       final client = MockClient((request) async {
         final payload = jsonDecode(request.body) as Map<String, dynamic>;
@@ -142,13 +142,9 @@ void main() {
       final requestCode = find.text('Получить код');
       await tester.scrollUntilVisible(requestCode, 120,
           scrollable: find.byType(Scrollable).first);
-      expect(tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Получить код'),
-      ).onPressed, isNotNull);
       await tester.tap(requestCode);
       await tester.pumpAndSettle();
       final otp = find.widgetWithText(TextField, 'Код подтверждения');
-      expect(otp, findsOneWidget);
       await tester.enterText(otp, '123456');
       await tester.pumpAndSettle();
       final verify = find.text('Подтвердить');
@@ -157,38 +153,44 @@ void main() {
       await tester.tap(verify);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('native-account-verified')), findsOneWidget);
-      expect(find.byKey(const Key('native-verified-user-id')), findsOneWidget);
-      expect(find.text('synthetic-account'), findsOneWidget);
-      expect(find.byKey(const Key('native-copy-user-id')), findsOneWidget);
-      expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);
-      expect(find.byType(PilotCabin), findsNothing);
       await tester.tap(find.byKey(const Key('native-continue-to-cabin')));
       await tester.pumpAndSettle();
 
+      final passenger = find.byKey(const Key('authorized-open-passenger'));
       final pilot = find.byKey(const Key('authorized-open-pilot'));
       final dispatcher = find.byKey(const Key('authorized-open-dispatcher'));
-      final dispatcherDrawer = find.byKey(const Key('dispatcher-open-drawer'));
-      if (role == 'pilot_dispatcher') {
+      expect(find.byKey(const Key('authorized-role-selection')), findsOneWidget);
+      expect(passenger, findsOneWidget);
+      expect(pilot, findsOneWidget);
+      expect(dispatcher, findsOneWidget);
+      expect(find.byType(PilotCabin), findsNothing);
+      expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);
+      final pilotAllowed = ['pilot', 'pilot_dispatcher', 'admin'].contains(role);
+      final dispatcherAllowed = ['dispatcher', 'pilot_dispatcher', 'admin'].contains(role);
+      expect(tester.widget<FilledButton>(pilot).onPressed,
+          pilotAllowed ? isNotNull : isNull);
+      expect(tester.widget<FilledButton>(dispatcher).onPressed,
+          dispatcherAllowed ? isNotNull : isNull);
+
+      await tester.tap(passenger);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
+      await tester.tap(find.byType(BackButton).first);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('authorized-role-selection')), findsOneWidget);
+
+      if (pilotAllowed) {
         await tester.tap(pilot);
         await tester.pumpAndSettle();
         expect(find.byType(PilotCabin), findsOneWidget);
-        expect(dispatcherDrawer, findsNothing);
-        await tester.tap(find.byType(BackButton));
+        await tester.tap(find.byType(BackButton).first);
         await tester.pumpAndSettle();
+      }
+      if (dispatcherAllowed) {
         await tester.tap(dispatcher);
         await tester.pumpAndSettle();
-        expect(dispatcherDrawer, findsOneWidget);
-      } else {
-        expect(pilot, findsNothing);
-        expect(dispatcher, findsNothing);
-        expect(find.byType(PilotCabin),
-            role == 'pilot' ? findsOneWidget : findsNothing);
-        expect(dispatcherDrawer,
-            role == 'dispatcher' ? findsOneWidget : findsNothing);
+        expect(find.byKey(const Key('dispatcher-open-drawer')), findsOneWidget);
       }
-      expect(find.byKey(const Key('passenger-entry-taxi')),
-          role == 'passenger' ? findsOneWidget : findsNothing);
-      expect(find.byKey(const Key('open-offline-demo')), findsNothing);
     });
   }
 

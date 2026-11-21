@@ -126,11 +126,15 @@ class FleetRegistryTests(unittest.TestCase):
         self.assertEqual(self.fleet.eligible_by_road_eta(
             authenticated_dispatcher="dispatcher_1",
             road_etas={"pilot_a": 10}), [])
-        # Existing independent manual assignment path still remains available.
-        self.engine.create_test_order("manual_fixture")
-        self.assertEqual(self.engine.offer_nearest(
-            "manual_fixture", [("manual_pilot", 40)], actor_role="dispatcher"),
-            ["manual_pilot"])
+        # Preserve the standalone synthetic dispatch engine behavior without
+        # registry tables. Registered fleet mode correctly rejects unknown IDs.
+        with tempfile.TemporaryDirectory() as standalone:
+            manual = IsolatedDispatch(os.path.join(standalone, "manual.sqlite"),
+                                      clock=self.clock)
+            manual.create_test_order("manual_fixture")
+            self.assertEqual(manual.offer_nearest(
+                "manual_fixture", [("manual_pilot", 40)], actor_role="dispatcher"),
+                ["manual_pilot"])
 
 
 if __name__ == "__main__":

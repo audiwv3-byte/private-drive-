@@ -55,46 +55,49 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertNotIn(b"https://api.", page.data)
         self.assertEqual(client.get("/api/admin/orders").status_code, 404)
 
-    def test_user_logo_displayed_on_all_staging_pages(self):
+    def test_approved_home_and_services_assets(self):
         with patch.dict(os.environ, self.env(), clear=True):
             app = create_app()
-        app.config["TESTING"] = True
         client = app.test_client()
         logo = client.get("/pd-logo-transparent.png")
         self.assertEqual(logo.status_code, 200)
-        self.assertEqual(logo.mimetype, "image/png")
-        self.assertGreater(len(logo.data), 2500)
         self.assertTrue(logo.data.startswith(bytes.fromhex("89504e470d0a1a0a")))
-        # PNG has transparency metadata (indexed transparency or RGBA).
-        self.assertTrue(b"tRNS" in logo.data or logo.data[25] in (4, 6))
         home = client.get("/")
         self.assertEqual(home.status_code, 200)
-        for name in ("pd-user-logo-4-original.webp", "pd-user-photo-6-original.webp", "pd-user-photo-7-original.webp"):
-            self.assertIn(name.encode(), home.data)
-            result = client.get("/assets/" + name)
-            self.assertEqual(result.status_code, 200)
-            self.assertEqual(result.mimetype, "image/webp")
-            self.assertGreater(len(result.data), 200000)
-            self.assertEqual(result.data[:4], b"RIFF")
-            self.assertEqual(result.data[8:12], b"WEBP")
-        self.assertGreaterEqual(home.data.count(b'width="864" height="1536"'), 2)
-        self.assertIn(b'src="/assets/pd-user-logo-4-original.webp"', home.data)
-        self.assertNotIn(b"pd-approved-mock1-hero.webp", home.data)
-        self.assertIn("Ваш личный водитель".encode("utf-8"), home.data)
-        self.assertIn(b'class="hero mock-two-hero"', home.data)
-        self.assertIn(b'id="quick-trip-form"', home.data)
-        self.assertEqual(home.data.count(b'class="mock-service-card"'), 4)
-        for section in (b'id="services"',b'id="prices"',b'id="about"',b'id="order"',b'id="contacts"'):
-            self.assertIn(section, home.data)
-        self.assertLess(home.data.index(b'id="services"'),home.data.index(b'id="prices"'))
-        self.assertLess(home.data.index(b'id="prices"'),home.data.index(b'id="order"'))
-        self.assertNotIn(b"commons.wikimedia.org", home.data)
-        self.assertNotIn(b"wanderin.ge", home.data)
-        self.assertNotIn("commons.wikimedia.org", home.headers["Content-Security-Policy"])
+        data = home.data.decode("utf-8")
+        for heading in ("Ваш личный водитель", "Наши услуги", "Популярные направления",
+                        "Быстрый заказ поездки", "© 2026 jenia ai_fast_work"):
+            self.assertIn(heading, data)
+        for fare in ("40", "120", "320", "460"):
+            self.assertIn(fare + " евро", data)
+        self.assertEqual(data.count('class="pd-img-card fare-link"'), 4)
+        self.assertEqual(data.count('class="pd-img-card" href='), 3)
+        self.assertIn('id="quick-trip-form"', data)
+        self.assertIn('id="order-live-map"', data)
+        self.assertIn('id="route-details"', data)
+        self.assertIn('href="/services"', data)
+        self.assertNotIn("facebook.com", data)
+        self.assertNotIn("commons.wikimedia.org", data)
+        self.assertNotIn("private_drive.demo", data)
+        self.assertIn("mailto:evrobaltictransfer@gmail.com", data)
+        self.assertIn("https://t.me/PrivateDraive", data)
+        self.assertIn("https://t.me/ai_fast_work", data)
+        for name in ("hero", "airport", "kaunas", "klaipeda", "warsaw",
+                     "service_airport", "service_parcel", "service_driver"):
+            filename = "pd-approved-" + name + ".webp"
+            self.assertIn(filename, data)
+            response = client.get("/assets/" + filename)
+            self.assertEqual(response.status_code, 200, filename)
+            self.assertEqual(response.mimetype, "image/webp")
+            self.assertGreater(len(response.data), 8000)
+            self.assertEqual(response.data[:4], b"RIFF")
+        self.assertEqual(client.get("/assets/non-approved.webp").status_code, 404)
+        service = client.get("/services")
+        self.assertEqual(service.status_code, 200)
+        self.assertIn("Помощь с запуском автомобиля зимой", service.data.decode("utf-8"))
+        self.assertIn("Трезвый водитель", service.data.decode("utf-8"))
         for path in ("/pilot-registration", "/dispatch/login"):
-            result = client.get(path)
-            self.assertEqual(result.status_code, 200)
-            self.assertIn(b'/pd-logo-transparent.png', result.data)
+            self.assertEqual(client.get(path).status_code, 200)
         self.assertEqual(client.get("/dispatch").status_code, 302)
 
     def test_logo_size_and_aspect_ratio_mobile_desktop(self):

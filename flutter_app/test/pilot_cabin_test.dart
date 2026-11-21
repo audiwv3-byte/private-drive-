@@ -53,7 +53,7 @@ void main() {
     expect(find.text('Стоимость · 110 €'), findsOneWidget);
     expect(find.textContaining('Доход пилота · требуется тариф'), findsOneWidget);
     await tester.drag(find.byKey(const Key('pilot-global-accept-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-global-accept'))).width - 52), 0));
+      Offset(tester.getSize(find.byKey(const Key('pilot-global-offer-swipe'))).width * 0.48, 0));
     await tester.pump();
     expect(store.pilotAccepted, isTrue);
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);

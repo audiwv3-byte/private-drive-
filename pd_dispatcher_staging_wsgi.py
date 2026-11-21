@@ -48,7 +48,8 @@ def create_app():
                                  "X-Content-Type-Options": "nosniff",
                                  "Content-Security-Policy": "default-src 'none'; img-src 'self' https://tile.openstreetmap.org https://unpkg.com data:; connect-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
 
-    # Only three exact owner-approved media files are publicly served on this test service.
+    # Serve only approved owner assets on isolated staging; never query stock photo sites.
+    @app.get("/assets/pd-approved-mock1-hero.webp")
     @app.get("/assets/pd-user-photo-7-original.webp")
     @app.get("/assets/pd-user-logo-4-original.webp")
     @app.get("/assets/pd-user-photo-6-original.webp")
@@ -57,7 +58,7 @@ def create_app():
     @app.get("/assets/pd-user-logo-4.webp")
     def approved_brand_media():
         filename = request.path.rsplit("/", 1)[-1]
-        allowed = frozenset(("pd-user-photo-6.webp", "pd-user-photo-6-original.webp", "pd-user-photo-7.webp", "pd-user-photo-7-original.webp", "pd-user-logo-4.webp", "pd-user-logo-4-original.webp"))
+        allowed = frozenset(("pd-approved-mock1-hero.webp", "pd-user-photo-6.webp", "pd-user-photo-6-original.webp", "pd-user-photo-7.webp", "pd-user-photo-7-original.webp", "pd-user-logo-4.webp", "pd-user-logo-4-original.webp"))
         if filename not in allowed:
             return "Not found", 404
         media_path = Path(__file__).parent / "assets" / filename

@@ -33,6 +33,28 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertTrue(app.config["SESSION_COOKIE_SECURE"])
         self.assertTrue(app.config["SESSION_COOKIE_HTTPONLY"])
 
+    def test_dashboard_is_protected_and_has_mock_map(self):
+        with patch.dict(os.environ, self.env(), clear=True):
+            app = create_app()
+        app.config["TESTING"] = True
+        client = app.test_client()
+        self.assertEqual(client.get("/dispatch").status_code, 302)
+        login = client.get("/dispatch/login")
+        csrf = re.search(rb'name="csrf" value="([^"]+)"', login.data).group(1).decode()
+        response = client.post("/dispatch/login", data={
+            "csrf": csrf, "password": "synthetic-staging-password"
+        })
+        self.assertEqual(response.status_code, 302)
+        page = client.get("/dispatch")
+        self.assertEqual(page.status_code, 200)
+        for item in ("PRIVATE DRIVE", "Карта автопарка", "Панель управления", "Заказы",
+                     "Пилоты", "Финансы", "ТЕСТОВЫЕ ДАННЫЕ", "Схема расположения"):
+            self.assertIn(item.encode("utf-8"), page.data)
+        self.assertIn(b'data-filter="free"', page.data)
+        self.assertIn(b'id="zoom-in"', page.data)
+        self.assertNotIn(b"https://api.", page.data)
+        self.assertEqual(client.get("/api/admin/orders").status_code, 404)
+
     def test_login_and_logout(self):
         with patch.dict(os.environ, self.env(), clear=True):
             app = create_app()

@@ -1,5 +1,6 @@
 """Isolated dispatcher WSGI regression tests, no live services or credentials."""
 import os
+import re
 import unittest
 from unittest.mock import patch
 
@@ -38,13 +39,12 @@ class DispatcherStagingTests(unittest.TestCase):
         app.config["TESTING"] = True
         client = app.test_client()
         self.assertEqual(client.get("/dispatch").status_code, 302)
-        client.get("/dispatch/login")
-        with client.session_transaction() as s:
-            csrf = s["pd_dispatch_csrf"]
+        page = client.get("/dispatch/login")
+        csrf = re.search(rb'name="csrf" value="([^"]+)"', page.data).group(1).decode()
         self.assertEqual(client.post("/dispatch/login", data={"csrf":csrf,"password":"synthetic-staging-password"}).status_code, 302)
         self.assertEqual(client.get("/dispatch").status_code, 200)
-        with client.session_transaction() as s:
-            csrf = s["pd_dispatch_csrf"]
+        page = client.get("/dispatch")
+        csrf = re.search(rb'name="csrf" value="([^"]+)"', page.data).group(1).decode()
         self.assertEqual(client.post("/dispatch/logout", data={"csrf":csrf}).status_code, 302)
         self.assertEqual(client.get("/dispatch").status_code, 302)
 

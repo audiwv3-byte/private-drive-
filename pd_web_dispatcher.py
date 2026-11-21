@@ -42,7 +42,16 @@ def register(app, core):
             return "Диспетчерская не настроена", 503
         return False
 
-    # Isolated test deployment only: a browser session is never treated as Telegram initData.
+    # Fail closed on a shared Flask app: changing SECRET_KEY would invalidate
+    # existing Telegram sessions and make the dispatcher share its cookie.
+    # Dispatcher must be mounted as a separate Flask application for staging.
+    existing_secret = app.secret_key
+    if existing_secret is not None and existing_secret != secret:
+        @app.get("/dispatch")
+        @app.get("/dispatch/login")
+        def pd_dispatch_shared_app_disabled():
+            return "Диспетчерская требует отдельного Flask-приложения", 503
+        return False
     app.secret_key = secret
     app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SECURE=True,
                       SESSION_COOKIE_SAMESITE="Strict",

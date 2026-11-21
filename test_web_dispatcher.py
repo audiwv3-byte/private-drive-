@@ -29,6 +29,19 @@ class DispatcherBrowserTests(unittest.TestCase):
         self.assertFalse(active)
         self.assertEqual(app.test_client().get("/dispatch").status_code, 503)
 
+    def test_shared_app_secret_is_preserved(self):
+        app = Flask(__name__)
+        app.secret_key = "original-telegram-session-secret"
+        core = SimpleNamespace(ADMIN_IDS=frozenset({999}), is_admin=lambda uid: uid == 999)
+        cfg = {"PD_DISPATCH_SESSION_SECRET": "synthetic-secret-32-characters-minimum-12345",
+               "PD_DISPATCH_PASSWORD_HASH": generate_password_hash("test-only-password"),
+               "PD_DISPATCH_ADMIN_ID": "999"}
+        with patch.dict(os.environ, cfg, clear=True):
+            active = pd_web_dispatcher.register(app, core)
+        self.assertFalse(active)
+        self.assertEqual(app.secret_key, "original-telegram-session-secret")
+        self.assertEqual(app.test_client().get("/dispatch").status_code, 503)
+
     def test_browser_login_csrf_role_and_logout(self):
         app, active = self.make_app()
         self.assertTrue(active)

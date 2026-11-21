@@ -106,12 +106,13 @@ jobs:
           flutter pub get
           flutter analyze --no-fatal-infos
           flutter test
+          flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_check_page_test.dart
       - name: Compile full main.dart debug APK with isolated staging authentication
         working-directory: private_drive_build
         shell: bash
         run: |
           set -euo pipefail
-          flutter build apk --debug --target lib/main.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com
+          flutter build apk --debug --target lib/main.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com --dart-define=PD_INTERNAL_QA=true
           APK=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$APK"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"

@@ -246,9 +246,18 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
           ),
         );
       }
-      final hasBothCabinets = signedInRole == 'pilot_dispatcher';
-      final role = hasBothCabinets ? selectedStaffRole : signedInRole;
-      if (role == null) {
+      // Role selection is always explicit after verified sign-in. The server
+      // remains authoritative for privileged role access.
+      final serverRole = signedInRole!;
+      final canPilot = const {'admin', 'pilot', 'pilot_dispatcher'}
+          .contains(serverRole);
+      final canDispatch = const {'admin', 'dispatcher', 'pilot_dispatcher'}
+          .contains(serverRole);
+      final role = selectedStaffRole;
+      if (role == null ||
+          (role == 'pilot' && !canPilot) ||
+          (role == 'dispatcher' && !canDispatch) ||
+          !const {'passenger', 'pilot', 'dispatcher'}.contains(role)) {
         return Scaffold(
           appBar: AppBar(
             title: const Text('PRIVATE DRIVE'),
@@ -260,21 +269,53 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
               ),
             ],
           ),
-          body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FilledButton(
-                  key: const Key('authorized-open-pilot'),
-                  onPressed: () => setState(() => selectedStaffRole = 'pilot'),
-                  child: const Text('Кабина пилота'),
+          body: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    const Icon(Icons.dashboard_customize_outlined,
+                        size: 64, color: gold),
+                    const SizedBox(height: 16),
+                    const Text('Выбери кабинет',
+                      key: Key('authorized-role-selection'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      key: const Key('authorized-open-passenger'),
+                      onPressed: () => setState(() => selectedStaffRole = 'passenger'),
+                      icon: const Icon(Icons.person_outline),
+                      label: const Text('Пассажир'),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      key: const Key('authorized-open-pilot'),
+                      onPressed: canPilot
+                          ? () => setState(() => selectedStaffRole = 'pilot')
+                          : null,
+                      icon: const Icon(Icons.directions_car_outlined),
+                      label: const Text('Пилот'),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      key: const Key('authorized-open-dispatcher'),
+                      onPressed: canDispatch
+                          ? () => setState(() => selectedStaffRole = 'dispatcher')
+                          : null,
+                      icon: const Icon(Icons.support_agent_outlined),
+                      label: const Text('Диспетчер'),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Кабинеты пилота и диспетчера доступны только '
+                        'с правами, подтверждёнными сервером.',
+                        textAlign: TextAlign.center),
+                  ],
                 ),
-                FilledButton(
-                  key: const Key('authorized-open-dispatcher'),
-                  onPressed: () => setState(() => selectedStaffRole = 'dispatcher'),
-                  child: const Text('Кабинет диспетчера'),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -282,13 +323,11 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       return PrivateDriveDemo(
         key: ValueKey('$role-${signedInUserId!}'),
         storageScope: signedInUserId,
-        adminOnly: role == 'admin' || role == 'dispatcher',
+        adminOnly: role == 'dispatcher',
         pilotOnly: role == 'pilot',
         passengerOnly: role == 'passenger',
         onSignOut: signOut,
-        onBackToCabinets: hasBothCabinets
-            ? () => setState(() => selectedStaffRole = null)
-            : null,
+        onBackToCabinets: () => setState(() => selectedStaffRole = null),
       );
     }
     return Scaffold(

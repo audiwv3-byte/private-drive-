@@ -34,7 +34,8 @@ void main() {
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
     await tester.tap(find.byKey(const Key('pilot-cockpit-earnings-toggle')));
     await tester.pump();
-    expect(find.textContaining('Баланс · нет подключённых выплат'), findsOneWidget);
+    expect(find.byKey(const Key('pilot-stat-income')), findsOneWidget);
+    expect(find.text('Нет данных'), findsWidgets);
 
     final context = tester.element(find.byType(PilotDemo));
     Navigator.of(context).push(MaterialPageRoute<void>(

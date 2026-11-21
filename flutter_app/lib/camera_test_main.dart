@@ -4,7 +4,7 @@ import 'pilot_identity_notice_page.dart';
 /// Standalone entry point for the separately packaged Android camera test APK.
 ///
 /// Does not initialize native sign-in, orders, dispatcher privileges, network
-/// sync, a real pilot account, camera capture or biometrics. Never use this
+/// sync, a real pilot account, server photo upload or biometrics. Never use this
 /// entry point for a release or production package.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +53,7 @@ class PdIsolatedPilotCameraHome extends StatelessWidget {
               'Изолированный тест без входа по телефону. '
               'Это не рабочая кабина пилота: поездки, заказы, '
               'права администратора и серверная авторизация недоступны. '
-              'Снимки не создаются и не отправляются.',
+              'Снимок можно просмотреть локально. Отправка без авторизации недоступна.',
               key: Key('isolated-camera-safety-explanation'),
             ),
             const SizedBox(height: 24),

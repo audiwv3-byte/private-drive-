@@ -45,7 +45,7 @@ class IdentityHttpTests(unittest.TestCase):
             for uid, role in [('pilot', 'pilot'), ('other', 'pilot'), ('reviewer', 'admin'), ('passenger', 'passenger')]:
                 conn.execute("INSERT INTO native_auth_users VALUES (%s,'phone',%s,%s)", (uid, uid, self.now))
                 conn.execute('INSERT INTO native_auth_roles VALUES (%s,%s)', (uid, role))
-                digest = hashlib.sha256((uid * 48).encode()).hexdigest()
+                digest = hashlib.sha256(uid.ljust(48, 'x').encode()).hexdigest()
                 conn.execute('INSERT INTO native_auth_sessions VALUES (%s,%s,%s,%s,NULL)',
                     (digest, uid, self.now, self.now + 30 * 86400))
         out = io.BytesIO()
@@ -56,7 +56,7 @@ class IdentityHttpTests(unittest.TestCase):
         body = json.dumps(payload).encode() if payload is not None else b''
         env = {'REQUEST_METHOD': 'POST' if payload is not None else 'GET',
             'PATH_INFO': '/native-identity/' + endpoint,
-            'HTTP_AUTHORIZATION': 'Bearer ' + uid * 48,
+            'HTTP_AUTHORIZATION': 'Bearer ' + uid.ljust(48, 'x'),
             'CONTENT_TYPE': 'application/json', 'CONTENT_LENGTH': str(len(body)),
             'wsgi.input': io.BytesIO(body)}
         response = []

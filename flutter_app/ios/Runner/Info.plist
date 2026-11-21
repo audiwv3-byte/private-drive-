@@ -5,7 +5,9 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>PRIVATE DRIVE запрашивает камеру только по твоему нажатию для планируемой проверки личности пилота. В тестовом экране фотографии не создаются и не передаются.</string>
+	<string>PRIVATE DRIVE использует камеру по твоему нажатию для снимка лица пилота. После предпросмотра ты можешь отдельно отправить фото уполномоченному диспетчеру для проверки личности.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Фотоконтроль использует только камеру. Доступ к твоей галерее не запрашивается.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>PRIVATE DRIVE показывает местоположение пилота на карте только после включения GPS. Данные не отправляются на сервер в демоверсии.</string>
 	<key>CFBundleDevelopmentRegion</key>

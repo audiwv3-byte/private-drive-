@@ -14,6 +14,28 @@ class RecordingCamera implements PdPilotCameraPermission {
 }
 
 void main() {
+  testWidgets('Internal QA can exit notice without camera or granting identity',
+      (tester) async {
+    final camera = RecordingCamera();
+    var returnedToCabinets = false;
+    await tester.pumpWidget(MaterialApp(home: PdPilotIdentityNoticePage(
+      cameraPermission: camera,
+      onContinueWithoutVerification: () => returnedToCabinets = true,
+    )));
+    final skip = find.byKey(const Key('pilot-identity-notice-qa-skip'));
+    if (const bool.fromEnvironment('PD_INTERNAL_QA')) {
+      await tester.ensureVisible(skip);
+      expect(skip, findsOneWidget);
+      await tester.tap(skip);
+      await tester.pumpAndSettle();
+      expect(returnedToCabinets, isTrue);
+      expect(camera.requests, 0);
+      expect(find.textContaining('Личность не подтверждена'), findsOneWidget);
+    } else {
+      expect(skip, findsNothing);
+      expect(returnedToCabinets, isFalse);
+    }
+  });
   testWidgets('RU notice requires acknowledgement before camera permission',
       (tester) async {
     final camera = RecordingCamera();

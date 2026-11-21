@@ -8,9 +8,11 @@ class PdPilotIdentityNoticePage extends StatefulWidget {
   const PdPilotIdentityNoticePage({
     super.key,
     this.cameraPermission = const PdSystemPilotCameraPermission(),
+    this.onContinueWithoutVerification,
   });
 
   final PdPilotCameraPermission cameraPermission;
+  final VoidCallback? onContinueWithoutVerification;
 
   @override
   State<PdPilotIdentityNoticePage> createState() =>
@@ -178,6 +180,7 @@ class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
                           MaterialPageRoute<void>(
                             builder: (_) => PdPilotIdentityCheckPage(
                               cameraPermission: widget.cameraPermission,
+                              onContinueWithoutVerification: widget.onContinueWithoutVerification,
                             ),
                           ),
                         )

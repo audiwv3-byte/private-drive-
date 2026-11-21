@@ -55,6 +55,20 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertNotIn(b"https://api.", page.data)
         self.assertEqual(client.get("/api/admin/orders").status_code, 404)
 
+    def test_pilot_registration_public_preview_has_no_upload_backend(self):
+        with patch.dict(os.environ, self.env(), clear=True):
+            app = create_app()
+        app.config["TESTING"] = True
+        client = app.test_client()
+        page = client.get("/pilot-registration")
+        self.assertEqual(page.status_code, 200)
+        for expected in ("Регистрация пилота", "ФИО", "Телефон", "Категория прав",
+                         "Госномер", "Паспорт", "IBAN", "ТЕСТОВЫЙ МАКЕТ"):
+            self.assertIn(expected.encode("utf-8"), page.data)
+        self.assertIn(b"form-action 'none'", page.headers["Content-Security-Policy"].encode())
+        self.assertEqual(client.post("/pilot-registration", data={"full_name": "synthetic"}).status_code, 503)
+        self.assertNotIn("submit", app.view_functions)
+
     def test_login_and_logout(self):
         with patch.dict(os.environ, self.env(), clear=True):
             app = create_app()

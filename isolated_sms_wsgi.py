@@ -4,6 +4,8 @@ Only the dedicated isolated test Web Service imports this module. This module
 never mounts the Telegram Mini App, production site, or payment processing.
 """
 import os
+import json
+import threading
 
 from pd_native_auth_postgres_http import make_app
 from pd_native_identity_http import make_identity_app
@@ -30,3 +32,9 @@ application = make_app(
     live=live,
 )
 application = make_identity_app(application, database_url, sms_enabled=live)
+
+def _report_sms_setup():
+    from pd_twilio_setup_diagnostics import inspect_setup
+    print('PD_SMS_SETUP_STATUS ' + json.dumps(inspect_setup(os.environ)), flush=True)
+
+threading.Thread(target=_report_sms_setup, name='read-only-sms-setup', daemon=True).start()

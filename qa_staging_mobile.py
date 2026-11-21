@@ -34,12 +34,12 @@ with sync_playwright() as p:
             }""",arg=name,timeout=12000)
         page.locator(".hero-stage").scroll_into_view_if_needed()
         info = page.evaluate("""() => {
-           const ids = ['pd-user-logo-4-original.webp','pd-user-photo-6-original.webp','pd-user-photo-7-original.webp','pd-approved-mock1-hero.webp'];
+           const ids = ['pd-user-logo-4-original.webp','pd-user-photo-6-original.webp','pd-user-photo-7-original.webp'];
            const pics = ids.map(id => [...document.querySelectorAll('img')].find(x=>x.src.includes(id)));
            const hero = document.querySelector('.hero');
            const gallery = document.querySelector('.hero-stage');
            return {viewport:innerWidth, pageWidth:document.documentElement.scrollWidth,
-              images:pics.map((img,i)=>({found:!!img,loaded:!!img && img.complete && img.naturalWidth>=(i===3?420:864)})),
+              images:pics.map((img,i)=>({found:!!img,loaded:!!img && img.complete && img.naturalWidth>=864})),
               galleryWidth:gallery?.getBoundingClientRect().width||0,
               heroWidth:hero?.getBoundingClientRect().width||0,
               booking:!!document.querySelector('#passenger-preview'),
@@ -49,7 +49,13 @@ with sync_playwright() as p:
         assert all(i["loaded"] for i in info["images"]), f"Image loading failed {width}: {info}"
         assert info["galleryWidth"] > 120, f"Gallery clipped {width}: {info}"
         assert info["booking"] and info["map"], f"Existing functionality missing {width}: {info}"
+        assert page.locator(".mock-two-services .mock-service-card").count() == 4, "Four visual service cards missing"
+        page.locator("#quick-from").fill("Vilnius")
+        page.locator("#quick-to").fill("Kaunas")
+        page.locator("#quick-trip-form button").click()
+        assert page.locator("#pickup-address").input_value() == "Vilnius", "Quick origin did not copy"
+        assert page.locator("#dropoff-address").input_value() == "Kaunas", "Quick destination did not copy"
         page.screenshot(path=f"mobile-qa-screenshots/home-{width}.png", full_page=True)
-        print(f"MOBILE_QA_OK width={width} no_overflow=true photos_loaded=4 booking_and_map_present=true",flush=True)
+        print(f"MOBILE_QA_OK width={width} no_overflow=true photos_loaded=3 quick_order_works=true booking_and_map_present=true",flush=True)
         page.close()
     browser.close()

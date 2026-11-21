@@ -25,10 +25,10 @@ with sync_playwright() as p:
         page.goto(URL, wait_until="domcontentloaded", timeout=30000)
         page.locator(".hero-gallery").scroll_into_view_if_needed()
         info = page.evaluate("""() => {
-           const ids = ['pd-user-logo-4-original.webp','pd-user-photo-6-original.webp','pd-user-photo-7-original.webp'];
+           const ids = ['pd-user-logo-4-original.webp','pd-user-photo-6-original.webp','pd-user-photo-7-original.webp','pd-approved-mock1-hero.webp'];
            const pics = ids.map(id => [...document.querySelectorAll('img')].find(x=>x.src.includes(id)));
            const hero = document.querySelector('.hero');
-           const gallery = document.querySelector('.hero-gallery');
+           const gallery = document.querySelector('.hero-stage');
            return {viewport:innerWidth, pageWidth:document.documentElement.scrollWidth,
               images:pics.map(img=>({found:!!img,loaded:!!img && img.complete && img.naturalWidth>=864})),
               galleryWidth:gallery?.getBoundingClientRect().width||0,
@@ -41,6 +41,6 @@ with sync_playwright() as p:
         assert info["galleryWidth"] > 120, f"Gallery clipped {width}: {info}"
         assert info["booking"] and info["map"], f"Existing functionality missing {width}: {info}"
         page.screenshot(path=f"mobile-qa-screenshots/home-{width}.png", full_page=True)
-        print(f"MOBILE_QA_OK width={width} no_overflow=true photos_loaded=3 booking_and_map_present=true",flush=True)
+        print(f"MOBILE_QA_OK width={width} no_overflow=true photos_loaded=4 booking_and_map_present=true",flush=True)
         page.close()
     browser.close()

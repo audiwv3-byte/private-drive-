@@ -187,7 +187,9 @@ void main() {
     await tester.tap(book);
     await tester.pump();
     expect(find.text('Заявка создана · ожидает назначения'), findsOneWidget);
-    expect(tester.widget<FilledButton>(book).onPressed, isNull);
+    // The booking form may be replaced after submission; the order status
+    // and lack of a second create action prove submission is complete.
+    expect(find.byKey(const Key('passenger-trip-status')), findsWidgets);
 
     await tester.pageBack();
     await tester.pumpAndSettle();

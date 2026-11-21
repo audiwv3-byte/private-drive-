@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'pilot_offer_tone.dart';
 import 'pilot_sound_settings.dart';
 import 'pilot_payment_settings.dart';
+import 'pilot_identity_check_page.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
 import 'pilot_cockpit_overlay.dart';
@@ -333,6 +334,17 @@ class _PilotCabinState extends State<PilotCabin> {
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.3,
                     ),
+                  ),
+                  const SizedBox(height: 18),
+                  OutlinedButton.icon(
+                    key: const Key('pilot-open-identity-check'),
+                    icon: const Icon(Icons.verified_user_outlined),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const PdPilotIdentityCheckPage(),
+                      ),
+                    ),
+                    label: const Text('Проверка личности · раз в 7 дней'),
                   ),
                   if (_onLine) ...[
                     const SizedBox(height: 18),

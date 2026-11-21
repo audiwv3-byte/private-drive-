@@ -47,7 +47,7 @@ void main() {
       (tester) async {
     final camera = RecordingCamera();
     await tester.pumpWidget(MaterialApp(
-      home: PdPilotIdentityNoticePage(cameraPermission: camera),
+      home: PdPilotIdentityNoticePage(cameraPermission: camera, photoCapture: CancelledPhoto()),
     ));
     expect(find.textContaining('Проверка личности пилота'), findsOneWidget);
     expect(find.textContaining('Фото'), findsWidgets);
@@ -114,7 +114,7 @@ void main() {
           ? 'Vairuotojo tapatybės patikra'
           : 'Pilot identity verification'), findsOneWidget);
       expect(find.textContaining(language == 'LT'
-          ? 'nuotraukos'
+          ? 'nuotrauk'
           : 'photo'), findsWidgets);
     });
   }

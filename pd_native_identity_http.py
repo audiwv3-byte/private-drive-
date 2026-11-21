@@ -65,7 +65,7 @@ def purge_expired(database_url, now):
             WHERE photo IS NOT NULL AND expires_at<=%s""", (now,))
 
 
-def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=True):
+def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=True, sms_enabled=False):
     initialize_identity(database_url)
 
     if start_cleanup:
@@ -87,6 +87,9 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
 
     def app(environ, start_response):
         route = environ.get("PATH_INFO", "")
+        if route == "/health" and environ.get("REQUEST_METHOD") == "GET":
+            return reply(start_response, "200 OK", {"status": "ok", "sms_enabled": sms_enabled,
+                "identity_enabled": True, "identity_revision": "photo-review-v1"})
         if not route.startswith("/native-identity/"):
             return next_app(environ, start_response)
         method = environ.get("REQUEST_METHOD", "")

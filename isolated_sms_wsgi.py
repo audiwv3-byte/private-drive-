@@ -29,4 +29,4 @@ application = make_app(
     pilot_phone=os.environ.get("PD_NATIVE_PILOT_PHONE") or None,
     live=live,
 )
-application = make_identity_app(application, database_url)
+application = make_identity_app(application, database_url, sms_enabled=live)

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'pilot_identity_check_page.dart';
+import 'pilot_identity_notice_page.dart';
 
 /// Standalone entry point for the separately packaged Android camera test APK.
 ///
@@ -61,7 +61,7 @@ class PdIsolatedPilotCameraHome extends StatelessWidget {
               key: const Key('isolated-camera-open-identity'),
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const PdPilotIdentityCheckPage(),
+                  builder: (_) => const PdPilotIdentityNoticePage(),
                 ),
               ),
               icon: const Icon(Icons.camera_alt_outlined),

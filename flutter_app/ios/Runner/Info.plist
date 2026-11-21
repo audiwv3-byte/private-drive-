@@ -4,6 +4,8 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>PRIVATE DRIVE запрашивает камеру только по твоему нажатию для планируемой проверки личности пилота. В тестовом экране фотографии не создаются и не передаются.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>PRIVATE DRIVE показывает местоположение пилота на карте только после включения GPS. Данные не отправляются на сервер в демоверсии.</string>
 	<key>CFBundleDevelopmentRegion</key>

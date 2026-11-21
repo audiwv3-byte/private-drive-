@@ -50,6 +50,11 @@ class IsolatedDispatch:
                 );
                 CREATE INDEX IF NOT EXISTS idx_dispatch_offer_pilot
                     ON dispatch_offers(pilot_id,status,deadline);
+                CREATE TABLE IF NOT EXISTS dispatch_reservations (
+                    pilot_id TEXT PRIMARY KEY,
+                    order_id TEXT NOT NULL UNIQUE REFERENCES dispatch_orders(id),
+                    reserved_at REAL NOT NULL
+                );
             """)
 
     def _db(self):
@@ -66,6 +71,34 @@ class IsolatedDispatch:
         if not all(ch.isascii() and (ch.isalnum() or ch in "_-") for ch in value):
             raise DispatchError("invalid_id")
         return value
+
+    @staticmethod
+    def _has_fleet(conn):
+        return conn.execute("""SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='fleet_pilots'""").fetchone() is not None
+
+    @staticmethod
+    def _is_available(conn, pilot_id, now):
+        # A reservation always wins over any client-reported busy=False.
+        reserved = conn.execute(
+            "SELECT 1 FROM dispatch_reservations WHERE pilot_id=?",
+            (pilot_id,)).fetchone()
+        if reserved:
+            return False
+        if not IsolatedDispatch._has_fleet(conn):
+            # Earlier standalone synthetic tests have no fleet registry.
+            return True
+        row = conn.execute("""SELECT f.approved,f.online,f.vehicle_ready,
+            f.busy,f.gps_at,f.latitude,f.longitude,i.role,i.verified
+            FROM fleet_pilots f JOIN fleet_identities i ON i.user_id=f.user_id
+            WHERE f.user_id=?""", (pilot_id,)).fetchone()
+        return bool(row and row["role"] == "pilot" and row["verified"]
+                    and row["approved"] and row["online"]
+                    and row["vehicle_ready"] and not row["busy"]
+                    and row["latitude"] is not None
+                    and row["longitude"] is not None
+                    and row["gps_at"] is not None
+                    and 0 <= now - row["gps_at"] < 90)
 
     def create_test_order(self, order_id):
         """Only for isolated synthetic fixtures, never a real booking endpoint."""
@@ -110,7 +143,11 @@ class IsolatedDispatch:
             used = {r[0] for r in conn.execute(
                 "SELECT DISTINCT pilot_id FROM dispatch_offers WHERE order_id=?", (order_id,))}
             # Exclude previously offered pilots, including explicit declines.
-            chosen = [pid for pid, _ in pilots if pid not in used][:BATCH_SIZE]
+            # Revalidate availability under the SAME write transaction that
+            # persists offers. A previously ranked pilot may now be busy,
+            # revoked, offline, or already reserved for a different order.
+            chosen = [pid for pid, _ in pilots
+                      if pid not in used and self._is_available(conn, pid, now)][:BATCH_SIZE]
             if not chosen:
                 conn.execute("UPDATE dispatch_orders SET status='requested' WHERE id=?", (order_id,))
                 return []
@@ -159,6 +196,14 @@ class IsolatedDispatch:
                     WHERE order_id=? AND pilot_id=? AND round_no=?""",
                     (order_id, pilot_id, order["round_no"]))
                 return "declined"
+            # Recheck verified identity, current GPS and vehicle state inside
+            # the acceptance transaction. The unique pilot_id reservation
+            # prevents winning another order, including across connections.
+            if not self._is_available(conn, pilot_id, now):
+                return "pilot_unavailable"
+            conn.execute("""INSERT INTO dispatch_reservations
+                (pilot_id,order_id,reserved_at) VALUES (?,?,?)""",
+                (pilot_id, order_id, now))
             conn.execute("""UPDATE dispatch_orders SET status='assigned', winner=?
                 WHERE id=? AND status='offered' AND winner IS NULL""",
                 (pilot_id, order_id))
@@ -169,6 +214,42 @@ class IsolatedDispatch:
             conn.execute("""INSERT INTO dispatch_events(order_id,pilot_id,event,at)
                 VALUES (?,?, 'accepted',?)""", (order_id, pilot_id, now))
             return "accepted"
+
+    def release_reservation(self, order_id, *, authenticated_dispatcher):
+        """Cancel an assigned synthetic trip and release only its own pilot.
+
+        This is a trusted maintenance action; a genuine dispatcher identity
+        must exist in the synthetic fleet registry. No client-originated role.
+        """
+        order_id = self._id(order_id)
+        dispatcher = self._id(authenticated_dispatcher)
+        now = self.clock()
+        with self._db() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            identity = conn.execute("""SELECT role, verified FROM fleet_identities
+                WHERE user_id=?""", (dispatcher,)).fetchone() if self._has_fleet(conn) else None
+            if not identity or identity["role"] != "dispatcher" or not identity["verified"]:
+                raise DispatchError("forbidden")
+            order = conn.execute("SELECT * FROM dispatch_orders WHERE id=?", (order_id,)).fetchone()
+            if order is None:
+                raise DispatchError("not_found")
+            if order["status"] == "cancelled":
+                return "already_released"
+            if order["status"] != "assigned" or order["winner"] is None:
+                raise DispatchError("not_assigned")
+            # WHERE on both IDs prevents clearing a reservation belonging to
+            # another order, even in an inconsistent or stale client request.
+            deleted = conn.execute("""DELETE FROM dispatch_reservations
+                WHERE pilot_id=? AND order_id=?""",
+                (order["winner"], order_id))
+            if deleted.rowcount != 1:
+                raise DispatchError("reservation_mismatch")
+            conn.execute("""UPDATE dispatch_orders SET status='cancelled'
+                WHERE id=?""", (order_id,))
+            conn.execute("""INSERT INTO dispatch_events(order_id,pilot_id,event,at)
+                VALUES (?,?, 'released',?)""",
+                (order_id, order["winner"], now))
+            return "released"
 
     def snapshot(self, order_id):
         order_id = self._id(order_id)

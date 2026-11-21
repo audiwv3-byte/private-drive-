@@ -94,7 +94,7 @@ class DispatcherStagingTests(unittest.TestCase):
         page = client.get("/")
         self.assertEqual(page.status_code, 200)
         for value in ("Поездка", "Трансфер", "pickup-address", "dropoff-address",
-                      "use-location", "navigator.geolocation", "order-map-frame",
+                      "use-location", "navigator.geolocation", "order-live-map", "leaflet.js",
                       "order-live-map", "leaflet.js", "pickup-date",
                       "pickup-time", "car-category", "preview-route"):
             self.assertIn(value.encode(), page.data)

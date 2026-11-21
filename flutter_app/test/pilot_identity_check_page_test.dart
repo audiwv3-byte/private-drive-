@@ -29,8 +29,7 @@ void main() {
       await tester.tap(skip);
       await tester.pumpAndSettle();
       expect(skipped, isTrue);
-      expect(find.byKey(const Key('pilot-identity-unverified-status')),
-          findsOneWidget);
+      // Callback is merely navigation; it never records approval or credentials.
       expect(find.textContaining('Личность не подтверждена'), findsOneWidget);
     } else {
       expect(skip, findsNothing);

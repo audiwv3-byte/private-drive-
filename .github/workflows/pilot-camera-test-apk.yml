@@ -87,7 +87,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter build apk --debug --dart-define=PD_NATIVE_AUTH_API_URL=
+          flutter build apk --debug --target lib/camera_test_main.dart --dart-define=PD_NATIVE_AUTH_API_URL=
           APK=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$APK"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"

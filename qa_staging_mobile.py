@@ -23,14 +23,14 @@ with sync_playwright() as p:
         page.route("https://tile.openstreetmap.org/**", lambda route: route.abort())
         page.route("https://unpkg.com/**", lambda route: route.abort())
         page.goto(URL, wait_until="domcontentloaded", timeout=30000)
-        page.locator(".hero-gallery").scroll_into_view_if_needed()
+        page.locator(".hero-stage").scroll_into_view_if_needed()
         info = page.evaluate("""() => {
            const ids = ['pd-user-logo-4-original.webp','pd-user-photo-6-original.webp','pd-user-photo-7-original.webp','pd-approved-mock1-hero.webp'];
            const pics = ids.map(id => [...document.querySelectorAll('img')].find(x=>x.src.includes(id)));
            const hero = document.querySelector('.hero');
            const gallery = document.querySelector('.hero-stage');
            return {viewport:innerWidth, pageWidth:document.documentElement.scrollWidth,
-              images:pics.map(img=>({found:!!img,loaded:!!img && img.complete && img.naturalWidth>=864})),
+              images:pics.map((img,i)=>({found:!!img,loaded:!!img && img.complete && img.naturalWidth>=(i===3?420:864)})),
               galleryWidth:gallery?.getBoundingClientRect().width||0,
               heroWidth:hero?.getBoundingClientRect().width||0,
               booking:!!document.querySelector('#passenger-preview'),

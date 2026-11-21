@@ -11,6 +11,7 @@ import 'taxi_fare.dart';
 import 'demo_rating_panel.dart';
 import 'company_info.dart';
 import 'passenger_orders_demo.dart';
+import 'pd_pilot_assignment_waiting.dart';
 import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -1752,6 +1753,19 @@ class _PassengerDemoState extends State<PassengerDemo> {
           ), // draggable panel
           if (!widget.enableMapTiles)
             Positioned.fill(child: bookingForm(null)),
+          // Status is driven by the existing order store; no simulated GPS
+          // matching, polling or server contact is started here.
+          if (widget.tripStore?.status == DemoTripStatus.requested)
+            const Positioned(
+              top: 74,
+              left: 14,
+              right: 14,
+              child: Center(
+                child: IgnorePointer(
+                  child: PdPilotAssignmentWaiting(),
+                ),
+              ),
+            ),
         ]), // viewport map stack
       ), // safe area
     );

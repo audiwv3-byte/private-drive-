@@ -55,6 +55,23 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertNotIn(b"https://api.", page.data)
         self.assertEqual(client.get("/api/admin/orders").status_code, 404)
 
+    def test_user_logo_displayed_on_all_staging_pages(self):
+        with patch.dict(os.environ, self.env(), clear=True):
+            app = create_app()
+        app.config["TESTING"] = True
+        client = app.test_client()
+        logo = client.get("/pd-logo.jpg")
+        self.assertEqual(logo.status_code, 200)
+        self.assertEqual(logo.mimetype, "image/jpeg")
+        self.assertGreater(len(logo.data), 2500)
+        self.assertTrue(logo.data.startswith(bytes.fromhex("ffd8")))
+        self.assertTrue(logo.data.endswith(bytes.fromhex("ffd9")))
+        for path in ("/", "/pilot-registration", "/dispatch/login"):
+            result = client.get(path)
+            self.assertEqual(result.status_code, 200)
+            self.assertIn(b'/pd-logo.jpg', result.data)
+        self.assertEqual(client.get("/dispatch").status_code, 302)
+
     def test_pilot_registration_public_preview_has_no_upload_backend(self):
         with patch.dict(os.environ, self.env(), clear=True):
             app = create_app()

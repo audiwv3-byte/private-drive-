@@ -46,7 +46,21 @@ def create_app():
         return Response(page, content_type="text/html; charset=utf-8",
                         headers={"Cache-Control": "no-store",
                                  "X-Content-Type-Options": "nosniff",
-                                 "Content-Security-Policy": "default-src 'none'; img-src 'self' https://tile.openstreetmap.org https://unpkg.com https://commons.wikimedia.org https://upload.wikimedia.org data:; connect-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+                                 "Content-Security-Policy": "default-src 'none'; img-src 'self' https://tile.openstreetmap.org https://unpkg.com data:; connect-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+
+    # Only three exact owner-approved media files are publicly served on this test service.
+    @app.get("/assets/pd-user-photo-6.webp")
+    @app.get("/assets/pd-user-photo-7.webp")
+    @app.get("/assets/pd-user-logo-4.webp")
+    def approved_brand_media():
+        filename = request.path.rsplit("/", 1)[-1]
+        allowed = frozenset(("pd-user-photo-6.webp", "pd-user-photo-7.webp", "pd-user-logo-4.webp"))
+        if filename not in allowed:
+            return "Not found", 404
+        media_path = Path(__file__).parent / "assets" / filename
+        return Response(media_path.read_bytes(), mimetype="image/webp",
+                        headers={"Cache-Control":"public, max-age=3600",
+                                 "X-Content-Type-Options":"nosniff"})
 
     @app.get("/pd-logo-transparent.png")
     def pd_logo_asset():

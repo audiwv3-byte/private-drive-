@@ -113,6 +113,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Stable TEST signing key: never use this public development key for release.
+          mkdir -p "$HOME/.android"
+          base64 --decode ../flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
           flutter build apk --debug --target lib/main.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com --dart-define=PD_INTERNAL_QA=true
           APK=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$APK"
@@ -138,3 +141,4 @@ jobs:
           path: full_native_qa_apk/
           if-no-files-found: error
           retention-days: 7
+

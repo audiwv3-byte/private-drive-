@@ -1,0 +1,30 @@
+name: PRIVATE DRIVE isolated photo review tests
+on:
+  push:
+    branches: [feature/flutter-independent-auth]
+    paths:
+      - 'pd_native_identity_http.py'
+      - 'test_native_identity_http.py'
+      - 'isolated_sms_wsgi.py'
+      - '.github/workflows/native-identity-checks.yml'
+jobs:
+  photo-review:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: synthetic-local-test
+          POSTGRES_DB: identity_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PD_IDENTITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-local-test@localhost:5432/identity_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-sms-render.txt
+      - run: python -m unittest -v test_native_identity_http.py

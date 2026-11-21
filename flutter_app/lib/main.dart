@@ -11,6 +11,8 @@ import 'app_language.dart';
 import 'permissions_onboarding.dart';
 import 'company_info.dart';
 import 'pd_http_api.dart';
+import 'pilot_identity_api.dart';
+import 'pilot_photo_capture.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 // Opt-in only for the isolated static Safari/Android browser test artifact.
@@ -19,6 +21,7 @@ const isolatedWebPreview = bool.fromEnvironment('PD_ISOLATED_WEB_PREVIEW');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await PdSystemPilotPhotoCapture.discardLostCapture();
   await pdLanguage.restore();
   runApp(const PrivateDriveApp());
 }
@@ -320,7 +323,9 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
           ),
         );
       }
-      return PrivateDriveDemo(
+      return PdIdentityScope(
+        api: PdIdentityApi(baseUrl: widget.authApiUrl, token: sessionToken!, client: widget.httpClient),
+        child: PrivateDriveDemo(
         key: ValueKey('$role-${signedInUserId!}'),
         storageScope: signedInUserId,
         adminOnly: role == 'dispatcher',
@@ -328,7 +333,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         passengerOnly: role == 'passenger',
         onSignOut: signOut,
         onBackToCabinets: () => setState(() => selectedStaffRole = null),
-      );
+      ));
     }
     return Scaffold(
       appBar: AppBar(
@@ -370,7 +375,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
-                  'Версия 0.2.24 · сборка 2026112022',
+                  'Версия 0.2.25 · сборка 2026112101',
                   key: Key('app-demo-version'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),
@@ -495,3 +500,4 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     );
   }
 }
+

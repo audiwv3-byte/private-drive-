@@ -8,6 +8,8 @@ import 'passenger_ride_entry.dart';
 import 'app_language.dart';
 import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
+import 'pilot_identity_api.dart';
+import 'pilot_identity_review_page.dart';
 import 'pilot_sound_settings.dart';
 import 'pilot_payment_settings.dart';
 import 'pilot_offer_tone.dart';
@@ -240,6 +242,15 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
               ? null
               : BackButton(onPressed: widget.onBackToCabinets),
           actions: [
+            if (PdIdentityScope.maybeOf(context) != null)
+              IconButton(
+                key: const Key('dispatcher-photo-review'),
+                tooltip: 'Фотоконтроль пилотов',
+                icon: const Icon(Icons.verified_user_outlined),
+                onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
+                  builder: (_) => PdIdentityReviewPage(api: PdIdentityScope.maybeOf(context)!),
+                )),
+              ),
             if (widget.onSignOut != null)
               IconButton(
                 key: const Key('admin-sign-out'),

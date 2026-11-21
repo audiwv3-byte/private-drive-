@@ -5,6 +5,7 @@ import 'pilot_offer_tone.dart';
 import 'pilot_sound_settings.dart';
 import 'pilot_payment_settings.dart';
 import 'pilot_identity_notice_page.dart';
+import 'pilot_identity_api.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
 import 'pilot_cockpit_overlay.dart';
@@ -342,6 +343,7 @@ class _PilotCabinState extends State<PilotCabin> {
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => PdPilotIdentityNoticePage(
+                          api: PdIdentityScope.maybeOf(context),
                           onContinueWithoutVerification: () {
                             // Never mark identity verified or change server rights.
                             Navigator.of(context).popUntil((route) => route.isFirst);
@@ -378,3 +380,4 @@ class _PilotCabinState extends State<PilotCabin> {
     );
   }
 }
+

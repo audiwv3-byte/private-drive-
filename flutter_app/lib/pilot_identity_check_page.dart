@@ -1,135 +1,165 @@
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'pilot_identity_api.dart';
+import 'pilot_photo_capture.dart';
 
-/// Narrow, replaceable interface: the preview NEVER captures, stores or sends
-/// a photo, uses biometrics or changes driver eligibility.
 abstract class PdPilotCameraPermission {
   Future<bool> requestCamera();
 }
-
 class PdSystemPilotCameraPermission implements PdPilotCameraPermission {
   const PdSystemPilotCameraPermission();
-
   @override
-  Future<bool> requestCamera() async {
-    if (kIsWeb) return false; // Web permission needs a separate user-media flow.
-    final status = await Permission.camera.request();
-    return status.isGranted;
-  }
+  Future<bool> requestCamera() async =>
+      !kIsWeb && (await Permission.camera.request()).isGranted;
 }
-
-/// Identity-check UX proposal only: no camera preview, photos or verification.
-/// The non-verifying QA bypass is compiled only into explicitly flagged builds.
 class PdPilotIdentityCheckPage extends StatefulWidget {
-  const PdPilotIdentityCheckPage({
-    super.key,
+  const PdPilotIdentityCheckPage({super.key,
     this.cameraPermission = const PdSystemPilotCameraPermission(),
-    this.onContinueWithoutVerification,
-  });
-
+    this.photoCapture = const PdSystemPilotPhotoCapture(),
+    this.api, this.onContinueWithoutVerification});
   final PdPilotCameraPermission cameraPermission;
+  final PdPilotPhotoCapture photoCapture;
+  final PdIdentityApi? api;
   final VoidCallback? onContinueWithoutVerification;
-
   @override
-  State<PdPilotIdentityCheckPage> createState() =>
-      _PdPilotIdentityCheckPageState();
+  State<PdPilotIdentityCheckPage> createState() => _PdPilotIdentityCheckPageState();
 }
-
 class _PdPilotIdentityCheckPageState extends State<PdPilotIdentityCheckPage> {
-  bool _requesting = false;
-  String? _result;
+  bool _busy = false;
+  Uint8List? _photo;
+  String _status = 'Проверка личности не выполнена';
+  String? _message;
+  PdIdentityApi? get _api => widget.api ?? PdIdentityScope.maybeOf(context);
 
-  Future<void> _start() async {
-    if (_requesting) return;
-    setState(() {
-      _requesting = true;
-      _result = null;
-    });
+  Future<void> _capture() async {
+    if (_busy) return;
+    setState(() { _busy = true; _message = null; });
     try {
-      final allowed = await widget.cameraPermission.requestCamera();
+      if (!await widget.cameraPermission.requestCamera()) {
+        if (mounted) setState(() => _message =
+            'Доступ к камере не предоставлен. Разреши камеру в настройках приложения и повтори.');
+        return;
+      }
+      final photo = await widget.photoCapture.capture();
       if (!mounted) return;
-      setState(() {
-        _result = allowed
-            ? 'Камера разрешена. Съёмка отключена: '
-              'проверка личности ещё не подключена.'
-            : 'Доступ к камере не предоставлен. '
-              'Разрешение можно изменить в настройках устройства.';
-      });
+      if (photo == null) {
+        setState(() => _message = 'Съёмка отменена. Можно повторить или вернуться в кабинет.');
+      } else if (photo.isEmpty || photo.length > 2 * 1024 * 1024) {
+        setState(() => _message = 'Не удалось подготовить фото. Максимальный размер — 2 МБ. Повтори съёмку.');
+      } else {
+        setState(() { _photo = photo; _message = 'Проверь фото перед отправкой.'; });
+      }
     } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _result = 'Не удалось запросить камеру. '
-            'Проверь разрешения приложения в настройках устройства.';
-      });
+      if (mounted) setState(() => _message =
+          'Не удалось открыть камеру. Проверь разрешения и повтори съёмку.');
     } finally {
-      if (mounted) setState(() => _requesting = false);
+      if (mounted) setState(() => _busy = false);
     }
   }
-
+  Future<void> _submit() async {
+    final api = _api;
+    final photo = _photo;
+    if (_busy || photo == null || api == null) return;
+    setState(() { _busy = true; _message = null; });
+    try {
+      final result = await api.submit(photo);
+      if (result['status'] != 'pending') {
+        throw const FormatException('Expected pending review');
+      }
+      if (mounted) setState(() {
+        _photo = null;
+        _status = 'Фото отправлено · ожидает проверки диспетчером';
+        _message = 'Отправка фото не подтверждает личность и не меняет права аккаунта.';
+      });
+    } catch (_) {
+      if (mounted) setState(() => _message =
+          'Фото не отправлено. Проверь подключение и повтори. Снимок оставлен для повторной отправки.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+  Future<void> _refresh() async {
+    final api = _api;
+    if (_busy || api == null) return;
+    setState(() { _busy = true; _message = null; });
+    try {
+      final result = await api.status();
+      final label = switch (result['status']) {
+        'approved' => 'Личность подтверждена диспетчером',
+        'pending' => 'Фото ожидает проверки диспетчером',
+        'rejected' => 'Фото отклонено · сделай новый снимок',
+        'expired' => 'Срок проверки истёк · сделай новый снимок',
+        _ => 'Проверка личности не выполнена',
+      };
+      if (mounted) setState(() => _status = label);
+    } catch (_) {
+      if (mounted) setState(() => _message =
+          'Не удалось получить статус с сервера. Повтори запрос.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('PRIVATE DRIVE · Проверка личности')),
-        body: SafeArea(
-          child: ListView(
-            key: const Key('pilot-identity-check-page'),
-            padding: const EdgeInsets.all(24),
-            children: [
-              const Icon(Icons.verified_user_outlined,
-                  size: 72, color: Color(0xFFDDC184)),
-              const SizedBox(height: 18),
-              const Text('Подтверждение личности пилота',
-                  style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              const Text(
-                'Планируемая проверка: при первом подключении, затем '
-                'не реже одного раза в 7 дней. Сейчас это тестовый экран. '
-                'Он не может подтвердить личность и не влияет на доступ к заказам.',
-                key: Key('pilot-identity-explanation'),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Для будущего подтверждения личности потребуется камера. '
-                'Разрешение запрашивается только после нажатия кнопки. '
-                'Фотография не создаётся, не сохраняется и не отправляется. '
-                'Биометрическое распознавание отсутствует. '
-                'Микрофон для проверки лица не используется.',
-                key: Key('pilot-identity-privacy'),
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                key: const Key('pilot-identity-request-camera'),
-                onPressed: _requesting ? null : _start,
-                icon: const Icon(Icons.camera_alt_outlined),
-                label: Text(_requesting
-                    ? 'Запрос разрешения…'
-                    : 'Разрешить камеру для проверки'),
-              ),
-              if (_result != null) ...[
-                const SizedBox(height: 16),
-                Text(_result!, key: const Key('pilot-identity-result')),
-              ],
-              const SizedBox(height: 20),
-              if (const bool.fromEnvironment('PD_INTERNAL_QA') &&
-                  widget.onContinueWithoutVerification != null) ...[
-                OutlinedButton.icon(
-                  key: const Key('pilot-identity-qa-skip'),
-                  onPressed: widget.onContinueWithoutVerification,
-                  icon: const Icon(Icons.arrow_forward),
-                  label: const Text('Продолжить без проверки лица'),
-                ),
-                const Text('Только внутренняя тестовая сборка. Личность не подтверждена. '
-                    'Дополнительные права не выдаются.'),
-                const SizedBox(height: 16),
-              ],
-              const Text(
-                'Статус: проверка личности не выполнена. '
-                'Реальный процесс будет доступен после защищённой '
-                'серверной интеграции и утверждения обработки данных.',
-                key: Key('pilot-identity-unverified-status'),
-              ),
-            ],
-          ),
-        ),
-      );
+    appBar: AppBar(title: const Text('PRIVATE DRIVE · Фотоконтроль')),
+    body: SafeArea(child: ListView(
+      key: const Key('pilot-identity-check-page'),
+      padding: const EdgeInsets.all(24),
+      children: [
+        const Text('Подтверждение личности пилота',
+            style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        Text(_status, key: const Key('pilot-identity-unverified-status')),
+        const SizedBox(height: 12),
+        const Text('Сделай чёткий снимок лица при хорошем освещении. '
+          'Фото отправляется только по отдельному нажатию. '
+          'Решение принимает диспетчер; автоматического распознавания нет.',
+          key: Key('pilot-identity-privacy')),
+        if (const bool.fromEnvironment('PD_INTERNAL_QA') &&
+            widget.onContinueWithoutVerification != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: const Key('pilot-identity-qa-skip'),
+            onPressed: _busy ? null : widget.onContinueWithoutVerification,
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('Продолжить без проверки лица')),
+          const Text('Только внутренняя тестовая сборка. Личность не подтверждена. Права не изменяются.'),
+        ],
+        const SizedBox(height: 16),
+        if (_photo != null) ...[
+          Image.memory(_photo!, height: 240, fit: BoxFit.contain,
+            key: const Key('pilot-identity-photo-preview'),
+            errorBuilder: (_, _, _) => const Text('Не удалось показать снимок. Сделай новое фото.')),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            key: const Key('pilot-identity-submit'),
+            onPressed: _busy || _api == null ? null : _submit,
+            icon: const Icon(Icons.upload_outlined),
+            label: const Text('Отправить на проверку')),
+        ],
+        FilledButton.icon(
+          key: const Key('pilot-identity-request-camera'),
+          onPressed: _busy ? null : _capture,
+          icon: const Icon(Icons.camera_alt_outlined),
+          label: Text(_photo == null ? 'Сделать фото' : 'Переснять')),
+        if (_api == null)
+          const Text('Сервер фотоконтроля не подключён. Отправка недоступна; личность не подтверждена.'),
+        if (_message != null)
+          Text(_message!, key: const Key('pilot-identity-result')),
+        if (_busy) const LinearProgressIndicator(),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          key: const Key('pilot-identity-refresh'),
+          onPressed: _busy || _api == null ? null : _refresh,
+          child: const Text('Обновить статус')),
+        TextButton(
+          key: const Key('pilot-identity-back'),
+          onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
+          child: const Text('Вернуться в кабинет')),
+      ],
+    )),
+  );
 }
+

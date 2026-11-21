@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:private_drive/pilot_photo_capture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/pilot_identity_notice_page.dart';
@@ -13,13 +15,18 @@ class RecordingCamera implements PdPilotCameraPermission {
   }
 }
 
+class CancelledPhoto implements PdPilotPhotoCapture {
+  @override
+  Future<Uint8List?> capture() async => null;
+}
+
 void main() {
   testWidgets('Internal QA can exit notice without camera or granting identity',
       (tester) async {
     final camera = RecordingCamera();
     var returnedToCabinets = false;
     await tester.pumpWidget(MaterialApp(home: PdPilotIdentityNoticePage(
-      cameraPermission: camera,
+      cameraPermission: camera, photoCapture: CancelledPhoto(),
       onContinueWithoutVerification: () => returnedToCabinets = true,
     )));
     final skip = find.byKey(const Key('pilot-identity-notice-qa-skip'));
@@ -43,7 +50,7 @@ void main() {
       home: PdPilotIdentityNoticePage(cameraPermission: camera),
     ));
     expect(find.textContaining('Проверка личности пилота'), findsOneWidget);
-    expect(find.textContaining('Фото'), findsNothing);
+    expect(find.textContaining('Фото'), findsWidgets);
     expect(find.byKey(const Key('pilot-identity-notice-purpose')), findsOneWidget);
     expect(find.byKey(const Key('pilot-identity-notice-retention')), findsOneWidget);
     expect(find.byKey(const Key('pilot-identity-notice-rights')), findsOneWidget);
@@ -74,7 +81,7 @@ void main() {
     await tester.tap(find.byKey(const Key('pilot-identity-request-camera')));
     await tester.pumpAndSettle();
     expect(camera.requests, 1);
-    expect(find.textContaining('Съёмка отключена'), findsOneWidget);
+    expect(find.textContaining('Съёмка отменена'), findsOneWidget);
   });
 
   for (final language in ['LT', 'EN']) {

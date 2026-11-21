@@ -6,6 +6,7 @@ never mounts the Telegram Mini App, production site, or payment processing.
 import os
 
 from pd_native_auth_postgres_http import make_app
+from pd_native_identity_http import make_identity_app
 
 if os.environ.get("PD_NATIVE_SMS_ISOLATED") != "YES":
     raise RuntimeError("Isolated SMS deployment requires explicit opt-in")
@@ -28,3 +29,4 @@ application = make_app(
     pilot_phone=os.environ.get("PD_NATIVE_PILOT_PHONE") or None,
     live=live,
 )
+application = make_identity_app(application, database_url)

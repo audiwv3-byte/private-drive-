@@ -60,7 +60,7 @@ def create_app():
         return Response(page, content_type="text/html; charset=utf-8",
                         headers={"Cache-Control": "no-store",
                                  "X-Content-Type-Options": "nosniff",
-                                 "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+                                 "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
 
     @app.post("/pilot-registration")
     def pilot_registration_submission_disabled():

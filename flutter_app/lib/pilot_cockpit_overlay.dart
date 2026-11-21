@@ -62,26 +62,26 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                   child: Material(
                     color: background,
                     borderRadius: BorderRadius.circular(18),
-                    child: InkWell(
-                      key: const Key('pilot-cockpit-earnings-toggle'),
-                      onTap: () => setState(() => _expanded = !_expanded),
-                      borderRadius: BorderRadius.circular(18),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InkWell(
+                          key: const Key('pilot-cockpit-earnings-toggle'),
+                          onTap: () => setState(() => _expanded = !_expanded),
+                          borderRadius: BorderRadius.circular(18),
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const PrivateDriveBrandLogo(size: 27, circular: true),
                                 const SizedBox(width: 7),
                                 Flexible(
-                                  child: Text(pdLabel(context, 'Сегодня · 0,00 €'),
+                                  child: Text(pdLabel(context, 'Сегодня · Нет данных'),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                       color: gold,
                                     )),
@@ -93,27 +93,54 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
                                 ),
                               ],
                             ),
-                            if (_expanded) ...[
-                              const SizedBox(height: 8),
-                              Text(pdLabel(context, 'За неделю · 0,00 € · демо'),
-                                style: TextStyle(fontSize: 12)),
-                              Text(pdLabel(context, 'Баланс · нет подключённых выплат'),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 12)),
-                              Text(
-                                fare == null
-                                  ? pdLabel(context, 'Стоимость заказа · по запросу')
-                                  : '${pdLabel(context, 'Стоимость заказа')} · $fare €',
-                                style: const TextStyle(
-                                  fontSize: 12, color: gold),
-                              ),
-                              Text(pdLabel(context, 'Доход пилота · комиссия не настроена'),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 11)),
-                            ],
-                          ],
+                          ),
                         ),
-                      ),
+                        if (_expanded)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: MediaQuery.sizeOf(context).height * 0.48,
+                            ),
+                            child: SingleChildScrollView(
+                              key: const Key('pilot-cockpit-statistics-panel'),
+                              padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  _PilotStatisticTile(
+                                    tileKey: 'pilot-stat-income',
+                                    icon: Icons.euro,
+                                    title: 'Доход',
+                                    value: 'Нет данных',
+                                  ),
+                                  _PilotStatisticTile(
+                                    tileKey: 'pilot-stat-acceptance',
+                                    icon: Icons.call_received,
+                                    title: 'Принятие заказов',
+                                    value: 'Нет данных',
+                                  ),
+                                  _PilotStatisticTile(
+                                    tileKey: 'pilot-stat-rating',
+                                    icon: Icons.star_outline,
+                                    title: 'Рейтинг пилота',
+                                    value: 'Нет данных',
+                                  ),
+                                  _PilotStatisticTile(
+                                    tileKey: 'pilot-stat-level',
+                                    icon: Icons.workspace_premium_outlined,
+                                    title: 'Уровень пилота',
+                                    value: 'Нет данных',
+                                  ),
+                                  _PilotStatisticTile(
+                                    tileKey: 'pilot-stat-rewards',
+                                    icon: Icons.card_giftcard_outlined,
+                                    title: 'Поощрения',
+                                    value: 'Нет данных',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -198,6 +225,52 @@ class _PilotCockpitOverlayState extends State<PilotCockpitOverlay> {
           ],
         );
       },
+    );
+  }
+}
+
+
+/// Read-only preview tiles. Detail routes and authenticated statistics are
+/// implemented in a later stage; no synthetic earnings or ratings are shown.
+class _PilotStatisticTile extends StatelessWidget {
+  const _PilotStatisticTile({
+    required this.tileKey,
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+
+  final String tileKey;
+  final IconData icon;
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: Key(tileKey),
+      margin: const EdgeInsets.only(top: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1D2733),
+        border: Border.all(color: const Color(0x667D683F)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: _PilotCockpitOverlayState.gold, size: 19),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(title, style: const TextStyle(fontSize: 12)),
+          ),
+          const SizedBox(width: 4),
+          Text(value, style: const TextStyle(
+            color: Color(0xFFDDC184),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          )),
+        ],
+      ),
     );
   }
 }

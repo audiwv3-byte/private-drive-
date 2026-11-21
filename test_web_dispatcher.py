@@ -56,7 +56,7 @@ class DispatcherBrowserTests(unittest.TestCase):
         self.assertEqual(c.post("/dispatch/login", data={"password": "test-only-password", "csrf": token}).status_code, 302)
         page = c.get("/dispatch")
         self.assertEqual(page.status_code, 200)
-        self.assertIn("Рабочая область пока пустая".encode(), page.data)
+        self.assertIn("Карта автопарка".encode(), page.data)
         with c.session_transaction() as s:
             logout_token = s["pd_dispatch_csrf"]
         self.assertEqual(c.post("/dispatch/logout", data={"csrf": "invalid"}).status_code, 403)

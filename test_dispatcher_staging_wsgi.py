@@ -95,13 +95,54 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertEqual(page.status_code, 200)
         for value in ("Поездка", "Трансфер", "pickup-address", "dropoff-address",
                       "use-location", "navigator.geolocation", "order-map-frame",
-                      "openstreetmap.org/export/embed.html", "pickup-date",
+                      "order-live-map", "leaflet.js", "pickup-date",
                       "pickup-time", "car-category", "preview-route"):
             self.assertIn(value.encode(), page.data)
-        self.assertIn("frame-src https://www.openstreetmap.org", page.headers["Content-Security-Policy"])
+        self.assertIn("connect-src 'self'", page.headers["Content-Security-Policy"])
         self.assertIn("form-action 'none'", page.headers["Content-Security-Policy"])
         self.assertNotIn(b'fetch("/api/', page.data)
         self.assertEqual(client.post("/", data={"pickup": "synthetic"}).status_code, 405)
+
+    def test_staging_route_no_key_does_not_create_orders(self):
+        from pd_public_route_preview import estimate
+        from decimal import Decimal
+        with patch.dict(os.environ, self.env(), clear=True):
+            app = create_app()
+        client = app.test_client()
+        result = client.get("/preview/api/suggest?q=Vilnius")
+        self.assertEqual(result.status_code, 200)
+        self.assertFalse(result.get_json()["available"])
+        data = {"origin": "Vilnius, Lithuania", "destination": "Kaunas, Lithuania",
+                "origin_coordinates": [25.2797, 54.6872],
+                "destination_coordinates": [23.9036, 54.8985],
+                "category": "comfort", "roundtrip": False}
+        response = client.post("/preview/api/route", json=data)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()["available"])
+        self.assertEqual(client.post("/api/order", json=data).status_code, 404)
+        self.assertEqual(estimate(100, 90, data)[0], Decimal("110.00"))
+        self.assertEqual(client.post("/preview/api/route", json=dict(data, category="invalid")).status_code, 400)
+
+    def test_mocked_ors_route_for_supported_and_unsupported_classes(self):
+        import pd_public_route_preview
+        with patch.dict(os.environ, {**self.env(), "PD_STAGING_ORS_API_KEY": "synthetic"}, clear=True):
+            app = create_app()
+            client = app.test_client()
+            fixture = {"features": [{"properties": {"summary": {"distance": 100000, "duration": 5400}},
+                                     "geometry": {"coordinates": [[25.2797, 54.6872], [23.9036, 54.8985]]}}]}
+            with patch.object(pd_public_route_preview, "_request_json", return_value=fixture):
+                data = {"origin": "Vilnius", "destination": "Kaunas",
+                        "origin_coordinates": [25.2797, 54.6872],
+                        "destination_coordinates": [23.9036, 54.8985],
+                        "category": "comfort", "roundtrip": False}
+                response = client.post("/preview/api/route", json=data)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.get_json()["price"], "110.00")
+                self.assertEqual(response.get_json()["km"], 100)
+                data["category"] = "minivan"
+                result = client.post("/preview/api/route", json=data).get_json()
+                self.assertTrue(result["available"])
+                self.assertIsNone(result["price"])
 
     def test_pilot_registration_public_preview_has_no_upload_backend(self):
         with patch.dict(os.environ, self.env(), clear=True):

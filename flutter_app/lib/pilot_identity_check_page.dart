@@ -18,11 +18,14 @@ class PdPilotIdentityCheckPage extends StatefulWidget {
   const PdPilotIdentityCheckPage({super.key,
     this.cameraPermission = const PdSystemPilotCameraPermission(),
     this.photoCapture = const PdSystemPilotPhotoCapture(),
-    this.api, this.onContinueWithoutVerification});
+    this.api, this.onContinueWithoutVerification, this.onRequestSignIn,
+    this.onVerificationApproved});
   final PdPilotCameraPermission cameraPermission;
   final PdPilotPhotoCapture photoCapture;
   final PdIdentityApi? api;
   final VoidCallback? onContinueWithoutVerification;
+  final VoidCallback? onRequestSignIn;
+  final VoidCallback? onVerificationApproved;
   @override
   State<PdPilotIdentityCheckPage> createState() => _PdPilotIdentityCheckPageState();
 }
@@ -94,6 +97,7 @@ class _PdPilotIdentityCheckPageState extends State<PdPilotIdentityCheckPage> {
         _ => 'Проверка личности не выполнена',
       };
       if (mounted) setState(() => _status = label);
+      if (mounted && result['status'] == 'approved') widget.onVerificationApproved?.call();
     } catch (_) {
       if (mounted) setState(() => _message =
           'Не удалось получить статус с сервера. Повтори запрос.');
@@ -144,8 +148,16 @@ class _PdPilotIdentityCheckPageState extends State<PdPilotIdentityCheckPage> {
           onPressed: _busy ? null : _capture,
           icon: const Icon(Icons.camera_alt_outlined),
           label: Text(_photo == null ? 'Сделать фото' : 'Переснять')),
-        if (_api == null)
-          const Text('Сервер фотоконтроля не подключён. Отправка недоступна; личность не подтверждена.'),
+        if (_api == null) ...[
+          Text(widget.onRequestSignIn == null
+            ? 'Сервер фотоконтроля не подключён. Отправка недоступна; личность не подтверждена.'
+            : 'Для отправки фото и доступа к кабинету пилота войди в аккаунт с серверными правами. '
+              'Съёмка сама по себе не подтверждает личность.'),
+          if (widget.onRequestSignIn != null)
+            OutlinedButton(key: const Key('pilot-photo-sign-in'),
+              onPressed: _busy ? null : widget.onRequestSignIn,
+              child: const Text('Войти для отправки фото')),
+        ],
         if (_message != null)
           Text(_message!, key: const Key('pilot-identity-result')),
         if (_busy) const LinearProgressIndicator(),

@@ -1,9 +1,17 @@
-# PRIVATE DRIVE 0.2.26 — internal photo review and guest entry QA
+# PRIVATE DRIVE 0.2.27 — cabin selection before sign-in
 
 Branch: feature/flutter-independent-auth. No production deployment, paid SMS,
 real booking or payment activation is part of this change.
 
 ## Implemented
+
+- The first screen is Passenger / Pilot / Dispatcher, before phone entry and
+  optional location/notification onboarding. Pilot opens the photo notice;
+  Passenger and Dispatcher are never routed through photo verification.
+- Pilot upload requires a verified native session with server-authorized pilot
+  entitlement. Pilot cabin navigation follows server-approved photo status.
+  Dispatcher sign-in checks server entitlement and requires no photo.
+- Internal QA photo skip returns to cabin choice and never approves identity.
 
 - Internal QA only: explicit guest entry opens the passenger cabin without
   requesting an OTP, claiming phone verification or exposing staff roles.

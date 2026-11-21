@@ -35,15 +35,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
     expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
-    expect(find.textContaining('0.2.26'), findsOneWidget);
-    expect(find.textContaining('2026112102'), findsOneWidget);
+    expect(find.textContaining('0.2.27'), findsOneWidget);
+    expect(find.textContaining('2026112103'), findsOneWidget);
     expect(find.byIcon(Icons.local_taxi_outlined), findsNothing);
   });
 
   testWidgets('Offline preview blocks real OTP requests', (tester) async {
     expect(apiBaseUrl, isEmpty,
         reason: 'Unsigned CI must not connect to production or paid SMS.');
-    await tester.pumpWidget(const PrivateDriveApp());
+    await tester.pumpWidget(const MaterialApp(home: NativeSignInScreen()));
     await tester.pumpAndSettle();
 
     expect(find.text('PRIVATE DRIVE'), findsWidgets);
@@ -69,7 +69,7 @@ void main() {
 
   testWidgets('Only phone sign-in is offered and no OTP is sent offline',
       (tester) async {
-    await tester.pumpWidget(const PrivateDriveApp());
+    await tester.pumpWidget(const MaterialApp(home: NativeSignInScreen()));
     await tester.pumpAndSettle();
     expect(find.text('Телефон в формате +370...'), findsOneWidget);
     expect(find.text('Email'), findsNothing);

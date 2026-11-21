@@ -7,11 +7,15 @@ class PdPilotIdentityNoticePage extends StatefulWidget {
   const PdPilotIdentityNoticePage({super.key,
     this.cameraPermission = const PdSystemPilotCameraPermission(),
     this.photoCapture = const PdSystemPilotPhotoCapture(),
-    this.api, this.onContinueWithoutVerification});
+    this.api, this.onContinueWithoutVerification, this.onRequestSignIn,
+    this.onVerificationApproved, this.onBack});
   final PdPilotCameraPermission cameraPermission;
   final PdPilotPhotoCapture photoCapture;
   final PdIdentityApi? api;
   final VoidCallback? onContinueWithoutVerification;
+  final VoidCallback? onRequestSignIn;
+  final VoidCallback? onVerificationApproved;
+  final VoidCallback? onBack;
   @override
   State<PdPilotIdentityNoticePage> createState() => _PdPilotIdentityNoticePageState();
 }
@@ -21,7 +25,8 @@ class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
   String tr(String ru, String lt, String en) => _language == 'LT' ? lt : _language == 'EN' ? en : ru;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('PRIVATE DRIVE · Фотоконтроль'), actions: [
+    appBar: AppBar(title: const Text('PRIVATE DRIVE · Фотоконтроль'),
+      leading: widget.onBack == null ? null : BackButton(onPressed: widget.onBack), actions: [
       DropdownButton<String>(
         key: const Key('pilot-identity-notice-language'),
         value: _language,
@@ -45,6 +50,10 @@ class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
           const Text('Только внутренняя тестовая сборка. Личность не подтверждена; права не изменяются.'),
         ],
         const SizedBox(height: 16),
+        if (widget.api == null && widget.onRequestSignIn != null)
+          OutlinedButton(key: const Key('pilot-identity-notice-sign-in'),
+            onPressed: widget.onRequestSignIn,
+            child: const Text('Войти в аккаунт пилота для отправки фото')),
         Text(tr('Цель — подтвердить, что поездку выполняет одобренный пилот. '
           'Решение принимает диспетчер. Проверка действует 7 дней и не назначает роли.',
           'Tikslas – patvirtinti vairuotojo tapatybę. Sprendžia dispečeris. Patikra galioja 7 dienas ir nekeičia teisių.',
@@ -88,9 +97,12 @@ class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
           onPressed: !_acknowledged ? null : () => Navigator.push(context, MaterialPageRoute<void>(
             builder: (_) => PdPilotIdentityCheckPage(
               cameraPermission: widget.cameraPermission, photoCapture: widget.photoCapture, api: widget.api,
-              onContinueWithoutVerification: widget.onContinueWithoutVerification))),
+              onContinueWithoutVerification: widget.onContinueWithoutVerification,
+              onRequestSignIn: widget.onRequestSignIn,
+              onVerificationApproved: widget.onVerificationApproved))),
           child: Text(tr('Продолжить к съёмке', 'Tęsti', 'Continue to camera'))),
-        TextButton(onPressed: () => Navigator.maybePop(context), child: Text(tr('Вернуться в кабинет', 'Grįžti', 'Return to cabin'))),
+        TextButton(onPressed: widget.onBack ?? () => Navigator.maybePop(context),
+          child: Text(tr('Вернуться к выбору кабинета', 'Grįžti', 'Return to cabin selection'))),
       ],
     )),
   );

@@ -41,8 +41,18 @@ def click_label(label, *, optional=False, timeout=60):
     raise AssertionError('Required app control not found: ' + label)
 
 
+initial = snapshot()
+assert all(label in initial for label in ('Пассажир', 'Пилот', 'Диспетчер')), 'Initial cabin choices missing'
+click_label('Пилот')
+assert 'Фотоконтроль' in snapshot(), 'Pilot did not open photo check'
+adb('shell', 'input', 'keyevent', '4')
+click_label('Диспетчер')
+dispatcher = snapshot()
+assert 'Вход диспетчера' in dispatcher, 'Dispatcher did not open authorized sign-in'
+assert 'Фотоконтроль' not in dispatcher, 'Dispatcher must never be routed to photo check'
+adb('shell', 'input', 'keyevent', '4')
+click_label('Пассажир')
 click_label('Продолжить без разрешений', optional=True, timeout=20)
-click_label('Продолжить как гость')
 deadline = time.monotonic() + 40
 while time.monotonic() < deadline:
     xml = snapshot()

@@ -13,6 +13,8 @@ import 'company_info.dart';
 import 'pd_http_api.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_photo_capture.dart';
+import 'native_cabin_entry.dart';
+import 'native_session.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 // Opt-in only for the isolated static Safari/Android browser test artifact.
@@ -48,8 +50,14 @@ class PrivateDriveApp extends StatelessWidget {
       ),
       home: kIsWeb && isolatedWebPreview
           ? const RemoteSyncDemo()
-          : PdPermissionsFirstLaunch(
-              child: NativeSignInScreen(enableOfflinePreview: enableOfflinePreview),
+          : PdNativeCabinEntry(
+              signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
+                enableOfflinePreview: enableOfflinePreview,
+                allowGuestEntry: role == 'passenger',
+                onAuthenticated: onAuthenticated,
+              ),
+              identityApiBuilder: (session) => PdIdentityApi(
+                baseUrl: apiBaseUrl, token: session.token),
             ),
       ),
     );
@@ -62,11 +70,15 @@ class NativeSignInScreen extends StatefulWidget {
     this.authApiUrl = apiBaseUrl,
     this.enableOfflinePreview = false,
     this.httpClient,
+    this.allowGuestEntry = true,
+    this.onAuthenticated,
   });
 
   final String authApiUrl;
   final bool enableOfflinePreview;
   final http.Client? httpClient;
+  final bool allowGuestEntry;
+  final ValueChanged<PdNativeSession>? onAuthenticated;
 
   @override
   State<NativeSignInScreen> createState() => _NativeSignInScreenState();
@@ -165,12 +177,19 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         throw const FormatException('Сервер не выдал корректную сессию.');
       }
       if (!mounted) return;
+      final expiry = DateTime.now().add(Duration(seconds: expiresIn));
+      final onAuthenticated = widget.onAuthenticated;
+      if (onAuthenticated != null) {
+        onAuthenticated(PdNativeSession(token: token, userId: userId,
+          role: role as String, expiresAt: expiry));
+        return;
+      }
       setState(() {
         sessionToken = token;
         signedInUserId = userId;
         signedInRole = role as String;
         showVerifiedIdentity = true;
-        sessionExpiry = DateTime.now().add(Duration(seconds: expiresIn));
+        sessionExpiry = expiry;
         message = '';
         challengeId = null;
         code.clear();
@@ -406,7 +425,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
-                  'Версия 0.2.26 · сборка 2026112102',
+                  'Версия 0.2.27 · сборка 2026112103',
                   key: Key('app-demo-version'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),
@@ -424,7 +443,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       child: const Text('Открыть тестовые кабинеты'),
                     ),
                   ),
-                if (const bool.fromEnvironment('PD_INTERNAL_QA')) ...[
+                if (const bool.fromEnvironment('PD_INTERNAL_QA') && widget.allowGuestEntry) ...[
                   const SizedBox(height: 12),
                   FilledButton.icon(
                     key: const Key('internal-guest-entry'),

@@ -107,7 +107,7 @@ jobs:
           flutter analyze --no-fatal-infos
           flutter test
           flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_check_page_test.dart
-          flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_notice_page_test.dart test/offline_auth_test.dart test/internal_guest_sign_in_test.dart
+          flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_notice_page_test.dart test/offline_auth_test.dart test/internal_guest_sign_in_test.dart test/native_cabin_entry_test.dart
       - name: Compile full main.dart debug APK with isolated staging authentication
         working-directory: private_drive_build
         shell: bash

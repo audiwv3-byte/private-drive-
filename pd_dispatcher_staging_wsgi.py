@@ -4,7 +4,6 @@ Never imports miniapp_server, Telegram, orders, payment modules or databases.
 Run only on a dedicated HTTPS test deployment; not production.
 """
 import os
-import base64
 from types import SimpleNamespace
 
 from flask import Flask, request, Response
@@ -47,10 +46,10 @@ def create_app():
                                  "X-Content-Type-Options": "nosniff",
                                  "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
 
-    @app.get("/pd-logo.jpg")
+    @app.get("/pd-logo-transparent.png")
     def pd_logo_asset():
-        payload = Path(__file__).parent.joinpath("assets/pd-logo-compact.b64").read_text(encoding="ascii").strip()
-        return Response(base64.b64decode(payload, validate=True), mimetype="image/jpeg",
+        logo = Path(__file__).parent / "assets" / "pd-logo-transparent.png"
+        return Response(logo.read_bytes(), mimetype="image/png",
                         headers={"Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff"})
 
 

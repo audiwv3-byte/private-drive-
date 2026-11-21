@@ -111,7 +111,7 @@ class DispatcherStagingTests(unittest.TestCase):
         if configured:
             import pd_public_route_preview as preview
             import urllib.parse
-            autocomplete_url = "https://api.openrouteservice.org/geocode/autocomplete?" + urllib.parse.urlencode({
+            autocomplete_url = "https://api.heigit.org/pelias/v1/autocomplete?" + urllib.parse.urlencode({
                 "text": "Vilnius", "size": 2, "focus.point.lat": 54.6872,
                 "focus.point.lon": 25.2797
             })
@@ -123,7 +123,7 @@ class DispatcherStagingTests(unittest.TestCase):
             except Exception as exc:
                 print("PD_STAGING_ORS_AUTOCOMPLETE=FAILED_" + type(exc).__name__ + ("_HTTP" + str(exc.code) if hasattr(exc, "code") else ""), flush=True)
             try:
-                directions = preview._request_json("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+                directions = preview._request_json("https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson", {
                     "coordinates": [[25.2797, 54.6872], [25.3130, 54.6980]]
                 })
                 feature = directions["features"][0]

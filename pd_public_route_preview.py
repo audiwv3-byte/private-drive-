@@ -10,6 +10,7 @@ import re
 import time
 import urllib.parse
 import urllib.request
+import urllib.error
 from collections import defaultdict, deque
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -34,9 +35,39 @@ def _rate_limit(action, count=15):
     return True
 
 
+def _normalized_key():
+    """Strip accidental copy/paste wrappers, not the key's actual contents."""
+    raw = os.getenv("PD_STAGING_ORS_API_KEY", "").strip()
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in ("'", '"'):
+        raw = raw[1:-1].strip()
+    if raw.lower().startswith("bearer "):
+        raw = raw[7:].strip()
+    return raw
+
+
+def _auth_error_category(exc):
+    """Classify a bounded API error body without logging it or the credential."""
+    if not isinstance(exc, urllib.error.HTTPError):
+        return "NETWORK_OR_UPSTREAM"
+    if exc.code != 403:
+        return "UPSTREAM_HTTP_" + str(exc.code)
+    try:
+        body = exc.read(1500).decode("utf-8", "replace").casefold()
+    except Exception:
+        return "FORBIDDEN_UNCLASSIFIED"
+    if "quota exceeded" in body or "rate limit" in body:
+        return "QUOTA_OR_RATE_LIMIT"
+    if ("invalid api key" in body or "invalid key" in body or
+            "access disallowed" in body or "access to this api has been disallowed" in body):
+        return "KEY_OR_PERMISSION_REJECTED"
+    if "not allowed" in body or "permission" in body or "forbidden" in body:
+        return "FORBIDDEN_PERMISSION"
+    return "FORBIDDEN_UNCLASSIFIED"
+
+
 def _request_json(url, payload=None):
     # Caller constructs only hardcoded ORS endpoints, never follows user URLs.
-    key = os.getenv("PD_STAGING_ORS_API_KEY", "").strip()
+    key = _normalized_key()
     if not key:
         raise RuntimeError("staging geocoding not configured")
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
@@ -114,7 +145,7 @@ def register(app):
         text = _text(request.args.get("q", ""))
         if not text:
             return jsonify(error="Введите не менее 3 символов"), 400
-        if not os.getenv("PD_STAGING_ORS_API_KEY"):
+        if not _normalized_key():
             return jsonify(available=False, suggestions=[], reason="Сервис подсказок пока не подключён"), 200
         url = _GEOCODE_BASE_URL + "/autocomplete?" + urllib.parse.urlencode({
             "text": text, "size": 5, "focus.point.lat": 54.6872,

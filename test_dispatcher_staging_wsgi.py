@@ -60,18 +60,17 @@ class DispatcherStagingTests(unittest.TestCase):
             app = create_app()
         app.config["TESTING"] = True
         client = app.test_client()
-        logo = client.get("/pd-logo.jpg")
+        logo = client.get("/pd-logo-transparent.png")
         self.assertEqual(logo.status_code, 200)
-        self.assertEqual(logo.mimetype, "image/jpeg")
+        self.assertEqual(logo.mimetype, "image/png")
         self.assertGreater(len(logo.data), 2500)
-        self.assertTrue(logo.data.startswith(bytes.fromhex("ffd8")))
-        self.assertTrue(logo.data.endswith(bytes.fromhex("ffd9")))
-        # The replacement includes the complete, uncropped 160x160 emblem.
-        self.assertIn(bytes.fromhex("ffc000110800a000a0"), logo.data)
+        self.assertTrue(logo.data.startswith(bytes.fromhex("89504e470d0a1a0a")))
+        # PNG has transparency metadata (indexed transparency or RGBA).
+        self.assertTrue(b"tRNS" in logo.data or logo.data[25] in (4, 6))
         for path in ("/", "/pilot-registration", "/dispatch/login"):
             result = client.get(path)
             self.assertEqual(result.status_code, 200)
-            self.assertIn(b'/pd-logo.jpg', result.data)
+            self.assertIn(b'/pd-logo-transparent.png', result.data)
         self.assertEqual(client.get("/dispatch").status_code, 302)
 
     def test_logo_size_and_aspect_ratio_mobile_desktop(self):

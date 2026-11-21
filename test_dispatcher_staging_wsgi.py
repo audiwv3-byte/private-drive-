@@ -69,7 +69,7 @@ class DispatcherStagingTests(unittest.TestCase):
         self.assertTrue(b"tRNS" in logo.data or logo.data[25] in (4, 6))
         home = client.get("/")
         self.assertEqual(home.status_code, 200)
-        for name in ("pd-user-logo-4.webp", "pd-user-photo-6.webp", "pd-user-photo-7.webp"):
+        for name in ("pd-user-logo-4.webp", "pd-user-photo-6-original.webp", "pd-user-photo-7.webp"):
             self.assertIn(name.encode(), home.data)
             result = client.get("/assets/" + name)
             self.assertEqual(result.status_code, 200)
@@ -77,6 +77,7 @@ class DispatcherStagingTests(unittest.TestCase):
             self.assertGreater(len(result.data), 900)
             self.assertEqual(result.data[:4], b"RIFF")
             self.assertEqual(result.data[8:12], b"WEBP")
+        self.assertIn(b'width="864" height="1536"', home.data)
         self.assertNotIn(b"commons.wikimedia.org", home.data)
         self.assertNotIn(b"wanderin.ge", home.data)
         self.assertNotIn("commons.wikimedia.org", home.headers["Content-Security-Policy"])

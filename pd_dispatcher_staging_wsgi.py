@@ -48,7 +48,23 @@ def create_app():
                                  "X-Content-Type-Options": "nosniff",
                                  "Content-Security-Policy": "default-src 'none'; img-src 'self' https://tile.openstreetmap.org https://unpkg.com data:; connect-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
 
+    @app.get("/services")
+    def public_services():
+        page = Path(__file__).with_name("pd_public_services_preview.html").read_text(encoding="utf-8")
+        return Response(page, content_type="text/html; charset=utf-8",
+                        headers={"Cache-Control":"no-store",
+                                 "X-Content-Type-Options":"nosniff",
+                                 "Content-Security-Policy":"default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+
     # Serve only approved owner assets on isolated staging; never query stock photo sites.
+    @app.get("/assets/pd-approved-hero.webp")
+    @app.get("/assets/pd-approved-airport.webp")
+    @app.get("/assets/pd-approved-kaunas.webp")
+    @app.get("/assets/pd-approved-klaipeda.webp")
+    @app.get("/assets/pd-approved-warsaw.webp")
+    @app.get("/assets/pd-approved-service_airport.webp")
+    @app.get("/assets/pd-approved-service_parcel.webp")
+    @app.get("/assets/pd-approved-service_driver.webp")
     @app.get("/assets/pd-approved-mock1-hero.webp")
     @app.get("/assets/pd-user-photo-7-original.webp")
     @app.get("/assets/pd-user-logo-4-original.webp")
@@ -58,7 +74,7 @@ def create_app():
     @app.get("/assets/pd-user-logo-4.webp")
     def approved_brand_media():
         filename = request.path.rsplit("/", 1)[-1]
-        allowed = frozenset(("pd-approved-mock1-hero.webp", "pd-user-photo-6.webp", "pd-user-photo-6-original.webp", "pd-user-photo-7.webp", "pd-user-photo-7-original.webp", "pd-user-logo-4.webp", "pd-user-logo-4-original.webp"))
+        allowed = frozenset(("pd-approved-hero.webp", "pd-approved-airport.webp", "pd-approved-kaunas.webp", "pd-approved-klaipeda.webp", "pd-approved-warsaw.webp", "pd-approved-service_airport.webp", "pd-approved-service_parcel.webp", "pd-approved-service_driver.webp", "pd-approved-mock1-hero.webp", "pd-user-photo-6.webp", "pd-user-photo-6-original.webp", "pd-user-photo-7.webp", "pd-user-photo-7-original.webp", "pd-user-logo-4.webp", "pd-user-logo-4-original.webp"))
         if filename not in allowed:
             return "Not found", 404
         media_path = Path(__file__).parent / "assets" / filename

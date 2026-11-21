@@ -341,7 +341,13 @@ class _PilotCabinState extends State<PilotCabin> {
                     icon: const Icon(Icons.verified_user_outlined),
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const PdPilotIdentityNoticePage(),
+                        builder: (_) => PdPilotIdentityNoticePage(
+                          onContinueWithoutVerification: () {
+                            // Never mark identity verified or change server rights.
+                            Navigator.of(context).popUntil((route) => route.isFirst);
+                            widget.onBackToCabinets?.call();
+                          },
+                        ),
                       ),
                     ),
                     label: const Text('Проверка личности · раз в 7 дней'),

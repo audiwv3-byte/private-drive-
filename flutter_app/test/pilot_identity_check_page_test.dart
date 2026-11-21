@@ -15,6 +15,28 @@ class FakeCamera implements PdPilotCameraPermission {
 }
 
 void main() {
+  testWidgets('QA skip is gated and never reports verified identity',
+      (tester) async {
+    var skipped = false;
+    await tester.pumpWidget(MaterialApp(home:
+      PdPilotIdentityCheckPage(
+        cameraPermission: FakeCamera(granted: false),
+        onContinueWithoutVerification: () => skipped = true,
+      )));
+    final skip = find.byKey(const Key('pilot-identity-qa-skip'));
+    if (const bool.fromEnvironment('PD_INTERNAL_QA')) {
+      expect(skip, findsOneWidget);
+      await tester.tap(skip);
+      await tester.pumpAndSettle();
+      expect(skipped, isTrue);
+      expect(find.byKey(const Key('pilot-identity-unverified-status')),
+          findsOneWidget);
+      expect(find.textContaining('Личность не подтверждена'), findsOneWidget);
+    } else {
+      expect(skip, findsNothing);
+      expect(skipped, isFalse);
+    }
+  });
   testWidgets('does not request camera before the pilot explicitly taps',
       (tester) async {
     final camera = FakeCamera(granted: true);

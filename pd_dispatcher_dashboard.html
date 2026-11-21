@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>PRIVATE DRIVE — Диспетчерская</title>
+<style>
+:root{--bg:#080a0e;--panel:#11151b;--panel2:#171c23;--line:#453b27;--gold:#d8b569;--muted:#a3aab4;--white:#f6f3ea;--green:#39cb85;--amber:#efbd53;--red:#ee6d65}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--white);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible{outline:2px solid #f5d996;outline-offset:2px}
+.shell{min-height:100vh;display:grid;grid-template-columns:244px minmax(0,1fr)}.sidebar{border-right:1px solid var(--line);background:#0d1015;display:flex;flex-direction:column;gap:14px;padding:22px 13px}.brand{color:var(--gold);font:600 22px Georgia,serif;letter-spacing:.15em;text-align:center;margin-bottom:17px}.brand span{display:block;font:10px system-ui;letter-spacing:.36em;margin-top:4px}
+.menu{display:grid;gap:5px}.nav{border:1px solid transparent;background:none;color:#c7cbd1;text-align:left;border-radius:10px;padding:12px 14px;display:flex;gap:12px;align-items:center;width:100%}.nav:hover,.nav.active{color:var(--gold);border-color:#8d6d34;background:linear-gradient(90deg,#3c3020,#14171b)}.nav .symbol{width:24px;text-align:center;font-size:18px}
+.sidebar-note{margin-top:auto;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding:14px}.content{min-width:0;padding:22px 24px 32px;max-width:1800px;width:100%;margin:0 auto}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:19px}.heading{font:500 clamp(24px,3vw,32px) Georgia,serif;color:var(--gold);margin:0}.sub{color:var(--muted);margin:4px 0 0}.top-right{display:flex;gap:10px;align-items:center}.pill{border:1px solid #82652c;background:#2b2519;color:#e9c780;border-radius:30px;padding:6px 12px;font-size:12px}.logout{background:transparent;color:var(--gold);border:1px solid var(--line);border-radius:9px;padding:9px 14px}.notice{background:#251f16;border:1px solid #786031;color:#e8cb93;padding:11px 15px;border-radius:10px;margin-bottom:18px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.stat,.panel{border:1px solid var(--line);border-radius:13px;background:linear-gradient(155deg,#191c21,#0f1217);box-shadow:0 12px 28px #0003}.stat{padding:16px 18px}.stat small{color:#b3b6bd;display:block}.stat strong{font-size:26px;display:block;color:var(--gold);margin-top:3px}.stat em{font-size:11px;color:var(--muted);font-style:normal}
+.workspace{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,.8fr);gap:15px}.panel-header{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px 17px;border-bottom:1px solid #403825;flex-wrap:wrap}.panel-header h2{font-size:15px;color:var(--gold);font-weight:600;margin:0}.tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.chip{border:1px solid #51462e;background:#1a1c21;border-radius:7px;color:#d8d9dc;padding:7px 10px;font-size:12px}.chip.selected{background:#84672e;color:#fff;border-color:#e1bb67}.map-area{position:relative;min-height:470px;overflow:hidden;background:radial-gradient(ellipse at 47% 50%,#273234,#121b23 72%);isolation:isolate}.map-canvas{position:absolute;inset:-35px;background:repeating-linear-gradient(28deg,transparent 0 37px,#39444c 39px,#39444c 41px,transparent 43px 102px),repeating-linear-gradient(115deg,transparent 0 70px,#35424b 72px,#35424b 75px,transparent 77px 139px),linear-gradient(140deg,#162128,#22292e);transform:scale(var(--zoom,1));transition:transform .2s}.road{position:absolute;display:block;height:7px;background:#9b7b39;opacity:.66;border-radius:12px;transform-origin:left}.road.a{width:76%;top:35%;left:3%;transform:rotate(14deg)}.road.b{width:83%;top:71%;left:7%;transform:rotate(-33deg)}.road.c{width:76%;top:7%;left:45%;transform:rotate(85deg)}.river{position:absolute;width:135%;height:60px;left:-20%;top:60%;border:19px solid #263f59;border-left:0;border-right:0;transform:rotate(-13deg);border-radius:50%;opacity:.7}.district{position:absolute;color:#9eabb0;text-shadow:0 2px 4px #080b0c;font-size:13px;letter-spacing:.04em}.district.one{top:18%;left:16%}.district.two{top:34%;right:17%}.district.three{bottom:25%;left:37%}
+.car{position:absolute;background:#0d1517;color:#fff;border:1px solid #87949b;border-radius:25px;padding:6px 8px;font-size:13px;box-shadow:0 4px 12px #0009;transform:translate(-50%,-50%)}.car[data-status="free"]{border-color:var(--green);color:var(--green)}.car[data-status="pickup"]{border-color:var(--amber);color:var(--amber)}.car[data-status="busy"]{border-color:var(--red);color:var(--red)}.car.hidden{display:none}.car:hover{background:#34383c}.map-controls{position:absolute;right:12px;bottom:14px;display:grid;gap:6px}.map-controls button{background:#111820;color:var(--gold);border:1px solid #645437;border-radius:8px;width:37px;height:37px;font-size:20px}.map-tag{position:absolute;top:14px;left:14px;background:#0b0e12dc;border:1px solid var(--line);border-radius:7px;padding:7px 10px;color:#d9cfbb;font-size:12px}.legend{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;color:#b5bac1;font-size:12px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.dot.free{background:var(--green)}.dot.pickup{background:var(--amber)}.dot.busy{background:var(--red)}
+.rightstack{display:grid;gap:15px;align-content:start}.block-content{padding:16px}.search{background:#0c1015;border:1px solid #55482c;border-radius:8px;padding:10px 12px;width:100%;color:#fff}.fieldlabel{display:block;color:#b8bdc3;font-size:12px;margin:0 0 6px}.bigaction{width:100%;background:linear-gradient(90deg,#d9b16a,#f1d38c);color:#18140e;border:0;border-radius:9px;padding:11px;font-weight:700;margin-top:14px}.bigaction:disabled{opacity:.45;cursor:not-allowed}.placeholder{color:#b5bac2;font-size:13px;margin:9px 0}.rowinfo{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #37352e;padding:11px 0}.rowinfo:last-child{border:0}.rowinfo strong{color:#e4d1a9}.empty{border:1px dashed #5a4d34;border-radius:9px;padding:14px;color:#b7babe;text-align:center;margin-top:10px}.mini{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px}.mini button{border:1px solid #675332;color:var(--gold);background:#202021;border-radius:8px;padding:9px}
+.mobile-header{display:none}.section-hidden{display:none}.footer{margin-top:16px;color:#8f979e;font-size:12px}#announce{min-height:20px;color:#edcd85;font-size:12px;margin-top:12px}
+@media(max-width:1150px){.stats{grid-template-columns:repeat(2,1fr)}.workspace{grid-template-columns:minmax(0,1fr)}.rightstack{grid-template-columns:repeat(2,minmax(0,1fr))}.rightstack>:last-child{grid-column:1/-1}}
+@media(max-width:760px){.shell{display:block}.sidebar{display:none;position:fixed;inset:0 auto 0 0;width:260px;z-index:10;box-shadow:10px 0 50px #000a}.sidebar.open{display:flex}.mobile-header{display:flex;align-items:center;justify-content:space-between;background:#101318;padding:12px 16px;border-bottom:1px solid var(--line)}.mobile-header button{border:1px solid var(--line);background:#16191e;color:var(--gold);padding:7px 13px;border-radius:7px}.content{padding:17px 12px}.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stat{padding:12px}.stat strong{font-size:21px}.map-area{min-height:360px}.rightstack{grid-template-columns:1fr}.rightstack>:last-child{grid-column:auto}.top{align-items:flex-start}.top-right{width:100%;justify-content:space-between}}
+</style>
+</head>
+<body>
+<div class="mobile-header"><strong style="color:var(--gold);letter-spacing:.12em">PD · PRIVATE DRIVE</strong><button id="mobile-menu" type="button" aria-expanded="false" aria-controls="sidebar">☰ Меню</button></div>
+<div class="shell">
+<aside class="sidebar" id="sidebar" aria-label="Навигация">
+<div class="brand">PD<span>PRIVATE DRIVE</span></div>
+<nav class="menu" aria-label="Разделы диспетчерской">
+<button class="nav active" type="button" data-section="Панель управления"><span class="symbol">⌂</span>Панель управления</button>
+<button class="nav" type="button" data-section="Заказы"><span class="symbol">▤</span>Заказы</button>
+<button class="nav" type="button" data-section="Пассажиры"><span class="symbol">♙</span>Пассажиры</button>
+<button class="nav" type="button" data-section="Пилоты"><span class="symbol">♧</span>Пилоты</button>
+<button class="nav" type="button" data-section="Автопарк"><span class="symbol">▱</span>Автопарк</button>
+<button class="nav" type="button" data-section="Финансы"><span class="symbol">€</span>Финансы</button>
+<button class="nav" type="button" data-section="Тарифы"><span class="symbol">◇</span>Тарифы</button>
+<button class="nav" type="button" data-section="Безопасность"><span class="symbol">⚑</span>Безопасность</button>
+<button class="nav" type="button" data-section="Отчёты"><span class="symbol">▥</span>Отчёты</button>
+<button class="nav" type="button" data-section="Настройки"><span class="symbol">⚙</span>Настройки</button>
+</nav>
+<div class="sidebar-note">PRIVATE DRIVE · тестовая среда<br>Реальные заказы и GPS не подключены.</div>
+</aside>
+<main class="content">
+<header class="top">
+<div><h1 class="heading" id="page-title">Диспетчерская</h1><p class="sub">Управление перевозками · тестовый интерфейс</p></div>
+<div class="top-right"><span class="pill">● ТЕСТОВЫЕ ДАННЫЕ</span><form method="post" action="{{ url_for('pd_dispatch_logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="logout" type="submit">Выйти</button></form></div>
+</header>
+<div class="notice" role="status">Демонстрационный экран. Все машины, показатели, заявки и адреса условные. Онлайн-GPS, пробки, SOS и оформление реальных заказов пока не работают.</div>
+<div id="dashboard-view">
+<section class="stats" aria-label="Показатели">
+<div class="stat"><small>Активные поездки</small><strong>3</strong><em>Синтетические данные</em></div>
+<div class="stat"><small>Свободные машины</small><strong>5</strong><em>Демонстрация статусов</em></div>
+<div class="stat"><small>Едут на заказ</small><strong>2</strong><em>На схематической карте</em></div>
+<div class="stat"><small>Средняя подача</small><strong>—</strong><em>Пока не рассчитывается</em></div>
+</section>
+<div class="workspace">
+<section class="panel" aria-label="Карта пилотов">
+<div class="panel-header"><h2>Карта автопарка</h2><div class="tools" role="group" aria-label="Статус машин"><button class="chip selected" type="button" data-filter="all" aria-pressed="true">Все</button><button class="chip" type="button" data-filter="free" aria-pressed="false">Свободные</button><button class="chip" type="button" data-filter="pickup" aria-pressed="false">На подаче</button><button class="chip" type="button" data-filter="busy" aria-pressed="false">Занятые</button></div></div>
+<div class="map-area" aria-label="Схематическая карта. Не показывает реальное местоположение">
+<div class="map-canvas" id="map-canvas" style="--zoom:1">
+<div class="river"></div><i class="road a"></i><i class="road b"></i><i class="road c"></i>
+<span class="district one">Центр</span><span class="district two">Северный район</span><span class="district three">Южный район</span>
+<button class="car" data-status="free" style="left:17%;top:31%" type="button" data-car="PD-T01">◆</button>
+<button class="car" data-status="free" style="left:38%;top:23%" type="button" data-car="PD-T02">◆</button>
+<button class="car" data-status="free" style="left:66%;top:19%" type="button" data-car="PD-T03">◆</button>
+<button class="car" data-status="free" style="left:77%;top:59%" type="button" data-car="PD-T04">◆</button>
+<button class="car" data-status="free" style="left:28%;top:79%" type="button" data-car="PD-T05">◆</button>
+<button class="car" data-status="pickup" style="left:47%;top:48%" type="button" data-car="PD-T06">◆</button>
+<button class="car" data-status="pickup" style="left:62%;top:75%" type="button" data-car="PD-T07">◆</button>
+<button class="car" data-status="busy" style="left:22%;top:59%" type="button" data-car="PD-T08">◆</button>
+<button class="car" data-status="busy" style="left:52%;top:29%" type="button" data-car="PD-T09">◆</button>
+<button class="car" data-status="busy" style="left:85%;top:36%" type="button" data-car="PD-T10">◆</button>
+</div>
+<div class="map-tag">Схема расположения · не GPS</div>
+<div class="map-controls"><button type="button" id="zoom-in" aria-label="Увеличить карту">+</button><button type="button" id="zoom-out" aria-label="Уменьшить карту">−</button></div>
+</div>
+<div class="legend"><span><i class="dot free"></i>Свободен</span><span><i class="dot pickup"></i>Едет на подачу</span><span><i class="dot busy"></i>На заказе</span><span>Тестовые маркеры</span></div>
+</section>
+<div class="rightstack">
+<section class="panel"><div class="panel-header"><h2>Быстрый заказ</h2></div><div class="block-content"><label class="fieldlabel" for="from">Точка отправления</label><input id="from" class="search" disabled placeholder="Пока не подключено"><label class="fieldlabel" for="to" style="margin-top:12px">Точка назначения</label><input id="to" class="search" disabled placeholder="Пока не подключено"><p class="placeholder">Тарифы, адресные подсказки и расчёт стоимости подключим после интеграции API.</p><button class="bigaction" type="button" disabled>Создать заказ</button></div></section>
+<section class="panel"><div class="panel-header"><h2>Пилоты на линии</h2></div><div class="block-content"><div class="rowinfo"><span>Свободные</span><strong style="color:var(--green)">5</strong></div><div class="rowinfo"><span>Едут к пассажиру</span><strong style="color:var(--amber)">2</strong></div><div class="rowinfo"><span>В поездке</span><strong style="color:var(--red)">3</strong></div><div class="mini"><button type="button" data-demo="Назначение пилота появится после подключения заказов">Автоназначение</button><button type="button" data-demo="Список пилотов появится после подключения API">Все пилоты</button></div></div></section>
+<section class="panel"><div class="panel-header"><h2>Оперативные события</h2></div><div class="block-content"><p class="placeholder">Тревожные сигналы SOS, сообщения и новые заказы появятся здесь после подключения защищённого серверного канала.</p><div class="empty">Новых событий нет · тестовый режим</div></div></section>
+</div></div></div>
+<section class="panel section-hidden" id="placeholder-view"><div class="panel-header"><h2 id="placeholder-title">Раздел</h2></div><div class="block-content"><div class="empty">Раздел подготовлен в меню. Функции и данные будут подключены на следующих этапах.</div></div></section>
+<div id="announce" role="status" aria-live="polite"></div>
+<p class="footer">PRIVATE DRIVE / Dispatcher staging UI · изолированная тестовая сборка · без доступа к реальным данным</p>
+</main></div>
+<script>
+(function(){
+  const navs=[...document.querySelectorAll('.nav')];
+  const dashboard=document.getElementById('dashboard-view');
+  const placeholder=document.getElementById('placeholder-view');
+  const announce=document.getElementById('announce');
+  const side=document.getElementById('sidebar');
+  const menu=document.getElementById('mobile-menu');
+  function setSection(name){
+    navs.forEach(b=>{const active=b.dataset.section===name;b.classList.toggle('active',active);b.setAttribute('aria-current',active?'page':'false')});
+    const isHome=name==='Панель управления';
+    dashboard.classList.toggle('section-hidden',!isHome);
+    placeholder.classList.toggle('section-hidden',isHome);
+    document.getElementById('page-title').textContent=isHome?'Диспетчерская':name;
+    document.getElementById('placeholder-title').textContent=name;
+    announce.textContent=isHome?'':'Раздел «'+name+'» будет подключён позднее.';
+    side.classList.remove('open');menu.setAttribute('aria-expanded','false');
+  }
+  navs.forEach(b=>b.addEventListener('click',()=>setSection(b.dataset.section)));
+  menu.addEventListener('click',()=>{const open=side.classList.toggle('open');menu.setAttribute('aria-expanded',String(open))});
+  document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{
+    const filter=b.dataset.filter;
+    document.querySelectorAll('[data-filter]').forEach(x=>{const chosen=x===b;x.classList.toggle('selected',chosen);x.setAttribute('aria-pressed',String(chosen))});
+    document.querySelectorAll('.car').forEach(x=>x.classList.toggle('hidden',filter!=='all'&&x.dataset.status!==filter));
+    announce.textContent=filter==='all'?'Показаны все тестовые машины.':'Отфильтрованы тестовые машины.';
+  }));
+  let zoom=1;
+  function changeZoom(v){zoom=Math.max(.85,Math.min(1.5,zoom+v));document.getElementById('map-canvas').style.setProperty('--zoom',zoom.toFixed(2));announce.textContent='Масштаб схемы: '+Math.round(zoom*100)+'%'}
+  document.getElementById('zoom-in').addEventListener('click',()=>changeZoom(.1));
+  document.getElementById('zoom-out').addEventListener('click',()=>changeZoom(-.1));
+  document.querySelectorAll('.car').forEach(b=>b.addEventListener('click',()=>announce.textContent='Тестовая машина '+b.dataset.car+'. Реальные данные отсутствуют.'));
+  document.querySelectorAll('[data-demo]').forEach(b=>b.addEventListener('click',()=>announce.textContent=b.dataset.demo));
+})();
+</script>
+</body></html>

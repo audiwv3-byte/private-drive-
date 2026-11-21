@@ -1,7 +1,4 @@
-<!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>PRIVATE DRIVE — премиальные поездки и трансферы</title><link rel="preload" as="image" href="/assets/pd-user-photo-7-original.webp" fetchpriority="high"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>PRIVATE DRIVE — ваш личный водитель в Литве и Европе</title><link rel="preload" href="/assets/pd-approved-hero.webp" as="image" fetchpriority="high"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>
 :root{color-scheme:dark;--gold:#d7b46e;--bg:#090b0f;--panel:#14171b;--line:#51422b;--muted:#b8b8bc}*{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:#f8f7f4;font:15px/1.6 system-ui,Arial,sans-serif}
 a{color:var(--gold);text-decoration:none}a:focus-visible{outline:2px solid var(--gold)}
@@ -238,35 +235,75 @@ main{max-width:1550px}
 .pd-footer-socials a{width:46px;min-width:46px;height:46px;min-height:46px;padding:7px;display:inline-flex;justify-content:center;align-items:center}
 .pd-footer-socials svg,.pd-footer-socials svg.pd-tg-round{width:28px;height:28px;min-width:28px}
 @media(max-width:600px){.mock-contacts{grid-template-columns:1fr 1fr;gap:8px 13px}.mock-contacts div{grid-column:1/-1}.mock-contacts a{font-size:12px}.pd-footer-socials{justify-content:flex-start}.pd-footer-socials a{flex:0 0 46px}}
+
+/* 2026 approved desktop composition: exact owner-supplied photograph crops, no stock art */
+html{scroll-behavior:smooth}
+body{background:#07090d;color:#f8f6f0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.pd-head{position:sticky;top:0;z-index:1000;background:#08101eeF;border-bottom:1px solid #997535;display:flex;align-items:center;gap:24px;justify-content:space-between;padding:9px clamp(16px,3vw,48px)}
+.pd-head .pd-brand{display:flex;align-items:center;gap:13px;white-space:nowrap;color:#fff;font:600 21px Georgia,serif;letter-spacing:.05em}
+.pd-head .pd-brand img{width:54px;height:54px;object-fit:contain;border-radius:100%}
+.pd-nav{display:flex;align-items:center;justify-content:flex-end;gap:clamp(9px,2vw,29px);flex-wrap:wrap}
+.pd-nav a{color:#e8e7ea;font-size:14px;display:inline-flex;align-items:center;min-height:42px;padding:3px 2px}
+.pd-nav a[aria-current=page],.pd-nav a:hover{color:#ffdb84;border-bottom:2px solid #efbe58}
+.pd-main{max-width:1540px;margin:0 auto}
+.pd-hero{background:linear-gradient(90deg,#080f1a 0%,#080f1ae6 36%,#080f1a00 78%),radial-gradient(circle at 70% 25%,#364458,#080f1a 65%);display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,1.1fr);align-items:center;gap:18px;padding:24px clamp(18px,3vw,52px);min-height:390px;overflow:hidden}
+.pd-hero-copy{position:relative;z-index:2}
+.pd-hero h1{font:700 clamp(32px,3.7vw,58px)/1.14 system-ui,Arial,sans-serif;color:white;margin:0 0 19px;max-width:800px}
+.pd-hero h1 em{font-style:normal;color:#ffdf97}
+.pd-trust{display:flex;gap:10px 19px;flex-wrap:wrap;color:#ffdfa1;font-size:15px;margin:8px 0 22px}
+.pd-trust span{white-space:nowrap}
+.pd-buttons{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.pd-buttons a{margin:0;min-height:52px}
+.pd-hero-img{display:block;width:100%;height:auto;max-width:890px;object-fit:contain;filter:drop-shadow(0 10px 18px #0008)}
+.pd-section{padding:17px clamp(15px,2.5vw,42px) 19px}
+.pd-section h2{font:650 clamp(22px,2.4vw,32px)/1.2 system-ui,Arial,sans-serif;color:#f4eee5;margin:0 0 13px}
+.pd-services-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.pd-img-card{display:block;overflow:hidden;border:1px solid #ac893d;border-radius:14px;position:relative;min-width:0;box-shadow:0 8px 24px #0008;transition:transform .2s,border-color .2s}
+.pd-img-card:hover,.pd-img-card:focus-visible{transform:translateY(-3px);border-color:#ffdf83;outline:2px solid #f3cd74;outline-offset:2px}
+.pd-img-card img{display:block;width:100%;height:auto;object-fit:contain;aspect-ratio:480/246}
+.pd-destinations{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+.pd-destinations .pd-img-card img{aspect-ratio:360/149}
+.pd-quick{margin:12px clamp(15px,2.5vw,42px) 25px;background:linear-gradient(110deg,#101c31,#0a1425);border:1px solid #ac883d;border-radius:15px;padding:17px}
+.pd-quick h2{color:#f5d69a;font-size:24px;font-weight:600;margin:0 0 13px}
+.pd-quick #quick-trip-form{display:grid;grid-template-columns:1.15fr 1.15fr .8fr .75fr auto;gap:11px;align-items:end}
+.pd-quick #quick-trip-form label{display:grid;gap:4px;min-width:0;color:#f6dca8;font-size:12px}
+.pd-quick #quick-trip-form input{display:block;background:#faf9fa;color:#172031;border:1px solid #c6b4a2;border-radius:8px;padding:10px 12px;min-width:0;width:100%;min-height:48px;font:14px system-ui}
+.pd-quick #quick-trip-form button{border:0;border-radius:8px;min-height:48px;cursor:pointer;margin:0}
+.pd-quick p{font-size:11px;color:#c3ac86;margin:8px 0 0}
+.pd-extra{margin:0 clamp(15px,2.5vw,42px);border-top:1px solid #644d2e;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;padding:17px 5px}
+.pd-extra>span{font-size:14px;color:#d4c4a7}.pd-extra>a{display:inline-flex;min-height:44px;align-items:center;color:#ffdc8c;font-weight:600}
+.pd-contact-top{padding:12px clamp(16px,3vw,48px);border-bottom:1px solid #534229;background:#0b1424;display:flex;gap:12px 20px;flex-wrap:wrap;align-items:center;justify-content:center}
+.pd-contact-top a{display:inline-flex;align-items:center;gap:7px;min-height:44px;color:#e4e9f5;font-size:13px;overflow-wrap:anywhere}
+.pd-contact-top svg{width:21px;height:21px;color:#229ed9}
+.pd-about-slim{padding:14px clamp(16px,3vw,48px);border-top:1px solid #6b512e;color:#d9c19a;font-size:13px}
+.pd-about-slim a{margin-left:12px}
+.pd-min-footer{padding:12px clamp(15px,3vw,50px);background:#050a13;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:9px;color:#efe1c9;border-top:1px solid #a48548;font-size:12px}
+.pd-min-footer a{color:#ffdc91;min-height:30px;display:inline-flex;gap:7px;align-items:center}
+.pd-min-footer svg{width:24px;height:24px}.pd-min-footer .divider{color:#8b6f42}
+.pd-airplane{display:inline-block;animation:pd-fly 10s linear infinite;transform-origin:center;pointer-events:none}
+@keyframes pd-fly{0%,10%{opacity:0;transform:translateX(-25px) translateY(5px)}13%,45%{opacity:1}50%,100%{opacity:0;transform:translateX(70px) translateY(-7px)}}
+@media(max-width:940px){.pd-head{flex-direction:column;gap:4px;align-items:stretch}.pd-nav{justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto}.pd-hero{grid-template-columns:1fr;gap:9px}.pd-hero-img{max-width:680px;margin:auto}.pd-quick #quick-trip-form{grid-template-columns:repeat(2,minmax(0,1fr))}.pd-quick #quick-trip-form button{grid-column:1/-1}}
+@media(max-width:640px){.pd-head{padding:7px 14px}.pd-head .pd-brand{font-size:18px}.pd-head .pd-brand img{width:42px;height:42px}.pd-hero{min-height:0;padding:24px 15px 13px}.pd-hero h1{font-size:clamp(30px,8vw,44px)}.pd-hero-img{max-height:240px}.pd-buttons a{width:100%;text-align:center;justify-content:center;display:inline-flex}.pd-trust{font-size:12px;gap:8px}.pd-services-three{grid-template-columns:1fr;max-width:530px;margin:auto}.pd-destinations{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pd-section{padding:17px 12px}.pd-quick{margin:9px 12px 20px}.pd-contact-top{justify-content:flex-start}.pd-about-slim{line-height:1.8}}
+@media(max-width:390px){.pd-destinations{grid-template-columns:1fr}.pd-quick #quick-trip-form{grid-template-columns:1fr}.pd-quick #quick-trip-form button{grid-column:auto}}
+@media(prefers-reduced-motion:reduce){.pd-airplane,.pd-img-card{animation:none;transition:none}.pd-img-card:hover{transform:none}}
 </style></head><body>
-<header class="mock-one-header"><a class="logo" href="/" aria-label="PRIVATE DRIVE — главная"><img src="/assets/pd-user-logo-4-original.webp" alt="Утверждённый золотой логотип PD" width="70" height="70"><span><strong>PRIVATE DRIVE</strong><small>Премиум-перевозки в Литве и Европе</small></span></a><nav aria-label="Главное меню"><a href="#top">Главная</a><a href="#services">Услуги</a><a href="#prices">Направления</a><a href="#about">О компании</a><a href="#documents">Документы</a><a href="#contacts">Контакты</a><a href="/pilot-registration">Пилотам</a><a href="/dispatch/login">Диспетчерская</a></nav><a class="header-contact" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Написать нам</a></header><main id="top">
-<div class="hero mock-two-hero"><div class="hero-copy">
-<span class="hero-eyebrow">PRIVATE DRIVE · ВИЛЬНЮС · ЛИТВА · ЕВРОПА</span>
-<h1>Ваш личный водитель <em>в Литве и Европе</em></h1>
-<p class="mock-two-lead">Такси · Трансферы · Персональные поездки</p>
-<ul class="mock-two-benefits"><li>Комфорт и безопасность</li><li>Пунктуальность и надёжность</li><li>Индивидуальный подход</li><li>Фиксированные тарифы на популярные направления</li></ul>
-<div class="hero-actions"><a class="btn" href="#quick-order">Забронировать поездку</a><a class="btn outline" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Написать в Telegram</a></div>
-</div><div class="hero-stage mock-two-stage" aria-label="Toyota RAV4 на оригинальных материалах PRIVATE DRIVE">
-<img class="hero-stage-art hero-main-photo" src="/assets/pd-user-photo-7-original.webp" alt="Toyota RAV4 в Вильнюсе — утверждённая фотография" width="864" height="1536" fetchpriority="high" decoding="async">
-<img class="hero-secondary-photo" src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 — оригинальная фотография PRIVATE DRIVE" width="864" height="1536" loading="lazy" decoding="async">
-</div></div>
-<section id="contacts" class="mock-contacts"><div><strong>PRIVATE DRIVE</strong><small>Премиум-перевозки в Литве и Европе</small></div><a class="pd-contact-telegram" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer" aria-label="Связаться с нами через Telegram"><svg class="pd-tg-round" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle cx="20" cy="20" r="20" fill="#229ED9"/><path d="M9.1 18.4 29.8 10.1c1.4-.55 2.5.32 2.04 2.27l-3.52 17.13c-.27 1.31-1.18 1.72-2.24 1.06l-6.42-4.77-3.1 3.06c-.33.34-.61.62-1.22.62l.47-6.54 11.96-10.97c.52-.47-.12-.73-.8-.31L12.08 21.4l-6.1-1.93c-1.33-.41-1.35-1.33.28-1.98Z" fill="#fff" transform="translate(1 0) scale(.96)"/></svg><span>@PrivateDraive</span></a><a href="mailto:evrobaltictransfer@gmail.com">evrobaltictransfer@gmail.com</a><a href="https://www.instagram.com/privatedraive/" target="_blank" rel="noopener noreferrer">Instagram</a></section><div class="mock-two-strip"><span>✈ Встреча в аэропорту VNO</span><span>◇ Междугородние трансферы</span><span>✧ Комфортные поездки</span><span>♧ Индивидуальные маршруты</span><span>✦ Дополнительные услуги</span></div><section id="services" class="mock-services mock-two-services"><h2 class="ornament-heading">Наши услуги</h2><div class="mock-service-grid">
-<a href="#quick-order" class="mock-service-card"><img src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 — трансферы в аэропорт" loading="lazy" width="864" height="1536"><div><h3>Трансфер в аэропорт</h3><p>Вильнюс (VNO) и другие аэропорты по согласованию</p><span class="mock-service-arrow">↗</span></div></a>
-<a href="#prices" class="mock-service-card"><img src="/assets/pd-user-photo-7-original.webp" alt="Toyota RAV4 — междугородние поездки" loading="lazy" width="864" height="1536"><div><h3>Междугородние поездки</h3><p>Каунас, Клайпеда, Паланга, Тракай, Друскининкай</p><span class="mock-service-arrow">↗</span></div></a>
-<a href="#quick-order" class="mock-service-card"><img src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 Hybrid — комфортные поездки" loading="lazy" width="864" height="1536"><div><h3>Комфортные поездки</h3><p>Персональный сервис, комфорт и конфиденциальность</p><span class="mock-service-arrow">↗</span></div></a>
-<a href="#contacts" class="mock-service-card"><img src="/assets/pd-user-photo-7-original.webp" alt="PRIVATE DRIVE — дополнительные услуги" loading="lazy" width="864" height="1536"><div><h3>Особые услуги</h3><p>Табличка при встрече, помощь с багажом, пожелания</p><span class="mock-service-arrow">↗</span></div></a>
+<header class="pd-head"><a class="pd-brand" href="/" aria-label="PRIVATE DRIVE — главная"><img src="/assets/pd-user-logo-4-original.webp" width="54" height="54" alt="Фирменный золотой логотип PD">PRIVATE DRIVE</a><nav class="pd-nav" aria-label="Главное меню"><a href="#top" aria-current="page">Главная</a><a href="/services">Наши услуги</a><a href="#prices">Тарифы</a><a href="#about">О нас</a><a href="#contacts">Контакты</a></nav></header><main class="pd-main" id="top">
+<section class="pd-hero"><div class="pd-hero-copy"><h1>Ваш личный водитель <em>в Литве и Европе</em></h1><div class="pd-trust"><span>◇ Комфортно</span><span>◇ Надёжно</span><span>◷ Вовремя</span></div><div class="pd-buttons"><a class="btn" href="#quick-order">Забронировать поездку</a><a class="btn outline" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Связаться с нами</a></div></div><img class="pd-hero-img" src="/assets/pd-approved-hero.webp" alt="Toyota RAV4 и водитель PRIVATE DRIVE на фоне Вильнюса — изображение из утверждённого макета" width="836" height="323" fetchpriority="high" decoding="async"></section>
+<section class="pd-section" id="services"><h2>Наши услуги <span class="pd-airplane" aria-hidden="true">✈</span></h2><div class="pd-services-three">
+<a class="pd-img-card" href="#quick-order" aria-label="Трансфер в аэропорт — открыть"><img src="/assets/pd-approved-service_airport.webp" alt="Трансфер в аэропорт, утверждённое изображение" width="480" height="246" loading="lazy"></a>
+<a class="pd-img-card" href="/services#parcel" aria-label="Доставка посылок — открыть"><img src="/assets/pd-approved-service_parcel.webp" alt="Доставка посылок, утверждённое изображение" width="480" height="246" loading="lazy"></a>
+<a class="pd-img-card" href="/services#driver" aria-label="Персональный водитель — открыть"><img src="/assets/pd-approved-service_driver.webp" alt="Персональный водитель, утверждённое изображение" width="480" height="246" loading="lazy"></a>
 </div></section>
-<section id="quick-order" class="mock-two-quick"><h2>Быстрый заказ</h2><form id="quick-trip-form">
-<label>Откуда<input id="quick-from" placeholder="Вильнюс" autocomplete="off" maxlength="220" required></label>
-<label>Куда<input id="quick-to" placeholder="Аэропорт (VNO)" autocomplete="off" maxlength="220" required></label>
-<label>Дата<input id="quick-date" type="date"></label><label>Время<input id="quick-time" type="time"></label>
-<button type="submit" class="btn">Найти маршрут</button></form><p>Тестовый предпросмотр — подтверждение заказа и оплата отключены.</p></section><section id="prices" class="mock-prices"><h2 class="ornament-heading">Популярные направления и тарифы</h2><div class="fare-strip" aria-label="Фиксированные тарифы PRIVATE DRIVE">
-<a class="fare-flight fare-link" href="#quick-order" data-from="Вильнюс" data-to="Аэропорт Вильнюса (VNO)" data-type="Трансфер"><span class="fare-airplane" aria-hidden="true">✈</span><div class="fare-airport-photo" role="img" aria-label="Встреча и трансфер в аэропорт на Toyota RAV4"></div><span class="fare-info"><span class="fare-symbol">✈</span><span class="fare-name">Вильнюс — Аэропорт</span><strong>40 €</strong><small>Трансфер</small></span></a>
-<a class="fare-link" href="#quick-order" data-from="Вильнюс" data-to="Каунас" data-type="Трансфер"><span class="fare-symbol">◆</span><span class="fare-name">Вильнюс — Каунас</span><strong>120 €</strong><small>Трансфер</small></a>
-<a class="fare-link" href="#quick-order" data-from="Вильнюс" data-to="Клайпеда" data-type="Трансфер"><span class="fare-symbol">↗</span><span class="fare-name">Вильнюс — Клайпеда</span><strong>320 €</strong><small>Трансфер</small></a>
-<a class="fare-link" href="#quick-order" data-from="Вильнюс" data-to="Варшава" data-type="Трансфер"><span class="fare-symbol">✦</span><span class="fare-name">Вильнюс — Варшава</span><strong>460 €</strong><small>Трансфер</small></a>
-<a class="fare-link" href="#contacts"><span class="fare-symbol">✧</span><span class="fare-name">Встреча с табличкой</span><strong>+15 €</strong><small>Дополнительная услуга</small></a>
-</div><p class="fare-caption">Нажми на направление, чтобы перенести адреса в форму быстрого заказа. Реальные заказы и платежи на тестовом сайте отключены.</p></section><section id="about" class="mock-about"><div class="about-visual"><img src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 PRIVATE DRIVE в Вильнюсе" loading="lazy" width="864" height="1536"></div><div class="about-copy"><h2>Почему выбирают PRIVATE DRIVE</h2><ul><li>Персональный комфорт и современные автомобили</li><li>Опытный водитель (пилот)</li><li>Фиксированные и прозрачные цены на выбранные направления</li><li>Индивидуальный подход к пожеланиям пассажира</li><li>Удобная связь в Telegram</li></ul></div><div class="app-preview"><img src="/assets/pd-user-logo-4-original.webp" alt="Логотип PRIVATE DRIVE" width="115" height="115"><strong>PRIVATE DRIVE</strong><p>Приложение готовится к тестированию</p><a href="#order">Посмотреть маршрут</a></div></section><section id="order" class="order-section" aria-label="Форма поездки и трансфера">
+<div class="pd-extra"><span>Розы, встреча с табличкой, трезвый водитель, помощь автомобилю зимой — отдельно, без перегрузки главной</span><a href="/services">Все услуги →</a></div>
+<section class="pd-section" id="prices"><h2>Популярные направления</h2><div class="pd-destinations">
+<a class="pd-img-card fare-link" href="#quick-order" data-from="Вильнюс" data-to="Аэропорт Вильнюса (VNO)" data-type="Трансфер" aria-label="Вильнюс — аэропорт, 40 евро. Выбрать маршрут"><img src="/assets/pd-approved-airport.webp" alt="Вильнюс — аэропорт — 40 евро, утверждённое изображение" width="360" height="149" loading="lazy"></a>
+<a class="pd-img-card fare-link" href="#quick-order" data-from="Вильнюс" data-to="Каунас" data-type="Трансфер" aria-label="Вильнюс — Каунас, 120 евро. Выбрать маршрут"><img src="/assets/pd-approved-kaunas.webp" alt="Вильнюс — Каунас — 120 евро, утверждённое изображение" width="360" height="149" loading="lazy"></a>
+<a class="pd-img-card fare-link" href="#quick-order" data-from="Вильнюс" data-to="Клайпеда" data-type="Трансфер" aria-label="Вильнюс — Клайпеда, 320 евро. Выбрать маршрут"><img src="/assets/pd-approved-klaipeda.webp" alt="Вильнюс — Клайпеда — 320 евро, утверждённое изображение" width="360" height="149" loading="lazy"></a>
+<a class="pd-img-card fare-link" href="#quick-order" data-from="Вильнюс" data-to="Варшава" data-type="Трансфер" aria-label="Вильнюс — Варшава, 460 евро. Выбрать маршрут"><img src="/assets/pd-approved-warsaw.webp" alt="Вильнюс — Варшава — 460 евро, утверждённое изображение" width="360" height="149" loading="lazy"></a>
+</div></section>
+<section class="pd-quick" id="quick-order"><h2>Быстрый заказ поездки</h2><form id="quick-trip-form" autocomplete="off"><label>Откуда<input id="quick-from" name="from" placeholder="Откуда" maxlength="220" required></label><label>Куда<input id="quick-to" name="to" placeholder="Куда" maxlength="220" required></label><label>Дата<input id="quick-date" name="date" type="date"></label><label>Время<input id="quick-time" name="time" type="time"></label><button class="btn" type="submit">Забронировать</button></form><p>Тестовый предпросмотр. Данные переходят в подробную форму ниже; реальные заказы и списания отключены.</p></section>
+<section id="contacts" class="pd-contact-top" aria-label="Контакты PRIVATE DRIVE"><a href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer"><svg class="pd-tg-round" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="#229ED9"/><path d="M9 18.5 30 10c1.6-.6 2.4.3 2 2l-3.5 17c-.3 1.4-1.3 1.7-2.4 1l-6.4-4.8-3.2 3.1c-.4.4-.7.5-1.2.5l.5-6.4 12-11c.5-.4-.1-.7-.8-.3L12 21.4l-6-1.9c-1.3-.4-1.2-1.3.3-1.9Z" fill="#fff"/></svg><span>@PrivateDraive — связаться с нами</span></a><a href="mailto:evrobaltictransfer@gmail.com">evrobaltictransfer@gmail.com</a><a href="https://www.instagram.com/privatedraive/" target="_blank" rel="noopener noreferrer">Instagram @privatedraive</a></section>
+<details class="pd-route-details"><summary>Карта и подробный расчёт маршрута</summary><section id="order" class="order-section" aria-label="Форма поездки и трансфера">
 <div class="order-shell">
 <div class="order-panel">
 <h2>Заказать поездку</h2><p>Выбери тип поездки, укажи адреса и время подачи. Пока это тестовый предпросмотр без отправки заказа.</p>
@@ -290,17 +327,10 @@ main{max-width:1550px}
 <div id="order-live-map" role="region" aria-label="Интерактивная карта маршрута с приближением и передвижением"></div>
 <small>© Участники OpenStreetMap. Маршрут строится непосредственно на карте после выбора адресов.</small></div>
 </div></section>
-<section id="faq" class="mock-faq"><h2 class="ornament-heading">Частые вопросы</h2><p>Тестовый сайт позволяет посмотреть форму, карту и предварительный маршрут. Настоящие заказы сейчас согласуются через Telegram. Оплата на сайте отключена.</p></section>
-<section id="documents" class="mock-docs"><h2>Документы</h2><p>Юридическая информация будет опубликована после проверки документов и реквизитов. Действующий сайт и приложение не затрагиваются.</p></section>
-</main>
-<footer class="pd-footer" aria-label="Контакты и авторство">
-  <div class="pd-footer-brand"><strong>PRIVATE DRIVE</strong><span>Тестовый предпросмотр</span></div>
-  <nav class="pd-footer-socials" aria-label="Социальные сети">
-    <a href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer" aria-label="Написать PRIVATE DRIVE в Telegram" title="Telegram"><svg class="pd-tg-round" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle cx="20" cy="20" r="20" fill="#229ED9"/><path d="M9.1 18.4 29.8 10.1c1.4-.55 2.5.32 2.04 2.27l-3.52 17.13c-.27 1.31-1.18 1.72-2.24 1.06l-6.42-4.77-3.1 3.06c-.33.34-.61.62-1.22.62l.47-6.54 11.96-10.97c.52-.47-.12-.73-.8-.31L12.08 21.4l-6.1-1.93c-1.33-.41-1.35-1.33.28-1.98Z" fill="#fff" transform="translate(1 0) scale(.96)"/></svg></a>
-    <a href="https://www.instagram.com/privatedraive/" target="_blank" rel="noopener noreferrer" aria-label="PRIVATE DRIVE в Instagram" title="Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.8" cy="6.4" r=".9" fill="currentColor" stroke="none"/></svg></a>
-  </nav>
-  <div class="pd-footer-credit"><span>© 2026 jenia ai_fast_work</span><span class="pd-developer">Разработчик: <a href="https://t.me/ai_fast_work" target="_blank" rel="noopener noreferrer" aria-label="Связаться с разработчиком в Telegram"><svg class="pd-tg-round" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><circle cx="20" cy="20" r="20" fill="#229ED9"/><path d="M9.1 18.4 29.8 10.1c1.4-.55 2.5.32 2.04 2.27l-3.52 17.13c-.27 1.31-1.18 1.72-2.24 1.06l-6.42-4.77-3.1 3.06c-.33.34-.61.62-1.22.62l.47-6.54 11.96-10.97c.52-.47-.12-.73-.8-.31L12.08 21.4l-6.1-1.93c-1.33-.41-1.35-1.33.28-1.98Z" fill="#fff" transform="translate(1 0) scale(.96)"/></svg><span>@ai_fast_work</span></a></span></div>
-</footer><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</details>
+<section class="pd-about-slim" id="about">PRIVATE DRIVE — персональные перевозки по предварительной записи. <a href="/pilot-registration">Регистрация пилота</a> <a href="/dispatch/login">Диспетчерская</a> <a href="/services">Дополнительные услуги</a></section>
+</main><footer class="pd-min-footer">Разработчик: <a href="https://t.me/ai_fast_work" target="_blank" rel="noopener noreferrer"><svg class="pd-tg-round" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="#229ED9"/><path d="M9 18.5 30 10c1.6-.6 2.4.3 2 2l-3.5 17c-.3 1.4-1.3 1.7-2.4 1l-6.4-4.8-3.2 3.1c-.4.4-.7.5-1.2.5l.5-6.4 12-11c.5-.4-.1-.7-.8-.3L12 21.4l-6-1.9c-1.3-.4-1.2-1.3.3-1.9Z" fill="#fff"/></svg><span>@ai_fast_work</span></a><span class="divider">|</span>© 2026 jenia ai_fast_work</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (()=>{
  const $=id=>document.getElementById(id);

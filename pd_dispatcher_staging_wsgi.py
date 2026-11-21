@@ -6,7 +6,8 @@ Run only on a dedicated HTTPS test deployment; not production.
 import os
 from types import SimpleNamespace
 
-from flask import Flask
+from flask import Flask, request, Response
+from pathlib import Path
 from pd_web_dispatcher import register
 
 
@@ -36,6 +37,20 @@ def create_app():
         is_admin=lambda uid: uid == allowed_id and allowed_id > 0,
     )
     register(app, core)
+
+    @app.get("/pilot-registration")
+    def pilot_registration():
+        page = Path(__file__).with_name("pd_pilot_registration.html").read_text(encoding="utf-8")
+        return Response(page, content_type="text/html; charset=utf-8",
+                        headers={"Cache-Control": "no-store",
+                                 "X-Content-Type-Options": "nosniff",
+                                 "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+
+    @app.post("/pilot-registration")
+    def pilot_registration_submission_disabled():
+        # Never accept IDs, uploaded photos, bank details or other PII on staging.
+        return "Загрузка анкет не подключена", 503
+
     return app
 
 

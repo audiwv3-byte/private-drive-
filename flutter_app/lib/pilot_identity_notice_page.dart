@@ -156,6 +156,20 @@ class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
                 ),
                 key: const Key('pilot-identity-notice-contact'),
               ),
+              if (const bool.fromEnvironment('PD_INTERNAL_QA') &&
+                  widget.onContinueWithoutVerification != null) ...[
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  key: const Key('pilot-identity-notice-qa-skip'),
+                  onPressed: widget.onContinueWithoutVerification,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: Text(_tr('Продолжить без проверки лица',
+                      'Tęsti be veido patikros',
+                      'Continue without face check')),
+                ),
+                const Text('Только внутренняя тестовая сборка. '
+                    'Личность не подтверждена; права не изменяются.'),
+              ],
               const SizedBox(height: 20),
               CheckboxListTile(
                 key: const Key('pilot-identity-notice-acknowledge'),

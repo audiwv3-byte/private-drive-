@@ -1,0 +1,114 @@
+name: PRIVATE DRIVE isolated camera-permission Android APK
+
+on:
+  push:
+    branches: [feature/flutter-independent-auth]
+    paths:
+      - '.github/workflows/pilot-camera-test-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-isolated-camera-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Build separate Android project, with no production credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
+          cp -R flutter_app/lib/. private_drive_build/lib/
+          cp -R flutter_app/assets private_drive_build/assets
+          cp -R flutter_app/test/. private_drive_build/test/
+          cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
+          cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
+          rm -f private_drive_build/test/widget_test.dart
+          python3 -m pip install --quiet Pillow
+          (cd flutter_app && python3 tool/prepare_transparent_logo.py)
+          cp flutter_app/assets/brand/private_drive_logo_transparent.png private_drive_build/assets/brand/
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          src = Path('flutter_app/assets/brand/private_drive_logo.webp')
+          assert hashlib.sha256(src.read_bytes()).hexdigest() == '550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f'
+          pub = Path('private_drive_build/pubspec.yaml')
+          text = pub.read_text()
+          marker = '    - assets/brand/private_drive_logo.webp'
+          assert text.count(marker) == 1
+          pub.write_text(text.replace(marker, marker + '\n    - assets/brand/private_drive_logo_transparent.png'))
+          gradle = Path('private_drive_build/android/app/build.gradle.kts')
+          text = gradle.read_text()
+          original = 'applicationId = "lt.privatedrive.private_drive"'
+          assert original in text
+          text = text.replace(original,
+              'applicationId = "lt.privatedrive.private_drive.camera_preview"')
+          gradle.write_text(text)
+          manifest = Path('private_drive_build/android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          assert '<application' in text
+          text = text.replace('android:label="private_drive"',
+              'android:label="PD CAMERA TEST"')
+          text = text.replace('android:icon="@mipmap/ic_launcher"',
+              'android:icon="@drawable/private_drive_logo"')
+          permissions = '''<uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-feature android:name="android.hardware.camera" android:required="false"/>
+              <queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>
+              '''
+          text = text.replace('<application', permissions + '<application', 1)
+          assert 'android.permission.RECORD_AUDIO' not in text
+          manifest.write_text(text)
+          drawable = manifest.parent / 'res/drawable-nodpi'
+          drawable.mkdir(parents=True, exist_ok=True)
+          (drawable / 'private_drive_logo.webp').write_bytes(src.read_bytes())
+          print('Isolated camera-preview ID configured; no production credentials.')
+          PY
+          python3 flutter_app/tool/apply_native_brand_splash.py
+      - name: Run static analysis and widget tests
+        working-directory: private_drive_build
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: Compile installable debug-signed APK with no auth API URL
+        working-directory: private_drive_build
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --debug --dart-define=PD_NATIVE_AUTH_API_URL=
+          APK=build/app/outputs/flutter-apk/app-debug.apk
+          test -s "$APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../camera-apk-signature.txt
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > ../camera-apk-badging.txt
+          grep "name='lt.privatedrive.private_drive.camera_preview'" ../camera-apk-badging.txt
+          grep "application-label:'PD CAMERA TEST'" ../camera-apk-badging.txt
+          "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../camera-apk-permissions.txt
+          grep "android.permission.CAMERA" ../camera-apk-permissions.txt
+          if grep -q "android.permission.RECORD_AUDIO" ../camera-apk-permissions.txt; then
+            echo "::error::Unexpected RECORD_AUDIO permission"
+            exit 1
+          fi
+          mkdir -p ../camera_test_apk
+          cp "$APK" ../camera_test_apk/PRIVATE-DRIVE-camera-preview-debug.apk
+          cp ../camera-apk-signature.txt ../camera-apk-badging.txt ../camera-apk-permissions.txt ../camera_test_apk/
+          (cd ../camera_test_apk && sha256sum PRIVATE-DRIVE-camera-preview-debug.apk > SHA256SUMS)
+      - name: Upload isolated installable camera test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-isolated-camera-test-apk
+          path: camera_test_apk/
+          if-no-files-found: error
+          retention-days: 7

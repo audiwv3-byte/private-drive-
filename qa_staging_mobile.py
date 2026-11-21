@@ -42,6 +42,26 @@ with sync_playwright() as p:
         })""")
         assert info["pageWidth"] <= width + 2, f"Horizontal overflow at {width}: {info}"
         assert info["serviceCards"] == 3 and info["fareCards"] == 4, info
+        # Approved screenshot uses light sections, dark/navy hero and compact footer.
+        visual = page.evaluate("""() => ({
+            sectionBg: getComputedStyle(document.querySelector('.pd-section')).backgroundColor,
+            headingColor: getComputedStyle(document.querySelector('.pd-section h2')).color,
+            heroBg: getComputedStyle(document.querySelector('.pd-hero')).backgroundImage,
+            duplicateContactStrip: !!document.querySelector('.pd-contact-top'),
+            duplicateServicesStrip: !!document.querySelector('.pd-extra')
+        })""")
+        assert visual["sectionBg"] == "rgb(247, 248, 251)", visual
+        assert visual["headingColor"] == "rgb(20, 36, 59)", visual
+        assert "gradient" in visual["heroBg"], visual
+        assert not visual["duplicateContactStrip"] and not visual["duplicateServicesStrip"], visual
+        page.locator(".pd-contacts-nav summary").click()
+        assert page.locator('.pd-contacts-popup a[href="https://t.me/PrivateDraive"]').is_visible()
+        assert page.locator('.pd-contacts-popup a[href="mailto:evrobaltictransfer@gmail.com"]').is_visible()
+        menuBounds = page.locator(".pd-contacts-popup").bounding_box()
+        assert menuBounds and menuBounds["x"] >= -2, menuBounds
+        assert menuBounds["x"] + menuBounds["width"] <= width + 2, menuBounds
+        page.locator(".pd-contacts-nav summary").click()
+
         assert info["booking"] and info["map"], info
         page.locator('a.fare-link[data-to="Каунас"]').click()
         assert page.locator("#quick-from").input_value() == "Вильнюс"

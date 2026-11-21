@@ -23,6 +23,15 @@ with sync_playwright() as p:
         page.route("https://tile.openstreetmap.org/**", lambda route: route.abort())
         page.route("https://unpkg.com/**", lambda route: route.abort())
         page.goto(URL, wait_until="domcontentloaded", timeout=30000)
+        # Lazy service photos must be scrolled into view before checking naturalWidth.
+        for name in ("pd-user-photo-6-original.webp", "pd-user-photo-7-original.webp"):
+            images = page.locator('img[src*="' + name + '"]')
+            images.first.scroll_into_view_if_needed()
+            images.first.evaluate("(img) => img.loading='eager'")
+            page.wait_for_function("""(id) => {
+              const img=[...document.querySelectorAll('img')].find(x=>x.src.includes(id));
+              return img && img.complete && img.naturalWidth>=864;
+            }""",arg=name,timeout=12000)
         page.locator(".hero-stage").scroll_into_view_if_needed()
         info = page.evaluate("""() => {
            const ids = ['pd-user-logo-4-original.webp','pd-user-photo-6-original.webp','pd-user-photo-7-original.webp','pd-approved-mock1-hero.webp'];

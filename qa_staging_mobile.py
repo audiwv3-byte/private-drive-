@@ -24,7 +24,7 @@ with sync_playwright() as p:
         page.route("https://unpkg.com/**", lambda route: route.abort())
         page.goto(BASE + "/", wait_until="domcontentloaded", timeout=30000)
         for name in ("airport", "kaunas", "klaipeda", "warsaw",
-                     "service_airport", "service_parcel", "service_driver"):
+                     "service_airport", "service_parcel"):
             image = page.locator('img[src="/assets/pd-approved-' + name + '.webp"]')
             assert image.count() == 1, f"{name} absent on {width}px"
             image.scroll_into_view_if_needed()
@@ -42,6 +42,14 @@ with sync_playwright() as p:
         })""")
         assert info["pageWidth"] <= width + 2, f"Horizontal overflow at {width}: {info}"
         assert info["serviceCards"] == 3 and info["fareCards"] == 4, info
+        driver = page.locator('.pd-driver-card img')
+        assert driver.count() == 1
+        assert driver.get_attribute("src") == "/assets/pd-user-photo-6-original.webp"
+        driver.scroll_into_view_if_needed()
+        driver.evaluate("(img) => img.loading = 'eager'")
+        page.wait_for_function("""() => {const img=document.querySelector('.pd-driver-card img');return img && img.complete && img.naturalWidth >= 800;}""", timeout=10000)
+        assert page.locator('.pd-services-three img[src="/assets/pd-approved-service_driver.webp"]').count() == 0
+
         # Main banner must use the owner's saved RAV4 photo with no unrelated person.
         assert page.locator('.pd-hero-img[src="/assets/pd-user-photo-6-original.webp"]').count() == 1
         assert page.locator('.pd-hero-img[src="/assets/pd-approved-hero.webp"]').count() == 0

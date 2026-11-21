@@ -87,6 +87,66 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _quietRide = false;
   bool _luggageHelp = false;
   List<LatLng> _roadPoints = const [];
+  int? _pickupEtaMinutes;
+  int _pickupEtaGeneration = 0;
+  String? _pickupEtaRouteKey;
+  DateTime? _pickupEtaRequestedAt;
+
+  /// Uses actual pilot GPS and a resolved pickup address; never assumes
+  /// average speed or invents an arrival time for a city-centre placeholder.
+  Future<void> _updatePickupEta() async {
+    final store = widget.tripStore;
+    final trip = store?.trip;
+    final lastFix = store?.pilotLastSeen;
+    final eligible = widget.enableMapTiles && trip != null &&
+        (store?.status == DemoTripStatus.assigned && store?.pilotAccepted == true ||
+         store?.status == DemoTripStatus.approaching) &&
+        store?.pilotOnline == true && store?.pilotLatitude != null &&
+        store?.pilotLongitude != null && lastFix != null &&
+        !lastFix.isAfter(DateTime.now()) &&
+        DateTime.now().difference(lastFix) < const Duration(minutes: 2);
+    final pickup = trip == null ? null :
+        (_pickedPickup ?? _resolvedAddresses[trip.from.trim()]);
+    if (!eligible || pickup == null) {
+      _pickupEtaGeneration++;
+      _pickupEtaRouteKey = null;
+      _pickupEtaMinutes = null;
+      return;
+    }
+    final lat = store!.pilotLatitude!;
+    final lng = store.pilotLongitude!;
+    final key = '${lat.toStringAsFixed(4)},${lng.toStringAsFixed(4)}'
+        ':${pickup.latitude.toStringAsFixed(5)},${pickup.longitude.toStringAsFixed(5)}';
+    if (_pickupEtaRouteKey == key &&
+        _pickupEtaRequestedAt != null &&
+        DateTime.now().difference(_pickupEtaRequestedAt!) <
+            const Duration(seconds: 30)) return;
+    _pickupEtaRouteKey = key;
+    _pickupEtaRequestedAt = DateTime.now();
+    _pickupEtaMinutes = null;
+    final request = ++_pickupEtaGeneration;
+    try {
+      final uri = Uri.https('router.project-osrm.org',
+        '/route/v1/driving/$lng,$lat;${pickup.longitude},${pickup.latitude}',
+        {'overview': 'false'});
+      final json = await const PdHttpApi().getJson(
+        uri, timeout: const Duration(seconds: 8));
+      final routes = json['routes'] as List<dynamic>?;
+      if (routes == null || routes.isEmpty) throw const FormatException('No route');
+      final duration = (routes.first as Map<String, dynamic>)['duration'];
+      if (duration is! num || !duration.isFinite || duration < 0) {
+        throw const FormatException('No duration');
+      }
+      if (!mounted || request != _pickupEtaGeneration) return;
+      // OSRM driving duration excludes live traffic and is only indicative.
+      setState(() => _pickupEtaMinutes =
+          (duration.toDouble() / 60).ceil().clamp(1, 1440));
+    } catch (_) {
+      if (!mounted || request != _pickupEtaGeneration) return;
+      setState(() => _pickupEtaMinutes = null);
+    }
+  }
+
   bool _routeLoading = false;
   String _routeInfo = '';
   int _routeRequest = 0;
@@ -426,6 +486,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
     }
     _knownPilotMessageCount = widget.tripStore?.pilotChatMessages.length ?? 0;
     widget.tripStore?.addListener(_onTripChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_updatePickupEta());
+    });
     _tripWishes.addListener(_savePreferences);
     for (final track in _favoriteTracks) {
       track.addListener(_savePreferences);
@@ -435,6 +498,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _gpsFreshnessTimer = Timer.periodic(const Duration(seconds: 15), (_) {
         if (mounted && widget.tripStore?.pilotLastSeen != null) {
           setState(() {}); // Hide stale pilot fixes even without new GPS events.
+          unawaited(_updatePickupEta());
         }
       });
     }
@@ -445,6 +509,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void _onTripChanged() {
     if (!mounted) return;
     _scheduleFollowPilot();
+    unawaited(_updatePickupEta());
     final messages = widget.tripStore?.pilotChatMessages ?? const <String>[];
     if (messages.length > _knownPilotMessageCount) {
       if (widget.onIncomingMessageVoice != null) {
@@ -804,6 +869,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void dispose() {
     widget.tripStore?.removeListener(_onTripChanged);
     _routeRequest++;
+    _pickupEtaGeneration++;
     _addressTimer?.cancel();
     _gpsFreshnessTimer?.cancel();
     if (widget.passengerMapController == null) _passengerMapController.dispose();
@@ -1188,6 +1254,23 @@ class _PassengerDemoState extends State<PassengerDemo> {
               'Tap the map to choose your pickup point.'),
               key: const Key('passenger-pickup-map-instruction'),
               style: const TextStyle(fontSize: 12)),
+            if (store != null && store.isActive)
+              Text(
+                store.status == DemoTripStatus.requested
+                    ? 'Время подачи: ожидаем назначения пилота'
+                    : store.status == DemoTripStatus.assigned &&
+                            !store.pilotAccepted
+                        ? 'Время подачи: ожидаем подтверждения пилота'
+                        : _pickupEtaMinutes != null && pilotPosition != null &&
+                                (store.status == DemoTripStatus.assigned ||
+                                 store.status == DemoTripStatus.approaching)
+                            ? 'Примерное время подачи: ≈ $_pickupEtaMinutes мин · без учёта пробок'
+                            : 'Время подачи уточняется',
+                key: const Key('passenger-pickup-eta'),
+                style: const TextStyle(
+                  color: Color(0xFFDDC184), fontWeight: FontWeight.w700,
+                ),
+              ),
             if (store != null && store.isActive)
               Text(
                 pilotPosition != null

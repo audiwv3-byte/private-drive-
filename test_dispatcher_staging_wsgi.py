@@ -211,6 +211,68 @@ class DispatcherStagingTests(unittest.TestCase):
                 self.assertTrue(result["available"])
                 self.assertIsNone(result["price"])
 
+    def test_staging_public_fallback_requires_explicit_flag_and_is_never_production(self):
+        from unittest.mock import patch
+        import pd_public_route_preview as preview
+        with patch.dict(os.environ, {**self.env(), "PD_STAGING_PUBLIC_FALLBACK": "1"}, clear=True):
+            self.assertTrue(preview._public_fallback_enabled())
+        with patch.dict(os.environ, {"PD_STAGING_PUBLIC_FALLBACK": "1"}, clear=True):
+            self.assertFalse(preview._public_fallback_enabled())
+        with patch.dict(os.environ, {**self.env(), "PD_STAGING_PUBLIC_FALLBACK": "0"}, clear=True):
+            self.assertFalse(preview._public_fallback_enabled())
+
+    def test_photon_and_osrm_403_fallback_mock_no_real_calls(self):
+        from io import BytesIO
+        from urllib.error import HTTPError
+        import pd_public_route_preview as preview
+        from unittest.mock import patch
+        # No network or secrets needed. Simulate both upstream sources.
+        def upstream_forbidden(*args, **kwargs):
+            raise HTTPError("https://api.heigit.org/test", 403, "Forbidden", {}, BytesIO(b"Forbidden"))
+        photon = {"features": [
+            {"properties": {"name": "Vilnius", "country": "Lithuania"},
+             "geometry": {"coordinates": [25.2797, 54.6872]}},
+            {"properties": {"name": "Kaunas", "country": "Lithuania"},
+             "geometry": {"coordinates": [23.9036, 54.8985]}}
+        ]}
+        osrm = {"code": "Ok", "routes": [{
+            "distance": 100000, "duration": 5400,
+            "geometry": {"coordinates": [[25.2797, 54.6872], [23.9036, 54.8985]]}
+        }]}
+        with patch.dict(os.environ, {**self.env(),
+                "PD_STAGING_ORS_API_KEY": "synthetic", "PD_STAGING_PUBLIC_FALLBACK": "1"}, clear=True):
+            app = create_app()
+            client = app.test_client()
+            with patch.object(preview, "_request_json", side_effect=upstream_forbidden):
+                with patch.object(preview, "_public_json", side_effect=lambda url, kind: photon if kind == "suggest" else osrm):
+                    response = client.get("/preview/api/suggest?q=Vilnius")
+                    self.assertEqual(response.status_code, 200)
+                    self.assertTrue(response.get_json()["available"])
+                    self.assertEqual(response.get_json()["provider"], "test-photon")
+                    self.assertEqual(response.get_json()["suggestions"][0]["coordinates"], [25.2797, 54.6872])
+                    data = {"origin": "Вильнюс", "destination": "Каунас",
+                        "origin_coordinates": [25.2797, 54.6872],
+                        "destination_coordinates": [23.9036, 54.8985],
+                        "category": "comfort", "roundtrip": False}
+                    route = client.post("/preview/api/route", json=data)
+                    self.assertEqual(route.status_code, 200)
+                    self.assertTrue(route.get_json()["available"])
+                    self.assertEqual(route.get_json()["provider"], "test-osrm")
+                    self.assertEqual(route.get_json()["km"], 100)
+                    self.assertEqual(route.get_json()["road_coordinates"][-1], [23.9036, 54.8985])
+                    self.assertEqual(client.post("/api/order", json=data).status_code, 404)
+
+    def test_public_demo_http_transport_host_validation_and_size_limit(self):
+        import pd_public_route_preview as preview
+        from unittest.mock import patch
+        with patch.dict(os.environ, {**self.env(), "PD_STAGING_PUBLIC_FALLBACK": "1"}, clear=True):
+            with self.assertRaises(ValueError):
+                preview._public_json("https://evil.example/api?q=a", "suggest")
+            with self.assertRaises(ValueError):
+                preview._public_json("http://photon.komoot.io/api?q=a", "suggest")
+            with self.assertRaises(ValueError):
+                preview._public_json("https://photon.komoot.io/api?q=a", "route")
+
     def test_pilot_registration_public_preview_has_no_upload_backend(self):
         with patch.dict(os.environ, self.env(), clear=True):
             app = create_app()

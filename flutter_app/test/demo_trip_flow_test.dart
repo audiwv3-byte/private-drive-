@@ -236,23 +236,25 @@ void main() {
     await tester.pump();
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
 
-    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
-    await tester.pump();
+    Future<void> swipe() async {
+      final track = find.byKey(const Key('pilot-next-trip'));
+      final handle = find.byKey(const Key('pilot-next-trip-handle'));
+      await tester.drag(handle, Offset(tester.getSize(track).width - 52, 0));
+      await tester.pump();
+    }
+    await swipe(); // К пассажиру.
     expect(find.text('Пилот едет к пассажиру'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('pilot-pause-trip')));
-    await tester.pump();
-    expect(find.text('Остановка · демо'), findsOneWidget);
-    expect(find.byKey(const Key('pilot-next-trip')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('pilot-pause-trip')));
-    await tester.pump();
-    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
-    await tester.pump();
+    await swipe(); // На месте, 3 минуты бесплатно.
+    expect(find.text('Поехали'), findsOneWidget);
+    await swipe(); // Поездка началась.
     expect(find.text('Поездка выполняется'), findsOneWidget);
-    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
+    await swipe(); // Остановка.
+    expect(find.text('Остановка · демо'), findsOneWidget);
+    await swipe(); // Возобновить маршрут.
+    expect(find.text('Поездка выполняется'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('pilot-final-destination-mode')));
     await tester.pump();
+    await swipe(); // Завершить поездку.
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('exit-pilot-preview')));

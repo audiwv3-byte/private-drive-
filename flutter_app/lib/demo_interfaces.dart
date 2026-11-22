@@ -1609,7 +1609,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                   color: Color(0xFFDDC184),
                                   fontWeight: FontWeight.bold)),
                             PdSlideToConfirm(
-                              key: ValueKey('pilot-next-trip-${_actionText}'),
+                              key: const Key('pilot-next-trip'),
                               thumbKey: const Key('pilot-next-trip-handle'),
                               label: pdLabel(context, _actionText),
                               enabled: _canAdvance,

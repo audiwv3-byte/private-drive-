@@ -67,6 +67,8 @@ class DemoTripStore extends ChangeNotifier {
   DemoTrip? _trip;
   DemoTripStatus? _status;
   bool _paused = false;
+  DateTime? _stopStartedAt;
+  final List<Duration> _completedStops = <Duration>[];
   bool _pilotAccepted = false;
   bool _pilotAcceptsCash = false;
   DateTime? _arrivalAt;
@@ -191,6 +193,18 @@ class DemoTripStore extends ChangeNotifier {
   }
   DemoTripStatus? get status => _status;
   bool get paused => _paused;
+  List<Duration> get completedStopWaits =>
+      List<Duration>.unmodifiable(_completedStops);
+  Duration currentStopElapsed({DateTime? now}) {
+    final started = _stopStartedAt;
+    if (!_paused || started == null) return Duration.zero;
+    final end = now ?? DateTime.now();
+    return end.isBefore(started) ? Duration.zero : end.difference(started);
+  }
+  Duration totalStopWaiting({DateTime? now}) =>
+      _completedStops.fold(Duration.zero, (sum, d) => sum + d) +
+      currentStopElapsed(now: now);
+
   bool get pilotAccepted => _pilotAccepted;
   bool get pilotAcceptsCash => _pilotAcceptsCash;
 
@@ -304,6 +318,8 @@ class DemoTripStore extends ChangeNotifier {
     _passengerChatMessages.clear();
     _dispatcherChatMessages.clear();
     _paused = false;
+    _stopStartedAt = null;
+    _completedStops.clear();
     _pilotAccepted = false;
     _arrivalAt = null;
     _departureFromPickupAt = null;
@@ -322,7 +338,7 @@ class DemoTripStore extends ChangeNotifier {
     _status = DemoTripStatus.cancelled;
     if (_arrivalAt != null) _departureFromPickupAt ??= DateTime.now();
     _pilotAccepted = false;
-    _paused = false;
+    _finishStop();
     notifyListeners();
     return true;
   }
@@ -376,16 +392,32 @@ class DemoTripStore extends ChangeNotifier {
       _departureFromPickupAt ??= departureTime.isBefore(_arrivalAt!)
           ? _arrivalAt : departureTime;
     }
+    if (next == DemoTripStatus.finished) _finishStop();
     _status = next;
     notifyListeners();
     return true;
   }
 
-  bool togglePause() {
-    if (_disposed ||
+  void _finishStop({DateTime? now}) {
+    if (_paused && _stopStartedAt != null) {
+      final elapsed = (now ?? DateTime.now()).difference(_stopStartedAt!);
+      _completedStops.add(elapsed.isNegative ? Duration.zero : elapsed);
+    }
+    _stopStartedAt = null;
+    _paused = false;
+  }
+
+  bool togglePause({DateTime? now}) {
+    if (_disposed || !_pilotAccepted ||
         (_status != DemoTripStatus.approaching &&
          _status != DemoTripStatus.underway)) return false;
-    _paused = !_paused;
+    final at = now ?? DateTime.now();
+    if (_paused) {
+      _finishStop(now: at);
+    } else {
+      _paused = true;
+      _stopStartedAt = at;
+    }
     notifyListeners();
     return true;
   }
@@ -412,6 +444,8 @@ class DemoTripStore extends ChangeNotifier {
       'services': trip.services,
       'status': status.name,
       'paused': _paused,
+      'stopStartedAt': _stopStartedAt?.toIso8601String(),
+      'completedStopMilliseconds': _completedStops.map((e) => e.inMilliseconds).toList(),
       'pilotAccepted': _pilotAccepted,
       'arrivalAt': _arrivalAt?.toIso8601String(),
       'departureFromPickupAt': _departureFromPickupAt?.toIso8601String(),
@@ -447,6 +481,16 @@ class DemoTripStore extends ChangeNotifier {
       final statusName = data['status'];
       final arrivalAtRaw = data['arrivalAt'];
       final departAtRaw = data['departureFromPickupAt'];
+      final stopStartedRaw = data['stopStartedAt'];
+      final stopsRaw = data['completedStopMilliseconds'] ?? <dynamic>[];
+      if ((stopStartedRaw != null && stopStartedRaw is! String) ||
+          stopsRaw is! List || stopsRaw.length > 100 ||
+          stopsRaw.any((e) => e is! int || e < 0 || e > 86400000)) {
+        return false;
+      }
+      final stopStartedParsed = stopStartedRaw is String
+          ? DateTime.tryParse(stopStartedRaw) : null;
+      if (stopStartedRaw != null && stopStartedParsed == null) return false;
       if ((arrivalAtRaw != null && arrivalAtRaw is! String) ||
           (departAtRaw != null && departAtRaw is! String)) return false;
       final arrivalParsed = arrivalAtRaw is String
@@ -540,6 +584,11 @@ class DemoTripStore extends ChangeNotifier {
       _status = status.first;
       _paused = data['paused'] == true &&
           (_status == DemoTripStatus.approaching || _status == DemoTripStatus.underway);
+      // Older paused snapshots lack timestamps; resume counting from restore.
+      _stopStartedAt = _paused ? (stopStartedParsed ?? DateTime.now()) : null;
+      _completedStops
+        ..clear()
+        ..addAll(stopsRaw.cast<int>().map((ms) => Duration(milliseconds: ms)));
       _arrivalAt = arrivalParsed;
       _departureFromPickupAt = departParsed;
       _pilotAccepted = data['pilotAccepted'] == true &&

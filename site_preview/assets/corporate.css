@@ -132,3 +132,12 @@ details p { margin: .6rem 0; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+/* Mini App tips shortcut in the corporate header */
+.header-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.header-tips { color: #21170b; background: linear-gradient(125deg, #ffedb9, #e7bd70 58%, #c79650); white-space: nowrap; }
+.header-tips:focus-visible { outline: 2px solid #ffedb9; outline-offset: 3px; }
+@media (max-width: 740px) {
+  .header-actions { width: 100%; justify-content: center; padding-top: 4px; }
+  .header-tips { min-height: 44px; }
+}

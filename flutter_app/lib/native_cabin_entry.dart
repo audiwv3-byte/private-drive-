@@ -56,8 +56,6 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       final session = _activeSession;
       if (role == 'pilot') {
         _page = 'photo';
-      } else if (role == 'dispatcher') {
-        _page = session?.canDispatch == true ? 'dispatcher' : 'signin';
       } else {
         _page = session != null || const bool.fromEnvironment('PD_INTERNAL_QA')
             ? 'passenger' : 'signin';
@@ -74,8 +72,6 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       _session = session;
       if (_requestedRole == 'pilot' && session.canPilot) {
         _page = 'photo';
-      } else if (_requestedRole == 'dispatcher' && session.canDispatch) {
-        _page = 'dispatcher';
       } else if (_requestedRole == 'passenger') {
         _page = 'passenger';
       } else {
@@ -100,7 +96,6 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     final cabin = PrivateDriveDemo(
       key: ValueKey('entry-$role-${session?.userId ?? (localQa ? 'local-qa' : 'guest')}'),
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',
-      adminOnly: role == 'dispatcher',
       storageScope: session?.userId ?? (localQa ? 'local-qa' : 'internal-guest'),
       onSignOut: _signOut, onBackToCabinets: _entry,
     );
@@ -137,7 +132,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
           onUnlocked: () => setState(() => _qaUnlocked = true),
         );
       }
-      if (const {'passenger', 'pilot', 'dispatcher'}.contains(_page)) {
+      if (const {'passenger', 'pilot'}.contains(_page)) {
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
@@ -150,8 +145,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       return PopScope(canPop: false,
         onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
         child: Scaffold(
-          appBar: AppBar(title: Text(_requestedRole == 'dispatcher'
-              ? 'Вход диспетчера' : _requestedRole == 'pilot' ? 'Вход пилота' : 'Вход пассажира'),
+          appBar: AppBar(title: Text(_requestedRole == 'pilot' ? 'Вход пилота' : 'Вход пассажира'),
             leading: BackButton(onPressed: _entry)),
           body: widget.signInBuilder(context, _requestedRole, _authenticated),
         ),
@@ -172,7 +166,6 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       return _cabin('passenger', session);
     }
     if (_page == 'pilot' && session?.canPilot == true) return _cabin('pilot', session);
-    if (_page == 'dispatcher' && session?.canDispatch == true) return _cabin('dispatcher', session);
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [
         if (session != null || _qaUnlocked) IconButton(onPressed: _signOut,
@@ -195,16 +188,12 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             FilledButton.icon(key: const Key('entry-pilot'),
               onPressed: () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
               label: const Text('Пилот')),
-            const SizedBox(height: 12),
-            FilledButton.icon(key: const Key('entry-dispatcher'),
-              onPressed: () => _select('dispatcher'), icon: const Icon(Icons.support_agent_outlined),
-              label: const Text('Диспетчер')),
             if (_message != null) Text(_message!, key: const Key('entry-role-message')),
             const SizedBox(height: 16),
             const Text(pdLocalQaEntryEnabled
-              ? 'Все три кабинета работают с локальными тестовыми данными.'
+              ? 'Оба кабинета используют локальные тестовые данные.'
               : 'Фотопроверка требуется только пилоту. '
-                'Доступ пилота и диспетчера подтверждается сервером.',
+                'Доступ пилота подтверждается сервером.',
               textAlign: TextAlign.center),
             const SizedBox(height: 12),
             const Text(pdLocalQaEntryEnabled

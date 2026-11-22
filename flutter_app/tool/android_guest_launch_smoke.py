@@ -57,12 +57,12 @@ click_label('Тестовый пароль')
 adb('shell', 'input', 'text', os.environ['PD_QA_LOCAL_PIN'])
 adb('shell', 'input', 'keyevent', '4')
 click_label('Войти в тест')
-wait_for_labels('Выбери кабинет', 'Пассажир', 'Пилот', 'Диспетчер')
+entry = wait_for_labels('Выбери кабинет', 'Пассажир', 'Пилот')
+assert 'Диспетчер' not in entry, 'Dispatcher must stay on the website'
 
 for role, labels in [
     ('Пассажир', ('Такси', 'Трансфер')),
     ('Пилот', ('Кабина пилота', 'Не на линии')),
-    ('Диспетчер', ('PRIVATE DRIVE · Диспетчер',)),
 ]:
     click_label(role)
     xml = wait_for_labels('Внутренний тест', *labels)
@@ -71,4 +71,4 @@ for role, labels in [
     Path(f'android-guest-{role}.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     adb('shell', 'input', 'keyevent', '4')
     wait_for_labels('Выбери кабинет')
-print('PASS: actual APK opened all three local cabins without phone or camera.', flush=True)
+print('PASS: actual APK opened both local cabins without phone or camera.', flush=True)

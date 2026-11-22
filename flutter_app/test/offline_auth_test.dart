@@ -162,15 +162,12 @@ void main() {
       expect(find.byKey(const Key('authorized-role-selection')), findsOneWidget);
       expect(passenger, findsOneWidget);
       expect(pilot, findsOneWidget);
-      expect(dispatcher, findsOneWidget);
+      expect(dispatcher, findsNothing);
       expect(find.byType(PilotCabin), findsNothing);
       expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);
       final pilotAllowed = ['pilot', 'pilot_dispatcher', 'admin'].contains(role);
-      final dispatcherAllowed = ['dispatcher', 'pilot_dispatcher', 'admin'].contains(role);
       expect(tester.widget<FilledButton>(pilot).onPressed,
           pilotAllowed ? isNotNull : isNull);
-      expect(tester.widget<FilledButton>(dispatcher).onPressed,
-          dispatcherAllowed ? isNotNull : isNull);
 
       await tester.tap(passenger);
       await tester.pumpAndSettle();
@@ -204,11 +201,7 @@ void main() {
         await tester.tap(find.byType(BackButton).first);
         await tester.pumpAndSettle();
       }
-      if (dispatcherAllowed) {
-        await tester.tap(dispatcher);
-        await tester.pumpAndSettle();
-        expect(find.byKey(const Key('dispatcher-open-drawer')), findsOneWidget);
-      }
+      expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);
     });
   }
 

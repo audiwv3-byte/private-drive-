@@ -311,13 +311,10 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       final serverRole = signedInRole!;
       final canPilot = const {'admin', 'pilot', 'pilot_dispatcher'}
           .contains(serverRole);
-      final canDispatch = const {'admin', 'dispatcher', 'pilot_dispatcher'}
-          .contains(serverRole);
       final role = selectedStaffRole;
       if (role == null ||
           (role == 'pilot' && !canPilot) ||
-          (role == 'dispatcher' && !canDispatch) ||
-          !const {'passenger', 'pilot', 'dispatcher'}.contains(role)) {
+          !const {'passenger', 'pilot'}.contains(role)) {
         return Scaffold(
           appBar: AppBar(
             title: const Text('PRIVATE DRIVE'),
@@ -360,17 +357,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       icon: const Icon(Icons.directions_car_outlined),
                       label: const Text('Пилот'),
                     ),
-                    const SizedBox(height: 12),
-                    FilledButton.icon(
-                      key: const Key('authorized-open-dispatcher'),
-                      onPressed: canDispatch
-                          ? () => setState(() => selectedStaffRole = 'dispatcher')
-                          : null,
-                      icon: const Icon(Icons.support_agent_outlined),
-                      label: const Text('Диспетчер'),
-                    ),
                     const SizedBox(height: 16),
-                    const Text('Кабинеты пилота и диспетчера доступны только '
+                    const Text('Кабинет пилота доступен только '
                         'с правами, подтверждёнными сервером.',
                         textAlign: TextAlign.center),
                   ],
@@ -385,7 +373,6 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         child: PrivateDriveDemo(
         key: ValueKey('$role-${signedInUserId!}'),
         storageScope: signedInUserId,
-        adminOnly: role == 'dispatcher',
         pilotOnly: role == 'pilot',
         passengerOnly: role == 'passenger',
         onSignOut: signOut,

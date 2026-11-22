@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:private_drive/demo_dispatcher_cabinet.dart';
 import 'package:private_drive/native_cabin_entry.dart';
 import 'package:private_drive/pilot_cabin.dart';
 import 'package:private_drive/pilot_identity_notice_page.dart';
@@ -37,17 +36,16 @@ void main() {
     await tester.enterText(pin, const String.fromEnvironment('PD_QA_LOCAL_PIN'));
     await tap(enter);
 
-    for (final role in const ['passenger', 'pilot', 'dispatcher']) {
+    expect(find.byKey(const Key('entry-dispatcher')), findsNothing);
+    for (final role in const ['passenger', 'pilot']) {
       await tap(find.byKey(Key('entry-$role')));
       expect(find.byKey(const Key('local-qa-status')), findsOneWidget);
       expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
       expect(find.byKey(const Key('dispatcher-photo-review')), findsNothing);
       if (role == 'passenger') {
         expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
-      } else if (role == 'pilot') {
-        expect(find.byType(PilotCabin), findsOneWidget);
       } else {
-        expect(find.byType(DemoDispatcherCabinet), findsOneWidget);
+        expect(find.byType(PilotCabin), findsOneWidget);
       }
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();

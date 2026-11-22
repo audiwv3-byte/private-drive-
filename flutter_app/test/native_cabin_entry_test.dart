@@ -44,11 +44,12 @@ void main() {
     if (skip.evaluate().isNotEmpty) await tap(tester, 'permission-onboarding-skip');
   }
 
-  testWidgets('first screen shows all three cabins before phone or photo', (tester) async {
+  testWidgets('first screen shows passenger and pilot before phone or photo', (tester) async {
     await pumpEntry(tester);
-    for (final role in ['passenger', 'pilot', 'dispatcher']) {
+    for (final role in ['passenger', 'pilot']) {
       expect(find.byKey(Key('entry-$role')), findsOneWidget);
     }
+    expect(find.byKey(const Key('entry-dispatcher')), findsNothing);
     expect(find.byKey(const Key('entry-test-sign-in')), findsNothing);
     expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
   });
@@ -62,17 +63,6 @@ void main() {
     await tester.tap(find.byType(BackButton).first);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('entry-cabin-selection')), findsOneWidget);
-  });
-
-  testWidgets('dispatcher authenticates with server role and never sees photo', (tester) async {
-    await pumpEntry(tester, serverRole: 'dispatcher');
-    await tap(tester, 'entry-dispatcher');
-    expect(find.byKey(const Key('entry-test-sign-in')), findsOneWidget);
-    expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
-    await tap(tester, 'entry-test-authenticate');
-    await skipPermissions(tester);
-    expect(find.byKey(const Key('dispatcher-open-drawer')), findsOneWidget);
-    expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
   });
 
   testWidgets('QA photo skip returns to selection without entering pilot cabin', (tester) async {
@@ -99,12 +89,14 @@ void main() {
     expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);
   });
 
-  testWidgets('role selection cannot promote passenger to dispatcher', (tester) async {
-    await pumpEntry(tester, serverRole: 'passenger');
-    await tap(tester, 'entry-dispatcher');
+  testWidgets('a dispatcher account does not unlock the native pilot cabin', (tester) async {
+    await pumpEntry(tester, serverRole: 'dispatcher');
+    await tap(tester, 'entry-pilot');
+    await tap(tester, 'pilot-identity-notice-sign-in');
     await tap(tester, 'entry-test-authenticate');
     expect(find.byKey(const Key('entry-role-message')), findsOneWidget);
-    expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);
+    expect(find.byType(PilotCabin), findsNothing);
+    expect(find.byKey(const Key('entry-dispatcher')), findsNothing);
   });
 
   testWidgets('pilot cabin opens only after server-approved photo status', (tester) async {

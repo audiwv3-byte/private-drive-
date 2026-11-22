@@ -4,8 +4,7 @@
 
 The internal Android APK opens a local PIN prompt before the cabin selector.
 The PIN is a build fixture carried only by that APK; it establishes no native
-session, server role, or phone or photo verification. Passenger, Pilot and
-Dispatcher use a shared local QA order scope separate from authenticated
+session, server role, or phone or photo verification. Passenger and Pilot use a shared local QA order scope separate from authenticated
 accounts. Android Back returns from a cabin to the selector. Signing out
 returns to the PIN prompt. Existing QA package ID and signing key are reused.
 
@@ -14,12 +13,12 @@ real booking or payment activation is part of this change.
 
 ## Implemented
 
-- The first screen is Passenger / Pilot / Dispatcher, before phone entry and
-  optional location/notification onboarding. Pilot opens the photo notice;
-  Passenger and Dispatcher are never routed through photo verification.
+- The native role selector offers Passenger and Pilot. The dispatcher uses the
+  website. Outside the local PIN build, Pilot opens the photo notice before
+  optional location and notification onboarding.
 - Pilot upload requires a verified native session with server-authorized pilot
   entitlement. Pilot cabin navigation follows server-approved photo status.
-  Dispatcher sign-in checks server entitlement and requires no photo.
+  The server continues to manage dispatcher entitlements for its own clients.
 - Internal QA photo skip returns to cabin choice and never approves identity.
 
 - Internal QA only: explicit guest entry opens the passenger cabin without

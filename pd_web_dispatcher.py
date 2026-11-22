@@ -7,6 +7,7 @@ import secrets
 import time
 from collections import defaultdict, deque
 from datetime import timedelta
+from pathlib import Path
 
 from flask import redirect, render_template_string, request, session, url_for
 from werkzeug.security import check_password_hash
@@ -29,11 +30,6 @@ small{color:var(--pd-muted,#c7b79e)}
 <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label for="password">Пароль</label>
 <input id="password" type="password" name="password" autocomplete="current-password" required maxlength="512">
 <button>Войти</button></form><small>Доступ только для уполномоченного администратора.</small></main></html>"""
-
-# Dashboard template belongs to the isolated test interface.
-from pathlib import Path
-HOME = Path(__file__).with_name("pd_dispatcher_dashboard.html").read_text(encoding="utf-8")
-
 
 def register(app, core):
     secret = os.environ.get("PD_DISPATCH_SESSION_SECRET", "")
@@ -114,7 +110,8 @@ def register(app, core):
     def pd_dispatch_home():
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
-        response = app.make_response(render_template_string(HOME, csrf=csrf()))
+        dashboard = Path(__file__).with_name("pd_dispatcher_dashboard.html").read_text(encoding="utf-8")
+        response = app.make_response(render_template_string(dashboard, csrf=csrf()))
         response.headers["Cache-Control"] = "private, no-store"
         return response
 

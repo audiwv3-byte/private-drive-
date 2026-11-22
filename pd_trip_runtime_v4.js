@@ -55,6 +55,25 @@ window.pdOpenLiveTripV4=async function(id){
  await refresh();
 };
 async function action(name){await requestTrip(active,'/action',{action:name});finishMode=false;await refresh();if(name==='finish'){stopPosition();closing(false);if(typeof pdCheckTripCompletion==='function')pdCheckTripCompletion()}}
+async function changeTripRoute(){
+ if(!active)return;
+ const currentId=active;
+ const dialogRoute=pdSimpleDialog(label('Изменить маршрут','Change route','Keisti maršrutą'));
+ const input=document.createElement('input');input.type='text';input.maxLength=200;
+ input.placeholder=label('Новый адрес назначения','New destination address','Naujas kelionės tikslas');
+ const notice=document.createElement('p');
+ notice.textContent=label(
+  'Новый адрес отправляется пассажиру на согласование. Цена не меняется автоматически. Изменяйте маршрут, только остановив автомобиль.',
+  'Passenger approval is required. The fare does not change automatically. Only edit while parked.',
+  'Reikia keleivio patvirtinimo. Kaina automatiškai nesikeičia. Keiskite maršrutą tik sustoję.');
+ const send=button(label('Отправить пассажиру','Send to passenger','Siųsti keleiviui'),async()=>{
+  const destination=input.value.trim();
+  if(destination.length<2)throw Error(label('Укажите адрес назначения','Enter a destination','Įveskite kelionės tikslą'));
+  await requestTrip(currentId,'/route-change',{destination});
+  dialogRoute.close();await refresh();
+ });
+ dialogRoute.append(input,notice,send);input.focus();
+}
 async function offerExtra(){
  const d=pdSimpleDialog(label('Дополнительная услуга','Additional service','Papildoma paslauga'));
  const reason=document.createElement('input');reason.placeholder=label('Остановка или пожелание','Stop or request','Sustojimas ar pageidavimas');reason.maxLength=300;

@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 from flask import request, jsonify
 
 POLICY = 'pd-trip-v4-20261028'
-FREE_SECONDS = 300
+FREE_SECONDS = 180
 WAIT_CENTS_PER_MINUTE = 25
 ACTIVE = ('Подтверждена', 'В пути')
 
@@ -288,7 +288,7 @@ def register(app, core, auth, provider=None, clock=None):
         uid = identity()
         body = request.get_json(silent=True) or {}
         if body.get('policy') != POLICY or body.get('accept') is not True:
-            raise ValueError('Подтвердите тариф: 5 минут бесплатно, далее 0,25 € за начатую минуту')
+            raise ValueError('Подтвердите тариф: 3 минуты бесплатно, далее 0,25 € за начатую минуту')
         with core.db(core.ORDERS_DB) as c:
             c.execute('BEGIN IMMEDIATE')
             r = row(c, oid)
@@ -348,7 +348,7 @@ def register(app, core, auth, provider=None, clock=None):
                 if not t['arrived_at']:
                     c.execute('UPDATE pd_trip_runtime_v4 SET arrived_at=?,base_cents=? WHERE order_id=?', (clock(), money(r['price']), oid))
                     event(c, oid, uid, 'arrived')
-                    text = f'🚘 Заказ №{oid}: машина прибыла. Первые 5 минут ожидания бесплатны. Далее — 0,25 € за каждую начатую минуту по подтверждённому тарифу.'
+                    text = f'🚘 Заказ №{oid}: машина прибыла. Первые 3 минуты ожидания бесплатны. Далее — 0,25 € за каждую начатую минуту по подтверждённому тарифу.'
             elif action == 'start':
                 if r['status'] != 'Подтверждена' or not t['arrived_at'] or t['ended_at']:
                     raise ValueError('Сначала отметьте прибытие')

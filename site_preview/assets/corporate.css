@@ -226,3 +226,21 @@ body{overflow-x:hidden}
 @media(max-width:740px){.hero-lux{min-height:680px;align-items:end}.hero-lux-photo{object-position:66% center}.hero-lux-shade{background:linear-gradient(0deg,#080909fa 0%,#080909cd 48%,#08090944 88%),linear-gradient(90deg,#08090955,transparent)}.hero-lux-content{width:calc(100% - 36px);padding-block:15rem 2rem}.hero-lux h1{font-size:clamp(2.15rem,7.5vw,3.5rem)}.amenity-strip{gap:8px;margin-top:1.8rem}.amenity{width:calc(25% - 6px);font-size:.72rem}.amenity svg{width:56px;height:56px;padding:12px}.home-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-service{min-height:206px}.partner-feature{align-items:flex-start;flex-wrap:wrap}.partner-feature .button{width:100%}}
 @media(max-width:530px){.hero-lux{min-height:calc(100svh - 110px)}.hero-lux-content{width:calc(100% - 28px);padding-block:13rem 1.6rem}.hero-lux h1{font-size:clamp(2rem,7.6vw,2.9rem)}.hero-lux-actions .button{width:100%}.home-service{min-height:190px}.home-service-overlay{font-size:.88rem}.footer-columns{grid-template-columns:1fr;gap:1.5rem}.partner-tech-icon{width:85px;height:85px}.partner-tech-icon span{font-size:43px}}
 @media(prefers-reduced-motion:reduce){.home-service,.home-service img,.home-route{transition:none}.home-service:hover,.home-route:hover{transform:none}.home-service:hover img{transform:none}}
+
+/* Mobile QA fixes: override legacy .hero display:block and protect compact header */
+@media(max-width:740px){
+  .hero.hero-lux{display:flex;min-height:680px;align-items:end}
+  .hero-lux-photo{display:block}
+  .top-inner{flex-wrap:wrap;gap:7px}
+  .top-inner nav{order:3;width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .top-inner nav a{min-width:0;overflow-wrap:anywhere;font-size:.83rem;padding:2px 3px}
+  .top-inner .header-actions{order:2;width:auto;margin-left:auto;padding-top:0}
+  .top-inner .brand span{font-size:.88rem}
+}
+@media(max-width:530px){
+  .hero.hero-lux{min-height:max(650px,calc(100svh - 110px))}
+  .top-inner .brand img{width:42px;height:42px}
+  .amenity{overflow-wrap:anywhere}
+  .catalog-heading{width:100%;justify-content:space-between}
+  .catalog-heading span:first-child{min-width:0;overflow-wrap:anywhere}
+}

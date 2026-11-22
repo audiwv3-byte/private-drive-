@@ -19,7 +19,7 @@ function pilotSwipe(text,nextAction){
   if(busy)return;
   if(nextAction==='finish'&&!window.confirm(label('Завершить поездку №','Finish trip #','Baigti kelionę Nr. ')+active+'?'))return reset();
   busy=true;handle.disabled=true;track.style.opacity='.65';
-  try{await action(nextAction)}catch(e){message(e.message,true);busy=false;handle.disabled=false;track.style.opacity='1';reset()}
+  try{if(nextAction==='accept'){await requestTrip(active,'/accept',{});await refresh()}else await action(nextAction)}catch(e){message(e.message,true);busy=false;handle.disabled=false;track.style.opacity='1';reset()}
  };
  handle.addEventListener('pointerdown',e=>{if(busy)return;start={x:e.clientX,id:e.pointerId};moved=0;swipeDragging=true;handle.setPointerCapture(e.pointerId)});
  handle.addEventListener('pointermove',e=>{if(!start||start.id!==e.pointerId||busy)return;const width=Math.max(0,track.clientWidth-handle.offsetWidth-10);moved=Math.min(width,Math.max(0,e.clientX-start.x));handle.style.transform='translateX('+moved+'px)'});
@@ -167,7 +167,7 @@ async function refresh(){
     body.append(button(label('Подтвердить карту и сумму','Confirm card and amount','Patvirtinti kortelę ir sumą'),async()=>{const result=await requestTrip(id,'/authorize',{accept:true,policy:POLICY});window.Telegram?.WebApp?.openLink?window.Telegram.WebApp.openLink(result.url):window.open(result.url,'_blank','noopener')}));
    }
    if(r.capture)p(label('Статус оплаты: ','Payment state: ','Mokėjimo būsena: ')+r.capture.state);
-   if(r.role==='pilot'&&r.card_capture_available&&r.capture&&['authorized','capturing'].includes(r.capture.state))body.append(button(label('Принять заявку и списать стоимость','Accept booking and charge fare','Priimti užsakymą ir nuskaityti kainą'),async()=>{await requestTrip(id,'/accept',{});await refresh()}));
+   if(r.role==='pilot'&&r.card_capture_available&&r.capture&&['authorized','capturing'].includes(r.capture.state))body.append(pilotSwipe(label('Сдвинь: Принять заказ','Swipe: Accept booking','Braukite: Priimti'),'accept'));
   }
  }catch(e){if(body)p(e.message)}finally{polling=false}
 }

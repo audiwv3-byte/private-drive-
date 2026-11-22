@@ -323,3 +323,49 @@ body{overflow-x:hidden}
   .home-service-overlay{inset:auto 12px 12px}
   .home-service-overlay strong{overflow-wrap:anywhere}
 }
+
+/* PRIVATE DRIVE — approved candidate 03: night business, staged for test site only */
+.hero.hero-lux.hero-night{
+  min-height:720px;display:block;position:relative;isolation:isolate;overflow:hidden;
+  background:#0b1014;border-bottom:1px solid #b18c4d;
+}
+.hero-night .hero-lux-photo{position:absolute;inset:0;width:100%;height:100%;max-height:none;aspect-ratio:auto;object-fit:cover;object-position:50% center;z-index:-3;opacity:.63}
+.hero-night .hero-lux-shade{position:absolute;inset:0;z-index:-2;opacity:1;pointer-events:none;background:linear-gradient(90deg,#080d12ed 0%,#080d12be 49%,#080d1299 100%),linear-gradient(0deg,#080d12ed,transparent 68%)}
+.hero-night-layout{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(330px,.79fr);align-items:center;gap:clamp(24px,5vw,82px);padding-block:64px 74px;min-height:720px}
+.hero-night-intro{min-width:0}
+.hero-night h1{font-size:clamp(2.7rem,5.1vw,5rem);max-width:700px;line-height:1.05;letter-spacing:-.035em;margin:27px 0 26px;color:#fff;text-wrap:balance}
+.hero-night h1 em{font-style:normal;color:#edc67f}
+.hero-night .hero-detail{max-width:490px;line-height:1.65;font-size:1.05rem;font-weight:400;color:#f0e3d2}
+.hero-night .hero-lux-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
+.hero-night-proof{display:flex;gap:18px 32px;flex-wrap:wrap;margin-top:54px;color:#e8d4b5;font-size:.91rem;border-top:1px solid #aa8a5266;padding-top:18px}
+.hero-night-proof strong{color:#edc67f;font-size:1.08rem;white-space:nowrap}
+.hero-night-booking{background:#0d1217ee;backdrop-filter:blur(12px);border:1px solid #b48e51;box-shadow:0 20px 60px #0009;padding:clamp(22px,2.7vw,38px);min-width:0}
+.hero-night-booking .eyebrow{font-size:.69rem;line-height:1.5;letter-spacing:.13em}
+.hero-night-booking h2{font:normal clamp(1.9rem,3vw,2.6rem) Georgia,serif;color:#f9ead0;margin:14px 0 6px}
+.hero-night-booking-lead{font-size:.87rem;color:#d6c7b1;line-height:1.55;margin-bottom:15px}
+.hero-night-choice{display:flex;align-items:center;gap:13px;border-bottom:1px solid #8671536e;min-height:76px;padding:13px 5px;color:#f9efe0;text-decoration:none;transition:background .16s}
+.hero-night-choice:hover,.hero-night-choice:focus-visible{background:#ad8c3b1f}
+.hero-night-choice-symbol{display:flex;align-items:center;justify-content:center;border:1px solid #b59057;border-radius:6px;flex:0 0 37px;height:37px;color:#e8c083;font-size:20px}
+.hero-night-choice strong{display:block;font-size:1rem;margin-bottom:2px;font-weight:650}
+.hero-night-choice small{display:block;font-size:.78rem;color:#c3af91;line-height:1.45}
+.hero-night .hero-night-primary{margin-top:23px;width:100%;min-height:55px;display:flex;gap:12px;text-align:center}
+.hero-night-legal{font-size:.74rem;line-height:1.6;color:#c4b29a;margin-top:14px}
+.hero-night-legal a{color:#e7c282}
+@media(max-width:920px){
+ .hero-night-layout{grid-template-columns:1fr;gap:28px;padding-block:50px 60px}
+ .hero.hero-lux.hero-night{min-height:0}
+ .hero-night-intro{max-width:700px}
+ .hero-night-proof{margin-top:28px}
+ .hero-night-booking{max-width:700px;width:100%}
+}
+@media(max-width:740px){
+ .hero.hero-lux.hero-night{display:block;min-height:0}
+ .hero-night .hero-lux-photo{position:absolute;inset:0;display:block;width:100%;height:100%;aspect-ratio:auto;object-fit:cover;object-position:61% top;opacity:.47}
+ .hero-night .hero-lux-shade{opacity:1;background:linear-gradient(180deg,#070b1099 0%,#080d12ed 38%,#080d12 100%)}
+ .hero-night-layout{width:calc(100% - 32px);display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;align-items:start;gap:28px;padding:60px 0 40px;min-height:0}
+ .hero-night h1{font-size:clamp(2.2rem,8.7vw,3.5rem);margin:21px 0}
+ .hero-night .hero-lux-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+ .hero-night .hero-lux-actions .button{width:100%;min-height:49px}
+ .hero-night-booking{padding:22px 18px}
+}
+@media(prefers-reduced-motion:reduce){.hero-night-choice{transition:none}}

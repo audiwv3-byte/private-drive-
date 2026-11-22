@@ -88,7 +88,7 @@ if(selectedRoute && !airportDirection){
  const destination=routeDestinations[selectedRoute];
  const explanation=document.createElement('p');
  explanation.className='note';
- explanation.textContent='Маршрут заполнен: Вильнюс → '+destination+'. Уточни адрес подачи, место назначения и дату поездки. Цена подтверждается отдельно.';
+ explanation.textContent='Маршрут выбран: Вильнюс → '+destination+'. Для отправки обязательно допиши улицу и номер дома в обоих адресах либо точные координаты GPS. Названий городов недостаточно. Цена подтверждается отдельно.';
  $('to').closest('.field').after(explanation);
 }
 
@@ -185,10 +185,29 @@ $('showRoute').addEventListener('click',async()=>{
   say('Точки отмечены. Маршрут дороги и цена уточняются при подтверждении заявки.');
  }catch(e){say(e.message||'Не удалось найти адреса. Проверь их написание.')}finally{busy=false;$('showRoute').disabled=false}
 });
+// Validate a precise address for the quick city routes (street name and house number,
+// or exact GPS coordinates from the location button). Other request types are unaffected.
+function isPreciseRouteAddress(raw){
+ const value=raw.trim();
+ const gps=value.match(/^(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/);
+ if(gps)return Math.abs(Number(gps[1]))<=90 && Math.abs(Number(gps[2]))<=180;
+ const detail=value.replace(/\b(?:vilnius|lithuania|lietuva|kaunas|klaipeda|warsaw|warszawa|poland|polska|trakai|druskininkai|palanga)\b/giu,' ')
+ .replace(/(?:вильнюс|литва|каунас|клайпеда|варшава|польша|тракай|друскининкай|паланга)/giu,' ')
+ .replace(/[,.]/g,' ').trim();
+ const names=detail.match(/\p{L}{2,}/gu)||[];
+ const generic=new Set(['улица','ул','дом','street','strasse','gatve','gatvė','prospektas','prospekt','aleja','avenue','road']);
+ const street=names.some(word=>!generic.has(word.toLowerCase()));
+ const number=/(?:^|\s)\d{1,4}[a-zA-Z\p{L}]?(?=$|[\s/\-])/u.test(detail);
+ return street && number;
+}
 $('orderForm').addEventListener('submit',async e=>{
  e.preventDefault();
  const from=$('from').value.trim(),to=$('to').value.trim();
  if(!from||!to){say('Укажи откуда и куда.');return}
+ if(selectedRoute && !airportDirection){
+  if(!isPreciseRouteAddress(from)){say('Укажи точный адрес подачи: улицу и номер дома в Вильнюсе или координаты GPS. Одного города недостаточно.');$('from').focus();return}
+  if(!isPreciseRouteAddress(to)){say('Укажи точный адрес назначения: улицу и номер дома или координаты GPS. Одного города недостаточно.');$('to').focus();return}
+ }
  updateDateLimits();
  const day=$('rideDate').value,time=$('rideTime').value,comment=$('comment').value.trim();
  if((day&&!time)||(!day&&time)){say('Выбери и дату, и время поездки.');return}

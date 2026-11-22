@@ -84,6 +84,96 @@ def _request_json(url, payload=None):
     return json.loads(raw)
 
 
+_PUBLIC_GEOCODER = "https://photon.komoot.io/api/"
+_PUBLIC_ROUTER = "https://routing.openstreetmap.de/routed-car/route/v1/driving/"
+_FALLBACK_CACHE = {}
+_FALLBACK_GLOBAL_HITS = defaultdict(deque)
+
+
+def _public_fallback_enabled():
+    """Explicitly isolated test service only; never production or Mini App."""
+    return (os.getenv("PD_DISPATCH_STAGING_ONLY") == "1" and
+            os.getenv("PD_STAGING_PUBLIC_FALLBACK") == "1")
+
+
+def _public_json(url, kind):
+    """Named public demo servers only, bounded requests; fail closed when busy."""
+    if not _public_fallback_enabled():
+        raise RuntimeError("public fallback disabled")
+    host = urllib.parse.urlsplit(url)
+    expected = "photon.komoot.io" if kind == "suggest" else "routing.openstreetmap.de"
+    if host.scheme != "https" or host.hostname != expected or kind not in ("suggest", "route"):
+        raise ValueError("unapproved test API host")
+    now = time.monotonic()
+    cached = _FALLBACK_CACHE.get(url)
+    if cached and now - cached[0] < 600:
+        return cached[1]
+    log = _FALLBACK_GLOBAL_HITS[kind]
+    while log and log[0] < now - 60:
+        log.popleft()
+    if len(log) >= (12 if kind == "suggest" else 4):
+        raise RuntimeError("test routing rate limited")
+    log.append(now)
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "PrivateDriveStaging/1.0 (testing only; contact evrobaltictransfer@gmail.com)",
+        "Accept": "application/json",
+    })
+    with urllib.request.urlopen(req, timeout=8) as response:
+        if response.status != 200:
+            raise RuntimeError("test routing upstream unavailable")
+        raw = response.read(400_001)
+    if len(raw) > 400_000:
+        raise RuntimeError("test routing response too large")
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError("invalid test API response")
+    if len(_FALLBACK_CACHE) >= 60:
+        _FALLBACK_CACHE.clear()
+    _FALLBACK_CACHE[url] = (now, parsed)
+    return parsed
+
+
+def _suggest_fallback(text):
+    url = _PUBLIC_GEOCODER + "?" + urllib.parse.urlencode({
+        "q": text, "limit": 5, "lat": 54.6872, "lon": 25.2797
+    })
+    doc = _public_json(url, "suggest")
+    suggestions = []
+    for feature in doc.get("features", [])[:8]:
+        if not isinstance(feature, dict):
+            continue
+        props, geom = feature.get("properties") or {}, feature.get("geometry") or {}
+        point = _coordinates(geom.get("coordinates"))
+        if not point:
+            continue
+        parts = [props.get(k) for k in ("name", "street", "housenumber", "city", "country")]
+        label = _text(", ".join(str(p).strip() for p in parts if isinstance(p, str) and p.strip()), 2, 200)
+        if label and not any(row["label"] == label for row in suggestions):
+            suggestions.append({"label": label, "coordinates": point})
+        if len(suggestions) >= 5:
+            break
+    return suggestions
+
+
+def _route_fallback(start, end):
+    pairs = ";".join(",".join(str(number) for number in point) for point in (start, end))
+    url = _PUBLIC_ROUTER + pairs + "?" + urllib.parse.urlencode({
+        "overview": "full", "geometries": "geojson", "steps": "false"
+    })
+    doc = _public_json(url, "route")
+    if doc.get("code") != "Ok" or not isinstance(doc.get("routes"), list) or not doc["routes"]:
+        raise ValueError("no road route from test provider")
+    route = doc["routes"][0]
+    return {
+        "features": [{
+            "properties": {"summary": {
+                "distance": route["distance"], "duration": route["duration"]
+            }},
+            "geometry": route["geometry"]
+        }]
+    }
+
+
 def _coordinates(value):
     if not isinstance(value, list) or len(value) != 2:
         return None
@@ -145,14 +235,21 @@ def register(app):
         text = _text(request.args.get("q", ""))
         if not text:
             return jsonify(error="Введите не менее 3 символов"), 400
-        if not _normalized_key():
+        if not _normalized_key() and not _public_fallback_enabled():
             return jsonify(available=False, suggestions=[], reason="Сервис подсказок пока не подключён"), 200
         url = _GEOCODE_BASE_URL + "/autocomplete?" + urllib.parse.urlencode({
             "text": text, "size": 5, "focus.point.lat": 54.6872,
             "focus.point.lon": 25.2797
         })
         try:
-            doc = _request_json(url)
+            if not _normalized_key():
+                return jsonify(available=True, suggestions=_suggest_fallback(text), provider="test-photon")
+            try:
+                doc = _request_json(url)
+            except urllib.error.HTTPError as exc:
+                if exc.code not in (401, 403) or not _public_fallback_enabled():
+                    raise
+                return jsonify(available=True, suggestions=_suggest_fallback(text), provider="test-photon")
             suggestions = []
             for feature in doc.get("features", [])[:8]:
                 if not isinstance(feature, dict):
@@ -165,7 +262,7 @@ def register(app):
                     suggestions.append({"label": label, "coordinates": point})
                 if len(suggestions) == 5:
                     break
-            return jsonify(available=True, suggestions=suggestions)
+            return jsonify(available=True, suggestions=suggestions, provider="heigit")
         except Exception:
             return jsonify(available=False, suggestions=[], reason="Подсказки временно недоступны"), 503
 
@@ -191,11 +288,22 @@ def register(app):
         category = d.get("category")
         if category not in ("comfort", "economy", "business", "minivan"):
             return jsonify(error="Выбери класс автомобиля"), 400
-        if not os.getenv("PD_STAGING_ORS_API_KEY"):
+        if not _normalized_key() and not _public_fallback_enabled():
             return jsonify(available=False, reason="Маршрутизация пока не подключена"), 200
         try:
-            geojson = _request_json(_DIRECTIONS_BASE_URL + "/v2/directions/driving-car/geojson",
-                                    {"coordinates": [start, end]})
+            fallback_used = False
+            if not _normalized_key():
+                geojson = _route_fallback(start, end)
+                fallback_used = True
+            else:
+                try:
+                    geojson = _request_json(_DIRECTIONS_BASE_URL + "/v2/directions/driving-car/geojson",
+                                            {"coordinates": [start, end]})
+                except urllib.error.HTTPError as exc:
+                    if exc.code not in (401, 403) or not _public_fallback_enabled():
+                        raise
+                    geojson = _route_fallback(start, end)
+                    fallback_used = True
             feature = geojson["features"][0]
             summary = feature["properties"]["summary"]
             coords = feature["geometry"]["coordinates"]
@@ -207,7 +315,10 @@ def register(app):
             result = {"available": True, "km": round(km, 2),
                       "minutes": round(minutes), "road_coordinates": coords,
                       "price": None, "currency": "EUR",
-                      "note": "Без учёта пробок. Данные для предпросмотра, без заказа."}
+                      "note": "Без учёта пробок. Данные для предпросмотра, без заказа.",
+                      "provider": "test-osrm" if fallback_used else "heigit"}
+            if fallback_used:
+                result["note"] += " Тестовый публичный маршрутизатор, не для реальных заказов."
             if category == "comfort":
                 price, source = estimate(km, minutes, {
                     "origin": origin, "destination": destination,

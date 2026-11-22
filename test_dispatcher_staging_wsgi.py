@@ -233,6 +233,25 @@ class DispatcherStagingTests(unittest.TestCase):
             "roundtrip": True
         })[0], Decimal("200"))
 
+    def test_report_public_fallback_reachability_without_secret(self):
+        """Diagnostic only on explicitly opted-in Render staging; never fails on demo outages."""
+        import pd_public_route_preview as preview
+        if not preview._public_fallback_enabled():
+            return
+        for name, function in (
+            ("PHOTON", lambda: preview._suggest_fallback("Vilnius")),
+            ("OSRM", lambda: preview._route_fallback(
+                [25.2797, 54.6872], [25.313, 54.698]))
+        ):
+            try:
+                result = function()
+                healthy = bool(result and (name != "PHOTON" or len(result) >= 1))
+                print("PD_STAGING_PUBLIC_" + name + "=" + ("OK" if healthy else "EMPTY"), flush=True)
+            except Exception as exc:
+                print("PD_STAGING_PUBLIC_" + name + "=FAILED_" +
+                      type(exc).__name__ +
+                      ("_HTTP" + str(exc.code) if hasattr(exc, "code") else ""), flush=True)
+
     def test_staging_public_fallback_requires_explicit_flag_and_is_never_production(self):
         from unittest.mock import patch
         import pd_public_route_preview as preview

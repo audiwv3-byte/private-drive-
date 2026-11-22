@@ -49,6 +49,23 @@ with sync_playwright() as p:
         driver.evaluate("(img) => img.loading = 'eager'")
         page.wait_for_function("""() => {const img=document.querySelector('.pd-driver-card img');return img && img.complete && img.naturalWidth >= 800;}""", timeout=10000)
         assert page.locator('.pd-services-three img[src="/assets/pd-approved-service_driver.webp"]').count() == 0
+        # Actual browser-calculated framing: original file remains unchanged, image
+        # sits inside the driver card so its wheels cannot be lost to the 480:246 crop.
+        crop = page.evaluate("""() => {
+          const card=document.querySelector('.pd-driver-card'),
+                driver=card.querySelector('img'), hero=document.querySelector('.pd-hero-img'),
+                dStyle=getComputedStyle(driver), hStyle=getComputedStyle(hero);
+          return {cardWidth:card.getBoundingClientRect().width,
+                  imageWidth:driver.getBoundingClientRect().width,
+                  driverPosition:dStyle.objectPosition,heroPosition:hStyle.objectPosition,
+                  heroHeight:hero.getBoundingClientRect().height,
+                  driverFit:dStyle.objectFit,heroFit:hStyle.objectFit};
+        }""")
+        assert 0.78 <= crop["imageWidth"]/crop["cardWidth"] <= 0.82, crop
+        assert crop["driverFit"] == "cover" and crop["heroFit"] == "cover", crop
+        assert crop["driverPosition"] == "50% 72%" and crop["heroPosition"] == "50% 72%", crop
+        assert crop["heroHeight"] >= 245, crop
+
 
         # Main banner must use the owner's saved RAV4 photo with no unrelated person.
         assert page.locator('.pd-hero-img[src="/assets/pd-user-photo-6-original.webp"]').count() == 1

@@ -204,8 +204,39 @@ def _config_decimal(name, default):
         return Decimal(default)
 
 
+def _approved_staging_price(route_data):
+    """Only owner-confirmed preview prices, never imported into actual booking app."""
+    import unicodedata
+    def place(value):
+        value = "".join(x for x in unicodedata.normalize("NFKD", str(value).casefold())
+                        if not unicodedata.combining(x))
+        if re.search(r"\\b(vno|airport|аэропорт)\\b", value):
+            return "vno"
+        aliases = {
+            "vilnius": r"\\b(vilnius|вильнюс|wilno|vilniaus)\\b",
+            "kaunas": r"\\b(kaunas|каунас|kowno)\\b",
+            "klaipeda": r"\\b(klaipeda|клаипеда|клайпеда|klaipėda)\\b",
+            "warsaw": r"\\b(warsaw|warszawa|варшава)\\b",
+        }
+        return next((code for code, pattern in aliases.items()
+                     if re.search(pattern, value)), None)
+    start, end = place(route_data.get("origin", "")), place(route_data.get("destination", ""))
+    if start == "vilnius" and end == "vno" or start == "vno" and end == "vilnius":
+        return Decimal("40")
+    if start == "vilnius" and end == "kaunas":
+        return Decimal("200") if route_data.get("roundtrip") else Decimal("120")
+    if start == "vilnius" and end == "klaipeda":
+        return Decimal("320")
+    if start == "vilnius" and end == "warsaw":
+        return Decimal("460")
+    return None
+
+
 def estimate(km, minutes, route_data):
-    """Matching core.quote's default formula, never claiming production config."""
+    """Staging-only approved quotes, then existing test fallback (no real order)."""
+    fixed = _approved_staging_price(route_data)
+    if fixed is not None:
+        return fixed, "fixed"
     fixed = pd_fixed_prices.base(route_data)
     if fixed:
         return Decimal(fixed), "fixed"

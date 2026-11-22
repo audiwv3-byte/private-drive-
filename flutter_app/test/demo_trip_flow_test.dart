@@ -161,6 +161,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('passenger-entry-transfer')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(

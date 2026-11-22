@@ -24,16 +24,25 @@ void main() {
     await tester.pump();
     expect(trip.status, DemoTripStatus.assigned,
       reason: 'Swiping in the wrong direction must not advance the trip');
-    for (final expected in [
-      DemoTripStatus.approaching,
-      DemoTripStatus.underway,
-      DemoTripStatus.finished,
-    ]) {
+    Future<void> swipe() async {
       await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
+        Offset(tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52, 0));
       await tester.pump();
-      expect(trip.status, expected);
     }
+    await swipe();
+    expect(trip.status, DemoTripStatus.approaching);
+    await swipe(); // At pickup.
+    expect(trip.arrivalAt, isNotNull);
+    await swipe(); // Begin trip.
+    expect(trip.status, DemoTripStatus.underway);
+    await swipe(); // Stop.
+    expect(trip.paused, isTrue);
+    await swipe(); // Resume.
+    expect(trip.paused, isFalse);
+    await tester.tap(find.byKey(const Key('pilot-final-destination-mode')));
+    await tester.pump();
+    await swipe(); // Finish.
+    expect(trip.status, DemoTripStatus.finished);
     expect(find.byKey(const Key('pilot-rate-passenger-panel')), findsOneWidget);
     expect(trip.ratePassengerByPilot(0), isFalse);
     expect(trip.ratePassengerByPilot(6), isFalse);
@@ -68,6 +77,7 @@ void main() {
       Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
     await tester.pump();
     expect(trip.status, DemoTripStatus.approaching);
+    expect(trip.paused, isFalse, reason: 'Swipe resumes an existing stop instead of advancing.');
     expect(trip.passengerRatingByPilot, isNull);
   });
 }

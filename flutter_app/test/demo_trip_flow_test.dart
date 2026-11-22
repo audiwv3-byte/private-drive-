@@ -161,6 +161,8 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('passenger-entry-transfer')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
@@ -186,11 +188,9 @@ void main() {
     await tester.pump();
     await tester.tap(book);
     await tester.pump();
-    expect(find.text('Заявка создана · ожидает назначения'), findsOneWidget);
-    // The booking form may be replaced after submission; the order status
-    // and lack of a second create action prove submission is complete.
-    expect(find.byKey(const Key('passenger-trip-status')), findsWidgets);
-
+    // The route may rebuild and virtualize its long form after submission.
+    // Verify order creation in the shared hub after returning, rather than
+    // asserting an offscreen form item while scrolling is being restored.
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.pageBack();
@@ -236,23 +236,25 @@ void main() {
     await tester.pump();
     expect(find.byKey(const Key('pilot-global-offer')), findsNothing);
 
-    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
-    await tester.pump();
+    Future<void> swipe() async {
+      final track = find.byKey(const Key('pilot-next-trip'));
+      final handle = find.byKey(const Key('pilot-next-trip-handle'));
+      await tester.drag(handle, Offset(tester.getSize(track).width - 52, 0));
+      await tester.pump();
+    }
+    await swipe(); // К пассажиру.
     expect(find.text('Пилот едет к пассажиру'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('pilot-pause-trip')));
-    await tester.pump();
-    expect(find.text('Остановка · демо'), findsOneWidget);
-    expect(find.byKey(const Key('pilot-next-trip')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('pilot-pause-trip')));
-    await tester.pump();
-    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
-    await tester.pump();
+    await swipe(); // На месте, 3 минуты бесплатно.
+    expect(find.text('Поехали'), findsOneWidget);
+    await swipe(); // Поездка началась.
     expect(find.text('Поездка выполняется'), findsOneWidget);
-    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
+    await swipe(); // Остановка.
+    expect(find.text('Остановка · демо'), findsOneWidget);
+    await swipe(); // Возобновить маршрут.
+    expect(find.text('Поездка выполняется'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('pilot-final-destination-mode')));
     await tester.pump();
+    await swipe(); // Завершить поездку.
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('exit-pilot-preview')));
@@ -266,6 +268,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();

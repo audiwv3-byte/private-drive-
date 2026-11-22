@@ -1,0 +1,48 @@
+name: PRIVATE DRIVE Mapbox isolated QA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mapbox-android-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Fetch dependencies
+        run: flutter pub get
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos
+      - name: Flutter tests
+        run: flutter test
+      - name: Prepare isolated Android platform
+        run: flutter create --platforms=android --project-name private_drive .
+      - name: Build Mapbox raster preview APK
+        env:
+          MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+        run: |
+          if [[ "$MAPBOX_PUBLIC_TOKEN" != pk.* ]]; then
+            echo "MAPBOX_PUBLIC_TOKEN is missing or is not a public token" >&2
+            exit 1
+          fi
+          flutter build apk --debug \
+            --dart-define=PD_NATIVE_AUTH_API_URL= \
+            --dart-define=PD_MAPBOX_QA=true \
+            --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN"
+      - name: Upload isolated APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-mapbox-raster-preview-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

@@ -19,13 +19,14 @@ def snapshot():
     return adb('exec-out', 'cat', '/sdcard/pd-window.xml').decode('utf-8')
 
 
-def click_label(label, *, optional=False, timeout=60):
+def click_node(label, *, timeout=60):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         text = snapshot()
         root = ET.fromstring(text)
         for node in root.iter('node'):
-            if label not in (node.get('text', '') + ' ' + node.get('content-desc', '')):
+            props = ' '.join(node.get(key, '') for key in ('text', 'content-desc', 'resource-id'))
+            if label not in props:
                 continue
             values = [int(n) for n in re.findall(r'\d+', node.get('bounds', ''))]
             if len(values) != 4:
@@ -37,8 +38,8 @@ def click_label(label, *, optional=False, timeout=60):
             print('Tapped:', label, flush=True)
             return True
         time.sleep(1)
-    if optional:
-        return False
+    Path('android-launch-last-window.xml').write_text(text, encoding='utf-8')
+    Path('android-launch-last-window.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     raise AssertionError('Required app control not found: ' + label)
 
 
@@ -49,14 +50,16 @@ def wait_for_labels(*labels, timeout=45):
         if all(label in xml for label in labels):
             return xml
         time.sleep(1)
+    Path('android-launch-last-window.xml').write_text(xml, encoding='utf-8')
+    Path('android-launch-last-window.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     raise AssertionError(f'Missing screen labels: {labels}')
 
 
-wait_for_labels('Тестовый вход', 'Тестовый пароль')
-click_label('Тестовый пароль')
+wait_for_labels('Тестовый вход')
+click_node('pd-qa-pin')
 adb('shell', 'input', 'text', os.environ['PD_QA_LOCAL_PIN'])
 adb('shell', 'input', 'keyevent', '4')
-click_label('Войти в тест')
+click_node('Войти в тест')
 entry = wait_for_labels('Выбери кабинет', 'Пассажир', 'Пилот')
 assert 'Диспетчер' not in entry, 'Dispatcher must stay on the website'
 
@@ -64,7 +67,7 @@ for role, labels in [
     ('Пассажир', ('Такси', 'Трансфер')),
     ('Пилот', ('Кабина пилота', 'Не на линии')),
 ]:
-    click_label(role)
+    click_node(role)
     xml = wait_for_labels('Внутренний тест', *labels)
     assert 'Фотоконтроль' not in xml and 'Проверка личности' not in xml
     Path(f'android-guest-{role}.xml').write_text(xml, encoding='utf-8')

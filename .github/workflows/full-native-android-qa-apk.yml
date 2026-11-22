@@ -177,8 +177,10 @@ jobs:
             adb shell am start -W -n lt.privatedrive.private_drive.photo_qa/lt.privatedrive.private_drive.MainActivity
             sleep 12
             adb shell pidof lt.privatedrive.private_drive.photo_qa
-            python3 flutter_app/tool/android_guest_launch_smoke.py
+            smoke_status=0
+            python3 flutter_app/tool/android_guest_launch_smoke.py || smoke_status=$?
             adb logcat -d > android-launch-log.txt
+            test "$smoke_status" = 0
             if grep -E 'FATAL EXCEPTION|Unhandled Exception|E/flutter.*\[ERROR' android-launch-log.txt; then exit 1; fi
             adb shell uiautomator dump /sdcard/pd-window.xml
             adb pull /sdcard/pd-window.xml android-launch-window.xml

@@ -248,14 +248,17 @@ class _LocalQaSignInState extends State<_LocalQaSignIn> {
         const SizedBox(height: 16),
         const Text('Тестовый вход', textAlign: TextAlign.center),
         const SizedBox(height: 16),
-        TextField(
-          key: const Key('local-qa-pin'),
-          controller: _pin,
-          obscureText: true,
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _submit(),
-          decoration: InputDecoration(labelText: 'Тестовый пароль', errorText: _error),
+        Semantics(
+          identifier: 'pd-qa-pin',
+          child: TextField(
+            key: const Key('local-qa-pin'),
+            controller: _pin,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+            decoration: InputDecoration(labelText: 'Тестовый пароль', errorText: _error),
+          ),
         ),
         const SizedBox(height: 16),
         FilledButton(

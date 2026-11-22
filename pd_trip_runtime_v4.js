@@ -101,7 +101,7 @@ async function refresh(){
    p(hasGPS?(r.location_stale?label('Геопозиция устарела','Location is stale','Vietovė pasenusi'):label('GPS пилота активен','Pilot GPS active','Piloto GPS aktyvus')):label('Карта доступна. Включите GPS пилота.','Map ready. Enable pilot GPS.','Žemėlapis paruoštas. Įjunkite piloto GPS.'));
   }else if(live){p(label('Ожидаем геопозицию пилота.','Waiting for pilot location.','Laukiama piloto vietovės.'))}
   if(r.role==='passenger'&&!r.wait_accepted_at&&['Новая','Подтверждена'].includes(r.status)){
-   p(label('Ожидание: 5 минут бесплатно, далее 0,25 € за каждую начатую минуту. До подтверждения тарифа платное ожидание не начисляется.','Waiting: 5 minutes free, then €0.25 per started minute. No paid waiting is charged before you accept.','Laukimas: 5 minutės nemokamai, vėliau 0,25 € už kiekvieną pradėtą minutę. Mokestis neskaičiuojamas iki patvirtinimo.'));
+   p(label('Ожидание: 3 минуты бесплатно, далее 0,25 € за каждую начатую минуту. До подтверждения тарифа платное ожидание не начисляется.','Waiting: 3 minutes free, then €0.25 per started minute. No paid waiting is charged before you accept.','Laukimas: 3 minutės nemokamai, vėliau 0,25 € už kiekvieną pradėtą minutę. Mokestis neskaičiuojamas iki patvirtinimo.'));
    body.append(button(label('Подтвердить тариф ожидания','Accept waiting tariff','Patvirtinti laukimo tarifą'),async()=>{await requestTrip(id,'/waiting-consent',{accept:true,policy:POLICY});await refresh()}));
   }
   if(r.arrived_at){

@@ -6,6 +6,28 @@ const label=(ru,en,lt)=>window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru;
 const eur=c=>(Number(c||0)/100).toFixed(2)+' €';
 let active=null,dialog=null,body=null,map=null,marker=null,watch=null,watchOrder=null,lastPositionSent=0,polling=false,hubBusy=false;
 const button=(text,action)=>{const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent=text;b.onclick=async()=>{b.disabled=true;try{await action()}catch(e){message(e.message,true)}finally{b.disabled=false}};return b};
+function pilotSwipe(text,nextAction){
+ const track=document.createElement('div');track.className='pd-pilot-swipe';track.dataset.action=nextAction;
+ track.style.cssText='position:relative;min-height:64px;border:1px solid #aa8b52;border-radius:32px;background:#211d17;overflow:hidden;display:flex;align-items:center;justify-content:center;margin:10px 0;color:#efd7a3;font-weight:600';
+ const caption=document.createElement('span');caption.textContent=text;caption.style.cssText='padding:0 16px 0 62px;text-align:center;pointer-events:none';
+ const handle=document.createElement('button');handle.type='button';handle.setAttribute('aria-label',text);
+ handle.style.cssText='position:absolute;left:5px;top:5px;width:54px;height:54px;border:0;border-radius:50%;background:#c7a360;color:#16130e;font-size:26px;touch-action:none;cursor:grab;transform:translateX(0);z-index:1';
+ handle.textContent='›';track.append(caption,handle);
+ let start=null,moved=0,busy=false;
+ const reset=()=>{start=null;moved=0;handle.style.transform='translateX(0)'};
+ const commit=async()=>{
+  if(busy)return;
+  if(nextAction==='finish'&&!window.confirm(label('Завершить поездку №','Finish trip #','Baigti kelionę Nr. ')+active+'?'))return reset();
+  busy=true;handle.disabled=true;track.style.opacity='.65';
+  try{await action(nextAction)}catch(e){message(e.message,true);busy=false;handle.disabled=false;track.style.opacity='1';reset()}
+ };
+ handle.addEventListener('pointerdown',e=>{if(busy)return;start={x:e.clientX,id:e.pointerId};moved=0;handle.setPointerCapture(e.pointerId)});
+ handle.addEventListener('pointermove',e=>{if(!start||start.id!==e.pointerId||busy)return;const width=Math.max(0,track.clientWidth-handle.offsetWidth-10);moved=Math.min(width,Math.max(0,e.clientX-start.x));handle.style.transform='translateX('+moved+'px)'});
+ handle.addEventListener('pointerup',e=>{if(!start||start.id!==e.pointerId)return;const width=Math.max(0,track.clientWidth-handle.offsetWidth-10);const ok=width>0&&moved>=width*.8;reset();if(ok)commit()});
+ handle.addEventListener('pointercancel',reset);handle.addEventListener('lostpointercapture',reset);
+ handle.addEventListener('click',e=>{if(e.detail===0)commit()});
+ return track;
+}
 const p=(text,parent=body)=>{const e=document.createElement('p');e.textContent=text;parent.append(e);return e};
 const requestTrip=(id,suffix='',data)=>api('/api/trip/'+Number(id)+suffix,data);
 function stopPosition(){if(watch!==null)navigator.geolocation.clearWatch(watch);watch=null;watchOrder=null}
@@ -109,7 +131,7 @@ async function refresh(){
    const time=document.createElement('p');time.dataset.waitStart=r.arrived_at;time.dataset.waitEnd=r.started_at||0;time.dataset.serverOffset=r.server_now*1000-Date.now();body.append(time);
    time.textContent=label('Ожидание: ','Waiting: ','Laukimas: ')+Math.floor(elapsed/60)+':'+String(elapsed%60).padStart(2,'0')+' · '+eur(r.wait_cents);
   }
-  if(r.role==='pilot'&&r.status==='Подтверждена')body.append(button(r.arrived_at?label('Начать поездку','Start trip','Pradėti kelionę'):label('Прибыл','Arrived','Atvykau'),()=>action(r.arrived_at?'start':'arrive')));
+  if(r.role==='pilot'&&r.status==='Подтверждена')body.append(pilotSwipe(r.arrived_at?label('Сдвинь: Поехали','Swipe: Start trip','Braukite: Pradėti'):label('Сдвинь: На месте','Swipe: Arrived','Braukite: Atvykau'),r.arrived_at?'start':'arrive'));
   if(r.role==='pilot'&&live)body.append(button(label('Дополнительная услуга','Extra service','Papildoma paslauga'),offerExtra));
   for(const extra of r.extras){
    const item=document.createElement('div');item.className='item';p(extra.reason+' · '+eur(extra.amount_cents)+' · '+extra.state,item);
@@ -123,13 +145,9 @@ async function refresh(){
    timer.dataset.ticked=String(Date.now());timer.dataset.running=r.stop_active?'1':'0';
    timer.style.cssText='font-variant-numeric:tabular-nums;flex:1 1 100%;margin:0 0 4px';
    tools.append(timer);
-   tools.append(button(r.stop_active?label('В путь','Resume trip','Tęsti kelionę'):label('Остановка','Stop','Sustojimas'),()=>action(r.stop_active?'resume':'pause')));
+   tools.append(pilotSwipe(r.stop_active?label('Сдвинь: Возобновить маршрут','Swipe: Resume trip','Braukite: Tęsti'):label('Сдвинь: Остановка','Swipe: Stop','Braukite: Sustoti'),r.stop_active?'resume':'pause'));
    tools.append(button(label('Изменить маршрут','Change route','Keisti maršrutą'),changeTripRoute));
-   tools.append(button(label('Завершить поездку','Finish trip','Baigti kelionę'),async()=>{
-    if(r.stop_active)throw Error(label('Сначала нажмите «В путь»','Resume trip before finishing','Pirma tęskite kelionę'));
-    if(!window.confirm(label('Завершить поездку №','Finish trip #','Baigti kelionę Nr. ')+id+'?'))return;
-    await action('finish');
-   }));
+   if(!r.stop_active)tools.append(pilotSwipe(label('Сдвинь: Завершить поездку','Swipe: Finish trip','Braukite: Baigti'),'finish'));
    body.append(tools);
   }
   if(r.route_pending){

@@ -263,3 +263,8 @@ body{overflow-x:hidden}
   .mobile-menu nav a:hover,.mobile-menu nav a:focus-visible{border-color:#edcc86}
   .footer-contact-buttons{max-width:320px}
 }
+
+
+/* Brand-only card photo: keep the transparent original PD logo sharp and legible */
+.home-service img.home-service-brand-image{object-fit:contain;object-position:center 37%;padding:13px 26px 54px;background:radial-gradient(circle at 50% 32%,#343021 0%,#17130e 52%,#070706 100%)}
+@media(max-width:530px){.home-service img.home-service-brand-image{padding:12px 16px 56px}}

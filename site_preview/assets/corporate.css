@@ -268,3 +268,43 @@ body{overflow-x:hidden}
 /* Brand-only card photo: keep the transparent original PD logo sharp and legible */
 .home-service img.home-service-brand-image{object-fit:contain;object-position:center 37%;padding:13px 26px 54px;background:radial-gradient(circle at 50% 32%,#343021 0%,#17130e 52%,#070706 100%)}
 @media(max-width:530px){.home-service img.home-service-brand-image{padding:12px 16px 56px}}
+
+
+/* Mobile composition pass: preserve the entire supplied wide Toyota RAV4 photograph.
+   The previous full-height object-fit:cover crop could hide most of the vehicle on phones. */
+@media(max-width:740px){
+  .hero.hero-lux{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;align-items:start;min-height:0}
+  .hero.hero-lux .hero-lux-photo{
+    position:relative;inset:auto;display:block;z-index:0;
+    width:100%;height:auto;aspect-ratio:auto;
+    object-fit:contain;object-position:center;
+    margin:0;background:#080909
+  }
+  .hero.hero-lux .hero-lux-shade{z-index:1;inset:0;pointer-events:none;background:linear-gradient(to bottom,transparent 0%,transparent 18%,#080909 46%,#080909 100%);opacity:.22}
+  .hero.hero-lux .hero-lux-content{
+    z-index:2;width:calc(100% - 36px);padding:1.15rem 0 2rem;
+  }
+  .hero.hero-lux .hero-lux-content h1{margin:.45rem 0 .75rem;line-height:1.09}
+  .hero.hero-lux .hero-lux-actions{margin-top:1.15rem}
+  .hero.hero-lux .amenity-strip{margin-top:1.5rem;width:100%;justify-content:space-between}
+  .home-service-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .home-service{min-height:200px}
+  .home-service-grid>.home-service:last-child{grid-column:1/-1;min-height:168px}
+  .home-service img.home-service-brand-image{padding:8px 24px 52px}
+}
+@media(max-width:530px){
+  .hero.hero-lux{min-height:0}
+  .hero.hero-lux .hero-lux-content{width:calc(100% - 28px);padding:1rem 0 1.5rem}
+  .hero.hero-lux .hero-lux-content h1{font-size:clamp(2rem,8vw,2.7rem)}
+  .hero.hero-lux .hero-lux-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+  .hero.hero-lux .hero-lux-actions .button{width:100%;min-height:48px}
+  .hero.hero-lux .amenity{width:calc(25% - 6px);font-size:.71rem}
+  .hero.hero-lux .amenity svg{width:50px;height:50px;padding:11px}
+  .home-service{min-height:190px}
+  .home-service-grid>.home-service:last-child{min-height:164px}
+}
+@media(max-width:350px){
+  .hero.hero-lux .amenity{font-size:.65rem}
+  .hero.hero-lux .amenity svg{width:44px;height:44px}
+  .home-service-overlay{inset:auto 9px 9px;font-size:.8rem}
+}

@@ -91,7 +91,7 @@ if(selectedRoute && !airportDirection){
  const destination=routeDestinations[selectedRoute];
  const explanation=document.createElement('p');
  explanation.className='note';
- explanation.textContent='Маршрут выбран: Вильнюс → '+destination+'. Для отправки обязательно допиши улицу и номер дома в обоих адресах либо точные координаты GPS. Названий городов недостаточно. Цена подтверждается отдельно.';
+ explanation.textContent='Маршрут выбран: Вильнюс → '+destination+'. Для отправки укажи название и тип улицы (например, Gedimino pr. 12) и номер дома для обоих адресов либо точные координаты GPS. Названий городов недостаточно. Цена подтверждается отдельно.';
  $('to').closest('.field').after(explanation);
 }
 
@@ -208,10 +208,14 @@ function coordinates(s){
  return Math.abs(lat)<=90 && Math.abs(lon)<=180 ? [lat,lon]:null;
 }
 function hasStreetAndNumber(raw){
- const text=normalizePlace(raw);
- const tokens=text.split(' ');
- return tokens.some(t=>houseNumber(t)) && tokens.some(t=>/^[a-zа-яё]{3,}$/iu.test(t) &&
- !['vilnius','lietuva','lithuania','kaunas','klaipeda','warsaw','warszawa','poland','polska','trakai','druskininkai','palanga','вильнюс','литва','каунас','клайпеда','варшава','польша','тракай','друскининкай','паланга','улица','дом','street','gatve'].includes(t));
+ const tokens=normalizePlace(raw).split(' ').filter(Boolean);
+ // Require a named street, street-type abbreviation and a house number.
+ // This excludes bare fabricated inputs like "abc 12" before any network request.
+ const types=new Set(['g','gatve','gatv','pr','prospektas','al','aleja','ul','улица','ул','проспект','пер','переулок','street','st','road','rd','avenue','ave']);
+ const generic=new Set(['vilnius','lietuva','lithuania','kaunas','klaipeda','warsaw','warszawa','poland','polska','trakai','druskininkai','palanga','вильнюс','литва','каунас','клайпеда','варшава','польша','тракай','друскининкай','паланга','дом','house']);
+ return tokens.some(t=>types.has(t)) &&
+ tokens.some(t=>houseNumber(t)) &&
+ tokens.some(t=>/^[a-zа-яё]{3,}$/iu.test(t)&&!types.has(t)&&!generic.has(t));
 }
 function verifiedGeocoderResult(raw,results){
  const source=normalizePlace(raw),tokens=source.split(' ');
@@ -263,6 +267,12 @@ verificationButton.addEventListener('click',async()=>{
  if(verifying)return;
  const source=$('from').value.trim(),destination=$('to').value.trim();
  if(!source||!destination){say('Укажи оба адреса.');return}
+ if(!(airportDirection==='from'&&source===airportLabel) && !coordinates(source) && !hasStreetAndNumber(source)){
+  say('Адрес подачи неполный. Укажи название улицы, её тип и номер дома (например, Gedimino pr. 12) либо GPS-координаты.');$('from').focus();return
+ }
+ if(!(airportDirection==='to'&&destination===airportLabel) && !coordinates(destination) && !hasStreetAndNumber(destination)){
+  say('Адрес назначения неполный. Укажи улицу с номером дома либо GPS-координаты.');$('to').focus();return
+ }
  verifying=true;verifiedPair=null;verificationButton.disabled=true;
  const before=pairKey();
  try{

@@ -311,14 +311,17 @@ body{background:#07090d;color:#f8f6f0;font-family:system-ui,-apple-system,"Segoe
 @media(max-width:390px){.pd-contacts-popup{left:12px;right:12px}}
 
 /* Explicit owner correction: never use a stock/generated stranger in hero. User's original Toyota RAV4 photo #6 only. */
-.pd-hero-img{width:100%;height:338px;max-height:338px;max-width:890px;object-fit:cover;object-position:center 76%;border-radius:12px;box-shadow:0 16px 32px #0008}
-@media(max-width:640px){.pd-hero-img{height:240px;max-height:240px;object-position:center 76%}}
+/* A taller window retains the full front bumper, roof and both wheels of owner's RAV4. */
+.pd-hero-img{width:100%;height:clamp(370px,33vw,430px);max-height:none;max-width:680px;object-fit:cover;object-position:center 72%;border-radius:12px;box-shadow:0 16px 32px #0008;margin-inline:auto}
+@media(max-width:940px){.pd-hero-img{max-width:660px}}
+@media(max-width:640px){.pd-hero-img{height:clamp(245px,70vw,285px);max-width:100%;object-position:center 72%}}
 
 /* Owner-approved photo #6 replaces unwanted stranger only in driver service card. */
-.pd-services-three .pd-driver-card{aspect-ratio:480/246}
-.pd-services-three .pd-driver-card img{height:100%;width:100%;aspect-ratio:auto;object-fit:cover;object-position:center 76%}
-.pd-services-three .pd-driver-caption{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,#07101cf2,#07101cbd 68%,transparent);padding:30px 16px 12px;color:#fff;font-weight:650;font-size:clamp(14px,1.6vw,21px);display:flex;align-items:center;justify-content:space-between;gap:7px}
-.pd-driver-caption>span{font-size:24px;color:#f0c565}
+/* Preserve the original photo: inset the image slightly instead of cutting wheels off in a wide card. */
+.pd-services-three .pd-driver-card{aspect-ratio:480/246;background:#071421}
+.pd-services-three .pd-driver-card img{height:100%;width:80%;margin-inline:auto;aspect-ratio:auto;object-fit:cover;object-position:center 72%}
+.pd-services-three .pd-driver-caption{position:absolute;top:10px;left:10px;right:auto;bottom:auto;max-width:calc(100% - 20px);background:#07101ce6;border:1px solid #b08a45;border-radius:8px;padding:7px 10px;color:#fff;font-weight:650;font-size:clamp(13px,1.3vw,17px);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pd-driver-caption>span{font-size:19px;color:#f0c565}
 </style></head><body>
 <header class="pd-head"><a class="pd-brand" href="/" aria-label="PRIVATE DRIVE — главная"><img src="/assets/pd-user-logo-4-original.webp" width="54" height="54" alt="Фирменный золотой логотип PD">PRIVATE DRIVE</a><nav class="pd-nav" aria-label="Главное меню"><a href="#top" aria-current="page">Главная</a><a href="/services">Наши услуги</a><a href="#prices">Тарифы</a><a href="#about">О нас</a><details class="pd-contacts-nav" id="contacts"><summary>Контакты</summary><div class="pd-contacts-popup"><a href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Связаться с нами · @PrivateDraive</a><a href="mailto:evrobaltictransfer@gmail.com">evrobaltictransfer@gmail.com</a><a href="https://www.instagram.com/privatedraive/" target="_blank" rel="noopener noreferrer">Instagram @privatedraive</a></div></details></nav></header><main class="pd-main" id="top">
 <section class="pd-hero"><div class="pd-hero-copy"><h1>Ваш личный водитель <em>в Литве и Европе</em></h1><div class="pd-trust"><span>◇ Комфортно</span><span>◇ Надёжно</span><span>◷ Вовремя</span></div><div class="pd-buttons"><a class="btn" href="#quick-order">Забронировать поездку</a><a class="btn outline" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Связаться с нами</a></div></div><img class="pd-hero-img" src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 в ночном Вильнюсе, оригинальное изображение PRIVATE DRIVE без посторонних людей" width="864" height="1536" fetchpriority="high" decoding="async"></section>

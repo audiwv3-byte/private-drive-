@@ -228,6 +228,15 @@ function verifiedGeocoderResult(raw,results){
   return meaningful.length>0 && meaningful.some(t=>source.includes(t));
  });
 }
+async function fetchAddressJson(url){
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),12000);
+ try{
+  const response=await fetch(url,{headers:{Accept:'application/json'},signal:controller.signal});
+  if(!response.ok)throw Error('Сервис проверки адресов временно недоступен');
+  return await response.json();
+ }finally{clearTimeout(timeout)}
+}
 async function lookupPrecise(raw){
  const point=coordinates(raw);
  if(point){
@@ -237,18 +246,14 @@ async function lookupPrecise(raw){
   const url=new URL('https://nominatim.openstreetmap.org/reverse');
   url.searchParams.set('lat',String(point[0]));url.searchParams.set('lon',String(point[1]));
   url.searchParams.set('format','jsonv2');url.searchParams.set('zoom','18');url.searchParams.set('addressdetails','1');
-  const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(12000)});
-  if(!response.ok)throw Error('Сервис проверки адресов временно недоступен');
-  const result=await response.json();
+  const result=await fetchAddressJson(url);
   return !!(result&&result.address&&(result.address.road||result.address.house_number||result.address.amenity));
  }
  if(!hasStreetAndNumber(raw))return false;
  const url=new URL('https://nominatim.openstreetmap.org/search');
  url.searchParams.set('q',raw);url.searchParams.set('format','jsonv2');
  url.searchParams.set('addressdetails','1');url.searchParams.set('limit','3');
- const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(12000)});
- if(!response.ok)throw Error('Сервис проверки адресов временно недоступен');
- return verifiedGeocoderResult(raw,await response.json());
+ return verifiedGeocoderResult(raw,await fetchAddressJson(url));
 }
 function pairKey(){return JSON.stringify([$('from').value.trim(),$('to').value.trim()])}
 for(const field of ['from','to']){

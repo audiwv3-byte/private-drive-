@@ -42,6 +42,7 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
  <form id="orderForm">
   <div class="field"><label for="from">Откуда</label><input id="from" name="from" placeholder="Город, улица, дом" autocomplete="street-address" maxlength="200" required></div>
   <div class="field"><label for="to">Куда</label><input id="to" name="to" placeholder="Город, улица, дом" maxlength="200" required></div>
+  <button class="btn" type="button" id="swapAddresses" aria-label="Поменять адреса местами">⇅ Поменять адреса местами</button>
   <div class="actions">
    <button class="btn" type="button" id="locate">◎ Моё местоположение</button>
    <button class="btn" type="button" id="showRoute">Показать точки на карте</button>
@@ -72,12 +73,12 @@ const $=id=>document.getElementById(id),status=$('status');
 const params=new URLSearchParams(location.search);
 const preorder=params.get('mode')==='preorder';
 const airportDirection=['to','from'].includes(params.get('airport'))?params.get('airport'):null;
-const serviceNames={'flowers':'Цветы к поездке','surprise':'Поездка-сюрприз','sober-driver':'Трезвый водитель','jump-start':'Запуск автомобиля · 20 €','meet-sign':'Встреча с табличкой · +15 €','luggage':'Помощь с багажом'};
+const serviceNames={'flowers':'Цветы к поездке','surprise':'Поездка-сюрприз','sober-driver':'Трезвый водитель','jump-start':'Запуск автомобиля · 20 €','meet-sign':'Встреча с табличкой · +15 €','luggage':'Помощь с багажом','parcel':'Доставка посылки','personal-driver':'Персональный водитель'};
 const selectedService=Object.prototype.hasOwnProperty.call(serviceNames,params.get('service'))?serviceNames[params.get('service')]:null;
 if(selectedService){
  const info=document.createElement('p');info.className='note';
  info.textContent='Выбрана услуга: '+selectedService+'. Доступность и окончательная стоимость подтверждаются отдельно.';
- $('datetime').closest('.field').before(info);
+ $('rideDate').closest('.field').before(info);
 }
 
 if(airportDirection){
@@ -129,6 +130,7 @@ try{
 }catch(e){$('mapFallback').textContent='Не удалось открыть карту. Заявку можно отправить без неё.'}
 function pin(lat,lon,label){if(!map)return;const marker=L.marker([lat,lon]).addTo(map).bindPopup(label);markers.push(marker)}
 function clearPins(){if(map)markers.forEach(m=>map.removeLayer(m));markers=[]}
+$('swapAddresses').addEventListener('click',()=>{const a=$('from').value;$('from').value=$('to').value;$('to').value=a;say('Адреса поменяны местами.');});
 $('locate').addEventListener('click',()=>{
  if(!navigator.geolocation){say('Геолокация недоступна. Введи адрес вручную.');return}
  say('Определяем местоположение…');

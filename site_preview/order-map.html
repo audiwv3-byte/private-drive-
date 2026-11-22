@@ -61,8 +61,8 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
    <p class="note">Информационный список. Онлайн-оплата на тестовом сайте ещё не активирована; доступность способов проверим при подключении Stripe.</p>
   </section>
   <p id="status" class="status" role="status" aria-live="polite"></p>
-  <button type="submit" class="btn main">Запросить поездку в Telegram</button>
-  <p class="note">Это предварительная заявка, не подтверждённый заказ. Никаких платежей сайт не принимает. Для отправки откроется Telegram.</p>
+  <button type="submit" class="btn main">Открыть заявку в Telegram</button>
+  <p class="note">Это предварительная заявка, не подтверждённый заказ. Telegram откроет чат с уже заполненным сообщением — проверь его и нажми «Отправить». Сайт не списывает деньги и не отправляет сообщения автоматически.</p>
  </form>
 </main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -192,9 +192,11 @@ $('orderForm').addEventListener('submit',async e=>{
   music?'Любимый трек: '+music:'',
   comment?'Пожелания: '+comment:''
  ].filter(Boolean).join('\n');
- try{await navigator.clipboard.writeText(draft);say('Заявка скопирована. Вставь её в сообщение Telegram.')}catch(_){say('Скопируй данные поездки перед отправкой в Telegram.');window.prompt('Текст заявки — скопируй его:',draft)}
- const link='https://t.me/PrivateDraive';
- const opened=window.open(link,'_blank','noopener,noreferrer');if(!opened)window.location.href=link;
+ // Telegram public username deep link: opens the intended chat with a prefilled, unsent draft.
+ // No clipboard permissions, external API calls, booking creation or automatic messages.
+ const link='https://t.me/PrivateDraive?text='+encodeURIComponent(draft);
+ say('Открываем Telegram с готовым текстом. Проверь заявку и нажми «Отправить».');
+ window.location.assign(link);
 });
 })();
 </script>

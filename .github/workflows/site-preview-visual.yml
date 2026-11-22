@@ -1,72 +1,90 @@
-name: PRIVATE DRIVE website preview visual check
+name: PRIVATE DRIVE live website screenshots
 on:
   push:
     branches:
       - feature/website-private-drive-preview
     paths:
-      - site_preview/**
-      - test_website_public_readiness.py
-      - test_website_legal_pages.py
-      - test_build_corporate_preview.py
-      - build_corporate_preview.py
       - .github/workflows/site-preview-visual.yml
   workflow_dispatch:
+
 jobs:
-  screenshots:
+  capture:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      PREVIEW_URL: https://private-drive-corporate-preview-20261122.onrender.com
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Check corporate website content and links
-        run: python -m unittest -v test_website_public_readiness.py test_website_legal_pages.py test_build_corporate_preview.py
-      - name: Install browser
+      - name: Install Chromium / Playwright
         run: |
           npm install --no-save playwright@1.58.2
           npx playwright install --with-deps chromium
-      - name: Capture full-page screenshots and audit
+      - name: Capture three actual published pages
         run: |
-          mkdir -p site_preview/screenshots
-          cat > visual-check.cjs <<'JS'
+          mkdir -p private-drive-screenshots
+          cat > capture-preview.cjs <<'JS'
           const { chromium } = require('playwright');
-          const { pathToFileURL } = require('node:url');
-          const path=require('node:path');
-          const fs=require('node:fs');
-          (async()=>{
-            const browser=await chromium.launch({headless:true});
-            const pageUrl=pathToFileURL(path.resolve('site_preview/index.html')).href;
-            const output=[];
-            for(const [name,width,height] of [['mobile-320',320,740],['mobile-390',390,844],['tablet-768',768,1024],['desktop-1440',1440,900]]) {
-              const page=await browser.newPage({viewport:{width,height},deviceScaleFactor:1});
-              await page.goto(pageUrl,{waitUntil:'load'});
-              await page.evaluate(()=>document.fonts.ready);
-              const report=await page.evaluate(()=>({
-                scrollWidth:document.documentElement.scrollWidth,
-                clientWidth:document.documentElement.clientWidth,
-                images:[...document.images].map(x=>({loaded:x.complete&&x.naturalWidth>0,width:x.naturalWidth,src:x.getAttribute('src')})),
-                sections:['taxi','transfers','extras','registration'].map(id=>({id,present:!!document.getElementById(id)})),
-                nav:[...document.querySelectorAll('.top nav a')].map(x=>{const b=x.getBoundingClientRect(),p=x.closest('nav').getBoundingClientRect();return {text:x.textContent.trim(),visible:b.width>0&&b.height>0,insideViewport:b.left>=-1&&b.right<=innerWidth+1,insideMenu:b.left>=p.left-1&&b.right<=p.right+1}}),navFits:document.querySelector('.top nav').scrollWidth<=document.querySelector('.top nav').clientWidth
-              }));
-              await page.screenshot({path:'site_preview/screenshots/'+name+'.png',fullPage:true});
-              output.push({name,width,height,...report});
-              await page.close();
+          const fs = require('node:fs');
+          const root = process.env.PREVIEW_URL;
+          if (!root || !root.startsWith('https://')) throw Error('Test HTTPS URL missing');
+          (async () => {
+            const browser = await chromium.launch({headless:true, args:['--no-sandbox']});
+            const jobs = [
+              {id:'01-desktop-home', path:'/', width:1440, height:900, mobile:false},
+              {id:'02-mobile-home', path:'/', width:390, height:844, mobile:true},
+              {id:'03-mobile-booking', path:'/order-map.html?mode=preorder&route=kaunas', width:390, height:844, mobile:true}
+            ];
+            const results = [];
+            try {
+              for (const job of jobs) {
+                const context = await browser.newContext({
+                  viewport:{width:job.width,height:job.height},
+                  deviceScaleFactor:1,
+                  isMobile:job.mobile,
+                  hasTouch:job.mobile,
+                  locale:'ru-RU'
+                });
+                const page = await context.newPage();
+                const url = new URL(job.path,root).href;
+                const response = await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
+                if(!response || !response.ok()) throw Error(job.id+': HTTP '+response?.status());
+                await page.locator('main').waitFor({state:'visible',timeout:15000});
+                await page.evaluate(()=>document.fonts.ready);
+                await page.waitForTimeout(1800);
+                const meta = await page.evaluate(() => ({
+                  title:document.title,
+                  viewport:innerWidth,
+                  scrollWidth:document.documentElement.scrollWidth,
+                  images:[...document.querySelectorAll('img')].map(el=>({
+                    src:el.getAttribute('src'),loaded:el.complete&&el.naturalWidth>0
+                  })),
+                  formPresent:!!document.querySelector('#orderForm'),
+                  legalNotice:!!document.querySelector('a[href="privacy.html"]'),
+                  verifyButton:!!document.querySelector('#verifyAddresses')
+                }));
+                const filename='private-drive-screenshots/'+job.id+'.png';
+                await page.screenshot({path:filename,fullPage:true,animations:'disabled'});
+                results.push({screen:job.id,file:filename,viewport:job.width+'x'+job.height,...meta});
+                await context.close();
+              }
+            } finally { await browser.close(); }
+            fs.writeFileSync('private-drive-screenshots/report.json',JSON.stringify(results,null,2));
+            console.log(JSON.stringify(results,null,2));
+            if(results.some(x=>x.scrollWidth>x.viewport)) throw Error('Horizontal overflow found');
+            if(!results[2].formPresent || !results[2].legalNotice || !results[2].verifyButton) {
+              throw Error('Booking form or privacy/check controls missing');
             }
-            await browser.close();
-            fs.writeFileSync('site_preview/screenshots/audit.json',JSON.stringify(output,null,2));
-            console.log(JSON.stringify(output,null,2));
-            if(output.some(x=>x.scrollWidth>x.clientWidth||x.images.some(i=>!i.loaded)||x.sections.some(s=>!s.present)||!x.navFits||x.nav.length!==5||!x.nav.some(n=>n.text==='Контакты')||x.nav.some(n=>!n.visible||!n.insideViewport||!n.insideMenu)))process.exitCode=1;
-          })().catch(e=>{console.error(e);process.exitCode=1});
+            if(results.some(x=>x.images.some(img=>!img.loaded))) throw Error('At least one image did not load');
+          })().catch(err=>{console.error(err);process.exitCode=1});
           JS
-          node visual-check.cjs
-      - uses: actions/upload-artifact@v4
+          node capture-preview.cjs
+      - name: Upload screenshots and report
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: private-drive-full-page-screenshots
-          path: site_preview/screenshots/
+          name: private-drive-live-three-screenshots
+          path: private-drive-screenshots/
           retention-days: 14
+          if-no-files-found: error

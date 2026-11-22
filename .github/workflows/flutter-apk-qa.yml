@@ -1,0 +1,48 @@
+name: Flutter Android APK QA
+
+on:
+  pull_request:
+    branches:
+      - feature/flutter-independent-auth
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/flutter-apk-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-android-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Flutter environment
+        run: flutter --version
+      - name: Fetch packages
+        run: flutter pub get
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos
+      - name: Run Flutter tests
+        run: flutter test
+      - name: Generate isolated Android QA platform
+        # This branch contains Dart sources but no committed android/ folder.
+        # Generate debug-only tooling here, never modify the app's production signing.
+        run: flutter create --platforms=android --project-name private_drive .
+      - name: Build isolated test APK (debug only)
+        run: flutter build apk --debug --dart-define=PD_NATIVE_AUTH_API_URL=
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-pilot-qa-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

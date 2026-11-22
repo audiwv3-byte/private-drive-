@@ -601,6 +601,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   String _gpsMessage = 'GPS выключен';
   int stage = 0;
   bool paused = false;
+  bool _finishTripMode = false;
   Timer? _waitingTicker;
   Timer? _pickupWaitingTicker;
   DateTime? _waitingStartedAt;
@@ -745,7 +746,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
           '${(left % 60).toString().padLeft(2, '0')}';
     }
     return 'Платное ожидание $clock · +${store.pickupWaitingFeeLabel()} '
-        '(0,30 €/мин)';
+        '(0,25 €/мин)';
   }
 
   void _onTripChanged() {
@@ -763,6 +764,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     _seenPassengerMessageCount = count;
     final tripId = store?.trip;
     if (tripId != _waitingTripId) {
+      _finishTripMode = false;
       _waitingTripId = tripId;
       _waitingElapsed = Duration.zero;
       _waitingStartedAt = null;
@@ -795,8 +797,12 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (store == null) return stages[stage];
     return switch (store.status) {
       DemoTripStatus.assigned => 'К пассажиру',
-      DemoTripStatus.approaching => 'В путь',
-      DemoTripStatus.underway => 'Завершить',
+      DemoTripStatus.approaching when store.paused => 'Возобновить маршрут',
+      DemoTripStatus.approaching when store.arrivalAt == null => 'На месте',
+      DemoTripStatus.approaching => 'Поехали',
+      DemoTripStatus.underway when store.paused => 'Возобновить маршрут',
+      DemoTripStatus.underway when _finishTripMode => 'Завершить поездку',
+      DemoTripStatus.underway => 'Остановка',
       _ => 'Нет назначенной поездки',
     };
   }
@@ -804,17 +810,37 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   bool get _canAdvance {
     final store = widget.tripStore;
     if (store == null) return !paused;
-    return !store.paused &&
-      ((store.status == DemoTripStatus.assigned && store.pilotAccepted) ||
-       store.status == DemoTripStatus.approaching ||
-       store.status == DemoTripStatus.underway);
+    return store.pilotAccepted &&
+        (store.status == DemoTripStatus.assigned ||
+         store.status == DemoTripStatus.approaching ||
+         store.status == DemoTripStatus.underway);
   }
 
-  bool get _canPause {
+  void _confirmPilotSwipe() {
     final store = widget.tripStore;
-    if (store == null) return stage != 0;
-    return store.status == DemoTripStatus.approaching ||
-        store.status == DemoTripStatus.underway;
+    if (store == null) { advance(); return; }
+    if (store.paused) {
+      _togglePaidWait();
+      return;
+    }
+    if (store.status == DemoTripStatus.approaching) {
+      if (store.arrivalAt == null) {
+        store.markArrived();
+      } else {
+        advance();
+      }
+      return;
+    }
+    if (store.status == DemoTripStatus.underway) {
+      if (_finishTripMode) {
+        _finishTripMode = false;
+        advance();
+      } else {
+        _togglePaidWait();
+      }
+      return;
+    }
+    advance();
   }
 
 
@@ -1563,16 +1589,6 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                               const SizedBox(height: 10),
                             ],
 
-                            if (widget.tripStore?.status ==
-                                DemoTripStatus.approaching &&
-                                widget.tripStore?.pilotAccepted == true &&
-                                widget.tripStore?.arrivalAt == null)
-                              FilledButton.icon(
-                                key: const Key('pilot-arrived-at-pickup'),
-                                onPressed: () => widget.tripStore!.markArrived(),
-                                icon: const Icon(Icons.pin_drop_outlined),
-                                label: const Text('Прибыл · 3 минуты бесплатно'),
-                              ),
                             if (widget.tripStore?.arrivalAt != null)
                               Text(
                                 _pickupWaitingText,
@@ -1592,27 +1608,24 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                 style: const TextStyle(
                                   color: Color(0xFFDDC184),
                                   fontWeight: FontWeight.bold)),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: PdSlideToConfirm(
-                                    key: const Key('pilot-next-trip'),
-                                    thumbKey: const Key('pilot-next-trip-handle'),
-                                    label: pdLabel(context, _actionText),
-                                    enabled: _canAdvance,
-                                    color: const Color(0xFF27764E),
-                                    onConfirmed: advance,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                OutlinedButton(
-                                  key: const Key('pilot-pause-trip'),
-                                  onPressed: !_canPause ? null : _togglePaidWait,
-                                  child: Text((widget.tripStore?.paused ?? paused)
-                                      ? 'Продолжить' : 'Остановка'),
-                                ),
-                              ],
+                            PdSlideToConfirm(
+                              key: const Key('pilot-next-trip'),
+                              thumbKey: const Key('pilot-next-trip-handle'),
+                              label: pdLabel(context, _actionText),
+                              enabled: _canAdvance,
+                              color: const Color(0xFF27764E),
+                              onConfirmed: _confirmPilotSwipe,
                             ),
+                            if (widget.tripStore?.status == DemoTripStatus.underway &&
+                                widget.tripStore?.paused != true)
+                              TextButton(
+                                key: const Key('pilot-final-destination-mode'),
+                                onPressed: () => setState(
+                                  () => _finishTripMode = !_finishTripMode),
+                                child: Text(_finishTripMode
+                                    ? 'Вернуться к остановке'
+                                    : 'Конечный пункт'),
+                              ),
                             if (widget.tripStore?.status == DemoTripStatus.finished)
                               Card(
                                 key: const Key('pilot-rate-passenger-panel'),

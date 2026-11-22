@@ -125,7 +125,8 @@ class PassengerRideEntry extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 460),
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: ListView(shrinkWrap: true, cacheExtent: 2500, children: [
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Center(
               child: PrivateDriveBrandLogo(
                 size: 196, transparentBackground: true)),
@@ -190,7 +191,7 @@ class PassengerRideEntry extends StatelessWidget {
             Text(pdLabel(context, 'Тестовый режим. Реальные заказы и оплата выключены.'),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 12)),
-          ]),
+          ])),
       ),
     ))),
     ]),

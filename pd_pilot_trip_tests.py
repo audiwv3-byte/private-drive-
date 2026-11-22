@@ -2,6 +2,7 @@
 from datetime import timedelta
 
 def run(server, core, call, check):
+    test_waiting_three_free_minutes()
     pilot_id,passenger_id=556,101
     core.save_user(pilot_id,'Test Pilot','+37060000556')
     with core.db(core.USERS_DB) as c:

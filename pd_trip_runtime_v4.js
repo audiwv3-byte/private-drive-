@@ -4,7 +4,7 @@
 const POLICY='pd-trip-v4-20261028';
 const label=(ru,en,lt)=>window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru;
 const eur=c=>(Number(c||0)/100).toFixed(2)+' €';
-let active=null,dialog=null,body=null,map=null,marker=null,watch=null,watchOrder=null,lastPositionSent=0,polling=false,hubBusy=false,finishMode=false;
+let active=null,dialog=null,body=null,map=null,marker=null,watch=null,watchOrder=null,lastPositionSent=0,polling=false,hubBusy=false,finishMode=false,swipeDragging=false;
 const button=(text,action)=>{const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent=text;b.onclick=async()=>{b.disabled=true;try{await action()}catch(e){message(e.message,true)}finally{b.disabled=false}};return b};
 function pilotSwipe(text,nextAction){
  const track=document.createElement('div');track.className='pd-pilot-swipe';track.dataset.action=nextAction;
@@ -14,14 +14,14 @@ function pilotSwipe(text,nextAction){
  handle.style.cssText='position:absolute;left:5px;top:5px;width:54px;height:54px;border:0;border-radius:50%;background:#c7a360;color:#16130e;font-size:26px;touch-action:none;cursor:grab;transform:translateX(0);z-index:1';
  handle.textContent='›';track.append(caption,handle);
  let start=null,moved=0,busy=false;
- const reset=()=>{start=null;moved=0;handle.style.transform='translateX(0)'};
+ const reset=()=>{start=null;moved=0;swipeDragging=false;handle.style.transform='translateX(0)'};
  const commit=async()=>{
   if(busy)return;
   if(nextAction==='finish'&&!window.confirm(label('Завершить поездку №','Finish trip #','Baigti kelionę Nr. ')+active+'?'))return reset();
   busy=true;handle.disabled=true;track.style.opacity='.65';
   try{await action(nextAction)}catch(e){message(e.message,true);busy=false;handle.disabled=false;track.style.opacity='1';reset()}
  };
- handle.addEventListener('pointerdown',e=>{if(busy)return;start={x:e.clientX,id:e.pointerId};moved=0;handle.setPointerCapture(e.pointerId)});
+ handle.addEventListener('pointerdown',e=>{if(busy)return;start={x:e.clientX,id:e.pointerId};moved=0;swipeDragging=true;handle.setPointerCapture(e.pointerId)});
  handle.addEventListener('pointermove',e=>{if(!start||start.id!==e.pointerId||busy)return;const width=Math.max(0,track.clientWidth-handle.offsetWidth-10);moved=Math.min(width,Math.max(0,e.clientX-start.x));handle.style.transform='translateX('+moved+'px)'});
  handle.addEventListener('pointerup',e=>{if(!start||start.id!==e.pointerId)return;const width=Math.max(0,track.clientWidth-handle.offsetWidth-10);const ok=width>0&&moved>=width*.8;reset();if(ok)commit()});
  handle.addEventListener('pointercancel',reset);handle.addEventListener('lostpointercapture',reset);
@@ -49,6 +49,7 @@ window.pdWorkGpsEnableForTrip=position;
 function cleanDialog(){if(map)map.remove();map=null;marker=null;dialog=null;body=null;active=null}
 window.pdOpenLiveTripV4=async function(id){
  if(dialog){dialog.close();cleanDialog()}
+ finishMode=false;swipeDragging=false;
  dialog=pdSimpleDialog(label('Текущая поездка','Current trip','Dabartinė kelionė'));dialog.id='pdTripRuntimeV4';
  body=document.createElement('div');dialog.append(body);active=Number(id);
  dialog.addEventListener('close',cleanDialog,{once:true});
@@ -85,7 +86,7 @@ async function offerExtra(){
  });d.append(reason,amount,save);
 }
 async function refresh(){
- if(!active||!body||polling)return;polling=true;
+ if(!active||!body||polling||swipeDragging)return;polling=true;
  try{
   const id=active,r=await requestTrip(id);if(active!==id||!body)return;
   if(map)map.remove();map=null;marker=null;body.replaceChildren();

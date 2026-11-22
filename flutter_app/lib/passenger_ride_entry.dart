@@ -60,7 +60,7 @@ class PassengerRideEntry extends StatelessWidget {
           ),
       ]),
     body: Stack(fit: StackFit.expand, children: [
-      const VilniusEveningBackdrop(),
+      const VilniusEveningBackdrop(brightPassenger: true),
       SafeArea(child: Center(child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 460),
       child: Padding(
@@ -68,21 +68,8 @@ class PassengerRideEntry extends StatelessWidget {
         child: ListView(shrinkWrap: true, children: [
             const Center(
               child: PrivateDriveBrandLogo(
-                size: 80, transparentBackground: true)),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: SizedBox(
-                key: const Key('passenger-entry-vilnius-panorama'),
-                height: 86,
-                child: Image.asset(
-                  'assets/brand/vilnius_cathedral_user_photo.webp',
-                  fit: BoxFit.cover,
-                  alignment: const Alignment(-0.48, 0),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
+                size: 196, transparentBackground: true)),
+            const SizedBox(height: 16),
             Text(pdLabel(context, 'Выбери тип поездки'),
               key: const Key('passenger-entry-title'),
               textAlign: TextAlign.center,

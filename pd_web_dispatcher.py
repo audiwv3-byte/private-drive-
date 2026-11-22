@@ -109,6 +109,9 @@ def register(app, core):
     raw_admin = os.environ.get("PD_DISPATCH_ADMIN_ID", "")
     dsn = os.environ.get("PD_DISPATCH_DATABASE_URL", "")
     invite_hash = os.environ.get("PD_DISPATCH_INVITE_SHA256", "")
+    invite_code = os.environ.get("PD_DISPATCH_INVITE_CODE", "")
+    if not invite_hash and re.fullmatch(r"[A-Za-z0-9_-]{43}", invite_code):
+        invite_hash = hashlib.sha256(invite_code.encode()).hexdigest()
     raw_expiration = os.environ.get("PD_DISPATCH_INVITE_EXPIRES", "")
     expires = int(raw_expiration) if re.fullmatch(r"[0-9]{1,12}", raw_expiration) else 0
     passwords = DispatcherPasswords(dsn) if dsn and not password_hash else None

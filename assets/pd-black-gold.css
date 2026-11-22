@@ -1,0 +1,14 @@
+:root {
+  color-scheme: dark;
+  --pd-black: #100e0b;
+  --pd-deep: #0b0907;
+  --pd-panel: #1c1711;
+  --pd-field: #16120d;
+  --pd-gold: #edca82;
+  --pd-gold-strong: #ffdfa0;
+  --pd-ink: #f7efe1;
+  --pd-muted: #c7b79e;
+  --pd-border: #77592f;
+  --pd-light: linear-gradient(110deg, #ffdfa0, #d6a658);
+  --pd-surface: linear-gradient(145deg, #241c13, #14100c);
+}

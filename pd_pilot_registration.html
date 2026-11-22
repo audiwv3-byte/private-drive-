@@ -2,22 +2,22 @@
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>PRIVATE DRIVE — Регистрация пилота (тест)</title>
-<style>
-:root{color-scheme:dark;--bg:#0a0c10;--p:#15191e;--b:#5f4d2d;--g:#d9b66b;--t:#f5f1e8;--m:#acb0b6}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#25221c,#0a0c10 55%);color:var(--t);font:14px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}
-header{border-bottom:1px solid var(--b);background:#101216ee;padding:18px max(18px,calc((100vw - 1100px)/2));display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+<link rel="stylesheet" href="/assets/pd-black-gold.css"><style>
+:root{color-scheme:dark;--bg:var(--pd-black);--b:var(--pd-border);--g:var(--pd-gold);--t:var(--pd-ink);--m:var(--pd-muted)}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#392a17,var(--bg) 55%);color:var(--t);font:14px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}
+header{border-bottom:1px solid var(--b);background:var(--pd-deep);padding:18px max(18px,calc((100vw - 1100px)/2));display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
 .logo{color:var(--g);font:700 24px Georgia,serif;letter-spacing:.18em}.logo span{font:11px system-ui;display:block;letter-spacing:.28em}
 header a{color:var(--g);text-decoration:none;border:1px solid var(--b);border-radius:8px;padding:9px 13px}
 main{max-width:1040px;margin:32px auto;padding:0 16px 40px}h1{font:500 clamp(27px,4vw,38px) Georgia,serif;color:var(--g);margin:0 0 8px}p.lead{color:var(--m);margin:0 0 22px}
 .notice{border:1px solid #886731;background:#2b251a;border-radius:10px;color:#f1cf8c;padding:13px 16px;margin:0 0 20px}
-fieldset{border:1px solid var(--b);background:linear-gradient(145deg,#171b22,#101318);border-radius:14px;padding:20px;margin:0 0 16px;min-width:0}legend{color:var(--g);padding:0 10px;font-size:17px;font-weight:650}
+fieldset{border:1px solid var(--b);background:var(--pd-surface);border-radius:14px;padding:20px;margin:0 0 16px;min-width:0}legend{color:var(--g);padding:0 10px;font-size:17px;font-weight:650}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.field{min-width:0}label{display:block;color:#e3d9c5;margin:0 0 6px}
-input,select{width:100%;border:1px solid #685839;border-radius:8px;background:#0a0d12;color:#f8f5eb;padding:12px;font:inherit;min-height:45px}
+input,select{width:100%;border:1px solid #685839;border-radius:8px;background:var(--pd-field);color:#f8f5eb;padding:12px;font:inherit;min-height:45px}
 input[type=file]{padding:10px;font-size:12px}input::placeholder{color:#889099}input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #f3d58a;outline-offset:2px}
 .help{display:block;font-size:12px;color:var(--m);margin:5px 0 0}.full{grid-column:1/-1}
-.doc{padding:12px;border:1px dashed #71603b;border-radius:10px;background:#151719}.doc small{color:#bfc1c4}
+.doc{padding:12px;border:1px dashed #71603b;border-radius:10px;background:var(--pd-panel)}.doc small{color:#bfc1c4}
 .choice{display:flex;align-items:flex-start;gap:9px;margin:16px 0}.choice input{width:18px;min-height:18px;flex:none;margin-top:3px;accent-color:var(--g)}
-.actions{margin-top:22px}.submit{background:linear-gradient(90deg,#d9b16a,#f3d78c);color:#1c1710;border:0;border-radius:9px;font-weight:750;padding:14px 22px;min-width:250px;opacity:.65;cursor:not-allowed}
+.actions{margin-top:22px}.submit{background:var(--pd-light);color:#1c1710;border:0;border-radius:9px;font-weight:750;padding:14px 22px;min-width:250px;opacity:.65;cursor:not-allowed}
 #demo-result{color:var(--g);margin-top:12px}footer{border-top:1px solid var(--b);color:#aaa;text-align:center;padding:20px}
 @media(max-width:650px){.grid{grid-template-columns:1fr}fieldset{padding:15px}.submit{width:100%}main{margin-top:20px}}
 </style></head>

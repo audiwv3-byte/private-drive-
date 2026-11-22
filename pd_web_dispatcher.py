@@ -13,7 +13,18 @@ from werkzeug.security import check_password_hash
 
 LOGIN = """<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PRIVATE DRIVE — вход диспетчера</title>
-<style>body{background:#101114;color:#ecd7a1;font:16px system-ui;margin:0;display:grid;min-height:100vh;place-items:center}main{width:min(430px,88vw);padding:28px;background:#1d1e22;border:1px solid #ae935b;border-radius:16px}input,button{display:block;box-sizing:border-box;width:100%;padding:13px;margin:14px 0;border-radius:8px;font:inherit}button{background:#b89a57;color:#111;border:0;font-weight:700;cursor:pointer}input{background:white;color:#111}small{color:#bbb}</style>
+<link rel="stylesheet" href="/assets/pd-black-gold.css">
+<style>
+*{box-sizing:border-box}
+body{background:var(--pd-black,#100e0b);color:var(--pd-ink,#f7efe1);font:16px/1.5 system-ui;margin:0;display:grid;min-height:100vh;place-items:center;padding:16px}
+main{width:min(430px,100%);padding:clamp(18px,5vw,28px);background:var(--pd-surface,#1c1711);border:1px solid var(--pd-border,#77592f);border-radius:16px}
+h1,h2{color:var(--pd-gold,#edca82)}
+input,button{display:block;width:100%;padding:12px;margin:10px 0 16px;border-radius:8px;font:inherit;min-height:46px}
+button{background:var(--pd-light,#edca82);color:#21170b;border:0;font-weight:700;cursor:pointer}
+input{background:var(--pd-field,#16120d);color:inherit;border:1px solid var(--pd-border,#77592f)}
+input:focus-visible,button:focus-visible{outline:2px solid var(--pd-gold-strong,#ffdfa0);outline-offset:3px}
+small{color:var(--pd-muted,#c7b79e)}
+</style>
 <main><img src="/pd-logo-transparent.png" alt="PRIVATE DRIVE — логотип PD с автомобилем" width="112" height="112" style="display:block;width:112px;height:112px;max-width:100%;aspect-ratio:1;object-fit:contain;margin:0 auto 14px;border-radius:14px"><h1 style="text-align:center">PRIVATE DRIVE</h1><h2>Вход диспетчера</h2>{% if error %}<p role="alert">{{ error }}</p>{% endif %}
 <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label for="password">Пароль</label>
 <input id="password" type="password" name="password" autocomplete="current-password" required maxlength="512">

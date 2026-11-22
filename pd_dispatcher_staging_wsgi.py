@@ -6,7 +6,7 @@ Run only on a dedicated HTTPS test deployment; not production.
 import os
 from types import SimpleNamespace
 
-from flask import Flask, request, Response
+from flask import Flask, request, Response, send_from_directory
 from pathlib import Path
 from pd_web_dispatcher import register
 from pd_public_route_preview import register as register_route_preview
@@ -39,6 +39,13 @@ def create_app():
     )
     register(app, core)
     register_route_preview(app)
+
+    @app.get("/assets/pd-black-gold.css")
+    def brand_styles():
+        response = send_from_directory(Path(__file__).with_name("assets"), "pd-black-gold.css",
+                                       mimetype="text/css", max_age=3600)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @app.get("/")
     def home_preview():
@@ -95,7 +102,7 @@ def create_app():
         return Response(page, content_type="text/html; charset=utf-8",
                         headers={"Cache-Control": "no-store",
                                  "X-Content-Type-Options": "nosniff",
-                                 "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+                                 "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
 
     @app.post("/pilot-registration")
     def pilot_registration_submission_disabled():

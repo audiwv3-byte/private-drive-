@@ -96,16 +96,18 @@ with sync_playwright() as p:
         hero.scroll_into_view_if_needed()
         assert hero.evaluate("(img) => img.complete && img.naturalWidth >= 800")
 
-        # Approved screenshot uses light sections, dark/navy hero and compact footer.
+        # The requested black-and-gold palette covers sections, labels and inputs.
         visual = page.evaluate("""() => ({
             sectionBg: getComputedStyle(document.querySelector('.pd-section')).backgroundColor,
             headingColor: getComputedStyle(document.querySelector('.pd-section h2')).color,
+            fieldBg: getComputedStyle(document.querySelector('#quick-from')).backgroundColor,
             heroBg: getComputedStyle(document.querySelector('.pd-hero')).backgroundImage,
             duplicateContactStrip: !!document.querySelector('.pd-contact-top'),
             duplicateServicesStrip: !!document.querySelector('.pd-extra')
         })""")
-        assert visual["sectionBg"] == "rgb(247, 248, 251)", visual
-        assert visual["headingColor"] == "rgb(20, 36, 59)", visual
+        assert visual["sectionBg"] == "rgb(16, 14, 11)", visual
+        assert visual["headingColor"] == "rgb(237, 202, 130)", visual
+        assert visual["fieldBg"] == "rgb(22, 18, 13)", visual
         assert "gradient" in visual["heroBg"], visual
         assert not visual["duplicateContactStrip"] and not visual["duplicateServicesStrip"], visual
         page.locator(".pd-contacts-nav summary").click()

@@ -25,6 +25,7 @@ import 'pd_http_api.dart';
 export 'passenger_demo.dart' show PassengerDemo;
 import 'package:flutter_map/flutter_map.dart';
 import 'demo_map_tile_provider.dart';
+import 'pd_mapbox_qa_config.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -1150,7 +1151,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     key: const Key('pilot-map-tiles'),
                     tileProvider: demoTileProvider(),
                     // Raster OSM tiles need no CARTO API key.
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    urlTemplate: PdMapboxQaConfig.rasterTileUrl ??
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'lt.privatedrive.private_drive.demo',
                     maxNativeZoom: 19,
                     errorTileCallback: (tile, error, stackTrace) {

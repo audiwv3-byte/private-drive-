@@ -57,6 +57,18 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id),status=$('status');
+const preorder=new URLSearchParams(location.search).get('mode')==='preorder';
+if(preorder){
+ document.querySelector('h1').textContent='Предварительный заказ';
+ document.querySelector('main.panel > p').textContent='Укажи маршрут, дату и время поездки для предварительного запроса.';
+ const dateInput=$('datetime');
+ dateInput.required=true;
+ dateInput.closest('.field').querySelector('label').textContent='Дата и время поездки *';
+ const localNow=new Date();
+ const localValue=new Date(localNow.getTime()-localNow.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ dateInput.min=localValue;
+ document.querySelector('#orderForm button[type="submit"]').textContent='Отправить предварительный заказ';
+}
 let map=null,markers=[],selectedPosition=null;
 function say(s){status.textContent=s}
 try{
@@ -110,7 +122,7 @@ $('orderForm').addEventListener('submit',async e=>{
  const from=$('from').value.trim(),to=$('to').value.trim();
  if(!from||!to){say('Укажи откуда и куда.');return}
  const date=$('datetime').value,comment=$('comment').value.trim();
- const draft='PRIVATE DRIVE — запрос поездки\nОткуда: '+from+'\nКуда: '+to+(date?'\nДата/время: '+date.replace('T',' '):'')+(comment?'\nПожелания: '+comment:'');
+ const draft=(preorder?'PRIVATE DRIVE — предварительный заказ':'PRIVATE DRIVE — запрос поездки')\nОткуда: '+from+'\nКуда: '+to+(date?'\nДата/время: '+date.replace('T',' '):'')+(comment?'\nПожелания: '+comment:'');
  try{await navigator.clipboard.writeText(draft);say('Заявка скопирована. Вставь её в сообщение Telegram.')}catch(_){say('Скопируй данные поездки перед отправкой в Telegram.');window.prompt('Текст заявки — скопируй его:',draft)}
  const link='https://t.me/PrivateDraive';
  const opened=window.open(link,'_blank','noopener,noreferrer');if(!opened)window.location.href=link;

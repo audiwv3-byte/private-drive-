@@ -6,24 +6,19 @@ import 'package:private_drive/passenger_ride_entry.dart';
 import 'package:private_drive/app_language.dart';
 
 void main() {
-  testWidgets('PD logo is above original Vilnius panorama and taxi/transfer', (tester) async {
+  testWidgets('PD logo and advance booking appear above three passenger choices', (tester) async {
     final store = DemoTripStore();
     addTearDown(store.dispose);
     await tester.pumpWidget(MaterialApp(
       home: PassengerRideEntry(enableMapTiles: false, tripStore: store),
     ));
     final logo = find.byKey(const Key('private-drive-brand-logo'));
-    final panorama = find.byKey(const Key('passenger-entry-vilnius-panorama'));
     expect(logo, findsOneWidget);
-    expect(panorama, findsOneWidget);
-    expect(tester.getRect(logo).bottom, lessThan(tester.getRect(panorama).top));
-    final photo = find.descendant(
-      of: panorama, matching: find.byType(Image));
-    expect(tester.widget<Image>(photo).image,
-      isA<AssetImage>().having((image) => image.assetName,
-        'asset name', 'assets/brand/vilnius_cathedral_user_photo.webp'));
+    expect(find.byKey(const Key('passenger-entry-advance-booking')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-entry-vilnius-panorama')), findsNothing);
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
     expect(find.byKey(const Key('passenger-entry-transfer')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-entry-delivery')), findsOneWidget);
   });
 
   testWidgets('Passenger language picker changes all screens without returning to login',

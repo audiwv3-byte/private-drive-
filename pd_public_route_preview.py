@@ -210,13 +210,13 @@ def _approved_staging_price(route_data):
     def place(value):
         value = "".join(x for x in unicodedata.normalize("NFKD", str(value).casefold())
                         if not unicodedata.combining(x))
-        if re.search(r"\\b(vno|airport|аэропорт)\\b", value):
+        if re.search(r"\b(vno|airport|аэропорт)\b", value):
             return "vno"
         aliases = {
-            "vilnius": r"\\b(vilnius|вильнюс|wilno|vilniaus)\\b",
-            "kaunas": r"\\b(kaunas|каунас|kowno)\\b",
-            "klaipeda": r"\\b(klaipeda|клаипеда|клайпеда|klaipėda)\\b",
-            "warsaw": r"\\b(warsaw|warszawa|варшава)\\b",
+            "vilnius": r"\b(vilnius|вильнюс|wilno|vilniaus)\b",
+            "kaunas": r"\b(kaunas|каунас|kowno)\b",
+            "klaipeda": r"\b(klaipeda|клаипеда|клайпеда|klaipėda)\b",
+            "warsaw": r"\b(warsaw|warszawa|варшава)\b",
         }
         return next((code for code, pattern in aliases.items()
                      if re.search(pattern, value)), None)

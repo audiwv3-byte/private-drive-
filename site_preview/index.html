@@ -12,138 +12,68 @@
 <body>
   <header class="top" id="top">
     <div class="wrap top-inner">
-      <a class="brand" href="#top" aria-label="PRIVATE DRIVE — главная">
-        <img src="assets/pd-logo.webp" width="52" height="52" alt="">
-        <span>PRIVATE DRIVE</span>
-      </a>
-      <nav aria-label="Основное меню">
-        <a href="order-map.html" target="_blank" rel="noopener noreferrer">Карта и заказ</a>
-        <a href="services.html">Услуги</a>
-        <a href="directions.html">Трансферы</a>
-        <a href="#taxi">Такси</a>
-        <a href="#documents">Документы</a>
-        <a href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Связаться с нами</a>
-      </nav>
-      <div class="header-actions">
-        <a class="button header-tips" href="https://t.me/EuroBalticTransferBot?start=tips" aria-label="Оставить чаевые через Telegram Mini App" title="Чаевые — открыть Mini App">💛 Чаевые</a>
-        <a class="button outline header-contact" href="https://t.me/PrivateDraive">Telegram</a>
-      </div>
+      <a class="brand" href="#top" aria-label="PRIVATE DRIVE — главная"><img src="assets/pd-logo.webp" width="52" height="52" alt="Логотип PRIVATE DRIVE"><span>PRIVATE DRIVE</span></a>
+      <nav aria-label="Основное меню"><a href="#top">Главная</a><a href="services.html">Наши услуги</a><a href="directions.html">Направления</a><a href="#partners">Партнёры</a><a href="#about">О нас</a><a href="#contact">Контакты</a></nav>
+      <div class="header-actions"><a class="button header-tips" href="https://t.me/EuroBalticTransferBot?start=tips">Чаевые</a></div>
     </div>
   </header>
-
   <main>
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-photo">
-        <img src="assets/hero.webp" width="836" height="323" alt="Водитель PRIVATE DRIVE рядом с Toyota RAV4 в Вильнюсе" fetchpriority="high">
-      </div>
-      <div class="wrap hero-content">
+    <section class="hero hero-lux" aria-labelledby="hero-title">
+      <img class="hero-lux-photo" src="assets/hero.webp" alt="Toyota RAV4 Hybrid PRIVATE DRIVE на фоне Вильнюса" fetchpriority="high">
+      <div class="hero-lux-shade" aria-hidden="true"></div>
+      <div class="wrap hero-lux-content">
         <p class="eyebrow">Вильнюс · Литва · Европа</p>
         <h1 id="hero-title">Ваш личный водитель<br><em>в Литве и Европе</em></h1>
-        <p class="hero-detail">Индивидуальные поездки на Toyota RAV4 Hybrid, трансферы и встреча в аэропорту.</p>
-        <div class="actions">
-          <a class="button gold" href="order-map.html?mode=preorder" target="_blank" rel="noopener noreferrer">Предварительный заказ</a>
-          <a class="button outline" href="order-map.html" target="_blank" rel="noopener noreferrer">Заказать по карте</a>
-          <a class="button outline" href="#transfers">Смотреть тарифы</a>
+        <p class="hero-detail">Комфортно · Надёжно · Вовремя</p>
+        <div class="actions hero-lux-actions">
+          <a class="button gold" href="order-map.html?mode=preorder">Забронировать поездку</a>
+          <a class="button outline" href="https://t.me/PrivateDraive" rel="noopener noreferrer">Связаться с нами</a>
+        </div>
+        <div class="amenity-strip" aria-label="Комфорт в автомобиле">
+          <div class="amenity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13V9a9 9 0 0 1 18 0v4M3 13v6h5v-8H3v2Zm18 0v6h-5v-8h5v2Z"/></svg><span>Наушники<br>и музыка</span></div>
+          <div class="amenity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0M5 13a10 10 0 0 1 14 0M9 17a5 5 0 0 1 6 0"/><circle cx="12" cy="21" r="1" fill="currentColor" stroke="none"/></svg><span>Бесплатный<br>Wi-Fi</span></div>
+          <div class="amenity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2h6v3H9zm-1 3h8l1 4v12H7V9l1-4zm-1 8h10"/></svg><span>Вода<br>в поездке</span></div>
+          <div class="amenity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 4 4-4 4-5-3 2-3-2-3 5-3Zm10 0-4 4 4 4 5-3-2-3 2-3-5-3ZM8 8h8v8H8z"/></svg><span>Конфеты<br>и угощения</span></div>
         </div>
       </div>
     </section>
-
-    <section class="section wrap" id="booking-map">
-      <div class="contact-block">
-        <div><h2>Заказ поездки по карте</h2><p>Открой карту на весь экран, укажи адрес отправления и назначения, затем передай запрос PRIVATE DRIVE.</p></div>
-        <div class="actions"><a class="button gold" href="order-map.html" target="_blank" rel="noopener noreferrer">Открыть карту и ввести адреса ↗</a></div>
-      </div>
+    <section class="section wrap" id="extras">
+      <h2><a class="catalog-heading" href="services.html"><span>Наши услуги</span><span class="catalog-heading-motion fly" aria-hidden="true">✈</span><span class="catalog-heading-arrow" aria-hidden="true">↗</span></a></h2>
+      <div class="home-service-grid"><a class="home-service" href="order-map.html?mode=preorder&amp;airport=to"><img src="assets/service-airport.webp" alt="Трансфер в аэропорт" loading="lazy"><span class="home-service-overlay"><strong>Трансфер в аэропорт</strong><small>40 €</small><span aria-hidden="true">↗</span></span></a>
+<a class="home-service" href="order-map.html?mode=preorder&amp;service=parcel"><img src="assets/service-parcel.webp" alt="Доставка посылок" loading="lazy"><span class="home-service-overlay"><strong>Доставка посылок</strong><small>По запросу</small><span aria-hidden="true">↗</span></span></a>
+<a class="home-service" href="order-map.html?mode=preorder&amp;service=personal-driver"><img src="assets/service-driver.webp" alt="Персональный водитель" loading="lazy"><span class="home-service-overlay"><strong>Персональный водитель</strong><small>По запросу</small><span aria-hidden="true">↗</span></span></a>
+<a class="home-service" href="order-map.html?mode=preorder&amp;service=flowers"><img src="https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&amp;fit=crop&amp;w=900&amp;q=80" alt="Цветы к поездке" loading="lazy"><span class="home-service-overlay"><strong>Цветы к поездке</strong><small>По запросу</small><span aria-hidden="true">↗</span></span></a>
+<a class="home-service" href="services.html"><img src="assets/private-drive-gold-car.webp" alt="Дополнительные услуги" loading="lazy"><span class="home-service-overlay"><strong>Дополнительные услуги</strong><small>Смотреть все</small><span aria-hidden="true">↗</span></span></a></div>
+      <a class="catalog-more" href="services.html">Все услуги →</a>
     </section>
-
-    <section id="extras" class="section wrap">
-      <h2><a href="services.html" class="catalog-heading"><span>Наши услуги</span><span class="catalog-heading-motion fly" aria-hidden="true">✈</span><span class="catalog-heading-arrow" aria-hidden="true">↗</span></a></h2>
-      <div class="grid services">
-        <article class="card">
-          <img src="assets/service-airport.webp" width="472" height="173" alt="" loading="lazy">
-          <div class="card-content"><h3>Трансфер в аэропорт Вильнюса</h3><p>Фиксированная стоимость — <strong>40 € в одну сторону</strong>, в аэропорт или из аэропорта. Встреча с табличкой +15 € по желанию.</p><div class="actions"><a class="button gold" href="order-map.html?mode=preorder&amp;airport=to">В аэропорт · 40 €</a><a class="button outline" href="order-map.html?mode=preorder&amp;airport=from">Из аэропорта · 40 €</a></div></div>
-        </article>
-        <article class="card">
-          <img src="assets/service-parcel.webp" width="469" height="173" alt="" loading="lazy">
-          <div class="card-content"><h3>Доставка посылок</h3><p>Заберём отправление и доставим по согласованному адресу.</p></div>
-        </article>
-        <article class="card">
-          <img src="assets/service-driver.webp" width="471" height="173" alt="" loading="lazy">
-          <div class="card-content"><h3>Персональный водитель</h3><p>Городские поездки и индивидуальные маршруты по Литве и Европе.</p></div>
-        </article>
-      </div>
-      <a class="catalog-more" href="services.html">Смотреть все услуги <span aria-hidden="true">→</span></a>
-    </section>
-
     <section id="transfers" class="section shaded">
       <div class="wrap">
         <h2><a href="directions.html" class="catalog-heading"><span>Популярные направления</span><span class="catalog-heading-motion drive" aria-hidden="true">🚙</span><span class="catalog-heading-arrow" aria-hidden="true">↗</span></a></h2>
         <div class="grid routes">
-          <article class="card">
-            <img src="assets/airport.webp" width="360" height="98" alt="" loading="lazy">
-            <div class="card-content"><h3>Аэропорт Вильнюса</h3><p>Вильнюс ↔ аэропорт</p><strong class="price">40 €</strong></div>
-          </article>
-          <article class="card">
-            <img src="assets/kaunas.webp" width="344" height="98" alt="" loading="lazy">
-            <div class="card-content"><h3>Каунас</h3><p>Из Вильнюса в одну сторону</p><strong class="price">130 €</strong><p>Туда и обратно — 200 €</p></div>
-          </article>
-          <article class="card">
-            <img src="assets/klaipeda.webp" width="346" height="98" alt="" loading="lazy">
-            <div class="card-content"><h3>Клайпеда</h3><p>Из Вильнюса</p><strong class="quote">Цена по запросу</strong></div>
-          </article>
-          <article class="card">
-            <img src="assets/warsaw.webp" width="342" height="98" alt="" loading="lazy">
-            <div class="card-content"><h3>Варшава</h3><p>Из Вильнюса</p><strong class="quote">Цена по запросу</strong></div>
-          </article>
+          <a class="card home-route" href="order-map.html?mode=preorder&amp;airport=to"><img src="assets/airport.webp" alt="Аэропорт Вильнюса" loading="lazy"><div class="card-content"><h3>Аэропорт Вильнюса</h3><strong class="price">40 €</strong></div></a>
+          <a class="card home-route" href="order-map.html?mode=preorder"><img src="assets/kaunas.webp" alt="Каунас" loading="lazy"><div class="card-content"><h3>Каунас</h3><strong class="price">130 €</strong><p>Туда-обратно — 200 €</p></div></a>
+          <a class="card home-route" href="order-map.html?mode=preorder"><img src="assets/klaipeda.webp" alt="Клайпеда" loading="lazy"><div class="card-content"><h3>Клайпеда</h3><strong class="quote">Цена по запросу</strong></div></a>
+          <a class="card home-route" href="order-map.html?mode=preorder"><img src="assets/warsaw.webp" alt="Варшава" loading="lazy"><div class="card-content"><h3>Варшава</h3><strong class="quote">Цена по запросу</strong></div></a>
         </div>
-        <a class="catalog-more" href="directions.html">Смотреть все направления <span aria-hidden="true">→</span></a>
+        <a class="catalog-more" href="directions.html">Все направления →</a>
       </div>
     </section>
-
-    <section id="taxi" class="section wrap">
-      <h2>Такси в Вильнюсе</h2>
-      <div class="grid fares">
-        <article class="card card-content"><h3>Город</h3><strong class="price">0,66 € / км</strong><p>Посадка 0,99 € · минимум 4 € · предварительный заказ +3 €.</p></article>
-        <article class="card card-content"><h3>За городом</h3><strong class="price">0,79 € / км</strong><p>Конечная стоимость зависит от дорожного маршрута.</p></article>
-        <article class="card card-content"><h3>Ожидание</h3><strong class="price">0,30 € / мин</strong><p>Первые три минуты после прибытия пилота бесплатны.</p></article>
+    <section id="partners" class="section wrap">
+      <h2>Наши партнёры</h2>
+      <div class="partner-feature">
+        <div class="partner-tech-icon" aria-hidden="true"><span>🤖</span></div>
+        <div class="partner-info"><h3>Work.www | IT-разработка</h3><span class="partner-role">Участник разработки сайта PRIVATE DRIVE</span><p>Разработка сайтов, веб-сервисов, приложений и Telegram-ботов.</p></div>
+        <a class="button outline" href="https://t.me/ai_fast_work" target="_blank" rel="noopener noreferrer">Связаться в Telegram</a>
       </div>
     </section>
-
-    <section id="contact" class="section shaded">
-      <div class="wrap contact-block">
-        <div>
-          <h2>О PRIVATE DRIVE</h2>
-          <p>Мы базируемся в Вильнюсе. Укажи маршрут, дату и время поездки в сообщении. Подтвердим доступность и стоимость.</p>
-        </div>
-        <div>
-          <h3>Связаться с нами</h3>
-          <div class="actions">
-            <a class="button gold" href="https://t.me/PrivateDraive">Написать в Telegram</a>
-            <a class="button outline" href="mailto:eurobaltictransfer@gmail.com">Написать на email</a>
-          </div>
-          <p class="small-print">eurobaltictransfer@gmail.com</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="registration" class="section wrap">
-      <details>
-        <summary>Регистрация пассажиров и пилотов</summary>
-        <p>Онлайн-регистрация пока недоступна. Напиши на <a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a>, если хочешь узнать о подключении.</p>
-        <p>Визитка не принимает онлайн-заказы и оплату.</p>
-      </details>
-    </section>
+    <section id="about" class="section shaded"><div class="wrap contact-block"><div><h2>PRIVATE DRIVE</h2><p>Индивидуальные поездки на Toyota RAV4 Hybrid, такси в Вильнюсе, трансферы по Литве и Европе.</p></div><div><h2>Заказ поездки</h2><p>Задай маршрут, дату и пожелания — мы уточним доступность и стоимость.</p><a class="button gold" href="order-map.html?mode=preorder">Быстрый заказ поездки</a></div></div></section>
+    <section id="contact" class="section wrap"><h2>Контакты</h2><div class="actions"><a class="button gold" href="https://t.me/PrivateDraive">Telegram PRIVATE DRIVE</a><a class="button outline" href="mailto:eurobaltictransfer@gmail.com">Написать на email</a></div></section>
   </main>
-
-  <footer id="documents">
-    <div class="wrap footer-inner">
-      <h2>Документы</h2>
-      <ul>
-        <li><a href="privacy.html" target="_blank" rel="noopener noreferrer">Конфиденциальность сайта</a></li>
-        <li><a href="terms.html" target="_blank" rel="noopener noreferrer">Условия поездок и возвратов</a></li>
-        <li><a href="pilot-privacy.html" target="_blank" rel="noopener noreferrer">Данные пилотов — проект</a></li>
-      </ul>
-      <p class="small-print">PRIVATE DRIVE · Вильнюс, Литва</p>
-    </div>
-  </footer>
+  <footer id="documents" class="home-footer"><div class="wrap footer-columns">
+    <div><a href="#top" class="brand"><img src="assets/pd-logo.webp" width="52" height="52" alt=""><span>PRIVATE DRIVE</span></a><p class="small-print">Трансферы · Поездки · Сопровождение</p></div>
+    <div><h3>Контакты</h3><a href="https://t.me/PrivateDraive">Telegram: @PrivateDraive</a><a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a></div>
+    <div><h3>Полезные ссылки</h3><a href="services.html">Наши услуги</a><a href="directions.html">Направления</a><a href="#partners">Партнёры</a><a href="privacy.html">Конфиденциальность</a><a href="terms.html">Условия поездок и возвратов</a><a href="pilot-privacy.html">Данные пилотов</a></div>
+    <div><h3>Связаться с нами</h3><a class="button outline" href="https://t.me/PrivateDraive">Telegram</a></div>
+  </div><div class="wrap footer-copyright">© 2026 PRIVATE DRIVE · Вильнюс, Литва</div></footer>
 </body>
 </html>

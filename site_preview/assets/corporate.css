@@ -152,3 +152,31 @@ details p { margin: .6rem 0; overflow-wrap: anywhere; }
 .premium-services .service-card .actions .button{width:100%}
 @media(max-width:530px){.premium-services .service-card img{height:205px}}
 @media(prefers-reduced-motion:reduce){.premium-services .service-card{transition:none}}
+
+/* Linked catalogue navigation and subtle motion. */
+.catalog-heading{display:flex;align-items:center;gap:.75rem;max-width:100%;width:max-content;padding:.32rem .7rem;border:1px solid #ad874c;border-radius:12px;color:var(--gold);text-decoration:none;transition:background .2s,border-color .2s}
+.catalog-heading:hover,.catalog-heading:focus-visible{background:#302519;border-color:#f1cb7b}
+.catalog-heading-motion{display:inline-block;font:normal 1.45rem/1 system-ui;transform-origin:center}
+.catalog-heading-arrow{font:600 1.1rem/1 system-ui;opacity:.85}
+.catalog-heading:hover .fly,.catalog-heading:focus-visible .fly{animation:catalog-plane .85s ease-in-out}
+.catalog-heading:hover .drive,.catalog-heading:focus-visible .drive{animation:catalog-car .85s ease-out}
+@keyframes catalog-plane{0%{transform:translate(-10px,9px) rotate(-15deg);opacity:.15}65%{transform:translate(10px,-7px) rotate(-15deg);opacity:1}100%{transform:translate(0,0) rotate(0)}}
+@keyframes catalog-car{0%{transform:translateX(-12px);opacity:.2}70%{transform:translateX(7px);opacity:1}100%{transform:translateX(0)}}
+.catalog-more{display:inline-flex;gap:.6rem;align-items:center;margin-top:1.3rem;padding:.8rem 1.1rem;border:1px solid #b38c50;border-radius:8px;text-decoration:none;color:#f1cb88;font-weight:700}
+.catalog-more:hover{background:#332516}
+.catalog-top{border-bottom:1px solid var(--line);background:#100d0bef}
+.catalog-top-row{min-height:80px;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding-block:.7rem}
+.catalog-back{color:var(--gold);text-decoration:none}
+.catalog-intro{position:relative;padding-top:3.2rem;padding-bottom:2.5rem;overflow:hidden}
+.catalog-intro h1{max-width:780px}
+.catalog-intro p{max-width:700px}
+.catalog-intro-icon{position:absolute;right:2%;top:22%;font-size:3.4rem;color:var(--gold);opacity:.45;pointer-events:none}
+.catalog-intro-icon.drive-in{animation:catalog-car 1.2s ease-out both}
+.catalog-note{margin-bottom:1.2rem}
+.catalog-location-icon{font-size:2rem;color:var(--gold)}
+.catalog-route-link{color:var(--ivory);text-decoration:none}
+.catalog-route-link:hover{border-color:#cba36a}
+.catalog-open{display:block;margin-top:.75rem;color:var(--gold);font-weight:700}
+.catalog-footer{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:2rem 0;border-top:1px solid var(--line)}
+@media(max-width:530px){.catalog-heading{font-size:clamp(1.2rem,6vw,1.8rem);gap:.4rem}.catalog-heading-motion{font-size:1.2rem}.catalog-top-row .brand img{width:38px;height:38px}.catalog-intro-icon{top:3%;opacity:.23}}
+@media(prefers-reduced-motion:reduce){.catalog-heading:hover .fly,.catalog-heading:hover .drive,.catalog-intro-icon.drive-in{animation:none}}

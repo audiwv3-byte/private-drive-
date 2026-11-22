@@ -20,10 +20,11 @@ import 'demo_map_tile_provider.dart';
 import 'pd_http_api.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' show LatLng;
+import 'package:url_launcher/url_launcher.dart';
 
 /// Passenger preview: all trip, date, service and payment state stays in memory.
-/// Map tiles are the only possible network activity; there is no orders API,
-/// geocoding, payment SDK, charge or persistent booking in this screen.
+/// The payment information link opens the website in an external browser.
+/// This screen does not collect payments or submit bookings.
 class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
       this.preferencesStorage, this.initialRideType = 'Трансфер',
@@ -55,6 +56,25 @@ class _PassengerDemoState extends State<PassengerDemo> {
   DateTime? _date;
   TimeOfDay? _time;
   String _route = '';
+  Future<void> _openPayseraPaymentInfo() async {
+    try {
+      final opened = await launchUrl(
+        Uri.https('privatedrive.lt', '/payment/paysera'),
+        mode: LaunchMode.externalApplication,
+      );
+      if (opened) return;
+    } on Exception {
+      // Show the same message when the platform cannot open the browser.
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(pdTr(
+      context,
+      'Не удалось открыть страницу Paysera.',
+      'Nepavyko atidaryti „Paysera“ puslapio.',
+      'Could not open the Paysera page.',
+    ))));
+  }
+
   String _payment = 'Карта';
   late String _rideType;
   bool _roundTrip = false;
@@ -1621,6 +1641,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         : (_) => setState(() => _payment = method),
                   ),
               ],
+            ),
+            TextButton.icon(
+              key: const Key('passenger-paysera-info'),
+              onPressed: _openPayseraPaymentInfo,
+              icon: const Icon(Icons.open_in_new),
+              label: Text(pdTr(context, 'Оплата через Paysera',
+                  'Mokėjimas per „Paysera“', 'Paying with Paysera')),
             ),
             if (_cashBlockedForAdvance)
               const Text(

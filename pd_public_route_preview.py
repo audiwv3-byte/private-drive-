@@ -135,7 +135,7 @@ def _public_json(url, kind):
 
 def _suggest_fallback(text):
     url = _PUBLIC_GEOCODER + "?" + urllib.parse.urlencode({
-        "q": text, "limit": 5, "lat": 54.6872, "lon": 25.2797
+        "q": text, "limit": 5, "lat": 54.6872, "lon": 25.2797, "lang": "ru"
     })
     doc = _public_json(url, "suggest")
     suggestions = []

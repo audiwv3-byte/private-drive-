@@ -180,3 +180,49 @@ details p { margin: .6rem 0; overflow-wrap: anywhere; }
 .catalog-footer{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:2rem 0;border-top:1px solid var(--line)}
 @media(max-width:530px){.catalog-heading{font-size:clamp(1.2rem,6vw,1.8rem);gap:.4rem}.catalog-heading-motion{font-size:1.2rem}.catalog-top-row .brand img{width:38px;height:38px}.catalog-intro-icon{top:3%;opacity:.23}}
 @media(prefers-reduced-motion:reduce){.catalog-heading:hover .fly,.catalog-heading:hover .drive,.catalog-intro-icon.drive-in{animation:none}}
+
+
+/* Approved 2026-11-22 full-width luxury home page */
+body{overflow-x:hidden}
+.hero-lux{min-height:min(760px,93svh);position:relative;isolation:isolate;display:flex;align-items:center;background:#080909;overflow:hidden;border-bottom:1px solid #ab8240}
+.hero-lux-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:65% center;z-index:-3}
+.hero-lux-shade{position:absolute;inset:0;z-index:-2;background:linear-gradient(90deg,rgba(4,5,7,.93) 0%,rgba(4,5,7,.74) 36%,rgba(4,5,7,.16) 78%),linear-gradient(0deg,rgba(4,5,7,.74),transparent 30%)}
+.hero-lux-content{width:min(1160px,calc(100% - 56px));padding-block:6rem 3.1rem;position:relative}
+.hero-lux h1{max-width:760px;color:#fff;text-shadow:0 2px 28px #000b;font-size:clamp(2.5rem,5.2vw,4.8rem)}
+.hero-lux .hero-detail{color:#fff4d9;font-weight:650;letter-spacing:.015em;text-shadow:0 2px 12px #000}
+.hero-lux-actions{margin-top:1.8rem}
+.hero-lux-actions .button{box-shadow:0 2px 18px #0008}
+.amenity-strip{display:flex;align-items:stretch;flex-wrap:wrap;gap:15px;margin-top:2.6rem;width:fit-content;max-width:100%}
+.amenity{width:120px;text-align:center;color:#fff6e2;font-size:.83rem;font-weight:600;line-height:1.35;text-shadow:0 1px 12px #000}
+.amenity svg{display:block;width:68px;height:68px;margin:0 auto .55rem;padding:15px;border:1px solid #d9a849;border-radius:17px;stroke:#f3c875;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;fill:none;background:#100f0cd9;box-shadow:0 0 20px #b8823529}
+.home-service-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.home-service{position:relative;isolation:isolate;display:block;min-height:204px;overflow:hidden;border:1px solid #ba8b43;border-radius:13px;color:#fff;text-decoration:none;background:#13100c;transition:transform .2s,border-color .2s}
+.home-service img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;transition:transform .35s}
+.home-service::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,rgba(3,3,3,.96),rgba(3,3,3,.07) 70%)}
+.home-service-overlay{position:absolute;inset:auto 13px 13px;display:grid;gap:3px;padding-right:18px;font-size:.98rem;line-height:1.2}
+.home-service-overlay small{font-size:.8rem;color:#f2c979}
+.home-service-overlay>span{position:absolute;right:-8px;bottom:3px;color:#f1c77a}
+.home-service:hover,.home-service:focus-visible{transform:translateY(-3px);border-color:#f4d187}
+.home-service:hover img{transform:scale(1.045)}
+.home-route{display:block;text-decoration:none;color:var(--ivory);transition:border-color .2s,transform .2s}
+.home-route:hover{border-color:#edcc86;transform:translateY(-2px)}
+.partner-feature{display:flex;align-items:center;gap:24px;padding:21px 25px;border:1px solid #bf8f45;border-radius:17px;background:linear-gradient(100deg,#070e19,#10141b 55%,#080b12);box-shadow:inset 0 0 45px #142a463d}
+.partner-tech-icon{display:grid;place-items:center;flex:none;width:112px;height:112px;border-radius:50%;border:2px solid #20b9ff;background:radial-gradient(circle,#114678,#071324 70%);box-shadow:0 0 25px #0a98ff55}
+.partner-tech-icon span{font-size:58px}
+.partner-info{flex:1;min-width:0}
+.partner-info h3{font:700 clamp(1.35rem,2.3vw,1.9rem)/1.3 system-ui;color:#f9f4ec}
+.partner-info p{margin-top:.5rem}
+.partner-role{display:inline-block;margin-top:9px;padding:5px 11px;border-radius:30px;background:#e5b44f;color:#221405;font-weight:750;font-size:.82rem}
+.partner-feature .button{flex:none}
+.home-footer{padding-block:2.3rem 1.2rem;background:#080808;border-top:1px solid #b58a49}
+.footer-columns{display:grid;grid-template-columns:1.15fr 1.4fr 1.25fr .9fr;gap:18px 32px}
+.footer-columns>div{display:flex;flex-direction:column;align-items:start;gap:.55rem;min-width:0}
+.footer-columns h3{font:700 .95rem system-ui;color:#fff8ec}
+.footer-columns a:not(.button):not(.brand){color:#ddd6ca;text-decoration:none;overflow-wrap:anywhere}
+.footer-columns a:hover{color:#edcc86}
+.footer-columns .small-print{margin:0}
+.footer-copyright{border-top:1px solid #604827;margin-top:1.6rem;padding-top:1rem;color:#b6a897;font-size:.85rem}
+@media(max-width:1040px){.home-service-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.footer-columns{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:740px){.hero-lux{min-height:680px;align-items:end}.hero-lux-photo{object-position:66% center}.hero-lux-shade{background:linear-gradient(0deg,#080909fa 0%,#080909cd 48%,#08090944 88%),linear-gradient(90deg,#08090955,transparent)}.hero-lux-content{width:calc(100% - 36px);padding-block:15rem 2rem}.hero-lux h1{font-size:clamp(2.15rem,7.5vw,3.5rem)}.amenity-strip{gap:8px;margin-top:1.8rem}.amenity{width:calc(25% - 6px);font-size:.72rem}.amenity svg{width:56px;height:56px;padding:12px}.home-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-service{min-height:206px}.partner-feature{align-items:flex-start;flex-wrap:wrap}.partner-feature .button{width:100%}}
+@media(max-width:530px){.hero-lux{min-height:calc(100svh - 110px)}.hero-lux-content{width:calc(100% - 28px);padding-block:13rem 1.6rem}.hero-lux h1{font-size:clamp(2rem,7.6vw,2.9rem)}.hero-lux-actions .button{width:100%}.home-service{min-height:190px}.home-service-overlay{font-size:.88rem}.footer-columns{grid-template-columns:1fr;gap:1.5rem}.partner-tech-icon{width:85px;height:85px}.partner-tech-icon span{font-size:43px}}
+@media(prefers-reduced-motion:reduce){.home-service,.home-service img,.home-route{transition:none}.home-service:hover,.home-route:hover{transform:none}.home-service:hover img{transform:none}}

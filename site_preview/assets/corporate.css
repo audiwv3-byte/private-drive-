@@ -308,3 +308,18 @@ body{overflow-x:hidden}
   .hero.hero-lux .amenity svg{width:44px;height:44px}
   .home-service-overlay{inset:auto 9px 9px;font-size:.8rem}
 }
+
+
+/* Final iPhone polish: safe image fallback and stable aspect ratio */
+.home-service-flowers{background:radial-gradient(circle at 44% 38%,#79412e,#3f1725 52%,#130b0e 100%)}
+.home-service-flowers::before{content:"✿";position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(4rem,10vw,7.5rem);color:#f1c17b55;z-index:-2;pointer-events:none}
+.hero-lux-photo{aspect-ratio:1000/320}
+@media(max-width:740px){
+  .hero.hero-lux .hero-lux-photo{aspect-ratio:1000/320}
+  .hero.hero-lux .hero-lux-content{margin-top:0}
+  .home-service-grid .home-service{touch-action:manipulation}
+}
+@media(max-width:530px){
+  .home-service-overlay{inset:auto 12px 12px}
+  .home-service-overlay strong{overflow-wrap:anywhere}
+}

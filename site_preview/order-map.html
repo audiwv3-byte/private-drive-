@@ -46,6 +46,9 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
    <button class="btn" type="button" id="showRoute">Показать точки на карте</button>
   </div>
   <div class="field"><label for="datetime">Дата и время (необязательно)</label><input type="datetime-local" id="datetime" name="datetime"></div>
+  <div class="field"><label for="radio">Радиостанция в поездке (необязательно)</label><select id="radio" name="radio"><option value="">Без предпочтений</option><option value="M-1">M-1</option><option value="Radiocentras">Radiocentras</option><option value="ZIP FM">ZIP FM</option><option value="LRT Opus">LRT Opus</option><option value="Другая">Другая радиостанция</option></select></div>
+  <div class="field" id="radioOtherField" hidden><label for="radioOther">Название радиостанции</label><input id="radioOther" maxlength="100" placeholder="Название или частота" autocomplete="off"></div>
+  <div class="field"><label for="music">Любимый трек в поездке (необязательно)</label><input id="music" name="music" maxlength="160" placeholder="Исполнитель — название песни"></div>
   <div class="field"><label for="comment">Пожелания (необязательно)</label><textarea id="comment" name="comment" maxlength="500" placeholder="Багаж, детское кресло, встреча с табличкой…"></textarea></div>
   <p id="status" class="status" role="status" aria-live="polite"></p>
   <button type="submit" class="btn main">Запросить поездку в Telegram</button>
@@ -83,6 +86,12 @@ if(preorder){
  dateInput.min=localValue;
  document.querySelector('#orderForm button[type="submit"]').textContent='Отправить предварительный заказ';
 }
+$('radio').addEventListener('change',()=>{
+ const other=$('radio').value==='Другая';
+ $('radioOtherField').hidden=!other;
+ $('radioOther').required=other;
+ if(!other)$('radioOther').value='';
+});
 let map=null,markers=[],selectedPosition=null;
 function say(s){status.textContent=s}
 try{
@@ -136,8 +145,10 @@ $('orderForm').addEventListener('submit',async e=>{
  const from=$('from').value.trim(),to=$('to').value.trim();
  if(!from||!to){say('Укажи откуда и куда.');return}
  const date=$('datetime').value,comment=$('comment').value.trim();
+ const radio=$('radio').value==='Другая'?$('radioOther').value.trim():$('radio').value;
+ const music=$('music').value.trim();
  if(airportDirection && (airportDirection==='to' && from==='Вильнюс, точный адрес уточнить' || airportDirection==='from' && to==='Вильнюс, точный адрес уточнить')){say('Укажи точный адрес подачи или назначения в Вильнюсе.');return}
- const draft=(airportDirection?'PRIVATE DRIVE — трансфер аэропорт · 40 €':preorder?'PRIVATE DRIVE — предварительный заказ':'PRIVATE DRIVE — запрос поездки')\nОткуда: '+from+'\nКуда: '+to+(date?'\nДата/время: '+date.replace('T',' '):'')+(comment?'\nПожелания: '+comment:'');
+ const draft=(airportDirection?'PRIVATE DRIVE — трансфер аэропорт · 40 €':preorder?'PRIVATE DRIVE — предварительный заказ':'PRIVATE DRIVE — запрос поездки')\nОткуда: '+from+'\nКуда: '+to+(date?'\nДата/время: '+date.replace('T',' '):'')+(radio?'\nРадиостанция: '+radio:'')+(music?'\nЛюбимый трек: '+music:'')+(comment?'\nПожелания: '+comment:'');
  try{await navigator.clipboard.writeText(draft);say('Заявка скопирована. Вставь её в сообщение Telegram.')}catch(_){say('Скопируй данные поездки перед отправкой в Telegram.');window.prompt('Текст заявки — скопируй его:',draft)}
  const link='https://t.me/PrivateDraive';
  const opened=window.open(link,'_blank','noopener,noreferrer');if(!opened)window.location.href=link;

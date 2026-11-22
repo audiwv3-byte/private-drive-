@@ -33,7 +33,11 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Run Flutter tests
         run: flutter test
-      - name: Build unsigned test APK (debug only)
+      - name: Generate isolated Android QA platform
+        # This branch contains Dart sources but no committed android/ folder.
+        # Generate debug-only tooling here, never modify the app's production signing.
+        run: flutter create --platforms=android --project-name private_drive .
+      - name: Build isolated test APK (debug only)
         run: flutter build apk --debug --dart-define=PD_NATIVE_AUTH_API_URL=
       - name: Upload test APK
         uses: actions/upload-artifact@v4

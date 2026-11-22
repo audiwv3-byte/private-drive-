@@ -58,3 +58,13 @@ def run(server, core, call, check):
     assert len(admin['route_history'])==2 and admin['stop_count']==1
     print('PASS pilot stops: persisted, idempotent, bounded by trip, completion guarded')
     print('PASS route changes: pilot-only proposal, passenger acceptance/rejection, no automatic fare change')
+
+
+def test_waiting_three_free_minutes():
+    from pd_trip_runtime_v4 import FREE_SECONDS, WAIT_CENTS_PER_MINUTE, waiting_cents
+    assert FREE_SECONDS == 180
+    assert waiting_cents(1000, 1000, 1180) == 0
+    assert waiting_cents(1000, 1000, 1181) == WAIT_CENTS_PER_MINUTE
+    assert waiting_cents(1000, 1000, 1241) == 2 * WAIT_CENTS_PER_MINUTE
+    assert waiting_cents(1000, None, 1500) == 0
+    assert waiting_cents(1000, 1300, 1301) == WAIT_CENTS_PER_MINUTE

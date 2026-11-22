@@ -81,6 +81,7 @@ class DispatcherBrowserTests(unittest.TestCase):
             "PD_DISPATCH_SESSION_SECRET": "synthetic-secret-32-characters-minimum-12345",
             "PD_DISPATCH_ADMIN_ID": "999",
             "PD_DISPATCH_DATABASE_URL": "synthetic-db-dsn",
+            "PD_DISPATCH_PASSWORD_HASH": generate_password_hash("old-test-password"),
             "PD_DISPATCH_INVITE_CODE": invite,
             "PD_DISPATCH_INVITE_EXPIRES": str(int(time.time()) + 60),
         }

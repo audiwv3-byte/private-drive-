@@ -114,7 +114,7 @@ def register(app, core):
         invite_hash = hashlib.sha256(invite_code.encode()).hexdigest()
     raw_expiration = os.environ.get("PD_DISPATCH_INVITE_EXPIRES", "")
     expires = int(raw_expiration) if re.fullmatch(r"[0-9]{1,12}", raw_expiration) else 0
-    passwords = DispatcherPasswords(dsn) if dsn and not password_hash else None
+    passwords = DispatcherPasswords(dsn) if dsn else None
     valid_admin = re.fullmatch(r"[0-9]{1,18}", raw_admin) and int(raw_admin) in core.ADMIN_IDS
     configured = password_hash.startswith(("scrypt:", "pbkdf2:")) or passwords is not None
     existing_secret = app.secret_key

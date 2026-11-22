@@ -157,6 +157,40 @@ with sync_playwright() as p:
         assert page.url.endswith("/services")
         assert page.locator("#jumpstart").count() == 1
         assert page.locator("#sober").count() == 1
+        # Detailed quick-booking validation is navigation-only and never submits orders.
+        page.goto(BASE + "/", wait_until="domcontentloaded")
+        posts = []
+        page.on("request", lambda request: posts.append(request.url) if request.method == "POST" else None)
+        assert page.locator("#quick-from").get_attribute("required") is not None
+        assert page.locator("#quick-to").get_attribute("required") is not None
+        assert not page.locator("#quick-trip-form").evaluate("(form) => form.checkValidity()")
+        assert page.locator("#route-details").get_attribute("open") is None
+
+        for i, (destination, date_value, time_value) in enumerate([
+            ("Аэропорт Вильнюса (VNO)", "2026-12-04", "07:15"),
+            ("Каунас", "2026-12-05", "14:30"),
+            ("Клайпеда", "2026-12-06", "20:45"),
+            ("Варшава", "2026-12-07", "05:40")
+        ]):
+            page.locator('.pd-destinations .fare-link[data-to="' + destination + '"]').click()
+            assert page.locator("#quick-from").input_value() == "Вильнюс"
+            assert page.locator("#quick-to").input_value() == destination
+            page.locator("#quick-date").fill(date_value)
+            page.locator("#quick-time").fill(time_value)
+            assert page.locator("#quick-trip-form").evaluate("(form) => form.checkValidity()")
+            page.locator('#quick-trip-form button[type="submit"]').click()
+            assert page.locator("#route-details").get_attribute("open") is not None
+            assert page.locator("#pickup-address").input_value() == "Вильнюс"
+            assert page.locator("#dropoff-address").input_value() == destination
+            assert page.locator("#pickup-date").input_value() == date_value
+            assert page.locator("#pickup-time").input_value() == time_value
+            assert "Адреса перенесены" in page.locator("#order-status").inner_text()
+            assert not posts, f"Unexpected POST request while previewing: {posts}"
+        page.locator("#swap-address").click()
+        assert page.locator("#pickup-address").input_value() == "Варшава"
+        assert page.locator("#dropoff-address").input_value() == "Вильнюс"
+        assert not posts
+        print(f"QUICK_BOOKING_OK width={width} routes=4 dates=4 times=4 required_validation=true swap=true posts=0", flush=True)
         page.goto(BASE + "/", wait_until="domcontentloaded")
         page.screenshot(path=f"mobile-qa-screenshots/home-{width}.png", full_page=True)
         print(f"MOBILE_QA_OK width={width} images=8 services=3 fares=4 no_overflow=true quick_booking=true services_page=true", flush=True)

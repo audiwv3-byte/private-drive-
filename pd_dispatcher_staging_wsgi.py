@@ -4,9 +4,10 @@ Never imports miniapp_server, Telegram, orders or payment modules.
 Run only on a dedicated HTTPS test deployment; not production.
 """
 import os
+import re
 from types import SimpleNamespace
 
-from flask import Flask, request, Response, send_from_directory
+from flask import Flask, request, Response, render_template_string, send_from_directory
 from pathlib import Path
 from pd_web_dispatcher import register
 from pd_public_route_preview import register as register_route_preview
@@ -55,6 +56,23 @@ def create_app():
                         headers={"Cache-Control": "no-store",
                                  "X-Content-Type-Options": "nosniff",
                                  "Content-Security-Policy": "default-src 'none'; img-src 'self' https://tile.openstreetmap.org https://unpkg.com data:; connect-src 'self'; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+
+    @app.get("/payment/paysera")
+    def paysera_payment():
+        recipient = os.environ.get("PD_PAYSERA_RECIPIENT_CODE", "")
+        qr = os.environ.get("PD_PAYSERA_QR_PNG_BASE64", "")
+        enabled = (os.environ.get("PD_PAYSERA_MANUAL_ENABLED") == "1"
+                   and re.fullmatch(r"EVP[0-9]{8,24}", recipient)
+                   and re.fullmatch(r"iVBORw0KGgo[A-Za-z0-9+/]{1,8192}={0,2}", qr))
+        page = Path(__file__).with_name("pd_paysera_payment.html").read_text(encoding="utf-8")
+        return Response(
+            render_template_string(page, code=recipient if enabled else "", qr=qr if enabled else ""),
+            content_type="text/html; charset=utf-8",
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+                     "Content-Security-Policy": "default-src 'none'; img-src 'self' data:; "
+                                                "style-src 'self' 'unsafe-inline'; "
+                                                "base-uri 'none'; frame-ancestors 'none'"},
+        )
 
     @app.get("/services")
     def public_services():

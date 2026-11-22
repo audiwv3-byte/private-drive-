@@ -18,6 +18,23 @@ class DispatcherStagingTests(unittest.TestCase):
             "PD_DISPATCH_ADMIN_ID": "999",
         }
 
+    def test_paysera_transfer_details_require_explicit_activation(self):
+        cfg = {
+            "PD_DISPATCH_STAGING_ONLY": "1",
+            "PD_PAYSERA_RECIPIENT_CODE": "EVP123456789",
+            "PD_PAYSERA_QR_PNG_BASE64": "iVBORw0KGgoAAA",
+        }
+        with patch.dict(os.environ, cfg, clear=True):
+            client = create_app().test_client()
+            page = client.get("/payment/paysera")
+            self.assertEqual(page.status_code, 200)
+            self.assertNotIn(b"paysera://", page.data)
+            os.environ["PD_PAYSERA_MANUAL_ENABLED"] = "1"
+            page = client.get("/payment/paysera")
+            self.assertIn(b"paysera://code?code=EVP123456789", page.data)
+            self.assertIn(b"data:image/png;base64,", page.data)
+            self.assertEqual(page.headers["Cache-Control"], "no-store")
+
     def test_gate_blocks_without_explicit_opt_in(self):
         with patch.dict(os.environ, self.env(False), clear=True):
             app = create_app()

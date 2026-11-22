@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Оплата через Paysera · PRIVATE DRIVE</title>
+  <link rel="stylesheet" href="/assets/pd-black-gold.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+           padding: 16px; background: #100e0b; color: #f7efe1; font: 16px/1.5 system-ui, sans-serif; }
+    main { width: min(100%, 440px); padding: clamp(20px, 6vw, 32px); border: 1px solid #77592f;
+           border-radius: 16px; background: #1c1711; }
+    h1, a { color: #edca82; }
+    img { display: block; width: min(220px, 100%); height: auto; margin: 16px auto; }
+    .pay { display: block; padding: 12px; border-radius: 8px; text-align: center;
+           background: #edca82; color: #21170b; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Оплата через Paysera</h1>
+    {% if code %}
+    <p>Переведи только сумму, которую диспетчер подтвердил для твоей поездки. Диспетчер проверит поступление вручную.</p>
+    <img alt="QR-код для перевода в Paysera" width="220" height="220" src="data:image/png;base64,{{ qr }}">
+    <a class="pay" href="paysera://code?code={{ code }}">Открыть Paysera</a>
+    {% else %}
+    <p>Переводы через Paysera пока отключены. Сумму и способ оплаты при бронировании подтверждает диспетчер.</p>
+    {% endif %}
+    <p><a href="/#quick-order">Вернуться к заказу</a></p>
+  </main>
+</body>
+</html>

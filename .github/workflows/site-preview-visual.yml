@@ -61,6 +61,9 @@ jobs:
                     src:el.getAttribute('src'),loaded:el.complete&&el.naturalWidth>0
                   })),
                   formPresent:!!document.querySelector('#orderForm'),
+                  nightHero:!!document.querySelector('.hero-night-booking'),
+                  bookingChoices:[...document.querySelectorAll('.hero-night-choice')].map(x=>x.getAttribute('href')),
+                  brandedPhoto:!!document.querySelector('img.hero-lux-photo[src="assets/hero.webp"]'),
                   legalNotice:!!document.querySelector('a[href="privacy.html"]'),
                   verifyButton:!!document.querySelector('#verifyAddresses')
                 }));
@@ -73,6 +76,7 @@ jobs:
             fs.writeFileSync('private-drive-screenshots/report.json',JSON.stringify(results,null,2));
             console.log(JSON.stringify(results,null,2));
             if(results.some(x=>x.scrollWidth>x.viewport)) throw Error('Horizontal overflow found');
+            if(results.slice(0,2).some(x=>!x.nightHero||!x.brandedPhoto||x.bookingChoices.length!==3))throw Error('Night hero or booking links not visible in published preview');
             if(!results[2].formPresent || !results[2].legalNotice || !results[2].verifyButton) {
               throw Error('Booking form or privacy/check controls missing');
             }

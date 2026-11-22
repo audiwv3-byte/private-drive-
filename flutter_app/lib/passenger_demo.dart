@@ -29,11 +29,13 @@ import 'package:url_launcher/url_launcher.dart';
 class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
       this.preferencesStorage, this.initialRideType = 'Трансфер',
+      this.initialAdvanceBooking = false,
       this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController,
       this.onIncomingMessageVoice});
 
   final bool enableMapTiles;
   final String initialRideType;
+  final bool initialAdvanceBooking;
   /// Test injection: null uses a real HTTPS tile request on Android.
   final Future<String?> Function()? mapConnectivityCheck;
   final DemoTripStore? tripStore;
@@ -516,6 +518,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void initState() {
     super.initState();
     _rideType = widget.initialRideType == 'Такси' ? 'Такси' : 'Трансфер';
+    _taxiAdvanceBooking = widget.initialAdvanceBooking && _rideType == 'Такси';
     if (widget.enableMapTiles) {
       unawaited(_checkMapNetwork());
     }
@@ -1213,6 +1216,25 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   onTap: _openOrders,
                 ),
               ),
+            if (widget.initialAdvanceBooking) ...[
+              Card(
+                key: const Key('passenger-advance-booking-banner'),
+                color: const Color(0xFF46371A),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(children: [
+                    const Icon(Icons.event_available_outlined, color: Color(0xFFE5C57B)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(pdTr(context,
+                        'Предварительный заказ: укажи адрес, дату и время',
+                        'Išankstinis užsakymas: nurodyk adresą, datą ir laiką',
+                        'Advance booking: choose address, date and time'),
+                      style: const TextStyle(fontWeight: FontWeight.bold))),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             Text(pdLabel(context, 'Тестовый заказ поездки'), style: TextStyle(fontSize: 22)),
             const SizedBox(height: 6),
             Text(pdLabel(context, 'Демонстрация. Не отправляет заказы и не списывает деньги.')),

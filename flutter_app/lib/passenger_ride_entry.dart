@@ -125,7 +125,7 @@ class PassengerRideEntry extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 460),
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: ListView(shrinkWrap: true, children: [
+        child: ListView(shrinkWrap: true, cacheExtent: 2500, children: [
             const Center(
               child: PrivateDriveBrandLogo(
                 size: 196, transparentBackground: true)),

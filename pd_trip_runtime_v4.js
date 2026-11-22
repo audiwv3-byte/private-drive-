@@ -4,7 +4,7 @@
 const POLICY='pd-trip-v4-20261028';
 const label=(ru,en,lt)=>window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru;
 const eur=c=>(Number(c||0)/100).toFixed(2)+' €';
-let active=null,dialog=null,body=null,map=null,marker=null,watch=null,watchOrder=null,lastPositionSent=0,polling=false,hubBusy=false;
+let active=null,dialog=null,body=null,map=null,marker=null,watch=null,watchOrder=null,lastPositionSent=0,polling=false,hubBusy=false,finishMode=false;
 const button=(text,action)=>{const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent=text;b.onclick=async()=>{b.disabled=true;try{await action()}catch(e){message(e.message,true)}finally{b.disabled=false}};return b};
 function pilotSwipe(text,nextAction){
  const track=document.createElement('div');track.className='pd-pilot-swipe';track.dataset.action=nextAction;
@@ -54,7 +54,7 @@ window.pdOpenLiveTripV4=async function(id){
  dialog.addEventListener('close',cleanDialog,{once:true});
  await refresh();
 };
-async function action(name){await requestTrip(active,'/action',{action:name});await refresh();if(name==='finish'){stopPosition();closing(false);if(typeof pdCheckTripCompletion==='function')pdCheckTripCompletion()}}
+async function action(name){await requestTrip(active,'/action',{action:name});finishMode=false;await refresh();if(name==='finish'){stopPosition();closing(false);if(typeof pdCheckTripCompletion==='function')pdCheckTripCompletion()}}
 async function changeTripRoute(){
  if(!active)return;
  const currentId=active;
@@ -145,9 +145,9 @@ async function refresh(){
    timer.dataset.ticked=String(Date.now());timer.dataset.running=r.stop_active?'1':'0';
    timer.style.cssText='font-variant-numeric:tabular-nums;flex:1 1 100%;margin:0 0 4px';
    tools.append(timer);
-   tools.append(pilotSwipe(r.stop_active?label('Сдвинь: Возобновить маршрут','Swipe: Resume trip','Braukite: Tęsti'):label('Сдвинь: Остановка','Swipe: Stop','Braukite: Sustoti'),r.stop_active?'resume':'pause'));
+   tools.append(pilotSwipe(r.stop_active?label('Сдвинь: Возобновить маршрут','Swipe: Resume trip','Braukite: Tęsti'):finishMode?label('Сдвинь: Завершить поездку','Swipe: Finish trip','Braukite: Baigti'):label('Сдвинь: Остановка','Swipe: Stop','Braukite: Sustoti'),r.stop_active?'resume':finishMode?'finish':'pause'));
    tools.append(button(label('Изменить маршрут','Change route','Keisti maršrutą'),changeTripRoute));
-   if(!r.stop_active)tools.append(pilotSwipe(label('Сдвинь: Завершить поездку','Swipe: Finish trip','Braukite: Baigti'),'finish'));
+   if(!r.stop_active)tools.append(button(finishMode?label('Назад к остановке','Switch to stop','Grįžti'):label('Конечный пункт','Final destination','Galutinis taškas'),()=>{finishMode=!finishMode;refresh()}));
    body.append(tools);
   }
   if(r.route_pending){

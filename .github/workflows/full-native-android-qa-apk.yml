@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Local fixture only. It does not authorize requests to any service.
+  PD_QA_LOCAL_PIN: "624819"
+
 jobs:
   build-full-native-qa-apk:
     runs-on: ubuntu-latest
@@ -108,7 +112,8 @@ jobs:
           flutter test
           flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_check_page_test.dart
           flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_notice_page_test.dart test/offline_auth_test.dart test/internal_guest_sign_in_test.dart test/native_cabin_entry_test.dart
-      - name: Compile full main.dart debug APK with isolated staging authentication
+          flutter test --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN" test/local_qa_entry_test.dart
+      - name: Compile full main.dart debug APK for local QA
         working-directory: private_drive_build
         shell: bash
         run: |
@@ -116,13 +121,15 @@ jobs:
           # Stable TEST signing key: never use this public development key for release.
           mkdir -p "$HOME/.android"
           base64 --decode ../flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
-          flutter build apk --debug --target lib/main.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com --dart-define=PD_INTERNAL_QA=true
+          flutter build apk --debug --target lib/main.dart --build-name=0.2.28 --build-number=2026112201 \
+            --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN"
           APK=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$APK"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
           grep "name='lt.privatedrive.private_drive.photo_qa'" ../full-qa-apk-badging.txt
+          grep "versionCode='2026112201'" ../full-qa-apk-badging.txt
           grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt

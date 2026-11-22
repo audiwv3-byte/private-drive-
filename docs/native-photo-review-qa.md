@@ -1,4 +1,13 @@
-# PRIVATE DRIVE 0.2.27 — cabin selection before sign-in
+# PRIVATE DRIVE Android QA — cabin entry
+
+## Local Android QA build 0.2.28
+
+The internal Android APK opens a local PIN prompt before the cabin selector.
+The PIN is a build fixture carried only by that APK; it establishes no native
+session, server role, or phone or photo verification. Passenger, Pilot and
+Dispatcher use a shared local QA order scope separate from authenticated
+accounts. Android Back returns from a cabin to the selector. Signing out
+returns to the PIN prompt. Existing QA package ID and signing key are reused.
 
 Branch: feature/flutter-independent-auth. No production deployment, paid SMS,
 real booking or payment activation is part of this change.

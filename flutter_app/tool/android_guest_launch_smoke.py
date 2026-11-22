@@ -1,7 +1,8 @@
 """Exercise the actual assembled internal APK on a disposable CI emulator.
 
-No phone number, OTP, legal acceptance, paid service or privileged role is used.
+No phone number, OTP, camera, paid service or server role is used.
 """
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -41,26 +42,33 @@ def click_label(label, *, optional=False, timeout=60):
     raise AssertionError('Required app control not found: ' + label)
 
 
-initial = snapshot()
-assert all(label in initial for label in ('Пассажир', 'Пилот', 'Диспетчер')), 'Initial cabin choices missing'
-click_label('Пилот')
-assert 'Фотоконтроль' in snapshot(), 'Pilot did not open photo check'
+def wait_for_labels(*labels, timeout=45):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        xml = snapshot()
+        if all(label in xml for label in labels):
+            return xml
+        time.sleep(1)
+    raise AssertionError(f'Missing screen labels: {labels}')
+
+
+wait_for_labels('Тестовый вход', 'Тестовый пароль')
+click_label('Тестовый пароль')
+adb('shell', 'input', 'text', os.environ['PD_QA_LOCAL_PIN'])
 adb('shell', 'input', 'keyevent', '4')
-click_label('Диспетчер')
-dispatcher = snapshot()
-assert 'Вход диспетчера' in dispatcher, 'Dispatcher did not open authorized sign-in'
-assert 'Фотоконтроль' not in dispatcher, 'Dispatcher must never be routed to photo check'
-adb('shell', 'input', 'keyevent', '4')
-click_label('Пассажир')
-click_label('Продолжить без разрешений', optional=True, timeout=20)
-deadline = time.monotonic() + 40
-while time.monotonic() < deadline:
-    xml = snapshot()
-    if all(label in xml for label in ('Гостевой доступ', 'Такси', 'Трансфер')):
-        Path('android-guest-passenger.xml').write_text(xml, encoding='utf-8')
-        Path('android-guest-passenger.png').write_bytes(adb('exec-out', 'screencap', '-p'))
-        print('PASS: actual APK opened passenger cabin without phone, SMS or staff access.', flush=True)
-        break
-    time.sleep(1)
-else:
-    raise AssertionError('Guest passenger cabin did not open')
+click_label('Войти в тест')
+wait_for_labels('Выбери кабинет', 'Пассажир', 'Пилот', 'Диспетчер')
+
+for role, labels in [
+    ('Пассажир', ('Такси', 'Трансфер')),
+    ('Пилот', ('Кабина пилота', 'Не на линии')),
+    ('Диспетчер', ('PRIVATE DRIVE · Диспетчер',)),
+]:
+    click_label(role)
+    xml = wait_for_labels('Внутренний тест', *labels)
+    assert 'Фотоконтроль' not in xml
+    Path(f'android-guest-{role}.xml').write_text(xml, encoding='utf-8')
+    Path(f'android-guest-{role}.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+    adb('shell', 'input', 'keyevent', '4')
+    wait_for_labels('Выбери кабинет')
+print('PASS: actual APK opened all three local cabins without phone or camera.', flush=True)

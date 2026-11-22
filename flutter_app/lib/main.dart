@@ -23,7 +23,9 @@ const isolatedWebPreview = bool.fromEnvironment('PD_ISOLATED_WEB_PREVIEW');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await PdSystemPilotPhotoCapture.discardLostCapture();
+  if (!pdLocalQaEntryEnabled) {
+    await PdSystemPilotPhotoCapture.discardLostCapture();
+  }
   await pdLanguage.restore();
   runApp(const PrivateDriveApp());
 }

@@ -244,3 +244,22 @@ body{overflow-x:hidden}
   .catalog-heading{width:100%;justify-content:space-between}
   .catalog-heading span:first-child{min-width:0;overflow-wrap:anywhere}
 }
+
+
+/* Test website: accessible mobile navigation and clearer footer contacts */
+.mobile-menu{display:none}
+.footer-contact-buttons{display:flex;flex-direction:column;align-items:stretch;gap:9px;width:100%}
+.footer-contact-buttons .button{width:100%;gap:8px;min-height:44px}
+@media(max-width:740px){
+  .top-inner>nav{display:none}
+  .mobile-menu{display:block;order:3;width:100%;position:relative}
+  .mobile-menu>summary{display:flex;gap:10px;align-items:center;justify-content:center;min-height:46px;padding:10px;border:1px solid #886737;border-radius:8px;background:#21180f;color:#efd09a;font-weight:700;cursor:pointer;list-style:none}
+  .mobile-menu>summary::-webkit-details-marker{display:none}
+  .mobile-menu[open]>summary{border-color:#edcc86;background:#2b2114}
+  .mobile-menu-icon{font-size:1.25rem;line-height:1}
+  .mobile-menu nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:7px;padding:10px 0 2px}
+  .mobile-menu nav a{display:flex;align-items:center;justify-content:center;text-align:center;min-height:46px;padding:8px;border:1px solid #685030;border-radius:7px;background:#221a11;color:#faf0df;font-size:.91rem;text-decoration:none;overflow-wrap:anywhere}
+  .mobile-menu nav a:last-child{grid-column:1/-1;color:#1e1509;background:linear-gradient(125deg,#ffedb9,#e7bd70 65%,#c79650);font-weight:750}
+  .mobile-menu nav a:hover,.mobile-menu nav a:focus-visible{border-color:#edcc86}
+  .footer-contact-buttons{max-width:320px}
+}

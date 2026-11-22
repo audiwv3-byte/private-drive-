@@ -12,6 +12,7 @@ import 'pd_pickup_fee.dart';
 import 'demo_rating_panel.dart';
 import 'company_info.dart';
 import 'passenger_orders_demo.dart';
+import 'passenger_extra_services.dart';
 import 'pd_pilot_assignment_waiting.dart';
 import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -1452,6 +1453,44 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            if (widget.tripStore != null) ...[
+              Text(pdTr(context, 'Дополнительные услуги',
+                  'Papildomos paslaugos', 'Additional services'),
+                key: const Key('passenger-booking-extra-services-title'),
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Card(child: ListTile(
+                key: const Key('passenger-booking-jumpstart'),
+                leading: const Icon(Icons.battery_charging_full, size: 32),
+                title: Text(pdTr(context, 'Запуск автомобиля · 20 €',
+                    'Automobilio užvedimas · 20 €', 'Car jump-start · €20')),
+                subtitle: Text(pdTr(context, 'Помощь с разряженным аккумулятором',
+                    'Pagalba išsikrovus akumuliatoriui',
+                    'Help with a flat car battery')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context, MaterialPageRoute<void>(
+                  builder: (_) => PdPassengerLanguageScope(
+                    child: PassengerExtraServices(
+                      type: ExtraServiceType.jumpstart,
+                      tripStore: widget.tripStore!)))),
+              )),
+              Card(child: ListTile(
+                key: const Key('passenger-booking-delivery'),
+                leading: const Icon(Icons.shopping_bag_outlined, size: 32),
+                title: Text(pdTr(context, 'Доставка товаров · 20 €',
+                    'Prekių pristatymas · 20 €', 'Goods delivery · €20')),
+                subtitle: Text(pdTr(context, 'Заберём покупки из магазина и доставим',
+                    'Paimsime pirkinius iš parduotuvės ir pristatysime',
+                    'We will pick up and deliver your shopping')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(context, MaterialPageRoute<void>(
+                  builder: (_) => PdPassengerLanguageScope(
+                    child: PassengerExtraServices(
+                      type: ExtraServiceType.delivery,
+                      tripStore: widget.tripStore!)))),
+              )),
+            ],
             const SizedBox(height: 16),
             if (!widget.enableMapTiles || _menuSection == 'preferences') ...[
             AbsorbPointer(

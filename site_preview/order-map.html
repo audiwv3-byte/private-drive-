@@ -148,7 +148,15 @@ $('orderForm').addEventListener('submit',async e=>{
  const radio=$('radio').value==='Другая'?$('radioOther').value.trim():$('radio').value;
  const music=$('music').value.trim();
  if(airportDirection && (airportDirection==='to' && from==='Вильнюс, точный адрес уточнить' || airportDirection==='from' && to==='Вильнюс, точный адрес уточнить')){say('Укажи точный адрес подачи или назначения в Вильнюсе.');return}
- const draft=(airportDirection?'PRIVATE DRIVE — трансфер аэропорт · 40 €':preorder?'PRIVATE DRIVE — предварительный заказ':'PRIVATE DRIVE — запрос поездки')\nОткуда: '+from+'\nКуда: '+to+(date?'\nДата/время: '+date.replace('T',' '):'')+(radio?'\nРадиостанция: '+radio:'')+(music?'\nЛюбимый трек: '+music:'')+(comment?'\nПожелания: '+comment:'');
+ const draft=[
+  airportDirection?'PRIVATE DRIVE — трансфер аэропорт · 40 €':preorder?'PRIVATE DRIVE — предварительный заказ':'PRIVATE DRIVE — запрос поездки',
+  'Откуда: '+from,
+  'Куда: '+to,
+  date?'Дата/время: '+date.replace('T',' '):'',
+  radio?'Радиостанция: '+radio:'',
+  music?'Любимый трек: '+music:'',
+  comment?'Пожелания: '+comment:''
+ ].filter(Boolean).join('\\n');
  try{await navigator.clipboard.writeText(draft);say('Заявка скопирована. Вставь её в сообщение Telegram.')}catch(_){say('Скопируй данные поездки перед отправкой в Telegram.');window.prompt('Текст заявки — скопируй его:',draft)}
  const link='https://t.me/PrivateDraive';
  const opened=window.open(link,'_blank','noopener,noreferrer');if(!opened)window.location.href=link;

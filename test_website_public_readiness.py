@@ -30,7 +30,7 @@ class WebsiteReadinessTests(unittest.TestCase):
 
     def test_navigation_targets_and_image(self):
         p = self.parser
-        for target in ("top", "taxi", "transfers", "extras", "registration", "contact"):
+        for target in ("top", "taxi", "transfers", "extras", "registration", "documents", "contact"):
             self.assertIn(target,p.ids)
         for href in p.links:
             if href.startswith("#"):
@@ -39,6 +39,8 @@ class WebsiteReadinessTests(unittest.TestCase):
                 self.assertIn("eurobaltictransfer@gmail.com",href)
             elif href in ("privacy.html", "terms.html", "pilot-privacy.html"):
                 self.assertTrue((ROOT / href).is_file(), href)
+            elif href == "https://t.me/PrivateDraive":
+                continue
             else:
                 u=urlparse(href)
                 self.assertEqual(u.scheme,"https")
@@ -56,7 +58,8 @@ class WebsiteReadinessTests(unittest.TestCase):
     def test_no_false_registration_or_live_order_claims(self):
         self.assertNotIn("ТЕСТОВЫЙ МАКЕТ",self.content)
         self.assertNotIn("Дизайн для согласования",self.content)
-        self.assertNotIn("https://t.me/",self.content)
+        self.assertIn("https://t.me/PrivateDraive",self.parser.links)
+        self.assertNotIn("https://t.me/EuroBalticTransferBot",self.parser.links)
         self.assertNotIn("site_preview/registration.html",self.content)
         self.assertIn("пока недоступна",self.content)
         self.assertIn("не принимает онлайн-заказы и оплату",self.content)

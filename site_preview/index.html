@@ -3,130 +3,135 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090b0d">
-  <meta name="description" content="PRIVATE DRIVE — городские поездки, индивидуальные трансферы и дополнительные услуги в Вильнюсе и Литве.">
-  <title>PRIVATE DRIVE — Такси и трансферы</title>
-  <style>
-    :root{color-scheme:dark;--bg:#080908;--panel:#121310;--ink:#f7f1e7;--muted:#b9ad98;--gold:#dbb66a;--gold-hi:#f6dfaa;--line:#55452c;--soft:#1a1b18}
-    *{box-sizing:border-box}html{scroll-behavior:smooth;overflow-x:clip}body{margin:0;overflow-x:clip;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
-    body:before{content:"";position:fixed;pointer-events:none;inset:0;z-index:30;opacity:.08;background-image:repeating-linear-gradient(0deg,transparent 0 3px,#c69e5f10 4px 5px);mix-blend-mode:screen}
-    a{color:inherit}a:focus-visible,button:focus-visible{outline:3px solid var(--gold-hi);outline-offset:4px}button{font:inherit}
-    .wrap{width:min(1200px,calc(100% - 52px));margin:auto}
-    .top{position:sticky;top:0;z-index:20;background:#0a0b0aef;backdrop-filter:blur(24px);border-bottom:1px solid #64503688}
-    .top-inner{min-height:98px;display:flex;align-items:center;justify-content:space-between;gap:28px}
-    .brand{display:flex;gap:13px;align-items:center;text-decoration:none;min-width:216px}
-    .brand img{width:70px;height:70px;object-fit:contain;border-radius:50%;background:#10100e;box-shadow:0 0 0 1px #836936,0 0 24px #a77f302e}
-    .brand strong{display:block;font:600 19px/1.2 Georgia,serif;letter-spacing:.19em;color:var(--gold-hi)}.brand small{font-size:9px;letter-spacing:.32em;color:#b7a17c}
-    nav{display:flex;gap:30px;align-items:center}nav a{text-decoration:none;color:#d2c6af;font-size:13px;letter-spacing:.05em;transition:color .2s}nav a:hover{color:var(--gold-hi)}
-    .button{display:inline-flex;gap:10px;align-items:center;justify-content:center;text-align:center;border:1px solid var(--gold);background:linear-gradient(125deg,#fff0c2 0%,#dbb66a 43%,#ac7f3c 100%);color:#171207;padding:15px 24px;border-radius:3px;text-decoration:none;font-weight:730;font-size:13px;letter-spacing:.075em;min-height:51px;cursor:pointer;transition:transform .2s,filter .2s}
-    .button.secondary{background:#00000020;border-color:#987b48;color:var(--gold-hi)}.button:hover{filter:brightness(1.12);transform:translateY(-2px)}
-    .hero{position:relative;overflow:hidden;border-bottom:1px solid #66513766;background:radial-gradient(ellipse at 71% 48%,#57482c35 0%,transparent 39%),radial-gradient(ellipse at 8% 85%,#50402b21 0%,transparent 49%),linear-gradient(120deg,#0a0b0b,#141310 56%,#070707)}
-    .hero:after{content:"";position:absolute;pointer-events:none;inset:0;background:linear-gradient(135deg,transparent 0 70%,#af864812 70.2% 70.3%,transparent 70.5%)}
-    .hero-inner{position:relative;z-index:1;display:grid;grid-template-columns:1.07fr .93fr;align-items:center;gap:40px;padding:104px 0 112px}
-    .eyebrow{color:var(--gold);letter-spacing:.3em;font-weight:660;font-size:11px;text-transform:uppercase;display:inline-flex;gap:10px;align-items:center}
-    .eyebrow:before{content:"";height:1px;width:29px;background:linear-gradient(90deg,#987142,#f7db91)}
-    h1,h2,h3,p{margin-top:0}h1{font:400 clamp(52px,6.35vw,91px)/1.045 Georgia,"Times New Roman",serif;letter-spacing:-.047em;margin:25px 0 28px;text-wrap:balance}h1{overflow-wrap:break-word}h1 em{font-style:normal;background:linear-gradient(110deg,#fcf0cb 0%,#e6c580 46%,#ad7c39 100%);background-clip:text;-webkit-background-clip:text;color:transparent}
-    .lede{max-width:560px;font-size:17px;color:#d7cbb7;line-height:1.9}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:36px}
-    .trust{display:flex;gap:22px;flex-wrap:wrap;margin-top:38px;color:#b2a58e;font-size:12px}.trust span:before{content:"✧";color:var(--gold-hi);margin-right:8px}
-    .hero-art{min-height:495px;display:grid;place-items:center;position:relative}
-    .hero-art:before{content:"";position:absolute;width:min(100%,490px);aspect-ratio:1;border:1px solid #be92572b;transform:rotate(45deg);pointer-events:none}
-    .hero-art:after{content:"PRIVATE  •  DRIVE  •  PREMIUM  •  EXPERIENCE";position:absolute;left:50%;top:6%;transform:translateX(-50%);white-space:nowrap;letter-spacing:.23em;font-size:8px;color:#a78f64}
-    .halo{width:min(89%,434px);aspect-ratio:1;border-radius:50%;border:1px solid #b89b62;box-shadow:0 0 0 1px #4e3b1d,0 0 0 26px #cda7650a,0 0 0 67px #cda76506,inset 0 0 90px #000;display:grid;place-items:center;background:radial-gradient(circle,#30291d 0%,#17150f 66%,#0b0b0a 100%);position:relative}
-    .halo:before{content:"";position:absolute;inset:13px;border-radius:50%;border:1px solid #cba76c55;pointer-events:none}
-    .halo img{width:75%;max-height:330px;object-fit:contain;border-radius:18%;filter:drop-shadow(0 12px 24px #000)}
-    .art-caption{position:absolute;bottom:1%;font-size:10px;color:#d1ad70;letter-spacing:.25em;text-align:center}
-    .hero-divider{height:1px;background:linear-gradient(90deg,transparent,#c49b52 35%,#f7dca3 50%,#c49b52 65%,transparent)}
-    .intro-strip{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:19px 0;color:#c8b995;font-size:11px;letter-spacing:.22em;text-transform:uppercase}
-    .intro-strip span{display:flex;align-items:center;gap:14px}.intro-strip span:before{content:"✦";color:var(--gold)}
-    section{scroll-margin-top:128px}.section{padding:94px 0}.section.alt{background:linear-gradient(145deg,#131410,#0d0e0d);border-block:1px solid #3c3325}
-    .section-head{display:flex;gap:25px;justify-content:space-between;align-items:end;margin-bottom:35px}.section-head h2{font:400 clamp(34px,3.8vw,51px)/1.15 Georgia,serif;margin:17px 0 0;letter-spacing:-.03em}.section-head p{max-width:400px;color:var(--muted);margin:0;line-height:1.75}
-    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px}
-    .card{position:relative;overflow:hidden;background:linear-gradient(160deg,#202019 0%,#111310 65%,#0d0e0c);border:1px solid #5a4b32;border-radius:5px;padding:35px 30px;min-height:270px;box-shadow:0 12px 36px #00000031;transition:border-color .2s,transform .2s}
-    .card:before{content:"";position:absolute;top:0;left:26px;right:26px;height:2px;background:linear-gradient(90deg,transparent,#dcaf5e,transparent);opacity:.7}
-    .card:hover{border-color:#ad8747;transform:translateY(-3px)}
-    .card .mark{color:var(--gold-hi);font-size:29px}.card h3{font:400 27px Georgia,serif;margin:17px 0 12px;letter-spacing:-.015em}.card p{color:#c5bca9;font-size:14px;line-height:1.8}.card .price{color:var(--gold-hi);font:600 24px Georgia,serif;margin-top:24px}.card .note{font-size:12px;color:#aa9b80}.card.accent{border-color:#ad8951;background:linear-gradient(150deg,#282419,#111310)}
-    .route-list{display:grid;gap:13px}.route{display:flex;justify-content:space-between;align-items:center;gap:15px;background:linear-gradient(100deg,#1d1d18,#111310);border:1px solid #4d412e;border-left:3px solid #c5a16b;border-radius:3px;padding:23px 26px;transition:background .2s}.route:hover{background:#26251d}.route strong{font-size:16px;letter-spacing:.02em}.route span{color:var(--gold-hi);font:600 25px Georgia,serif;white-space:nowrap}.route small{display:block;color:var(--muted);margin-top:4px}
-    .registration{display:grid;grid-template-columns:1fr 1fr;gap:18px}.registration .card{min-height:285px}.registration .button{max-width:100%;white-space:normal}
-    .pill{color:#edcd91;background:#312818;border:1px solid #876b40;border-radius:2px;padding:7px 12px;font-size:10px;letter-spacing:.18em}
-    footer{background:#080908}.legal{display:flex;flex-wrap:wrap;align-items:center;gap:24px;font-size:13px;color:#aaa08e;border-top:1px solid var(--line);padding:34px 0 44px}.legal a{color:#ebcb89}.legal strong{color:var(--gold-hi);letter-spacing:.16em}.fine{font-size:12px;color:#a89b86;margin-top:24px}
-    @media(max-width:1000px){nav{gap:16px}.top-inner{gap:18px}.hero-inner{padding:75px 0;grid-template-columns:1fr .85fr}.hero-art{min-height:340px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid .card:last-child{grid-column:1/-1}.brand{min-width:190px}}
-    @media(max-width:720px){.wrap{width:min(100% - 32px,1200px)}.preview{font-size:9px;letter-spacing:.09em}.top-inner{padding:12px 0;flex-wrap:wrap;min-height:0}.top-inner nav{order:3;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;width:100%;overflow:visible;border-top:1px solid #54452b;padding:12px 0 3px}.top-inner nav a{display:flex;align-items:center;justify-content:center;min-width:0;min-height:38px;text-align:center;font-size:clamp(10px,2.8vw,12px);line-height:1.2;padding:7px 3px;white-space:normal;border:1px solid #66533880;border-radius:4px;background:#181711}.top .button{padding:11px 13px;min-height:41px;font-size:11px}.brand{min-width:0}.brand img{width:47px;height:47px}.brand strong{font-size:15px}.brand small{font-size:8px}
-    .hero-inner{display:flex;flex-direction:column;align-items:stretch;padding:40px 0 60px;gap:10px}.hero-art{min-height:215px;order:-1}.hero-art:before{width:190px}.hero-art:after{display:none}.halo{width:200px;box-shadow:0 0 0 13px #cda7650a,0 0 0 35px #cda76505}.halo img{width:77%}.art-caption{display:none}
-    h1{font-size:clamp(44px,10vw,63px)}.lede{font-size:15px}.intro-strip{font-size:9px;letter-spacing:.1em;flex-wrap:wrap;gap:9px}.section{padding:61px 0}.section-head{display:block}.section-head p{margin-top:17px}.grid,.registration{grid-template-columns:1fr}.grid .card:last-child{grid-column:auto}.card{min-height:auto;padding:27px}.route{padding:18px}.route strong{font-size:14px}.route span{font-size:21px}.actions .button{flex:1;min-width:150px}}
-    @media(max-width:430px){.top-inner{gap:8px}.top-inner nav{gap:6px}.top .button{padding:8px 10px;min-height:35px}.brand strong{font-size:13px;letter-spacing:.1em}.hero-inner{padding-top:30px}.route{align-items:flex-start}.route span{font-size:19px}}
-    @media(max-width:365px){.top-inner nav{gap:5px}.top-inner nav a{font-size:10px;padding:7px 2px}.top .button{display:none}.brand strong{letter-spacing:.1em}.intro-strip{display:none}.route span{font-size:18px}}
-    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.button,.card{transition:none}}
-  </style>
+  <meta name="theme-color" content="#100e0c">
+  <meta name="description" content="PRIVATE DRIVE — личный водитель на Toyota RAV4, такси в Вильнюсе и трансферы по Литве и Европе.">
+  <title>PRIVATE DRIVE — Личный водитель и трансферы</title>
+  <link rel="icon" href="assets/pd-logo.webp" type="image/webp">
+  <link rel="stylesheet" href="assets/corporate.css">
 </head>
 <body>
-  <header class="top"><div class="wrap top-inner">
-    <a class="brand" href="#top" aria-label="PRIVATE DRIVE — на главную">
-      <img src="assets/private-drive-gold-car.webp" alt="Золотой фирменный логотип PD с автомобилем" width="58" height="58">
-      <span><strong>PRIVATE DRIVE</strong><small>PREMIUM TRANSFERS</small></span>
-    </a>
-    <nav aria-label="Основное меню"><a href="#taxi">Такси</a><a href="#transfers">Трансферы</a><a href="#extras">Услуги</a><a href="#registration">Регистрация</a><a href="#contact">Контакты</a></nav>
-    <a class="button secondary" href="#contact">Связаться</a>
-  </div></header>
-  <main id="top">
-    <section class="hero" aria-labelledby="hero-title"><div class="wrap hero-inner">
-      <div>
-        <span class="eyebrow">Вильнюс · Литва · Европа</span>
-        <h1 id="hero-title">Ваша поездка.<br><em>Наше внимание.</em></h1>
-        <p class="lede">Премиальные городские поездки в Вильнюсе, трансферы по Литве и Европе, встреча в аэропорту и дополнительные услуги. Прямой контакт с PRIVATE DRIVE.</p>
-        <div class="actions"><a class="button" href="mailto:eurobaltictransfer@gmail.com?subject=PRIVATE%20DRIVE%20%E2%80%94%20%D0%B7%D0%B0%D0%BF%D1%80%D0%BE%D1%81%20%D0%BF%D0%BE%D0%B5%D0%B7%D0%B4%D0%BA%D0%B8">Запросить поездку <span aria-hidden="true">↗</span></a><a class="button secondary" href="#transfers">Тарифы трансферов <span aria-hidden="true">→</span></a></div>
-        <div class="trust"><span>Вильнюс и Европа</span><span>Условия до поездки</span><span>Ответ на запрос по email</span></div>
-      </div>
-      <div class="hero-art" aria-label="Фирменный стиль PRIVATE DRIVE"><div class="halo"><img src="assets/private-drive-gold-car.webp" alt="Золотая монограмма PD, надпись PRIVATE DRIVE и автомобиль"></div><span class="art-caption">PRIVATE DRIVE · PREMIUM SERVICE</span></div>
-    </div></section>
-    <div class="hero-divider" aria-hidden="true"></div>
-    <div class="wrap intro-strip" aria-label="Сервис PRIVATE DRIVE"><span>Персональный подход</span><span>Такси и трансферы</span><span>Вильнюс · Европа</span></div>
+  <header class="top" id="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="#top" aria-label="PRIVATE DRIVE — главная">
+        <img src="assets/pd-logo.webp" width="52" height="52" alt="">
+        <span>PRIVATE DRIVE</span>
+      </a>
+      <nav aria-label="Основное меню">
+        <a href="#extras">Услуги</a>
+        <a href="#transfers">Трансферы</a>
+        <a href="#taxi">Такси</a>
+        <a href="#documents">Документы</a>
+        <a href="#contact">Контакты</a>
+      </nav>
+      <a class="button outline header-contact" href="https://t.me/PrivateDraive">Telegram</a>
+    </div>
+  </header>
 
-    <section id="taxi" class="section"><div class="wrap">
-      <div class="section-head"><div><span class="eyebrow">01 / Такси</span><h2>Поездки по вашему маршруту</h2></div><p>Отображаем согласованные базовые ставки. Итог зависит от дорожного расстояния и выбранных услуг.</p></div>
-      <div class="grid">
-        <article class="card accent"><div class="mark">◆</div><h3>Город</h3><p>Удобные поездки по Вильнюсу с расчётом по автомобильному маршруту.</p><div class="price">0,66 € / км</div><div class="note">Посадка 0,99 € · минимум 4 € · предварительный заказ +3 €</div></article>
-        <article class="card"><div class="mark">◇</div><h3>За городом</h3><p>Поездки за пределами города с отдельной ставкой на расстояние.</p><div class="price">0,79 € / км</div><div class="note">Смешанные маршруты уточняются при расчёте</div></article>
-        <article class="card"><div class="mark">◈</div><h3>Ожидание при подаче</h3><p>Первые три минуты после подтверждённого прибытия пилота бесплатны.</p><div class="price">0,30 € / мин</div><div class="note">После трёх бесплатных минут</div></article>
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-photo">
+        <img src="assets/hero.webp" width="836" height="323" alt="Водитель PRIVATE DRIVE рядом с Toyota RAV4 в Вильнюсе" fetchpriority="high">
       </div>
-    </div></section>
+      <div class="wrap hero-content">
+        <p class="eyebrow">Вильнюс · Литва · Европа</p>
+        <h1 id="hero-title">Ваш личный водитель<br><em>в Литве и Европе</em></h1>
+        <p class="hero-detail">Индивидуальные поездки на Toyota RAV4 Hybrid, трансферы и встреча в аэропорту.</p>
+        <div class="actions">
+          <a class="button gold" href="https://t.me/PrivateDraive">Запросить поездку</a>
+          <a class="button outline" href="#transfers">Смотреть тарифы</a>
+        </div>
+      </div>
+    </section>
 
-    <section id="transfers" class="section alt"><div class="wrap">
-      <div class="section-head"><div><span class="eyebrow">02 / Трансферы</span><h2>Маршруты с известной ценой</h2></div><p>Фиксированные тарифы трансфера — отдельно от городского такси.</p></div>
-      <div class="route-list">
-        <div class="route"><div><strong>Вильнюс → Каунас</strong><small>Индивидуальный трансфер · в одну сторону</small></div><span>130 €</span></div>
-        <div class="route"><div><strong>Вильнюс ↔ Каунас</strong><small>Туда и обратно · согласованный тариф</small></div><span>200 €</span></div>
-        <div class="route"><div><strong>Вильнюс ↔ Аэропорт Вильнюса</strong><small>Трансфер в обоих направлениях</small></div><span>40 €</span></div>
+    <section id="extras" class="section wrap">
+      <h2>Основные услуги</h2>
+      <div class="grid services">
+        <article class="card">
+          <img src="assets/service-airport.webp" width="472" height="173" alt="" loading="lazy">
+          <div class="card-content"><h3>Трансфер в аэропорт</h3><p>Вильнюс ↔ Аэропорт Вильнюса — 40 €. Встреча с табличкой +15 €.</p></div>
+        </article>
+        <article class="card">
+          <img src="assets/service-parcel.webp" width="469" height="173" alt="" loading="lazy">
+          <div class="card-content"><h3>Доставка посылок</h3><p>Заберём отправление и доставим по согласованному адресу.</p></div>
+        </article>
+        <article class="card">
+          <img src="assets/service-driver.webp" width="471" height="173" alt="" loading="lazy">
+          <div class="card-content"><h3>Персональный водитель</h3><p>Городские поездки и индивидуальные маршруты по Литве и Европе.</p></div>
+        </article>
       </div>
-      <p class="fine">Другие маршруты рассчитываются индивидуально. Отдельного фиксированного тарифа Каунас → Вильнюс здесь нет.</p>
-    </div></section>
+      <p class="small-print">Доставка покупок — 20 €. Запуск автомобиля при разряженном аккумуляторе — 20 €.</p>
+    </section>
 
-    <section id="extras" class="section"><div class="wrap">
-      <div class="section-head"><div><span class="eyebrow">03 / Дополнительные услуги</span><h2>Больше, чем поездка</h2></div><p>Заказываются отдельно или согласовываются с диспетчером. Стоимость дополнительных услуг согласовывается до подтверждения заказа.</p></div>
-      <div class="grid">
-        <article class="card"><div class="mark">✦</div><h3>Встреча с табличкой</h3><p>Поможем найти пилота в аэропорту или в согласованной точке встречи.</p><div class="price">+15 €</div></article>
-        <article class="card"><div class="mark">⚡</div><h3>Запуск автомобиля</h3><p>Помощь при разряженном аккумуляторе.</p><div class="price">20 €</div></article>
-        <article class="card"><div class="mark">▣</div><h3>Доставка товаров</h3><p>Заберём покупки из магазина и доставим по указанному адресу.</p><div class="price">20 €</div></article>
+    <section id="transfers" class="section shaded">
+      <div class="wrap">
+        <h2>Популярные направления</h2>
+        <div class="grid routes">
+          <article class="card">
+            <img src="assets/airport.webp" width="360" height="98" alt="" loading="lazy">
+            <div class="card-content"><h3>Аэропорт Вильнюса</h3><p>В обе стороны действует один тариф</p><strong class="price">40 €</strong></div>
+          </article>
+          <article class="card">
+            <img src="assets/kaunas.webp" width="344" height="98" alt="" loading="lazy">
+            <div class="card-content"><h3>Каунас</h3><p>Из Вильнюса в одну сторону</p><strong class="price">130 €</strong><p>Туда и обратно — 200 €</p></div>
+          </article>
+          <article class="card">
+            <img src="assets/klaipeda.webp" width="346" height="98" alt="" loading="lazy">
+            <div class="card-content"><h3>Клайпеда</h3><p>Из Вильнюса</p><strong class="quote">Цена по запросу</strong></div>
+          </article>
+          <article class="card">
+            <img src="assets/warsaw.webp" width="342" height="98" alt="" loading="lazy">
+            <div class="card-content"><h3>Варшава</h3><p>Из Вильнюса</p><strong class="quote">Цена по запросу</strong></div>
+          </article>
+        </div>
+        <p class="small-print">Также доступны поездки в Тракай, Друскининкай и Палангу. Стоимость уточни у PRIVATE DRIVE.</p>
       </div>
-      <p class="fine">Дополнительные остановки и изменение маршрута согласовываются отдельно до выполнения.</p>
-    </div></section>
+    </section>
 
-    <section id="registration" class="section alt"><div class="wrap">
-      <div class="section-head"><div><span class="eyebrow">04 / Регистрация</span><h2>Ваш PRIVATE DRIVE</h2></div><p>Независимая онлайн-регистрация пассажира и пилота готовится и пока недоступна. Запрос на подключение можно отправить по электронной почте.</p></div>
-      <div class="registration">
-        <article class="card"><span class="pill">ПАССАЖИР</span><h3>Путешествуй с комфортом</h3><p>Выбор маршрута, способа оплаты, дополнительных услуг и управление заказом.</p><a class="button secondary" href="mailto:eurobaltictransfer@gmail.com?subject=PRIVATE%20DRIVE%20%E2%80%94%20%D0%BF%D0%B0%D1%81%D1%81%D0%B0%D0%B6%D0%B8%D1%80">Связаться по регистрации</a></article>
-        <article class="card"><span class="pill">ПИЛОТ</span><h3>Присоединяйся к команде</h3><p>Заявка пилота, данные автомобиля и проверка документов администратором.</p><a class="button secondary" href="mailto:eurobaltictransfer@gmail.com?subject=PRIVATE%20DRIVE%20%E2%80%94%20%D0%BF%D0%B8%D0%BB%D0%BE%D1%82">Отправить запрос пилота</a><p class="note"><a href="pilot-privacy.html" target="_blank" rel="noopener noreferrer">Проект политики данных кандидатов в пилоты</a> · публичный сбор документов пока не включён.</p></article>
+    <section id="taxi" class="section wrap">
+      <h2>Такси в Вильнюсе</h2>
+      <div class="grid fares">
+        <article class="card card-content"><h3>Город</h3><strong class="price">0,66 € / км</strong><p>Посадка 0,99 € · минимум 4 € · предварительный заказ +3 €.</p></article>
+        <article class="card card-content"><h3>За городом</h3><strong class="price">0,79 € / км</strong><p>Конечная стоимость зависит от дорожного маршрута.</p></article>
+        <article class="card card-content"><h3>Ожидание</h3><strong class="price">0,30 € / мин</strong><p>Первые три минуты после прибытия пилота бесплатны.</p></article>
       </div>
-      <p class="fine">Эта информационная страница не принимает онлайн-заказы и оплату. Работа личных кабинетов будет объявлена отдельно после проверки безопасности.</p>
-    </div></section>
+    </section>
+
+    <section id="contact" class="section shaded">
+      <div class="wrap contact-block">
+        <div>
+          <h2>О PRIVATE DRIVE</h2>
+          <p>Мы базируемся в Вильнюсе. Укажи маршрут, дату и время поездки в сообщении. Подтвердим доступность и стоимость.</p>
+        </div>
+        <div>
+          <h3>Связаться с нами</h3>
+          <div class="actions">
+            <a class="button gold" href="https://t.me/PrivateDraive">Написать в Telegram</a>
+            <a class="button outline" href="mailto:eurobaltictransfer@gmail.com">Написать на email</a>
+          </div>
+          <p class="small-print">eurobaltictransfer@gmail.com</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="registration" class="section wrap">
+      <details>
+        <summary>Регистрация пассажиров и пилотов</summary>
+        <p>Онлайн-регистрация пока недоступна. Напиши на <a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a>, если хочешь узнать о подключении.</p>
+        <p>Визитка не принимает онлайн-заказы и оплату.</p>
+      </details>
+    </section>
   </main>
-  <section id="contact" class="section alt"><div class="wrap"><div class="section-head"><div><span class="eyebrow">05 / Контакты</span><h2>Связаться с PRIVATE DRIVE</h2></div><p>Запроси условия поездки, трансфера или сотрудничества. Договорённости и стоимость согласовываются до подтверждения.</p></div><a class="button" href="mailto:eurobaltictransfer@gmail.com?subject=PRIVATE%20DRIVE%20%E2%80%94%20%D0%B7%D0%B0%D0%BF%D1%80%D0%BE%D1%81">Написать PRIVATE DRIVE</a><p class="fine">Email: eurobaltictransfer@gmail.com · Вильнюс, Литва. На этом сайте нет онлайн-оплаты или отправки реального заказа.</p></div></section>
-  <footer><div class="wrap legal">
-    <strong>PRIVATE DRIVE</strong>
-    <a href="privacy.html" target="_blank" rel="noopener noreferrer">Конфиденциальность сайта</a>
-    <a href="terms.html" target="_blank" rel="noopener noreferrer">Условия поездок и возвратов</a>
-    <a href="pilot-privacy.html" target="_blank" rel="noopener noreferrer">Данные пилотов — проект</a>
-    <a href="mailto:eurobaltictransfer@gmail.com">Контакты</a>
-    <span>Вильнюс, Литва · PRIVATE DRIVE</span>
-  </div></footer>
+
+  <footer id="documents">
+    <div class="wrap footer-inner">
+      <h2>Документы</h2>
+      <ul>
+        <li><a href="privacy.html" target="_blank" rel="noopener noreferrer">Конфиденциальность сайта</a></li>
+        <li><a href="terms.html" target="_blank" rel="noopener noreferrer">Условия поездок и возвратов</a></li>
+        <li><a href="pilot-privacy.html" target="_blank" rel="noopener noreferrer">Данные пилотов — проект</a></li>
+      </ul>
+      <p class="small-print">PRIVATE DRIVE · Вильнюс, Литва</p>
+    </div>
+  </footer>
 </body>
 </html>

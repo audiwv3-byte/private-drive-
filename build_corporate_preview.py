@@ -1,14 +1,10 @@
-"""Build a strictly allowlisted, offline PRIVATE DRIVE corporate preview ZIP.
-
-This program never deploys, opens sockets, touches DNS or calls payment APIs.
-Only a human-approved authenticated HTTPS host may serve its output later.
-"""
+"""Build the allowlisted PRIVATE DRIVE corporate preview ZIP or static site."""
+import argparse
 from html.parser import HTMLParser
 from pathlib import Path
 import hashlib
 import json
 import shutil
-import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
@@ -19,9 +15,19 @@ FILES = (
     "terms.html",
     "pilot-privacy.html",
     "assets/private-drive-gold-car.webp",
+    "assets/corporate.css",
+    "assets/pd-logo.webp",
+    "assets/hero.webp",
+    "assets/service-airport.webp",
+    "assets/service-parcel.webp",
+    "assets/service-driver.webp",
+    "assets/airport.webp",
+    "assets/kaunas.webp",
+    "assets/klaipeda.webp",
+    "assets/warsaw.webp",
 )
-MARKER = "PRIVATE DRIVE — ИЗОЛИРОВАННЫЙ ТЕСТОВЫЙ ПРЕДПРОСМОТР. НЕ ПРИНИМАЕТ ЗАКАЗЫ И ПЛАТЕЖИ."
 OUTPUT = ROOT / "build" / "corporate-preview"
+RENDER_OUTPUT = ROOT / "build" / "render-preview"
 
 class AssetLinks(HTMLParser):
     def __init__(self):
@@ -61,7 +67,7 @@ def validate_source():
                 raise ValueError("Insecure HTTP reference in " + name)
     return expected
 
-def build(destination=OUTPUT):
+def build_static_files(destination, notice):
     validate_source()
     destination = Path(destination)
     if destination.exists():
@@ -74,22 +80,32 @@ def build(destination=OUTPUT):
             text = data.decode("utf-8")
             if "<head>" not in text:
                 raise ValueError("Cannot inject preview guard: " + name)
+            if "<body>" not in text:
+                raise ValueError("Cannot insert preview notice: " + name)
             inject = ('<meta name="robots" content="noindex,nofollow,noarchive">'
                       '<meta name="referrer" content="no-referrer">'
+                      '<meta http-equiv="Content-Security-Policy" content="'
+                      "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+                      "form-action 'none'; base-uri 'none'\">"
                       '<style id="pd-private-preview-banner">'
-                      'body{padding-top:38px!important}'
-                      'body:after{content:"ИЗОЛИРОВАННЫЙ ПРЕДПРОСМОТР · ЗАКАЗЫ И ПЛАТЕЖИ ОТКЛЮЧЕНЫ";'
-                      'position:fixed;top:0;left:0;right:0;z-index:99999;'
-                      'background:#443019;color:#ffebbd;font:700 11px/1.4 system-ui,sans-serif;'
-                      'padding:10px;text-align:center;letter-spacing:.04em;pointer-events:none}'
+                      '.pd-preview-notice{max-width:none;margin:0;background:#443019;color:#ffebbd;'
+                      'font:650 13px/1.4 system-ui,sans-serif;padding:8px 12px;text-align:center}'
                       '</style>')
             text = text.replace("<head>", "<head>" + inject, 1)
+            text = text.replace("<body>", f'<body><div class="pd-preview-notice">{notice}</div>', 1)
             data = text.encode("utf-8")
         target = destination / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
         manifest[name] = hashlib.sha256(data).hexdigest()
     (destination / "robots.txt").write_text("User-agent: *\nDisallow: /\n", encoding="utf-8")
+    return manifest
+
+def build(destination=OUTPUT):
+    destination = Path(destination)
+    manifest = build_static_files(
+        destination, "ИЗОЛИРОВАННЫЙ ПРЕДПРОСМОТР · ЗАКАЗЫ И ПЛАТЕЖИ ОТКЛЮЧЕНЫ"
+    )
     (destination / "_headers").write_text(
         "/*\n"
         "  X-Robots-Tag: noindex, nofollow, noarchive\n"
@@ -116,4 +132,10 @@ def build(destination=OUTPUT):
     return archive
 
 if __name__ == "__main__":
-    print(build())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--render", action="store_true", help="Build the public test directory without packaging.")
+    if parser.parse_args().render:
+        build_static_files(RENDER_OUTPUT, "Тестовый предпросмотр PRIVATE DRIVE")
+        print(RENDER_OUTPUT)
+    else:
+        print(build())

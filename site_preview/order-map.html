@@ -72,6 +72,14 @@ const $=id=>document.getElementById(id),status=$('status');
 const params=new URLSearchParams(location.search);
 const preorder=params.get('mode')==='preorder';
 const airportDirection=['to','from'].includes(params.get('airport'))?params.get('airport'):null;
+const serviceNames={'flowers':'Цветы к поездке','surprise':'Поездка-сюрприз','sober-driver':'Трезвый водитель','jump-start':'Запуск автомобиля · 20 €','meet-sign':'Встреча с табличкой · +15 €','luggage':'Помощь с багажом'};
+const selectedService=Object.prototype.hasOwnProperty.call(serviceNames,params.get('service'))?serviceNames[params.get('service')]:null;
+if(selectedService){
+ const info=document.createElement('p');info.className='note';
+ info.textContent='Выбрана услуга: '+selectedService+'. Доступность и окончательная стоимость подтверждаются отдельно.';
+ $('datetime').closest('.field').before(info);
+}
+
 if(airportDirection){
  const airport='Аэропорт Вильнюса (VNO)';
  const vilnius='Вильнюс, точный адрес уточнить';
@@ -177,6 +185,7 @@ $('orderForm').addEventListener('submit',async e=>{
   'Откуда: '+from,
   'Куда: '+to,
   date?'Дата/время: '+date.replace('T',' '):'',
+  selectedService?'Дополнительная услуга: '+selectedService:'',
   radio?'Радиостанция: '+radio:'',
   music?'Любимый трек: '+music:'',
   comment?'Пожелания: '+comment:''

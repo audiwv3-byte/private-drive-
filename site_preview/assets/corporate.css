@@ -141,3 +141,14 @@ details p { margin: .6rem 0; overflow-wrap: anywhere; }
   .header-actions { width: 100%; justify-content: center; padding-top: 4px; }
   .header-tips { min-height: 44px; }
 }
+
+/* Photo-led premium service cards */
+.extras-subtitle{margin-top:2.5rem;font-size:clamp(1.6rem,3vw,2.2rem)}
+.premium-services .service-card{display:flex;flex-direction:column;box-shadow:0 10px 28px #0004;transition:border-color .18s,transform .18s}
+.premium-services .service-card:hover{border-color:#d7ad69;transform:translateY(-3px)}
+.premium-services .service-card img{height:190px;aspect-ratio:auto;object-fit:cover}
+.premium-services .service-card .card-content{display:flex;flex:1;flex-direction:column;gap:.35rem}
+.premium-services .service-card .card-content .price,.premium-services .service-card .card-content .quote{margin-top:auto;padding-top:.75rem}
+.premium-services .service-card .actions .button{width:100%}
+@media(max-width:530px){.premium-services .service-card img{height:205px}}
+@media(prefers-reduced-motion:reduce){.premium-services .service-card{transition:none}}

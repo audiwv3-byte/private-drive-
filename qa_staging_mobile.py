@@ -65,6 +65,28 @@ with sync_playwright() as p:
         assert crop["driverFit"] == "cover" and crop["heroFit"] == "cover", crop
         assert crop["driverPosition"] == "50% 72%" and crop["heroPosition"] == "50% 72%", crop
         assert crop["heroHeight"] >= 245, crop
+        # Readability and layout after the image crop (real Chromium geometry).
+        ui = page.evaluate("""() => {
+          const q=s=>document.querySelector(s);
+          const box=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom}};
+          const title=q('.pd-hero h1'), hero=q('.pd-hero-img'),
+                buttons=[...document.querySelectorAll('.pd-buttons a')],
+                card=q('.pd-driver-card'), caption=q('.pd-driver-caption');
+          const size=e=>parseFloat(getComputedStyle(e).fontSize);
+          return {title:box(title),titleSize:size(title),photo:box(hero),
+                  buttons:buttons.map(box),buttonFonts:buttons.map(size),
+                  card:box(card),caption:box(caption),captionSize:size(caption)};
+        }""")
+        assert ui["titleSize"] >= 29 and ui["captionSize"] >= 13, ui
+        assert len(ui["buttons"]) == 2 and all(b["h"] >= 44 for b in ui["buttons"]), ui
+        assert all(font >= 14 for font in ui["buttonFonts"]), ui
+        assert ui["photo"]["w"] >= 255 and ui["photo"]["h"] >= 245, ui
+        assert ui["caption"]["x"] >= ui["card"]["x"] - 1, ui
+        assert ui["caption"]["right"] <= ui["card"]["right"] + 1, ui
+        assert ui["caption"]["bottom"] <= ui["card"]["bottom"] + 1, ui
+        assert ui["title"]["x"] >= -1 and ui["title"]["right"] <= width + 1, ui
+        print(f"RAV4_READABILITY_OK width={width} title_px={ui['titleSize']:.0f} card_caption_px={ui['captionSize']:.0f} hero_height={ui['photo']['h']:.0f} both_buttons>=44px", flush=True)
+
 
 
         # Main banner must use the owner's saved RAV4 photo with no unrelated person.

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'passenger_demo.dart';
+import 'passenger_extra_services.dart';
 import 'vilnius_evening_backdrop.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
@@ -32,6 +33,17 @@ class PassengerRideEntry extends StatelessWidget {
           initialAdvanceBooking: advanceBooking,
           initialAdvanceDate: advanceDate,
           initialAdvanceTime: advanceTime,
+        ),
+      ),
+    ));
+  }
+
+  void _openDelivery(BuildContext context) {
+    Navigator.push(context, MaterialPageRoute<void>(
+      builder: (_) => PdPassengerLanguageScope(
+        child: PassengerExtraServices(
+          type: ExtraServiceType.delivery,
+          tripStore: tripStore,
         ),
       ),
     ));
@@ -162,6 +174,17 @@ class PassengerRideEntry extends StatelessWidget {
               subtitle: Text(pdLabel(context, 'Междугородние поездки и аэропорты')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _open(context, 'Трансфер'),
+            )),
+            const SizedBox(height: 12),
+            Card(child: ListTile(
+              key: const Key('passenger-entry-delivery'),
+              leading: const Icon(Icons.local_shipping_outlined, size: 36),
+              title: Text(pdTr(context, 'Доставка',
+                  'Pristatymas', 'Delivery')),
+              subtitle: Text(pdTr(context, 'Доставка товаров · 20 €',
+                  'Prekių pristatymas · 20 €', 'Goods delivery · €20')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _openDelivery(context),
             )),
             const SizedBox(height: 20),
             Text(pdLabel(context, 'Тестовый режим. Реальные заказы и оплата выключены.'),

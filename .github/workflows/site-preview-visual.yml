@@ -88,3 +88,55 @@ jobs:
           path: private-drive-screenshots/
           retention-days: 14
           if-no-files-found: error
+
+  five-design-concepts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chromium / Playwright
+        run: |
+          npm install --no-save playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Capture five distinct page concepts from real project assets
+        run: |
+          mkdir -p private-drive-five-concepts
+          cat > capture-concepts.cjs <<'JS'
+          const { chromium } = require('playwright');
+          const { pathToFileURL } = require('node:url');
+          const fs = require('node:fs');
+          const path = require('node:path');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+            try {
+              const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:1,locale:'ru-RU'});
+              await page.goto(pathToFileURL(path.resolve('site_preview/alternatives/five-concepts.html')).href,{waitUntil:'load'});
+              await page.evaluate(()=>document.fonts.ready);
+              const audit=[];
+              for(let n=1;n<=5;n++){
+                const section=page.locator('#concept-'+n);
+                const imageStatus=await section.evaluate(el=>[...el.querySelectorAll('img')].map(i=>({
+                  src:i.getAttribute('src'),loaded:i.complete&&i.naturalWidth>0
+                })));
+                const filename='private-drive-five-concepts/concept-'+n+'.png';
+                await section.screenshot({path:filename,animations:'disabled'});
+                const dimensions=await section.evaluate(el=>({width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height}));
+                audit.push({concept:n,file:filename,images:imageStatus,...dimensions});
+              }
+              fs.writeFileSync('private-drive-five-concepts/report.json',JSON.stringify(audit,null,2));
+              console.log(JSON.stringify(audit,null,2));
+              if(audit.length!==5||audit.some(a=>a.images.some(i=>!i.loaded)||a.width!==1440||a.height!==900))throw Error('Concept screenshot audit failed');
+            } finally {await browser.close()}
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          JS
+          node capture-concepts.cjs
+      - name: Upload five concept screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-five-design-concepts
+          path: private-drive-five-concepts/
+          retention-days: 14
+          if-no-files-found: error

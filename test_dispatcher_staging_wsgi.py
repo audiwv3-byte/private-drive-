@@ -187,7 +187,7 @@ class DispatcherStagingTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertFalse(response.get_json()["available"])
             self.assertEqual(client.post("/api/order", json=data).status_code, 404)
-            self.assertEqual(estimate(100, 90, data)[0], Decimal("110.00"))
+            self.assertEqual(estimate(100, 90, data)[0], Decimal("120.00"))
             self.assertEqual(client.post("/preview/api/route", json=dict(data, category="invalid")).status_code, 400)
 
     def test_mocked_ors_route_for_supported_and_unsupported_classes(self):
@@ -204,12 +204,34 @@ class DispatcherStagingTests(unittest.TestCase):
                         "category": "comfort", "roundtrip": False}
                 response = client.post("/preview/api/route", json=data)
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.get_json()["price"], "110.00")
+                self.assertEqual(response.get_json()["price"], "120.00")
                 self.assertEqual(response.get_json()["km"], 100)
                 data["category"] = "minivan"
                 result = client.post("/preview/api/route", json=data).get_json()
                 self.assertTrue(result["available"])
                 self.assertIsNone(result["price"])
+
+    def test_staging_approved_fares_match_home_cards_without_app_changes(self):
+        from decimal import Decimal
+        import pd_public_route_preview as preview
+        for destination, expected in [
+            ("Аэропорт Вильнюса (VNO)", "40"),
+            ("Каунас", "120"),
+            ("Клайпеда", "320"),
+            ("Варшава", "460"),
+        ]:
+            self.assertEqual(preview.estimate(150, 120, {
+                "origin": "Вильнюс", "destination": destination,
+                "roundtrip": False
+            })[0], Decimal(expected), destination)
+        self.assertEqual(preview.estimate(15, 25, {
+            "origin": "Аэропорт Вильнюса (VNO)", "destination": "Вильнюс",
+            "roundtrip": False
+        })[0], Decimal("40"))
+        self.assertEqual(preview.estimate(100, 90, {
+            "origin": "Вильнюс", "destination": "Каунас",
+            "roundtrip": True
+        })[0], Decimal("200"))
 
     def test_staging_public_fallback_requires_explicit_flag_and_is_never_production(self):
         from unittest.mock import patch

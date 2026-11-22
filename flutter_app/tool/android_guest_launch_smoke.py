@@ -66,7 +66,7 @@ for role, labels in [
 ]:
     click_label(role)
     xml = wait_for_labels('Внутренний тест', *labels)
-    assert 'Фотоконтроль' not in xml
+    assert 'Фотоконтроль' not in xml and 'Проверка личности' not in xml
     Path(f'android-guest-{role}.xml').write_text(xml, encoding='utf-8')
     Path(f'android-guest-{role}.png').write_bytes(adb('exec-out', 'screencap', '-p'))
     adb('shell', 'input', 'keyevent', '4')

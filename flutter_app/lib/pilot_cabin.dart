@@ -23,12 +23,14 @@ class PilotCabin extends StatefulWidget {
     this.onOfferAlert,
     this.onSignOut,
     this.onBackToCabinets,
+    this.showIdentityCheck = true,
   });
 
   final bool enableMapTiles;
   final DemoTripStore? tripStore;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
+  final bool showIdentityCheck;
   /// Test-only hook to verify alert repetition without device audio.
   final VoidCallback? onOfferAlert;
 
@@ -336,24 +338,26 @@ class _PilotCabinState extends State<PilotCabin> {
                       letterSpacing: 1.3,
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  OutlinedButton.icon(
-                    key: const Key('pilot-open-identity-check'),
-                    icon: const Icon(Icons.verified_user_outlined),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => PdPilotIdentityNoticePage(
-                          api: PdIdentityScope.maybeOf(context),
-                          onContinueWithoutVerification: () {
-                            // Never mark identity verified or change server rights.
-                            Navigator.of(context).popUntil((route) => route.isFirst);
-                            widget.onBackToCabinets?.call();
-                          },
+                  if (widget.showIdentityCheck) ...[
+                    const SizedBox(height: 18),
+                    OutlinedButton.icon(
+                      key: const Key('pilot-open-identity-check'),
+                      icon: const Icon(Icons.verified_user_outlined),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => PdPilotIdentityNoticePage(
+                            api: PdIdentityScope.maybeOf(context),
+                            onContinueWithoutVerification: () {
+                              // Never mark identity verified or change server rights.
+                              Navigator.of(context).popUntil((route) => route.isFirst);
+                              widget.onBackToCabinets?.call();
+                            },
+                          ),
                         ),
                       ),
+                      label: const Text('Проверка личности · раз в 7 дней'),
                     ),
-                    label: const Text('Проверка личности · раз в 7 дней'),
-                  ),
+                  ],
                   if (_onLine) ...[
                     const SizedBox(height: 18),
                     OutlinedButton.icon(

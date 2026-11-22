@@ -40,6 +40,7 @@ class PrivateDriveDemo extends StatefulWidget {
     this.passengerOnly = false,
     this.adminOnly = false,
     this.pilotOnly = false,
+    this.showPilotIdentityCheck = true,
     this.storageScope,
     this.onSignOut,
     this.onBackToCabinets,
@@ -53,6 +54,7 @@ class PrivateDriveDemo extends StatefulWidget {
   /// This is a local demo console; real admin API authorization is separate.
   final bool adminOnly;
   final bool pilotOnly;
+  final bool showPilotIdentityCheck;
   final String? storageScope;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
@@ -228,6 +230,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
     }
     if (widget.pilotOnly) {
       return PilotCabin(
+        showIdentityCheck: widget.showPilotIdentityCheck,
         enableMapTiles: widget.enableMapTiles,
         tripStore: _trip,
         onSignOut: widget.onSignOut,

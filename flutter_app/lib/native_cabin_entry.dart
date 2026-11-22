@@ -96,6 +96,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     final cabin = PrivateDriveDemo(
       key: ValueKey('entry-$role-${session?.userId ?? (localQa ? 'local-qa' : 'guest')}'),
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',
+      showPilotIdentityCheck: !localQa,
       storageScope: session?.userId ?? (localQa ? 'local-qa' : 'internal-guest'),
       onSignOut: _signOut, onBackToCabinets: _entry,
     );

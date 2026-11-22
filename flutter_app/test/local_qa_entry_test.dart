@@ -41,6 +41,7 @@ void main() {
       await tap(find.byKey(Key('entry-$role')));
       expect(find.byKey(const Key('local-qa-status')), findsOneWidget);
       expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
+      expect(find.byKey(const Key('pilot-open-identity-check')), findsNothing);
       expect(find.byKey(const Key('dispatcher-photo-review')), findsNothing);
       if (role == 'passenger') {
         expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);

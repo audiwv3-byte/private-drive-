@@ -46,6 +46,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-title')), findsOneWidget);
     expect(find.byKey(const Key('passenger-form')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('passenger-entry-transfer')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
     expect(find.byType(PassengerDemo), findsOneWidget);
@@ -121,24 +123,15 @@ void main() {
     expect(find.text('Едем к пассажиру'), findsOneWidget);
     expect(find.text('В путь'), findsOneWidget);
 
-    // Single swipe: arrive, start, stop, resume, then explicit finish mode.
-    Future<void> swipe() async {
-      await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-        Offset(tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52, 0));
-      await tester.pump();
-    }
-    await swipe(); // Arrived at pickup.
-    expect(find.text('Поехали'), findsOneWidget);
-    await swipe(); // Driving.
-    expect(find.text('Поездка выполняется'), findsOneWidget);
-    await swipe(); // Stop.
-    expect(find.text('Остановка · демо'), findsOneWidget);
-    await swipe(); // Resume.
-    expect(find.text('Остановка'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('pilot-final-destination-mode')));
+    // No tripStore: standalone cockpit only cycles mock display stages.
+    // Actual arrival, stop and resume are covered by store-backed tests.
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset(tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52, 0));
     await tester.pump();
-    expect(find.text('Завершить поездку'), findsOneWidget);
-    await swipe(); // Finish.
+    expect(find.text('Завершить'), findsOneWidget);
+    await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
+      Offset(tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52, 0));
+    await tester.pump();
     expect(find.text('Нет активной поездки'), findsOneWidget);
   });
   testWidgets('Pilot GPS stream updates map state locally and can be disabled',

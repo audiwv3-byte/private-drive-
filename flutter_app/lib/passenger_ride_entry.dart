@@ -21,13 +21,14 @@ class PassengerRideEntry extends StatelessWidget {
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
 
-  void _open(BuildContext context, String type) {
+  void _open(BuildContext context, String type, {bool advanceBooking = false}) {
     Navigator.push(context, MaterialPageRoute<void>(
       builder: (_) => PdPassengerLanguageScope(
         child: PassengerDemo(
           enableMapTiles: enableMapTiles,
           tripStore: tripStore,
           initialRideType: type,
+          initialAdvanceBooking: advanceBooking,
         ),
       ),
     ));
@@ -59,6 +60,29 @@ class PassengerRideEntry extends StatelessWidget {
             const Center(
               child: PrivateDriveBrandLogo(
                 size: 196, transparentBackground: true)),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('passenger-entry-advance-booking'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE5C57B),
+                  foregroundColor: const Color(0xFF17130C),
+                  padding: const EdgeInsets.symmetric(vertical: 17, horizontal: 12),
+                  textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                ),
+                icon: const Icon(Icons.event_available_outlined),
+                label: Text(pdTr(context, 'Предварительный заказ',
+                    'Išankstinis užsakymas', 'Advance booking')),
+                onPressed: () => _open(context, 'Такси', advanceBooking: true),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(pdTr(context, 'Забронируй поездку заранее — выбери дату и время',
+                'Užsisakyk kelionę iš anksto — pasirink datą ir laiką',
+                'Book ahead — choose your date and time'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
             const SizedBox(height: 16),
             Text(pdLabel(context, 'Выбери тип поездки'),
               key: const Key('passenger-entry-title'),

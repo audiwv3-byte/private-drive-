@@ -33,7 +33,13 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-booking-jumpstart')), 160,
       scrollable: find.byType(Scrollable).first);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-booking-delivery')), 160,
+      scrollable: find.byType(Scrollable).first);
     expect(find.byKey(const Key('passenger-booking-delivery')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-booking-jumpstart')), -160,
+      scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const Key('passenger-booking-jumpstart')));
     await tester.pumpAndSettle();
     expect(find.text('Запуск автомобиля'), findsWidgets);

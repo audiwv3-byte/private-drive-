@@ -61,7 +61,10 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
    <p class="note">Информационный список. Онлайн-оплата на тестовом сайте ещё не активирована; доступность способов проверим при подключении Stripe.</p>
   </section>
   <p id="status" class="status" role="status" aria-live="polite"></p>
+  <button type="button" class="btn" id="verifyAddresses" hidden>Проверить адреса</button>
+  <p class="note" id="addressCheckHint" hidden>Сначала уточни оба адреса, затем нажми «Проверить адреса». Для проверки адреса отправляются в сервис Nominatim. При недоступности сервиса заявка по быстрому маршруту не откроется.</p>
   <button type="submit" class="btn main">Открыть заявку в Telegram</button>
+  <p class="note">Перед проверкой адресов прочитай <a href="privacy.html">политику конфиденциальности</a> и <a href="terms.html">условия поездок</a>. Адреса передаются сервису Nominatim при проверке; при открытии заявки её содержание передаётся в Telegram. Сообщение отправляешь только ты.</p>
   <p class="note">Это предварительная заявка, не подтверждённый заказ. Telegram откроет чат с уже заполненным сообщением — проверь его и нажми «Отправить». Сайт не списывает деньги и не отправляет сообщения автоматически.</p>
  </form>
 </main>
@@ -119,7 +122,7 @@ if(preorder){
  $('rideTime').required=true;
  $('rideDate').closest('.field').querySelector('label').textContent='Дата поездки *';
  $('rideTime').closest('.field').querySelector('label').textContent='Время подачи *';
- document.querySelector('#orderForm button[type="submit"]').textContent='Отправить предварительный заказ';
+ document.querySelector('#orderForm button[type="submit"]').textContent='Открыть заявку в Telegram';
 }
 function localDay(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function updateDateLimits(){
@@ -185,29 +188,97 @@ $('showRoute').addEventListener('click',async()=>{
   say('Точки отмечены. Маршрут дороги и цена уточняются при подтверждении заявки.');
  }catch(e){say(e.message||'Не удалось найти адреса. Проверь их написание.')}finally{busy=false;$('showRoute').disabled=false}
 });
-// Validate a precise address for the quick city routes (street name and house number,
-// or exact GPS coordinates from the location button). Other request types are unaffected.
-function isPreciseRouteAddress(raw){
- const value=raw.trim();
- const gps=value.match(/^(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/);
- if(gps)return Math.abs(Number(gps[1]))<=90 && Math.abs(Number(gps[2]))<=180;
- const detail=value.replace(/\b(?:vilnius|lithuania|lietuva|kaunas|klaipeda|warsaw|warszawa|poland|polska|trakai|druskininkai|palanga)\b/giu,' ')
- .replace(/(?:вильнюс|литва|каунас|клайпеда|варшава|польша|тракай|друскининкай|паланга)/giu,' ')
- .replace(/[,.]/g,' ').trim();
- const names=detail.match(/\p{L}{2,}/gu)||[];
- const generic=new Set(['улица','ул','дом','street','strasse','gatve','gatvė','prospektas','prospekt','aleja','avenue','road']);
- const street=names.some(word=>!generic.has(word.toLowerCase()));
- const number=/(?:^|\s)\d{1,4}[a-zA-Z\p{L}]?(?=$|[\s/\-])/u.test(detail);
- return street && number;
+// Airport is a fixed landmark; all other quick-route endpoints need a confirmed address.
+const needsVerification=Boolean(selectedRoute||airportDirection);
+const airportLabel='Аэропорт Вильнюса (VNO)';
+const verificationButton=$('verifyAddresses'),verificationHint=$('addressCheckHint');
+verificationButton.hidden=!needsVerification;
+verificationHint.hidden=!needsVerification;
+let verifiedPair=null,verifying=false;
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function normalizePlace(s){
+ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .toLowerCase().replace(/[^a-zа-яё0-9]+/g,' ').trim();
 }
+function houseNumber(s){return /^\d{1,4}[a-zа-я]?$/iu.test(String(s||'').trim())}
+function coordinates(s){
+ const m=String(s).trim().match(/^(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/);
+ if(!m)return null;
+ const lat=Number(m[1]),lon=Number(m[2]);
+ return Math.abs(lat)<=90 && Math.abs(lon)<=180 ? [lat,lon]:null;
+}
+function hasStreetAndNumber(raw){
+ const text=normalizePlace(raw);
+ const tokens=text.split(' ');
+ return tokens.some(t=>houseNumber(t)) && tokens.some(t=>/^[a-zа-яё]{3,}$/iu.test(t) &&
+ !['vilnius','lietuva','lithuania','kaunas','klaipeda','warsaw','warszawa','poland','polska','trakai','druskininkai','palanga','вильнюс','литва','каунас','клайпеда','варшава','польша','тракай','друскининкай','паланга','улица','дом','street','gatve'].includes(t));
+}
+function verifiedGeocoderResult(raw,results){
+ const source=normalizePlace(raw),tokens=source.split(' ');
+ const numbers=tokens.filter(t=>houseNumber(t));
+ if(!Array.isArray(results))return false;
+ return results.some(place=>{
+  const addr=place&&place.address||{};
+  const road=addr.road||addr.pedestrian||addr.residential||addr.street;
+  if(!road||!addr.house_number)return false;
+  const returnedNumber=normalizePlace(addr.house_number).split(' ')[0];
+  if(!numbers.includes(returnedNumber))return false;
+  const normalizedRoad=normalizePlace(road);
+  const meaningful=normalizedRoad.split(' ').filter(t=>t.length>=4 && !['street','gatve','avenue','road','prospektas','улица'].includes(t));
+  return meaningful.length>0 && meaningful.some(t=>source.includes(t));
+ });
+}
+async function lookupPrecise(raw){
+ const point=coordinates(raw);
+ if(point){
+  // Coordinates supplied via the GPS button are a known browser location reading.
+  if(selectedPosition&&point.every((v,i)=>Math.abs(v-selectedPosition[i])<0.000002))return true;
+  // Manually entered coordinates need a mapped object at that position.
+  const url=new URL('https://nominatim.openstreetmap.org/reverse');
+  url.searchParams.set('lat',String(point[0]));url.searchParams.set('lon',String(point[1]));
+  url.searchParams.set('format','jsonv2');url.searchParams.set('zoom','18');url.searchParams.set('addressdetails','1');
+  const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(12000)});
+  if(!response.ok)throw Error('Сервис проверки адресов временно недоступен');
+  const result=await response.json();
+  return !!(result&&result.address&&(result.address.road||result.address.house_number||result.address.amenity));
+ }
+ if(!hasStreetAndNumber(raw))return false;
+ const url=new URL('https://nominatim.openstreetmap.org/search');
+ url.searchParams.set('q',raw);url.searchParams.set('format','jsonv2');
+ url.searchParams.set('addressdetails','1');url.searchParams.set('limit','3');
+ const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(12000)});
+ if(!response.ok)throw Error('Сервис проверки адресов временно недоступен');
+ return verifiedGeocoderResult(raw,await response.json());
+}
+function pairKey(){return JSON.stringify([$('from').value.trim(),$('to').value.trim()])}
+for(const field of ['from','to']){
+ $(field).addEventListener('input',()=>{verifiedPair=null;if(needsVerification)say('Адрес изменён. Повтори проверку перед переходом в Telegram.')});
+}
+verificationButton.addEventListener('click',async()=>{
+ if(verifying)return;
+ const source=$('from').value.trim(),destination=$('to').value.trim();
+ if(!source||!destination){say('Укажи оба адреса.');return}
+ verifying=true;verifiedPair=null;verificationButton.disabled=true;
+ const before=pairKey();
+ try{
+  say('Проверяем точный адрес подачи…');
+  const originOk=airportDirection==='from'&&source===airportLabel || await lookupPrecise(source);
+  if(!originOk){say('Адрес подачи не подтверждён. Введи существующую улицу и дом или GPS-координаты.');$('from').focus();return}
+  // Public Nominatim requires restrained usage: never make consecutive requests in a burst.
+  if(!(airportDirection==='from'&&source===airportLabel))await delay(1200);
+  say('Проверяем точный адрес назначения…');
+  const destinationOk=airportDirection==='to'&&destination===airportLabel || await lookupPrecise(destination);
+  if(!destinationOk){say('Адрес назначения не подтверждён. Введи существующую улицу и дом или GPS-координаты.');$('to').focus();return}
+  if(before!==pairKey()){say('Адреса изменились во время проверки. Повтори проверку.');return}
+  verifiedPair=before;say('Оба адреса проверены. Теперь нажми «Открыть заявку в Telegram».');
+ }catch(err){say('Проверка адресов не завершена: '+(err.name==='TimeoutError'?'превышено время ожидания':err.message||'ошибка сети')+'. Повтори позже.')}
+ finally{verifying=false;verificationButton.disabled=false}
+});
 $('orderForm').addEventListener('submit',async e=>{
  e.preventDefault();
  const from=$('from').value.trim(),to=$('to').value.trim();
  if(!from||!to){say('Укажи откуда и куда.');return}
- if(selectedRoute && !airportDirection){
-  if(!isPreciseRouteAddress(from)){say('Укажи точный адрес подачи: улицу и номер дома в Вильнюсе или координаты GPS. Одного города недостаточно.');$('from').focus();return}
-  if(!isPreciseRouteAddress(to)){say('Укажи точный адрес назначения: улицу и номер дома или координаты GPS. Одного города недостаточно.');$('to').focus();return}
- }
+ if(needsVerification && (verifying || verifiedPair!==pairKey())){say('Сначала нажми «Проверить адреса» и дождись подтверждения обеих точек.');return}
  updateDateLimits();
  const day=$('rideDate').value,time=$('rideTime').value,comment=$('comment').value.trim();
  if((day&&!time)||(!day&&time)){say('Выбери и дату, и время поездки.');return}
@@ -219,7 +290,7 @@ $('orderForm').addEventListener('submit',async e=>{
  const date=day&&time?day+'T'+time:'';
  const radio=$('radio').value==='Другая'?$('radioOther').value.trim():$('radio').value;
  const music=$('music').value.trim();
- if(airportDirection && (airportDirection==='to' && from==='Вильнюс, точный адрес уточнить' || airportDirection==='from' && to==='Вильнюс, точный адрес уточнить')){say('Укажи точный адрес подачи или назначения в Вильнюсе.');return}
+
  const draft=[
   airportDirection?'PRIVATE DRIVE — трансфер аэропорт · 40 €':preorder?'PRIVATE DRIVE — предварительный заказ':'PRIVATE DRIVE — запрос поездки',
   'Откуда: '+from,

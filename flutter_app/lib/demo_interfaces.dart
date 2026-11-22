@@ -608,9 +608,10 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   DemoTrip? _waitingTripId;
   int _seenPassengerMessageCount = 0;
 
-  Duration get _waitingTotal => _waitingElapsed +
-      (_waitingStartedAt == null ? Duration.zero :
-      DateTime.now().difference(_waitingStartedAt!));
+  Duration get _waitingTotal => widget.tripStore != null
+      ? widget.tripStore!.totalStopWaiting()
+      : _waitingElapsed + (_waitingStartedAt == null ? Duration.zero :
+          DateTime.now().difference(_waitingStartedAt!));
 
   String get _waitingClock {
     final seconds = _waitingTotal.inSeconds;
@@ -620,7 +621,20 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   }
 
   void _togglePaidWait() {
-    final currentlyPaused = widget.tripStore?.paused ?? paused;
+    if (widget.tripStore != null) {
+      final changed = widget.tripStore!.togglePause();
+      if (!changed) return;
+      if (widget.tripStore!.paused) {
+        _waitingTicker ??= Timer.periodic(const Duration(seconds: 1), (_) {
+          if (mounted) setState(() {});
+        });
+      } else {
+        _waitingTicker?.cancel();
+        _waitingTicker = null;
+      }
+      return;
+    }
+    final currentlyPaused = paused;
     if (!currentlyPaused) {
       _waitingStartedAt = DateTime.now();
       _waitingTicker ??= Timer.periodic(const Duration(seconds: 1), (_) {
@@ -634,11 +648,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
       _waitingTicker?.cancel();
       _waitingTicker = null;
     }
-    if (widget.tripStore != null) {
-      widget.tripStore!.togglePause();
-    } else {
-      setState(() => paused = !paused);
-    }
+    setState(() => paused = !paused);
   }
   static const stages = ['К пассажиру', 'В путь', 'Завершить'];
   static const labels = ['Нет активной поездки', 'Едем к пассажиру', 'Поездка выполняется'];
@@ -697,6 +707,11 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         widget.tripStore?.passengerChatMessages.length ?? 0;
     widget.tripStore?.addListener(_onTripChanged);
     _syncPickupWaitingTicker();
+    if (widget.tripStore?.paused == true) {
+      _waitingTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    }
     if (widget.tripStore?.pilotOnline == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _onTripChanged();
@@ -1568,8 +1583,11 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                               ),
                             const SizedBox(height: 4),
                             if ((widget.tripStore?.paused ?? paused) ||
-                                _waitingElapsed > Duration.zero)
-                              Text('Остановка · $_waitingClock · без начисления за посадку',
+                                _waitingTotal > Duration.zero)
+                              Text(
+                                'Остановка · $_waitingClock · '
+                                '${widget.tripStore?.completedStopWaits.length ?? 0} завершено · '
+                                'без начисления за посадку',
                                 key: const Key('pilot-paid-wait-timer'),
                                 style: const TextStyle(
                                   color: Color(0xFFDDC184),

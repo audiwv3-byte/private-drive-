@@ -117,6 +117,32 @@ with sync_playwright() as p:
         page.locator(".pd-contacts-nav summary").click()
 
         assert info["booking"] and info["map"], info
+        # Browser-click every navigation item on narrow and wide viewports.
+        for label, expected_hash in [("Главная", "#top"), ("Тарифы", "#prices"), ("О нас", "#about")]:
+            page.locator(".pd-nav a", has_text=label).click()
+            assert page.url.endswith(expected_hash), (width, label, page.url)
+        page.locator(".pd-nav a[href='/services']").click()
+        assert page.url.endswith("/services")
+        assert page.locator("#airport").count() == 1
+        page.goto(BASE + "/", wait_until="domcontentloaded")
+
+        # Three approved service cards must be clickable and reach the intended target.
+        page.locator('.pd-services-three a[aria-label^="Трансфер"]').click()
+        assert page.url.endswith("#quick-order"), page.url
+        for name, anchor_id in [("Доставка посылок", "parcel"), ("Персональный водитель", "driver")]:
+            page.goto(BASE + "/", wait_until="domcontentloaded")
+            page.locator('.pd-services-three a[aria-label^="' + name + '"]').click()
+            assert page.url.endswith("/services#" + anchor_id), (name, page.url)
+            assert page.locator("#" + anchor_id).count() == 1
+        page.goto(BASE + "/", wait_until="domcontentloaded")
+
+        # Four fare cards must prefill the actual quick form with correct routing.
+        for place in ["Аэропорт Вильнюса (VNO)", "Каунас", "Клайпеда", "Варшава"]:
+            page.locator('.pd-destinations a.fare-link[data-to="' + place + '"]').click()
+            assert page.url.endswith("#quick-order"), (width, place, page.url)
+            assert page.locator("#quick-from").input_value() == "Вильнюс", place
+            assert page.locator("#quick-to").input_value() == place, place
+        print(f"MOBILE_NAV_OK width={width} nav=4 service_cards=3 fare_cards=4", flush=True)
         page.locator('a.fare-link[data-to="Каунас"]').click()
         assert page.locator("#quick-from").input_value() == "Вильнюс"
         assert page.locator("#quick-to").input_value() == "Каунас"

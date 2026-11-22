@@ -745,7 +745,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
           '${(left % 60).toString().padLeft(2, '0')}';
     }
     return 'Платное ожидание $clock · +${store.pickupWaitingFeeLabel()} '
-        '(0,30 €/мин)';
+        '(0,25 €/мин)';
   }
 
   void _onTripChanged() {

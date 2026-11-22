@@ -1,6 +1,6 @@
 """Isolated staging WSGI entry for PRIVATE DRIVE browser dispatcher.
 
-Never imports miniapp_server, Telegram, orders, payment modules or databases.
+Never imports miniapp_server, Telegram, orders or payment modules.
 Run only on a dedicated HTTPS test deployment; not production.
 """
 import os
@@ -26,6 +26,7 @@ def create_app():
     if os.environ.get("PD_DISPATCH_STAGING_ONLY") != "1":
         @app.get("/dispatch")
         @app.get("/dispatch/login")
+        @app.route("/dispatch/register", methods=["GET", "POST"])
         def staging_unavailable():
             return "Test dispatcher is disabled", 503
         return app

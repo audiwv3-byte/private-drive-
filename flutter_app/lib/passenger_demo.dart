@@ -18,6 +18,7 @@ import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'demo_map_tile_provider.dart';
+import 'pd_mapbox_qa_config.dart';
 import 'pd_http_api.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -1036,9 +1037,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             key: const Key('passenger-map-tiles'),
                             tileProvider: demoTileProvider(),
                             // Both modes use keyless OSM raster tiles; fallback is for isolated tests.
-                            urlTemplate: _useBackupTiles
-                                ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
-                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            urlTemplate: PdMapboxQaConfig.rasterTileUrl ??
+                                (_useBackupTiles
+                                    ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
+                                    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
                             userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
                             errorTileCallback: (tile, error, stackTrace) {
                               debugPrint('PD_PASSENGER_TILE_ERROR: $error');

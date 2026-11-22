@@ -25,6 +25,7 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
 .btn{border:1px solid #ad8754;border-radius:9px;background:#292016;color:#f2daa8;min-height:44px;padding:10px 12px;font-weight:650}
 .btn.main{background:linear-gradient(125deg,#ffedb9,#e7bd70 60%,#c79650);color:#1d1409;border:0;width:100%}
 .btn:disabled{opacity:.5;cursor:not-allowed}.note{font-size:12px;color:#cbbda5}.status{min-height:22px;font-size:13px;color:#eed3a1}
+.payment-methods{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}.payment-methods span{border:1px solid #9d7c4b;background:#29231c;color:#f9e8c7;padding:8px 10px;border-radius:7px;font-size:13px;font-weight:700}
 .leaflet-control-attribution{font-size:10px!important}
 @media(max-width:640px){.topbar{top:8px;left:8px;right:8px}.panel{top:auto;bottom:8px;left:8px;width:calc(100% - 16px);max-height:min(65dvh,540px);padding:13px}.brand{padding:5px 9px}.brand img{width:29px;height:29px}.back{padding:9px 11px}h1{font-size:22px}.leaflet-bottom.leaflet-right{bottom:calc(min(65dvh,540px) + 16px)}}
 </style>
@@ -51,6 +52,13 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
   <div class="field" id="radioOtherField" hidden><label for="radioOther">Название радиостанции</label><input id="radioOther" maxlength="100" placeholder="Название или частота" autocomplete="off"></div>
   <div class="field"><label for="music">Любимый трек в поездке (необязательно)</label><input id="music" name="music" maxlength="160" placeholder="Исполнитель — название песни"></div>
   <div class="field"><label for="comment">Пожелания (необязательно)</label><textarea id="comment" name="comment" maxlength="500" placeholder="Багаж, детское кресло, встреча с табличкой…"></textarea></div>
+  <section class="field" aria-label="Способы оплаты">
+   <label>Способы оплаты после подтверждения заказа</label>
+   <div class="payment-methods" aria-label="Visa, Mastercard, Apple Pay, Google Pay, PayPal">
+    <span>Visa</span><span>Mastercard</span><span>Apple Pay</span><span>Google Pay</span><span>PayPal</span>
+   </div>
+   <p class="note">Информационный список. Онлайн-оплата на тестовом сайте ещё не активирована; доступность способов проверим при подключении Stripe.</p>
+  </section>
   <p id="status" class="status" role="status" aria-live="polite"></p>
   <button type="submit" class="btn main">Запросить поездку в Telegram</button>
   <p class="note">Это предварительная заявка, не подтверждённый заказ. Никаких платежей сайт не принимает. Для отправки откроется Telegram.</p>

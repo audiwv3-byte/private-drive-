@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#100e0c">
+<title>Заказать поездку — PRIVATE DRIVE</title>
+<link rel="icon" href="assets/pd-logo.webp" type="image/webp">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyo0SS+uqOGdGQ=" crossorigin="">
+<style>
+:root{color-scheme:dark;--gold:#edcc86;--bg:#100e0c;--panel:#191511;--border:#745c3c}
+*{box-sizing:border-box}html,body{margin:0;height:100%;font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#f9efe1}
+a{color:var(--gold)}button,input,select,textarea{font:inherit}button{cursor:pointer}
+#map{position:fixed;inset:0;z-index:0;background:#242424}
+.map-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;background:#25211d;color:#f9e1b0;z-index:1}
+.leaflet-container{font:inherit}
+.topbar{position:fixed;top:12px;left:12px;right:12px;z-index:1000;pointer-events:none;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.topbar>*{pointer-events:auto}
+.brand,.back{border:1px solid var(--border);border-radius:12px;background:#15110eef;box-shadow:0 3px 20px #0007;color:var(--gold);text-decoration:none;display:flex;align-items:center;gap:9px;padding:7px 12px;font-weight:700}
+.brand img{width:34px;height:34px;object-fit:contain}.brand small{display:block;color:#e0d2bd;font-size:10px;letter-spacing:.07em}
+.panel{position:fixed;z-index:1000;top:76px;left:12px;width:min(390px,calc(100vw - 24px));max-height:calc(100dvh - 92px);overflow:auto;padding:18px;background:#15110ef5;backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 50px #0009}
+h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px 0;color:#d8cbb7}.field{margin:11px 0}.field label{display:block;color:#efd4a2;margin-bottom:5px;font-weight:600}.field input,.field select,.field textarea{width:100%;border:1px solid #8d724c;border-radius:9px;background:#29231c;color:#fff;padding:11px 12px;min-height:44px}.field textarea{min-height:64px;resize:vertical}
+.field input:focus,.field textarea:focus{outline:2px solid #f1c878;outline-offset:1px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.btn{border:1px solid #ad8754;border-radius:9px;background:#292016;color:#f2daa8;min-height:44px;padding:10px 12px;font-weight:650}
+.btn.main{background:linear-gradient(125deg,#ffedb9,#e7bd70 60%,#c79650);color:#1d1409;border:0;width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed}.note{font-size:12px;color:#cbbda5}.status{min-height:22px;font-size:13px;color:#eed3a1}
+.leaflet-control-attribution{font-size:10px!important}
+@media(max-width:640px){.topbar{top:8px;left:8px;right:8px}.panel{top:auto;bottom:8px;left:8px;width:calc(100% - 16px);max-height:min(65dvh,540px);padding:13px}.brand{padding:5px 9px}.brand img{width:29px;height:29px}.back{padding:9px 11px}h1{font-size:22px}.leaflet-bottom.leaflet-right{bottom:calc(min(65dvh,540px) + 16px)}}
+</style>
+</head>
+<body>
+<div id="map" aria-label="Интерактивная карта Вильнюса"><div id="mapFallback" class="map-fallback">Загрузка карты…</div></div>
+<div class="topbar">
+ <a class="brand" href="index.html" aria-label="PRIVATE DRIVE — вернуться на сайт"><img src="assets/pd-logo.webp" alt=""><span>PRIVATE DRIVE<small>КАРТА ПОЕЗДКИ</small></span></a>
+ <a class="back" href="index.html">← На сайт</a>
+</div>
+<main class="panel">
+ <h1>Заказать поездку</h1>
+ <p>Укажи адреса и отправь запрос пилоту.</p>
+ <form id="orderForm">
+  <div class="field"><label for="from">Откуда</label><input id="from" name="from" placeholder="Город, улица, дом" autocomplete="street-address" maxlength="200" required></div>
+  <div class="field"><label for="to">Куда</label><input id="to" name="to" placeholder="Город, улица, дом" maxlength="200" required></div>
+  <div class="actions">
+   <button class="btn" type="button" id="locate">◎ Моё местоположение</button>
+   <button class="btn" type="button" id="showRoute">Показать точки на карте</button>
+  </div>
+  <div class="field"><label for="datetime">Дата и время (необязательно)</label><input type="datetime-local" id="datetime" name="datetime"></div>
+  <div class="field"><label for="comment">Пожелания (необязательно)</label><textarea id="comment" name="comment" maxlength="500" placeholder="Багаж, детское кресло, встреча с табличкой…"></textarea></div>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+  <button type="submit" class="btn main">Запросить поездку в Telegram</button>
+  <p class="note">Это предварительная заявка, не подтверждённый заказ. Никаких платежей сайт не принимает. Для отправки откроется Telegram.</p>
+ </form>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id),status=$('status');
+let map=null,markers=[],selectedPosition=null;
+function say(s){status.textContent=s}
+try{
+ if(typeof L!=='undefined'){
+  map=L.map('map',{zoomControl:false}).setView([54.6872,25.2797],12);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  $('mapFallback').remove();
+  setTimeout(()=>map.invalidateSize(),200);
+ }else{$('mapFallback').textContent='Карта временно недоступна. Адреса можно ввести вручную и отправить заявку.'}
+}catch(e){$('mapFallback').textContent='Не удалось открыть карту. Заявку можно отправить без неё.'}
+function pin(lat,lon,label){if(!map)return;const marker=L.marker([lat,lon]).addTo(map).bindPopup(label);markers.push(marker)}
+function clearPins(){if(map)markers.forEach(m=>map.removeLayer(m));markers=[]}
+$('locate').addEventListener('click',()=>{
+ if(!navigator.geolocation){say('Геолокация недоступна. Введи адрес вручную.');return}
+ say('Определяем местоположение…');
+ navigator.geolocation.getCurrentPosition(p=>{
+  selectedPosition=[p.coords.latitude,p.coords.longitude];
+  $('from').value=selectedPosition.map(v=>v.toFixed(6)).join(', ');
+  clearPins();pin(...selectedPosition,'Твоё местоположение');
+  map?.setView(selectedPosition,15);say('Местоположение отмечено на карте. При необходимости впиши точный адрес.');
+ },()=>say('Не удалось получить геолокацию. Разреши доступ к местоположению или введи адрес вручную.'),{enableHighAccuracy:false,timeout:10000,maximumAge:60000});
+});
+async function geocode(value){
+ const coords=value.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
+ if(coords)return [+coords[1],+coords[2]];
+ const q=new URL('https://nominatim.openstreetmap.org/search');q.searchParams.set('q',value);q.searchParams.set('format','jsonv2');q.searchParams.set('limit','1');
+ const res=await fetch(q,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(12000)});
+ if(!res.ok)throw Error('Сервис поиска адресов сейчас недоступен');
+ const data=await res.json();if(!data.length)throw Error('Адрес не найден: '+value);
+ return [Number(data[0].lat),Number(data[0].lon)];
+}
+let busy=false;
+$('showRoute').addEventListener('click',async()=>{
+ if(busy)return;
+ const from=$('from').value.trim(),to=$('to').value.trim();
+ if(!from||!to){say('Сначала введи оба адреса.');return}
+ if(!map){say('Карта недоступна, но заявку всё равно можно отправить.');return}
+ busy=true;$('showRoute').disabled=true;say('Ищем адреса…');
+ try{
+  const a=await geocode(from);
+  await new Promise(r=>setTimeout(r,1100));
+  const b=await geocode(to);
+  clearPins();pin(...a,'Откуда');pin(...b,'Куда');
+  map.fitBounds(L.latLngBounds([a,b]).pad(.3),{maxZoom:15,padding:[25,25]});
+  say('Точки отмечены. Маршрут дороги и цена уточняются при подтверждении заявки.');
+ }catch(e){say(e.message||'Не удалось найти адреса. Проверь их написание.')}finally{busy=false;$('showRoute').disabled=false}
+});
+$('orderForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const from=$('from').value.trim(),to=$('to').value.trim();
+ if(!from||!to){say('Укажи откуда и куда.');return}
+ const date=$('datetime').value,comment=$('comment').value.trim();
+ const draft='PRIVATE DRIVE — запрос поездки\nОткуда: '+from+'\nКуда: '+to+(date?'\nДата/время: '+date.replace('T',' '):'')+(comment?'\nПожелания: '+comment:'');
+ try{await navigator.clipboard.writeText(draft);say('Заявка скопирована. Вставь её в сообщение Telegram.')}catch(_){say('Скопируй данные поездки перед отправкой в Telegram.');window.prompt('Текст заявки — скопируй его:',draft)}
+ const link='https://t.me/PrivateDraive';
+ const opened=window.open(link,'_blank','noopener,noreferrer');if(!opened)window.location.href=link;
+});
+})();
+</script>
+</body></html>

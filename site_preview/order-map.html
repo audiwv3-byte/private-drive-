@@ -73,6 +73,25 @@ const $=id=>document.getElementById(id),status=$('status');
 const params=new URLSearchParams(location.search);
 const preorder=params.get('mode')==='preorder';
 const airportDirection=['to','from'].includes(params.get('airport'))?params.get('airport'):null;
+const routeDestinations={
+ 'kaunas':'Каунас, Литва',
+ 'klaipeda':'Клайпеда, Литва',
+ 'warsaw':'Варшава, Польша',
+ 'trakai':'Тракай, Литва',
+ 'druskininkai':'Друскининкай, Литва',
+ 'palanga':'Паланга, Литва'
+};
+const selectedRoute=Object.prototype.hasOwnProperty.call(routeDestinations,params.get('route'))?params.get('route'):null;
+if(selectedRoute && !airportDirection){
+ $('from').value='Вильнюс, Литва';
+ $('to').value=routeDestinations[selectedRoute];
+ const destination=routeDestinations[selectedRoute];
+ const explanation=document.createElement('p');
+ explanation.className='note';
+ explanation.textContent='Маршрут заполнен: Вильнюс → '+destination+'. Уточни адрес подачи, место назначения и дату поездки. Цена подтверждается отдельно.';
+ $('to').closest('.field').after(explanation);
+}
+
 const serviceNames={'flowers':'Цветы к поездке','surprise':'Поездка-сюрприз','sober-driver':'Трезвый водитель','jump-start':'Запуск автомобиля · 20 €','meet-sign':'Встреча с табличкой · +15 €','luggage':'Помощь с багажом','parcel':'Доставка посылки','personal-driver':'Персональный водитель'};
 const selectedService=Object.prototype.hasOwnProperty.call(serviceNames,params.get('service'))?serviceNames[params.get('service')]:null;
 if(selectedService){

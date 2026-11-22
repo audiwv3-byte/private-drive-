@@ -71,7 +71,10 @@ class DispatcherStagingTests(unittest.TestCase):
         for fare in ("40", "120", "320", "460"):
             self.assertIn(fare + " евро", data)
         self.assertEqual(data.count('class="pd-img-card fare-link"'), 4)
-        self.assertEqual(data.count('class="pd-img-card" href='), 3)
+        self.assertEqual(data.count('class="pd-img-card" href=') + data.count('class="pd-img-card pd-driver-card" href='), 3)
+        self.assertIn('class="pd-img-card pd-driver-card"', data)
+        self.assertIn('src="/assets/pd-user-photo-6-original.webp"', data)
+        self.assertNotIn('src="/assets/pd-approved-service_driver.webp"', data)
         self.assertIn('id="quick-trip-form"', data)
         self.assertIn('id="order-live-map"', data)
         self.assertIn('id="route-details"', data)

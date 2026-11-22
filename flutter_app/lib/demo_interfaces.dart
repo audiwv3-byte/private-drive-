@@ -843,13 +843,6 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     advance();
   }
 
-  bool get _canPause {
-    final store = widget.tripStore;
-    if (store == null) return stage != 0;
-    return store.status == DemoTripStatus.approaching ||
-        store.status == DemoTripStatus.underway;
-  }
-
 
   void _animatePosition() {
     if (!mounted || _animationStart == null || _animationTarget == null) return;

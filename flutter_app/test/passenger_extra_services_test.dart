@@ -18,24 +18,23 @@ void main() {
     expect(find.byKey(const Key('extra-payment-PayPal')), findsOneWidget);
   });
 
-  testWidgets('Passenger menu contains both standalone 20 EUR services',
+  testWidgets('Passenger booking includes assistance and delivery options',
       (tester) async {
     final store = DemoTripStore();
     addTearDown(store.dispose);
     await tester.pumpWidget(MaterialApp(home: PassengerRideEntry(
       enableMapTiles: false, tripStore: store)));
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('passenger-entry-jumpstart')), 160,
-      scrollable: find.byType(Scrollable).first);
-    expect(find.byKey(const Key('passenger-entry-jumpstart')), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('passenger-entry-delivery')), 160,
-      scrollable: find.byType(Scrollable).first);
+    // Standalone delivery is on the entry screen; assistance is on the
+    // subsequent booking screen as requested.
     expect(find.byKey(const Key('passenger-entry-delivery')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('passenger-entry-taxi')));
+    await tester.tap(find.byKey(const Key('passenger-entry-taxi')));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.byKey(const Key('passenger-entry-jumpstart')), -160,
+      find.byKey(const Key('passenger-booking-jumpstart')), 160,
       scrollable: find.byType(Scrollable).first);
-    await tester.tap(find.byKey(const Key('passenger-entry-jumpstart')));
+    expect(find.byKey(const Key('passenger-booking-delivery')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('passenger-booking-jumpstart')));
     await tester.pumpAndSettle();
     expect(find.text('Запуск автомобиля'), findsWidgets);
     expect(find.byKey(const Key('extra-service-price')), findsOneWidget);

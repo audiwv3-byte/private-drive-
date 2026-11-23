@@ -40,7 +40,7 @@ class PdNativeSessionVault {
   Future<void> save(PdNativeSession session) async {
     if (!session.active || session.token.length < 40 ||
         session.token.length > 256 || session.userId.isEmpty ||
-        !const {'passenger', 'pilot', 'admin'}.contains(session.role)) {
+        !const {'passenger', 'pilot', 'dispatcher', 'pilot_dispatcher', 'admin'}.contains(session.role)) {
       throw const FormatException('Invalid verified native session');
     }
     final marker = await _installationMarker(create: true);
@@ -67,7 +67,7 @@ class PdNativeSessionVault {
           role = data['role'], expires = data['expires_at'];
       if (token is! String || token.length < 40 || token.length > 256 ||
           id is! String || id.isEmpty || role is! String ||
-          !const {'passenger', 'pilot', 'admin'}.contains(role) ||
+          !const {'passenger', 'pilot', 'dispatcher', 'pilot_dispatcher', 'admin'}.contains(role) ||
           expires is! int) return null;
       final result = PdNativeSession(
         token: token, userId: id, role: role,

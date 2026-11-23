@@ -1,0 +1,58 @@
+name: PRIVATE DRIVE native secure storage platform QA
+on:
+  push:
+    branches: [feature/web-dispatcher-browser-auth]
+    paths:
+      - 'flutter_app/lib/native_session_vault.dart'
+      - 'flutter_app/test/native_session_persistence_test.dart'
+      - 'flutter_app/test/native_auth_relaunch_widget_test.dart'
+      - 'flutter_app/tool/harden_android_native_auth.py'
+      - 'flutter_app/tool/test_harden_android_native_auth.py'
+      - '.github/workflows/pd-native-storage-hardening-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  harden-native-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PD_NATIVE_AUTH_API_URL: ''
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Check Android backup policy on synthetic generated manifest
+        run: python3 -m unittest discover -s flutter_app/tool -p test_harden_android_native_auth.py -v
+      - name: Generate throwaway Android project and apply backup exclusions
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive /tmp/pd_ci_generated
+          python3 flutter_app/tool/harden_android_native_auth.py /tmp/pd_ci_generated
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p=Path('/tmp/pd_ci_generated/android/app/src/main/AndroidManifest.xml')
+          app=ET.parse(p).getroot().find('application')
+          android='{http://schemas.android.com/apk/res/android}'
+          assert app.get(android+'allowBackup')=='false'
+          assert app.get(android+'dataExtractionRules')=='@xml/pd_native_no_extract'
+          for f in ['pd_native_no_backup.xml','pd_native_no_extract.xml']:
+              ET.parse(p.parent/'res/xml'/f)
+          print('Generated Android application backup and transfer disabled in CI')
+          PY
+      - name: Prepare Flutter artwork and packages
+        working-directory: flutter_app
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 tool/prepare_transparent_logo.py
+          flutter pub get
+      - name: Test iOS device-only keychain and Android install-marker isolation
+        working-directory: flutter_app
+        run: flutter test --no-pub --reporter expanded test/native_session_persistence_test.dart test/native_auth_relaunch_widget_test.dart test/native_logout_api_test.dart
+      - name: Flutter static analysis
+        working-directory: flutter_app
+        run: flutter analyze --no-fatal-infos

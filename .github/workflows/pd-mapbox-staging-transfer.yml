@@ -1,0 +1,64 @@
+name: PRIVATE DRIVE - transfer public Mapbox token to staging only
+
+on:
+  push:
+    branches:
+      - feature/web-dispatcher-browser-auth
+    paths:
+      - .github/workflows/pd-mapbox-staging-transfer.yml
+
+permissions:
+  contents: read
+
+jobs:
+  staging-mapbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+      RENDER_TOKEN: ${{ secrets.RENDER_API_KEY }}
+    steps:
+      - name: Check tokens and update only the isolated staging service
+        shell: bash
+        run: |
+          set +x
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          import urllib.error
+          import urllib.request
+
+          mapbox = os.environ.get('MAPBOX_TOKEN', '')
+          render = os.environ.get('RENDER_TOKEN', '')
+          print('MAPBOX_PUBLIC_TOKEN: ' + ('PRESENT' if mapbox else 'ABSENT'))
+          print('RENDER_API_KEY: ' + ('PRESENT' if render else 'ABSENT'))
+          if not mapbox or not render:
+              print('TRANSFER: SKIPPED_MISSING_SECRET')
+              sys.exit(0)
+          if not re.fullmatch(r'pk\.[A-Za-z0-9_.-]{1,512}', mapbox):
+              print('TRANSFER: SKIPPED_INVALID_PUBLIC_TOKEN')
+              sys.exit(0)
+          url = ('https://api.render.com/v1/services/'
+                 'srv-dc0qfsp42hec73c7ff3g/env-vars/MAPBOX_WEB_PUBLIC_TOKEN')
+          req = urllib.request.Request(
+              url,
+              method='PUT',
+              data=json.dumps({'value': mapbox}).encode('utf-8'),
+              headers={
+                  'Authorization': 'Bearer ' + render,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+              },
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  print('TRANSFER: ' + ('SUCCESS' if resp.status == 200 else 'UNEXPECTED_STATUS'))
+          except urllib.error.HTTPError as exc:
+              print('TRANSFER: HTTP_' + str(exc.code))
+              sys.exit(1)
+          except Exception as exc:
+              print('TRANSFER: NETWORK_' + type(exc).__name__)
+              sys.exit(1)
+          PY

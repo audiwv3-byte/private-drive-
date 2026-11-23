@@ -65,6 +65,10 @@ jobs:
           # An unrelated empty DB proves restoration cannot overwrite source.
           docker run --rm --network host -e PGPASSWORD=synthetic-only-password postgres:18 \
             createdb -h 127.0.0.1 -U pd_ci pd_schema_restored
+          # Only disposable restore DB: remove its default empty public schema.
+          docker run --rm --network host -e PGPASSWORD=synthetic-only-password postgres:18 \
+            psql -h 127.0.0.1 -U pd_ci -d pd_schema_restored \
+            -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE'
           age --decrypt --identity "$dir/key.txt" "$dir/backup.age" \
             | docker run --rm -i --network host -e PGPASSWORD=synthetic-only-password postgres:18 \
                 pg_restore -h 127.0.0.1 -U pd_ci -d pd_schema_restored \

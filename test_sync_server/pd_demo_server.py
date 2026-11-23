@@ -303,8 +303,12 @@ class ApiServer(ThreadingHTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address, store, credentials, *, browser_origin=None):
+    def __init__(self, address, store, credentials, *, browser_origin=None,
+                 native_principal_lookup=None):
         self.store, self.credentials = store, credentials
+        # Optional explicitly injected authority for isolated native-auth QA.
+        # Production startup never supplies it or discovers real DB secrets.
+        self.native_principal_lookup = native_principal_lookup
         self.browser_origin = browser_origin
         super().__init__(address, ApiHandler)
 
@@ -337,10 +341,32 @@ class ApiHandler(BaseHTTPRequestHandler):
         header = self.headers.get("Authorization", "")
         if not header.startswith("Bearer "):
             raise TripError("unauthorized", 401)
-        raw = header[7:].strip()
-        if len(raw) > 200:
+        raw = header[7:]
+        if not 32 <= len(raw) <= 200 or raw != raw.strip() or any(c.isspace() for c in raw):
             raise TripError("unauthorized", 401)
         fingerprint = hashlib.sha256(raw.encode()).digest()
+        lookup = self.server.native_principal_lookup
+        cabin = self.headers.get("X-PD-Cabin")
+        if lookup is not None:
+            # Do not trust client-supplied roles. Resolve every request from
+            # current native session status and current server roles.
+            principal = lookup(fingerprint.hex())
+            if principal is None or cabin not in ("passenger", "pilot", "dispatcher"):
+                raise TripError("unauthorized", 401)
+            user_id, server_role = principal
+            allowed = {
+                "passenger": {"passenger", "pilot", "dispatcher",
+                              "pilot_dispatcher", "admin"},
+                "pilot": {"pilot", "pilot_dispatcher", "admin"},
+                "dispatcher": {"dispatcher", "pilot_dispatcher", "admin"},
+            }
+            if server_role not in allowed[cabin]:
+                raise TripError("forbidden", 403)
+            if not isinstance(user_id, str) or not 1 <= len(user_id) <= 128:
+                raise TripError("unauthorized", 401)
+            return cabin, user_id
+        if cabin is not None:
+            raise TripError("forbidden", 403)
         for expected, principal in self.server.credentials.items():
             if hmac.compare_digest(fingerprint, expected):
                 return principal

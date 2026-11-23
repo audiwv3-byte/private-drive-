@@ -1046,7 +1046,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             tileProvider: demoTileProvider(),
                             // Switch the actual provider when Mapbox tiles fail.
                             urlTemplate: (usesMapbox
-                                ? (_nightMap ? mapboxUrl : mapboxUrl!.replaceFirst('/dark-v11/', '/streets-v12/'))
+                                ? (_nightMap ? mapboxUrl : mapboxUrl.replaceFirst('/dark-v11/', '/streets-v12/'))
                                 : null) ??
                                 (_useBackupTiles
                                     ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'

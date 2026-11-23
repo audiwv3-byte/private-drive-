@@ -76,6 +76,7 @@ class PrivateDriveApp extends StatelessWidget {
                 authApiUrl: authUrl,
                 httpClient: httpClient,
                 allowLoopback: mockSync,
+                qaRole: role,
                 allowGuestEntry: !mockSync && role == 'passenger',
                 onAuthenticated: onAuthenticated,
               ),
@@ -96,6 +97,7 @@ class NativeSignInScreen extends StatefulWidget {
     this.httpClient,
     this.allowLoopback = false,
     this.allowGuestEntry = true,
+    this.qaRole = 'passenger',
     this.onAuthenticated,
   });
 
@@ -103,6 +105,7 @@ class NativeSignInScreen extends StatefulWidget {
   final bool enableOfflinePreview;
   final http.Client? httpClient;
   final bool allowGuestEntry;
+  final String qaRole;
   final bool allowLoopback;
   final ValueChanged<PdNativeSession>? onAuthenticated;
 
@@ -139,6 +142,39 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     final uri = PdHttpApi.secureUri(widget.authApiUrl, path, allowLoopback: widget.allowLoopback);
     return const PdHttpApi().postJson(uri, payload, client: widget.httpClient,
       allowLoopback: widget.allowLoopback);
+  }
+
+  /// QA sessions are synthetic and never represent verified phone ownership.
+  Future<void> signInSyntheticQa() async {
+    if (busy || !_acknowledgedLegal || widget.onAuthenticated == null ||
+        !const bool.fromEnvironment('PD_ISOLATED_QA_AUTH')) return;
+    setState(() { busy = true; message = 'Подключаем тестовый кабинет…'; });
+    try {
+      final result = await post('/native-auth/qa-session', {'role': widget.qaRole});
+      final token = result['access_token'];
+      final userId = result['user_id'];
+      final expires = result['expires_in'];
+      if (result['qa'] != true || result['verified'] != false ||
+          result['role'] != widget.qaRole || result['token_type'] != 'Bearer' ||
+          token is! String || token.length < 40 ||
+          userId is! String || userId.isEmpty ||
+          expires is! int || expires <= 0) {
+        throw const FormatException('Некорректная тестовая сессия');
+      }
+      if (!mounted) return;
+      widget.onAuthenticated!(PdNativeSession(
+        token: token, userId: userId, role: widget.qaRole,
+        expiresAt: DateTime.now().add(Duration(seconds: expires)),
+      ));
+    } on PdHttpStatusException catch (error) {
+      if (mounted) setState(() => message =
+        'Тестовый вход недоступен (HTTP ${error.statusCode}).');
+    } catch (_) {
+      if (mounted) setState(() => message =
+        'Нет подключения к тестовому серверу. Проверь актуальность ссылки.');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Future<void> requestCode() async {
@@ -472,6 +508,23 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 ],
                 const SizedBox(height: 20),
+                if (const bool.fromEnvironment('PD_ISOLATED_QA_AUTH') &&
+                    widget.onAuthenticated != null) ...[
+                  const Text('Синтетический тест. Телефон не подтверждается, '
+                    'SMS не отправляются. Права определяются Mock API.',
+                    textAlign: TextAlign.center,
+                    key: Key('qa-auth-explanation')),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    key: const Key('qa-sign-in'),
+                    onPressed: busy || !_acknowledgedLegal ? null : signInSyntheticQa,
+                    child: const Text('Войти в тестовый кабинет без SMS'),
+                  ),
+                  if (message.isNotEmpty)
+                    Text(message, key: const Key('qa-auth-feedback'),
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                ],
                 TextField(
                   controller: destination,
                   enabled: !busy && challengeId == null,

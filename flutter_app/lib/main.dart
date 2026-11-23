@@ -15,6 +15,7 @@ import 'pilot_identity_api.dart';
 import 'pilot_photo_capture.dart';
 import 'native_cabin_entry.dart';
 import 'native_session.dart';
+import 'native_logout_api.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 // Opt-in only for the isolated static Safari/Android browser test artifact.
@@ -63,6 +64,7 @@ class PrivateDriveApp extends StatelessWidget {
               ),
               identityApiBuilder: (session) => PdIdentityApi(
                 baseUrl: apiBaseUrl, token: session.token),
+              logoutApi: const PdNativeLogoutApi(baseUrl: apiBaseUrl),
             ),
       ),
     );
@@ -93,6 +95,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   final destination = TextEditingController();
   final code = TextEditingController();
   bool busy = false;
+  bool loggingOut = false;
   bool _guest = false;
   bool _acknowledgedLegal = false;
   // Authentication belongs to the Russian-only shared/native shell.
@@ -221,6 +224,29 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     });
   }
 
+  Future<void> remoteSignOut() async {
+    if (loggingOut) return;
+    final token = sessionToken;
+    if (token == null) {
+      signOut();
+      return;
+    }
+    setState(() => loggingOut = true);
+    try {
+      await PdNativeLogoutApi(baseUrl: widget.authApiUrl,
+        client: widget.httpClient).revokeCurrentDevice(token);
+      if (!mounted || sessionToken != token) return;
+      signOut();
+    } catch (_) {
+      if (mounted) {
+        setState(() => message =
+          'Не удалось завершить сеанс на сервере. Попробуй ещё раз.');
+      }
+    } finally {
+      if (mounted) setState(() => loggingOut = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const gold = Color(0xFFDDC184);
@@ -244,7 +270,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       );
     }
     // The token remains only in process memory; app restart requires sign-in.
-    // Server revocation and durable secure storage are separate future steps.
+    // Durable secure storage is a separate future step.
     final active = sessionToken != null &&
         signedInUserId != null &&
         sessionExpiry != null &&
@@ -294,7 +320,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       child: const Text('Перейти в приложение'),
                     ),
                     TextButton(
-                      onPressed: signOut,
+                      onPressed: loggingOut ? null : remoteSignOut,
                       child: const Text('Выйти'),
                     ),
                   ],

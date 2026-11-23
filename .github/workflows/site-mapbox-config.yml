@@ -1,0 +1,46 @@
+name: PRIVATE DRIVE Mapbox public map configuration
+on:
+  push:
+    branches:
+      - feature/website-private-drive-preview
+    paths:
+      - .github/workflows/site-mapbox-config.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  public-mapbox-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          ref: feature/website-private-drive-preview
+      - name: Validate saved public Mapbox token and generate web config
+        env:
+          MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          token=os.environ.get('MAPBOX_PUBLIC_TOKEN','').strip()
+          if not re.fullmatch(r'pk\.[A-Za-z0-9_.-]+',token):
+              raise SystemExit('The existing MAPBOX_PUBLIC_TOKEN secret is missing or not a pk. token')
+          Path('site_preview/assets/mapbox-config.js').write_text(
+              'window.PD_MAPBOX_PUBLIC_TOKEN = '+json.dumps(token)+';\n', encoding='utf-8')
+          print('Mapbox public browser configuration created (token not logged).')
+          PY
+      - name: Commit published browser configuration to website preview branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add site_preview/assets/mapbox-config.js
+          if git diff --cached --quiet; then
+            echo 'Mapbox config already up to date'
+          else
+            git commit -m 'chore(site): configure public Mapbox browser token'
+            git push origin HEAD:feature/website-private-drive-preview
+          fi

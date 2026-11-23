@@ -217,7 +217,7 @@ class DemoTripStore extends ChangeNotifier {
   bool get cashOrderNeedsOtherPilot => _trip != null &&
       _trip!.paymentMethod == 'Наличные' && !_pilotAcceptsCash;
   static const freePickupWaiting = Duration(minutes: 3);
-  static const pickupWaitingCentsPerMinute = 30;
+  static const pickupWaitingCentsPerMinute = 25;
   DateTime? get arrivalAt => _arrivalAt;
   bool get isWaitingAtPickup => _arrivalAt != null &&
       _departureFromPickupAt == null && _status == DemoTripStatus.approaching;
@@ -244,7 +244,7 @@ class DemoTripStore extends ChangeNotifier {
     return paid.isNegative ? Duration.zero : paid;
   }
 
-  /// 0.30 EUR per started paid minute. Free first 180 seconds.
+  /// 0.25 EUR per started paid minute. Free first 180 seconds.
   int pickupWaitingChargeCents({DateTime? now}) {
     final elapsed = pickupPaidWaitingElapsed(now: now);
     if (elapsed == Duration.zero) return 0;

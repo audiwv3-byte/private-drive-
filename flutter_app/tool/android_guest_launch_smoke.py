@@ -58,14 +58,17 @@ def wait_for_labels(*labels, timeout=45):
     raise AssertionError(f'Missing screen labels: {labels}')
 
 
-def scroll_to_passenger_option(label, xml):
+def scroll_to_passenger_option(label, xml, *, scroll_back=False):
     screen_sizes = re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size').decode())
     width, height = map(int, screen_sizes[-1])
     for _ in range(4):
         if label in xml:
             return xml
-        adb('shell', 'input', 'swipe', str(width // 2), str(height * 3 // 4),
-            str(width // 2), str(height // 3), '350')
+        start, end = height * 3 // 4, height // 3
+        if scroll_back:
+            start, end = end, start
+        adb('shell', 'input', 'swipe', str(width // 2), str(start),
+            str(width // 2), str(end), '350')
         xml = snapshot()
     if label in xml:
         return xml
@@ -89,6 +92,13 @@ for role, labels in [
     if role == 'Пассажир':
         xml = scroll_to_passenger_option('Трансфер', xml)
         xml = scroll_to_passenger_option('Доставка', xml)
+        scroll_to_passenger_option('Трансфер', xml, scroll_back=True)
+        click_node('Трансфер')
+        wait_for_labels('Mapbox')
+        assert b'PD_MAPBOX_TILE_OK' in adb('logcat', '-d'), 'Mapbox tile probe did not succeed'
+        Path('android-guest-mapbox.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+        adb('shell', 'input', 'keyevent', '4')
+        wait_for_labels('Такси')
     assert 'Фотоконтроль' not in xml and 'Проверка личности' not in xml
     Path(f'android-guest-{role}.xml').write_text(xml, encoding='utf-8')
     Path(f'android-guest-{role}.png').write_bytes(adb('exec-out', 'screencap', '-p'))

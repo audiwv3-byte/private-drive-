@@ -18,6 +18,7 @@ import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'demo_map_tile_provider.dart';
+import 'pd_mapbox_qa_config.dart';
 import 'pd_http_api.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -93,7 +94,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _music = false;
   bool _flowers = false;
   bool _coffee = false;
-  bool _nightMap = false;
+  bool _nightMap = PdMapboxQaConfig.canUseMapbox;
   String _menuSection = 'booking';
   bool _followPilot = true;
   LatLng? _lastPilotCameraFix;
@@ -192,6 +193,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   int _routeRequest = 0;
   Timer? _addressTimer;
   Timer? _gpsFreshnessTimer;
+  StreamSubscription<ServiceStatus>? _passengerGpsStatus;
   int _addressGeneration = 0;
   String? _editingAddress;
   List<String> _addressSuggestions = const [];
@@ -433,6 +435,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
         throw const FormatException('Некорректные координаты GPS');
       }
       setState(() => _passengerLocation = point);
+      if (!kIsWeb && widget.currentPositionLoader == null) {
+        _passengerGpsStatus ??= Geolocator.getServiceStatusStream().listen((status) {
+          if (mounted && status == ServiceStatus.disabled) {
+            setState(() => _passengerLocation = null);
+          }
+        }, onError: (Object _) {
+          if (mounted) setState(() => _passengerLocation = null);
+        });
+      }
       if (widget.enableMapTiles) _passengerMapController.move(point, 16);
     } catch (_) {
       if (mounted) setState(() => _locationMessage =
@@ -865,23 +876,27 @@ class _PassengerDemoState extends State<PassengerDemo> {
     }
     final client = http.Client();
     try {
+      final tile = _mapboxTileUrl
+          ?.replaceAll('{z}', '10')
+          .replaceAll('{x}', '583')
+          .replaceAll('{y}', '325');
       final uri = Uri.parse(
-        'https://tile.openstreetmap.org/10/583/325.png');
+        tile ?? 'https://tile.openstreetmap.org/10/583/325.png');
       final response = await client.get(uri).timeout(const Duration(seconds: 7));
       if (response.statusCode != 200 ||
-          !response.headers['content-type'].toString().contains('image/png')) {
+          !(response.headers['content-type'] ?? '').startsWith('image/')) {
         throw Exception('HTTP ${response.statusCode}');
       }
       if (response.bodyBytes.isEmpty) {
         throw const FormatException('Пустое изображение');
       }
+      if (tile != null) debugPrint('PD_MAPBOX_TILE_OK');
       if (mounted) setState(() {
         _mapNetworkError = null;
         _mapTilesFailed = false;
       });
     } on Exception catch (error) {
-      // A direct OSM probe may fail on the device even when alternate OSM tiles work.
-      // Switch providers rather than covering an otherwise usable map.
+      // Try the backup tile provider before declaring the map unavailable.
       if (mounted) setState(() {
         _lastTileError = 'Сеть: ${error.runtimeType}';
         if (!_useBackupTiles) {
@@ -908,6 +923,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
     unawaited(_checkMapNetwork());
   }
 
+  String? get _mapboxTileUrl => _useBackupTiles
+      ? null
+      : PdMapboxQaConfig.rasterTileUrl(night: _nightMap);
+
   @override
   void dispose() {
     widget.tripStore?.removeListener(_onTripChanged);
@@ -915,6 +934,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _pickupEtaGeneration++;
     _addressTimer?.cancel();
     _gpsFreshnessTimer?.cancel();
+    unawaited(_passengerGpsStatus?.cancel());
     if (widget.passengerMapController == null) _passengerMapController.dispose();
     _from.dispose();
     _to.dispose();
@@ -950,6 +970,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             (start.longitude + finish.longitude) / 2)
         : start ?? const LatLng(54.6872, 25.2797);
     final mapGeneration = _tileRetry;
+    final mapboxTileUrl = _mapboxTileUrl;
     final mapZoom = start != null && finish != null
         ? (start.longitude - finish.longitude).abs() > 2 ? 6.3 : 8.2
         : 10.0;
@@ -981,7 +1002,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
           point: pilotPosition,
           width: 52,
           height: 52,
-          child: const Icon(
+          child: PdMapboxQaConfig.canUseMapbox
+              ? const PdPilotMapMarker(key: Key('passenger-pilot-map-marker'))
+              : const Icon(
             Icons.location_on,
             key: Key('passenger-pilot-map-marker'),
             color: Color(0xFFB6FF36),
@@ -1019,7 +1042,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             key: ValueKey('passenger-raster-tile-generation-$mapGeneration'),
                             child: ColorFiltered(
                             key: const Key('passenger-map-night-filter'),
-                            colorFilter: _nightMap
+                            colorFilter: _nightMap && mapboxTileUrl == null
                                 ? const ColorFilter.matrix(<double>[
                                     -0.65, 0, 0, 0, 170,
                                     0, -0.65, 0, 0, 170,
@@ -1035,13 +1058,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             child: TileLayer(
                             key: const Key('passenger-map-tiles'),
                             tileProvider: demoTileProvider(),
-                            // Both modes use keyless OSM raster tiles; fallback is for isolated tests.
-                            urlTemplate: _useBackupTiles
-                                ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
-                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            urlTemplate: mapboxTileUrl ??
+                                (_useBackupTiles
+                                    ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
+                                    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
                             userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
                             errorTileCallback: (tile, error, stackTrace) {
-                              debugPrint('PD_PASSENGER_TILE_ERROR: $error');
+                              debugPrint('PD_PASSENGER_TILE_ERROR: ${error.runtimeType}');
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 if (!mounted || _mapTilesFailed ||
                                     mapGeneration != _tileRetry ||
@@ -1050,12 +1073,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                     (widget.mapConnectivityCheck != null &&
                                      _mapNetworkError != null)) return;
                                 setState(() {
-                                  _lastTileError = error.toString();
+                                  _lastTileError = pdTr(context,
+                                    'Не удалось загрузить карту.',
+                                    'Nepavyko įkelti žemėlapio.',
+                                    'Could not load map tiles.');
                                   _mapTileErrors++;
                                   if (_mapTileErrors >= 3) {
                                     if (!_useBackupTiles) {
-                                      // Temporary Safari test fallback: OSM.de requires no CARTO API key;
-                                      // retry automatically with CARTO light.
                                       _useBackupTiles = true;
                                       _mapTileErrors = 0;
                                       _mapNetworkError = null;
@@ -1082,7 +1106,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                               ],
                             ),
                           MarkerLayer(markers: mapMarkers),
-                          const RichAttributionWidget(
+                          if (mapboxTileUrl != null)
+                            const PdMapboxAttribution()
+                          else const RichAttributionWidget(
                             attributions: [
                               TextSourceAttribution('© OpenStreetMap contributors'),
                               TextSourceAttribution('© OpenStreetMap.de'),
@@ -1134,6 +1160,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                           key: Key('passenger-map-checking'),
                           style: TextStyle(color: Colors.white, fontSize: 11)),
                       ),
+                    if (_passengerLocation == null)
                     Positioned(
                       top: 8, left: 8,
                       child: Material(
@@ -1193,6 +1220,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             _mapTileErrors = 0;
                             _mapTilesFailed = false;
                             _lastTileError = null;
+                            _useBackupTiles = false;
                             _tileRetry++;
                           }),
                           ),
@@ -1259,14 +1287,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 pdTr(context,
                   'Фиксированные тарифы Sedan без скидки: '
                   'Вильнюс → Каунас 110 €, '
-                  'Вильнюс ↔ аэропорт Вильнюса 40 €. '
+                  'Вильнюс ↔ аэропорт Вильнюса: 40 € в одну сторону. '
                   'Вильнюс — Каунас туда и обратно 200 €. '
                   'Другие маршруты — по тарифной таблице или по запросу.',
                   'Fiksuotos Sedan kainos be nuolaidos: Vilnius → Kaunas 110 €, '
-                  'Vilnius ↔ Vilniaus oro uostas 40 €. '
+                  'Vilnius ↔ Vilniaus oro uostas: 40 € į vieną pusę. '
                   'Vilnius–Kaunas į abi puses 200 €. Kiti maršrutai pagal kainoraštį arba užklausą.',
                   'Fixed Sedan fares with no discount: Vilnius → Kaunas €110, '
-                  'Vilnius ↔ Vilnius Airport €40. '
+                  'Vilnius ↔ Vilnius Airport: €40 one way. '
                   'Vilnius–Kaunas round trip €200. Other routes per price list or on request.'),
                 key: const Key('passenger-transfer-tariffs'),
                 style: const TextStyle(fontSize: 12),

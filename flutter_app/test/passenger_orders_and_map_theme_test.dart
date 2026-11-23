@@ -91,6 +91,7 @@ void main() {
     await tester.tap(find.byKey(const Key('passenger-locate-me')));
     await tester.pumpAndSettle();
     expect(requests, 1);
+    expect(find.byKey(const Key('passenger-locate-me')), findsNothing);
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-use-current-as-pickup')), 130,
       scrollable: find.byType(Scrollable).first);

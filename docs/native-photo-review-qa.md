@@ -1,9 +1,14 @@
 # PRIVATE DRIVE Android QA — cabin entry
 
-## Local Android QA build 0.2.30
+## Local Android QA build 0.2.31
 
 The internal Android APK opens a local PIN prompt before the cabin selector.
 The on-screen digit buttons also accept the PIN when the Android keyboard is unavailable.
+The test map starts with Mapbox Dark and can switch to Mapbox Light.
+Existing route previews use a gold line and the pilot position has a PD marker.
+The local pilot slider confirms arrival, departure, stops and resumption.
+Pickup waiting starts with three free minutes, then costs €0.25 per started minute.
+The Vilnius–airport transfer fare is €40 one way in either direction.
 The PIN is a build fixture carried only by that APK; it establishes no native
 session, server role, or phone or photo verification. Passenger and Pilot use a shared local QA order scope separate from authenticated
 accounts. Android Back returns from a cabin to the selector. Signing out

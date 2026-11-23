@@ -60,7 +60,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     // Return to the hero after scrolling down to the transfer option.
-    await tester.drag(find.byType(ListView).first, const Offset(0, 460));
+    await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, 460));
     await tester.pumpAndSettle();
     expect(find.text('Choose ride type'), findsOneWidget);
   });

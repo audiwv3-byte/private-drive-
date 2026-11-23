@@ -56,17 +56,24 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: PilotDemo(
       enableMapTiles: false, tripStore: store,
     )));
-    final stop = find.byKey(const Key('pilot-pause-trip'));
-    expect(stop, findsOneWidget);
-    await tester.tap(stop);
-    await tester.pump();
+    final track = find.byKey(const Key('pilot-next-trip'));
+    final handle = find.byKey(const Key('pilot-next-trip-handle'));
+    Future<void> swipe() async {
+      await tester.drag(handle, Offset(tester.getSize(track).width - 52, 0));
+      await tester.pump();
+    }
+    // One slider handles arrival, travel, stop and resume.
+    await swipe(); // On site: begin free pickup waiting.
+    await swipe(); // Drive.
+    expect(store.status, DemoTripStatus.underway);
+    expect(find.text('Остановка'), findsOneWidget);
+    await swipe();
     expect(store.paused, isTrue);
     expect(find.byKey(const Key('pilot-paid-wait-timer')), findsOneWidget);
     expect(find.textContaining('без начисления за посадку'), findsOneWidget);
-    expect(find.text('Продолжить'), findsOneWidget);
+    expect(find.text('Возобновить маршрут'), findsOneWidget);
     // Show elapsed time only; do not invent a charge or hourly rate.
-    await tester.tap(stop);
-    await tester.pump();
+    await swipe();
     expect(store.paused, isFalse);
     expect(find.text('Остановка'), findsOneWidget);
   });

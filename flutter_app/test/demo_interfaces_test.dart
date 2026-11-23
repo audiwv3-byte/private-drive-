@@ -127,19 +127,14 @@ void main() {
     expect(find.text('Едем к пассажиру'), findsOneWidget);
     expect(find.text('В путь'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('pilot-pause-trip')));
-    await tester.pump();
-    expect(find.text('Остановка · демо'), findsOneWidget);
-    expect(find.byKey(const Key('pilot-next-trip')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('pilot-pause-trip')));
-    await tester.pump();
+    // No tripStore: standalone cockpit only cycles mock display stages.
+    // Actual arrival, stop and resume are covered by store-backed tests.
     await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
+      Offset(tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52, 0));
     await tester.pump();
-    expect(find.text('Поездка выполняется'), findsOneWidget);
+    expect(find.text('Завершить'), findsOneWidget);
     await tester.drag(find.byKey(const Key('pilot-next-trip-handle')),
-      Offset((tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52), 0));
+      Offset(tester.getSize(find.byKey(const Key('pilot-next-trip'))).width - 52, 0));
     await tester.pump();
     expect(find.text('Нет активной поездки'), findsOneWidget);
   });

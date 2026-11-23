@@ -116,14 +116,42 @@ jobs:
       - name: Compile full main.dart debug APK for local QA
         working-directory: private_drive_build
         shell: bash
+        env:
+          MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: |
           set -euo pipefail
+          if [[ "$MAPBOX_PUBLIC_TOKEN" != pk.* ]]; then
+            echo "::error::The public Mapbox token is missing in GitHub Actions"
+            exit 1
+          fi
+          python3 - <<'PY'
+          from os import environ
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import urlencode
+          from urllib.request import urlopen
+
+          query = urlencode({'access_token': environ['MAPBOX_PUBLIC_TOKEN']})
+          for style in ('dark-v11', 'light-v11'):
+              url = f'https://api.mapbox.com/styles/v1/mapbox/{style}/tiles/256/10/583/325?{query}'
+              try:
+                  with urlopen(url, timeout=15) as response:
+                      if not response.headers.get_content_type().startswith('image/'):
+                          raise SystemExit(f'Mapbox {style} did not return an image')
+                      if not response.read(16):
+                          raise SystemExit(f'Mapbox {style} returned an empty tile')
+              except HTTPError as error:
+                  raise SystemExit(f'Mapbox {style} returned HTTP {error.code}') from None
+              except (URLError, TimeoutError):
+                  raise SystemExit(f'Mapbox {style} tile request did not complete') from None
+              print(f'Mapbox {style} tile verified')
+          PY
           # Stable TEST signing key: never use this public development key for release.
           mkdir -p "$HOME/.android"
           base64 --decode ../flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
-          QA_VERSION=0.2.30
-          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112302 \
+          QA_VERSION=0.2.31
+          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112303 \
             --dart-define="PD_QA_BUILD_LABEL=Версия $QA_VERSION · внутренняя сборка" \
+            --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN" \
             --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN"
           APK=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$APK"
@@ -131,7 +159,7 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
           grep "name='lt.privatedrive.private_drive.photo_qa'" ../full-qa-apk-badging.txt
-          grep "versionCode='2026112302'" ../full-qa-apk-badging.txt
+          grep "versionCode='2026112303'" ../full-qa-apk-badging.txt
           grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt

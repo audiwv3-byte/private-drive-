@@ -10,6 +10,7 @@ import unittest
 from urllib.parse import urlsplit
 
 import psycopg
+from psycopg import sql
 from psycopg.errors import InsufficientPrivilege
 
 from pd_native_auth_postgres_http import make_app
@@ -39,9 +40,9 @@ class PhoneAuthStartupWithoutDDLTests(unittest.TestCase):
         cls.owner.commit()
         install_synthetic_phone_auth_grants(cls.owner)
         with cls.owner.cursor() as cur:
-            cur.execute("""CREATE ROLE pd_ci_auth_login LOGIN INHERIT
-                         NOCREATEDB NOCREATEROLE PASSWORD %s""",
-                         (AUTH_PASSWORD,))
+            cur.execute(sql.SQL("""CREATE ROLE pd_ci_auth_login LOGIN INHERIT
+                         NOCREATEDB NOCREATEROLE PASSWORD {}""").format(
+                             sql.Literal(AUTH_PASSWORD)))
             cur.execute("GRANT pd_ci_phone_auth TO pd_ci_auth_login")
         cls.owner.commit()
         cls.runtime_dsn = (

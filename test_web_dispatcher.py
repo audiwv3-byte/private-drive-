@@ -3,6 +3,7 @@ Uses only a temporary Flask application and synthetic credentials.
 """
 import os
 import hashlib
+import re
 import time
 import unittest
 from types import SimpleNamespace
@@ -15,16 +16,71 @@ import pd_web_dispatcher
 
 
 class DispatcherBrowserTests(unittest.TestCase):
-    def make_app(self, enabled=True):
+    def make_app(self, enabled=True, test_sync=False):
         app = Flask(__name__)
         core = SimpleNamespace(ADMIN_IDS=frozenset({999}), is_admin=lambda uid: uid == 999)
         cfg = {"PD_DISPATCH_SESSION_SECRET": "synthetic-secret-32-characters-minimum-12345",
                "PD_DISPATCH_PASSWORD_HASH": generate_password_hash("test-only-password"),
                "PD_DISPATCH_ADMIN_ID": "999"}
+        if test_sync:
+            cfg.update(PD_DISPATCH_STAGING_ONLY="1", PD_DISPATCH_TEST_SYNC="1")
         with patch.dict(os.environ, cfg if enabled else {}, clear=True):
             result = pd_web_dispatcher.register(app, core)
         app.config["TESTING"] = True
         return app, result
+
+    def test_staging_mobile_pilot_and_order_appear_in_dispatcher(self):
+        app, _ = self.make_app(test_sync=True)
+        directory, store = app.extensions["pd_dispatch_test_sync"]
+        self.addCleanup(directory.cleanup)
+        self.addCleanup(store.close)
+        dispatcher = app.test_client()
+        mobile = app.test_client()
+        self.assertEqual(dispatcher.get("/dispatch/test-sync").status_code, 302)
+        self.assertEqual(dispatcher.get("/dispatch/test-sync/state").status_code, 401)
+        self.assertEqual(mobile.get("/v1/me").status_code, 401)
+        dispatcher.get("/dispatch/login")
+        with dispatcher.session_transaction() as session:
+            csrf = session["pd_dispatch_csrf"]
+        self.assertEqual(dispatcher.post("/dispatch/login", data={
+            "csrf": csrf, "password": "test-only-password",
+        }).status_code, 302)
+        setup = dispatcher.get("/dispatch/test-sync")
+        pilot_token, passenger_token = re.findall(rb'value="([a-f0-9]{64})"', setup.data)
+        self.assertNotEqual(pilot_token, passenger_token)
+        pilot = {"Authorization": "Bearer " + pilot_token.decode()}
+        passenger = {"Authorization": "Bearer " + passenger_token.decode()}
+        with dispatcher.session_transaction() as session:
+            csrf = session["pd_dispatch_csrf"]
+        self.assertIn(b'id="ordersList"', dispatcher.get("/dispatch").data)
+        self.assertFalse(dispatcher.get("/dispatch/test-sync/state").json["pilot_online"])
+        self.assertEqual(mobile.get("/v1/me", headers=pilot).json["role"], "pilot")
+        self.assertIsNone(mobile.get("/v1/current", headers=pilot).json["trip"])
+        route = {"from": "Тестовая точка A", "to": "Тестовая точка B"}
+        self.assertEqual(mobile.post("/v1/trips", headers=pilot, json=route).status_code, 403)
+        created = mobile.post("/v1/trips", headers=passenger, json=route)
+        self.assertEqual(created.status_code, 201)
+        snapshot = dispatcher.get("/dispatch/test-sync/state").json
+        self.assertTrue(snapshot["pilot_online"])
+        trip = snapshot["trips"][0]
+        self.assertEqual(trip["origin"], route["from"])
+        self.assertEqual(trip["status"], "requested")
+        self.assertEqual(mobile.get(f"/v1/trips/{trip['id']}", headers=pilot).status_code, 404)
+        form = {"trip_id": trip["id"], "version": trip["version"]}
+        self.assertEqual(dispatcher.post("/dispatch/test-sync/assign", data=form).status_code, 403)
+        self.assertEqual(dispatcher.post("/dispatch/test-sync/assign",
+            data={**form, "csrf": csrf}).status_code, 200)
+        self.assertEqual(mobile.get("/v1/current", headers=pilot).json["trip"]["status"], "assigned")
+        self.assertEqual(mobile.get(f"/v1/trips/{trip['id']}/events?after=0",
+            headers=passenger).status_code, 200)
+        self.assertEqual(mobile.get(f"/v1/trips/{trip['id']}/messages?after=0",
+            headers=pilot).json["messages"], [])
+        advanced = mobile.post(f"/v1/trips/{trip['id']}/action", headers=pilot,
+            json={"action": "advance", "version": 2})
+        self.assertEqual(advanced.json["trip"]["status"], "approaching")
+        self.assertEqual(dispatcher.get("/dispatch/test-sync/state").json["trips"][0]["status"], "approaching")
+        with patch("pd_dispatch_test_sync.time.monotonic", return_value=store.last_pilot_poll + 16):
+            self.assertFalse(dispatcher.get("/dispatch/test-sync/state").json["pilot_online"])
 
     def test_disabled_without_secret(self):
         app, active = self.make_app(False)

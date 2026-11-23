@@ -316,8 +316,16 @@ def register(app, core):
         from pd_site_analytics import register as register_site_analytics
         register_site_analytics(app, authorized, passwords.connect)
 
+    test_sync_enabled = (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
+                         and os.environ.get("PD_DISPATCH_TEST_SYNC") == "1")
+    if test_sync_enabled:
+        from pd_dispatch_test_sync import register as register_test_sync
+        register_test_sync(app, authorized, valid_csrf)
+
     @app.get("/dispatch")
     def pd_dispatch_home():
+        if test_sync_enabled:
+            return pd_dispatch_map()
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
         dashboard = Path(__file__).with_name("pd_dispatcher_dashboard.html").read_text(encoding="utf-8")
@@ -335,7 +343,11 @@ def register(app, core):
         if not re.fullmatch(r"pk\.[A-Za-z0-9_.-]{1,512}", token):
             token = ""
         page = Path(__file__).with_name("pd_dispatcher_mapbox.html").read_text(encoding="utf-8")
-        response = app.make_response(render_template_string(page, mapbox_token=token))
+        response = app.make_response(render_template_string(
+            page, mapbox_token=token, test_sync_enabled=test_sync_enabled,
+            analytics_enabled="pd_site_analytics" in app.view_functions,
+            csrf=csrf() if test_sync_enabled else "",
+        ))
         response.headers.update({
             "Cache-Control": "private, no-store",
             "X-Content-Type-Options": "nosniff",
@@ -347,7 +359,7 @@ def register(app, core):
                 "style-src 'self' 'unsafe-inline' https://unpkg.com; "
                 "img-src 'self' data: https://*.mapbox.com https://tile.openstreetmap.org https://unpkg.com; "
                 "connect-src 'self' https://api.mapbox.com; "
-                "font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+                "font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
             ),
         })
         return response

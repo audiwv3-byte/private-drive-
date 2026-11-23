@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:http/http.dart' as http;
 import 'remote_sync_demo.dart';
+import 'remote_sync_client.dart';
 import 'demo_interfaces.dart';
 import 'demo_backup_page.dart';
 import 'brand_logo.dart';
@@ -69,6 +70,17 @@ class PrivateDriveApp extends StatelessWidget {
               logoutApi: const PdNativeLogoutApi(baseUrl: apiBaseUrl),
               sessionManager: const PdNativeSessionManager(
                 baseUrl: apiBaseUrl, vault: PdNativeSessionVault()),
+              // Isolated integration QA is opt-in and separate from live
+              // dispatch. Requires a synthetic server verifying this SAME
+              // native bearer token on every request.
+              isolatedSyncGatewayBuilder:
+                const bool.fromEnvironment('PD_ISOLATED_NATIVE_SYNC') &&
+                const String.fromEnvironment('PD_ISOLATED_SYNC_API_URL').isNotEmpty
+                  ? (session, cabin) => RemoteDemoClient(
+                      const String.fromEnvironment('PD_ISOLATED_SYNC_API_URL'),
+                      session.token, cabin: cabin,
+                    )
+                  : null,
             ),
       ),
     );

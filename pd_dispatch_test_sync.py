@@ -2,6 +2,9 @@
 
 import hashlib
 import hmac
+import json
+import os
+import sqlite3
 import re
 import secrets
 import time
@@ -39,8 +42,11 @@ class StagingTripStore(DemoStore):
             online = now - self.last_pilot_poll < ONLINE_SECONDS
             position = self.pilot_position if online and now - self.last_pilot_fix < ONLINE_SECONDS else None
             trips = self.db.execute("""
-                SELECT id, origin, destination, pilot, status, paused, version
-                FROM trips ORDER BY created DESC LIMIT 50
+                SELECT t.id, t.origin, t.destination, t.pilot, t.status,
+                       t.paused, t.version, i.source, i.source_order_id,
+                       i.trip_date, i.trip_time
+                FROM trips t LEFT JOIN qa_source_imports i ON i.trip_id=t.id
+                ORDER BY t.created DESC LIMIT 50
             """)
             return {
                 "pilot_online": online,
@@ -53,6 +59,17 @@ def register(app, authorized, valid_csrf):
     directory = TemporaryDirectory(prefix="pd-test-trips-")
     store = StagingTripStore(Path(directory.name) / "trips.sqlite")
     app.extensions["pd_dispatch_test_sync"] = (directory, store)
+    with DB_LOCK, store.db:
+        store.db.execute("""CREATE TABLE IF NOT EXISTS qa_source_imports (
+            source TEXT NOT NULL,
+            source_order_id TEXT NOT NULL,
+            trip_id TEXT NOT NULL UNIQUE,
+            payload_hash TEXT NOT NULL,
+            trip_date TEXT,
+            trip_time TEXT,
+            PRIMARY KEY(source, source_order_id),
+            FOREIGN KEY(trip_id) REFERENCES trips(id)
+        )""")
 
     def token(role, day):
         purpose = f"pd-dispatch-staging-mobile-test:v1:{role}:{day}".encode("ascii")
@@ -193,6 +210,80 @@ def register(app, authorized, valid_csrf):
             return reply({"trip": trip, "qa_only": True}, 201)
         except TripError as exc:
             return reply({"error": exc.code}, exc.status)
+
+    # Server-only synthetic QA bridge; disabled without a staging-only secret.
+    @app.post("/v1/qa-source/import")
+    def pd_import_external_qa_order():
+        secret = os.environ.get("PD_QA_SOURCE_BRIDGE_SECRET", "")
+        if len(secret) < 32 or os.environ.get("PD_DISPATCH_STAGING_ONLY") != "1":
+            return reply({"error": "bridge_disabled"}, 503)
+        if request.mimetype != "application/json":
+            return reply({"error": "invalid_body"}, 400)
+        if request.content_length is None or not 0 < request.content_length <= MAX_BODY:
+            return reply({"error": "invalid_body"}, 400)
+        issued = request.headers.get("X-PD-QA-Timestamp", "")
+        mac = request.headers.get("X-PD-QA-Signature", "")
+        if not re.fullmatch(r"[0-9]{10,12}", issued) or not re.fullmatch(r"[a-f0-9]{64}", mac):
+            return reply({"error": "unauthorized"}, 401)
+        if abs(int(time.time()) - int(issued)) > 300:
+            return reply({"error": "expired_signature"}, 401)
+        raw = request.get_data(cache=True)
+        signed = issued.encode("ascii") + b"." + raw
+        expected = hmac.new(secret.encode("utf-8"), signed, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(mac, expected):
+            return reply({"error": "unauthorized"}, 401)
+        try:
+            data = json.loads(raw)
+        except (UnicodeError, ValueError):
+            return reply({"error": "invalid_body"}, 400)
+        if not isinstance(data, dict) or set(data) != {
+                "source", "source_order_id", "from", "to", "trip_date", "trip_time"}:
+            return reply({"error": "invalid_body"}, 400)
+        source, original = data["source"], data["source_order_id"]
+        if source not in ("telegram_miniapp", "telegram_bot"):
+            return reply({"error": "invalid_source"}, 400)
+        if not isinstance(original, str) or not re.fullmatch(r"[0-9]{1,20}", original):
+            return reply({"error": "invalid_source_order_id"}, 400)
+        origin, destination = data["from"], data["to"]
+        if (not isinstance(origin, str) or not isinstance(destination, str)
+            or not 1 <= len(origin.strip()) <= 200
+            or not 1 <= len(destination.strip()) <= 200
+            or origin.strip().casefold() == destination.strip().casefold()):
+            return reply({"error": "invalid_route"}, 400)
+        date, clock = data["trip_date"], data["trip_time"]
+        if not isinstance(date, str) or len(date) > 32 or not isinstance(clock, str) or len(clock) > 16:
+            return reply({"error": "invalid_departure"}, 400)
+        normalized = json.dumps({
+            "source": source, "source_order_id": original,
+            "from": origin.strip(), "to": destination.strip(),
+            "trip_date": date, "trip_time": clock,
+        }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+        with DB_LOCK:
+            row = store.db.execute(
+                "SELECT trip_id,payload_hash FROM qa_source_imports WHERE source=? AND source_order_id=?",
+                (source, original)).fetchone()
+            if row:
+                if row["payload_hash"] != digest:
+                    return reply({"error": "source_order_conflict"}, 409)
+                return reply({"qa_only": True, "replayed": True,
+                              "trip": store.get(row["trip_id"], "dispatcher", "dispatcher_test")})
+            # Unique internal actor avoids demo passenger single-active-trip limits.
+            actor = "source_qa_" + source + "_" + original
+            try:
+                trip = store.create(actor, {
+                    "from": origin.strip(), "to": destination.strip(), "payment": "Карта"
+                })
+                with store.db:
+                    store.db.execute("""INSERT INTO qa_source_imports
+                        (source,source_order_id,trip_id,payload_hash,trip_date,trip_time)
+                        VALUES (?,?,?,?,?,?)""",
+                        (source, original, trip["id"], digest, date, clock))
+            except TripError as exc:
+                return reply({"error": exc.code}, exc.status)
+            except sqlite3.IntegrityError:
+                return reply({"error": "source_order_conflict"}, 409)
+        return reply({"qa_only": True, "replayed": False, "trip": trip}, 201)
 
     @app.get("/dispatch/test-sync")
     def pd_test_sync_setup():

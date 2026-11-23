@@ -34,6 +34,7 @@ class FakeGateway extends RemoteTripGateway {
   @override
   Future<Map<String, dynamic>> get(String path) async {
     if (path == '/v1/me') return {'role': role, 'actor': role + '_test', 'demo': true};
+    if (path == '/v1/pilots') return {'pilots': ['pilot_test']};
     if (path == '/v1/current') {
       if (role == 'pilot' && server.trip?['pilot'] != 'pilot_test') {
         return {'trip': null};

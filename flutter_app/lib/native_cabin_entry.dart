@@ -55,8 +55,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
 
   Future<void> _restoreQaSession() async {
     try {
-      final prefs = SharedPreferencesAsync();
-      final encoded = await prefs.getString(_qaSessionKey);
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = prefs.getString(_qaSessionKey);
       if (encoded == null) return;
       final data = jsonDecode(encoded);
       if (data is! Map<String, dynamic>) return;
@@ -99,10 +99,18 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     }
   }
 
+  Future<void> _clearQaSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_qaSessionKey);
+    } catch (_) { /* QA-only best effort. */ }
+  }
+
   Future<void> _saveQaSession(PdNativeSession session) async {
     if (!_persistQaOnly) return;
     try {
-      await SharedPreferencesAsync().setString(_qaSessionKey, jsonEncode({
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_qaSessionKey, jsonEncode({
         'token': session.token, 'user_id': session.userId,
         'role': session.role,
         'expiry_ms': session.expiresAt.millisecondsSinceEpoch,
@@ -134,8 +142,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
   void _signOut() {
     if (_persistQaOnly) {
-      unawaited(SharedPreferencesAsync().remove(_qaSessionKey).then<void>(
-        (_) {}, onError: (Object _) {}));
+      unawaited(_clearQaSession());
     }
     _expiry?.cancel();
     _session = null;

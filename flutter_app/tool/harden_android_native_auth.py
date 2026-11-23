@@ -25,7 +25,7 @@ def harden_android(project: Path) -> None:
         raise ValueError("Android application element missing")
     if 'xmlns:android=' not in text:
         raise ValueError("Android namespace is required")
-    match = re.search(r"<application\\b[^>]*>", text, flags=re.DOTALL)
+    match = re.search(r"<application\b[^>]*>", text, flags=re.DOTALL)
     if match is None:
         raise ValueError("Android application opening tag missing")
     app_tag = match.group(0)
@@ -34,7 +34,7 @@ def harden_android(project: Path) -> None:
         ("fullBackupContent", "@xml/pd_native_no_backup"),
         ("dataExtractionRules", "@xml/pd_native_no_extract"),
     ):
-        pattern = r'android:' + attribute + r'\\s*=\\s*["\\x27][^"\\x27]*["\\x27]'
+        pattern = r'android:' + attribute + r'\s*=\s*["\x27][^"\x27]*["\x27]'
         replacement = 'android:' + attribute + '="' + value + '"'
         if re.search(pattern, app_tag):
             app_tag = re.sub(pattern, replacement, app_tag)

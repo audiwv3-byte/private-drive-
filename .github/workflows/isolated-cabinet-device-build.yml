@@ -2,7 +2,7 @@ name: PRIVATE DRIVE isolated cabinet device builds
 
 on:
   push:
-    branches: [test/flutter-cabinet-sync]
+    branches: [test/cabinet-mapbox-device-qa]
     paths:
       - '.github/workflows/isolated-cabinet-device-build.yml'
       - 'flutter_app/**'
@@ -14,12 +14,13 @@ permissions:
 
 jobs:
   build-isolated-clients:
+    if: github.ref == 'refs/heads/test/cabinet-mapbox-device-qa'
     runs-on: ubuntu-24.04
     timeout-minutes: 95
     env:
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
-      QA_PACKAGE: lt.privatedrive.cabinetsync.qa.parallel
-      QA_APP_LABEL: PRIVATE DRIVE QA 2
+      QA_PACKAGE: lt.privatedrive.cabinetsync.qa.mapbox
+      QA_APP_LABEL: PRIVATE DRIVE Mapbox QA
       PYTHONPATH: 'test_sync_server:.'
     steps:
       - uses: actions/checkout@v4
@@ -168,23 +169,23 @@ jobs:
           python3 -m playwright install --with-deps chromium webkit
           python3 test_sync_server/qa_browser_smoke.py
 
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: qa-browser-diagnostics
-          path: device_artifacts/browser/
-          if-no-files-found: ignore
-          retention-days: 1
-
       - name: Build installable isolated Android APK
         working-directory: qa_android
         shell: bash
+        env:
+          MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: |
           set -euo pipefail
+          if [[ "$MAPBOX_PUBLIC_TOKEN" != pk.* ]]; then
+            echo 'Missing public Mapbox token' >&2
+            exit 1
+          fi
           flutter build apk --debug --target lib/main.dart \
             --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
             --dart-define=PD_ISOLATED_WEB_PREVIEW=false \
-            --dart-define=PD_ISOLATED_QA_AUTH=true
+            --dart-define=PD_ISOLATED_QA_AUTH=true \
+            --dart-define=PD_MAPBOX_QA=true \
+            --dart-define="MAPBOX_PUBLIC_TOKEN=$MAPBOX_PUBLIC_TOKEN"
           apk=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$apk"
           build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
@@ -196,24 +197,15 @@ jobs:
           grep -F android.permission.CAMERA ../apk-permissions.txt
           if grep -q 'android.permission.RECORD_AUDIO' ../apk-permissions.txt; then exit 1; fi
           mkdir -p ../device_artifacts/android
-          cp "$apk" ../device_artifacts/android/PRIVATE-DRIVE-QA-2.apk
+          cp "$apk" ../device_artifacts/android/PRIVATE-DRIVE-MAPBOX-QA.apk
           cp ../apk-certificate.txt ../apk-badging.txt ../apk-permissions.txt ../device_artifacts/android/
-          (cd ../device_artifacts/android && sha256sum PRIVATE-DRIVE-QA-2.apk > SHA256SUMS)
-
-      - name: Upload QA browser screenshots when an interactive check fails
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: private-drive-qa-browser-diagnostics
-          path: device_artifacts/browser/
-          retention-days: 3
-          if-no-files-found: ignore
+          (cd ../device_artifacts/android && sha256sum PRIVATE-DRIVE-MAPBOX-QA.apk > SHA256SUMS)
 
       - name: Verify both artifacts are wired to the same temporary URL
         shell: bash
         run: |
           set -euo pipefail
-          test -s device_artifacts/android/PRIVATE-DRIVE-QA-2.apk
+          test -s device_artifacts/android/PRIVATE-DRIVE-MAPBOX-QA.apk
           test -s device_artifacts/safari/main.dart.js
           python3 - <<'PY'
           from pathlib import Path
@@ -228,24 +220,8 @@ jobs:
           echo "Android QA package: $QA_PACKAGE" >> "$GITHUB_STEP_SUMMARY"
           echo "WARNING: Temporary API and embedded URL expire with the current GitHub runner; do not treat this as a permanent device-test release." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload compiled Android APK and Safari Web artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: private-drive-isolated-cabinets-android-safari
-          path: device_artifacts/
-          retention-days: 3
-          if-no-files-found: error
-
-      - name: Keep isolated QA HTTPS API and Safari page available for physical testing
-        shell: bash
-        timeout-minutes: 40
+      - name: Record isolated compilation result without publishing token-bearing binaries
         run: |
-          set -euo pipefail
-          echo "Temporary browser page: $PD_MOCK_CABINET_API_URL/app/" >> "$GITHUB_STEP_SUMMARY"
-          echo "No production services or user data are used. Endpoint expires when this job exits." >> "$GITHUB_STEP_SUMMARY"
-          for attempt in {1..228}; do
-            kill -0 "$(cat "$RUNNER_TEMP/cabinet-preview.pid")"
-            curl --fail --silent --show-error --max-time 12 "$PD_MOCK_CABINET_API_URL/healthz" >/dev/null
-            curl --fail --silent --show-error --max-time 12 "$PD_MOCK_CABINET_API_URL/app/" >/dev/null
-            sleep 10
-          done
+          echo "Android and Web compiled with Mapbox public client configuration." >> "$GITHUB_STEP_SUMMARY"
+          echo "No token-bearing APK or Web bundle uploaded to the public repository." >> "$GITHUB_STEP_SUMMARY"
+          echo "Browser and API tests use an isolated temporary backend; this is not a deployment to the existing dispatcher." >> "$GITHUB_STEP_SUMMARY"

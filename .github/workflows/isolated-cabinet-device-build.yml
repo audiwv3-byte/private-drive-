@@ -1,0 +1,189 @@
+name: PRIVATE DRIVE isolated cabinet device builds
+
+on:
+  push:
+    branches: [test/flutter-cabinet-sync]
+    paths:
+      - '.github/workflows/isolated-cabinet-device-build.yml'
+      - 'flutter_app/**'
+      - 'test_sync_server/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-isolated-clients:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      QA_PACKAGE: lt.privatedrive.cabinetsync.qa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+
+      - name: Verify synthetic server, session roles and existing cabinet flows
+        run: PYTHONPATH=test_sync_server:. python3 -m unittest discover -s test_sync_server -p 'test_*.py' -v
+
+      - name: Prepare one temporary isolated HTTPS Mock API for both clients
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 2 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.11.2/cloudflared-linux-amd64 \
+            -o "$RUNNER_TEMP/cloudflared"
+          printf '%s  %s\n' \
+            '56f13335143ec0e22772963290683a84a04114a35ec64cbc794a4d39ff9bb8cf' \
+            "$RUNNER_TEMP/cloudflared" | sha256sum -c -
+          chmod 700 "$RUNNER_TEMP/cloudflared"
+          python3 test_sync_server/run_native_https_preview.py \
+            --cloudflared "$RUNNER_TEMP/cloudflared" \
+            --address-file "$RUNNER_TEMP/cabinet-address.txt" \
+            > "$RUNNER_TEMP/cabinet-preview.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/cabinet-preview.pid"
+          for attempt in {1..90}; do
+            if test -s "$RUNNER_TEMP/cabinet-address.txt"; then
+              address=$(cat "$RUNNER_TEMP/cabinet-address.txt")
+              case "$address" in https://*.trycloudflare.com) ;; *) exit 1 ;; esac
+              curl --fail --silent --show-error --max-time 15 "$address/healthz" | python3 -c \
+                'import json,sys; assert json.load(sys.stdin)["service"] == "private-drive-cabinet-mock"'
+              echo "PD_MOCK_CABINET_API_URL=$address" >> "$GITHUB_ENV"
+              echo "Temporary API verified (valid only while this job runs)." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/cabinet-preview.pid")" 2>/dev/null; then
+              cat "$RUNNER_TEMP/cabinet-preview.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/cabinet-preview.log"
+          exit 1
+
+      - name: Generate isolated Android and Web projects, keeping main entry and photo flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive qa_android
+          flutter create --platforms=web --org=lt.privatedrive --project-name=private_drive qa_web
+          python3 -m pip install --quiet Pillow
+          (cd flutter_app && python3 tool/prepare_transparent_logo.py)
+          for dest in qa_android qa_web; do
+            cp -R flutter_app/lib/. "$dest/lib/"
+            cp -R flutter_app/assets/. "$dest/assets/"
+            cp flutter_app/pubspec.yaml "$dest/pubspec.yaml"
+            cp flutter_app/analysis_options.yaml "$dest/analysis_options.yaml"
+            mkdir -p "$dest/test"
+            cp flutter_app/test/cabinet_sync_integration_test.dart "$dest/test/"
+            cp flutter_app/test/pd_http_api_test.dart "$dest/test/"
+            rm -f "$dest/test/widget_test.dart"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          package = "lt.privatedrive.cabinetsync.qa"
+          gradle = Path("qa_android/android/app/build.gradle.kts")
+          text = gradle.read_text()
+          original = 'applicationId = "lt.privatedrive.private_drive"'
+          assert text.count(original) == 1, "Generated Android package changed"
+          gradle.write_text(text.replace(original, f'applicationId = "{package}"'))
+          manifest = Path("qa_android/android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text()
+          assert 'android:label="private_drive"' in text
+          text = text.replace('android:label="private_drive"', 'android:label="PD CABINET SYNC QA"')
+          permissions = """
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-feature android:name="android.hardware.camera" android:required="false"/>
+              <queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>
+          """
+          assert "<application" in text
+          manifest.write_text(text.replace("<application", permissions+"<application", 1))
+          assert "android.permission.RECORD_AUDIO" not in manifest.read_text()
+          print("Separate synthetic package configured:", package)
+          PY
+
+      - name: Run Flutter analysis and main-cabinet integration tests
+        working-directory: qa_android
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test --reporter expanded test/pd_http_api_test.dart
+          flutter test --reporter expanded --dart-define=PD_CABINET_SYNC_INTEGRATION=true test/cabinet_sync_integration_test.dart
+
+      - name: Build installable isolated Android APK
+        working-directory: qa_android
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --debug --target lib/main.dart \
+            --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
+            --dart-define=PD_ISOLATED_WEB_PREVIEW=false
+          apk=build/app/outputs/flutter-apk/app-debug.apk
+          test -s "$apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk" > ../apk-certificate.txt
+          "$build_tools/aapt" dump badging "$apk" > ../apk-badging.txt
+          grep -F "name='$QA_PACKAGE'" ../apk-badging.txt
+          grep -F "application-label:'PD CABINET SYNC QA'" ../apk-badging.txt
+          "$build_tools/aapt" dump permissions "$apk" > ../apk-permissions.txt
+          grep -F android.permission.CAMERA ../apk-permissions.txt
+          if grep -q 'android.permission.RECORD_AUDIO' ../apk-permissions.txt; then exit 1; fi
+          mkdir -p ../device_artifacts/android
+          cp "$apk" ../device_artifacts/android/PRIVATE-DRIVE-cabinet-sync-QA.apk
+          cp ../apk-certificate.txt ../apk-badging.txt ../apk-permissions.txt ../device_artifacts/android/
+          (cd ../device_artifacts/android && sha256sum PRIVATE-DRIVE-cabinet-sync-QA.apk > SHA256SUMS)
+
+      - name: Compile existing main Flutter cabinets for Safari
+        working-directory: qa_web
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build web --release --target lib/main.dart \
+            --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
+            --dart-define=PD_ISOLATED_WEB_PREVIEW=false
+          test -s build/web/index.html
+          test -s build/web/main.dart.js
+          grep -F "trycloudflare.com" build/web/main.dart.js
+          printf 'User-agent: *\nDisallow: /\n' > build/web/robots.txt
+          printf '/*\n  X-Robots-Tag: noindex, nofollow, noarchive\n  Referrer-Policy: no-referrer\n' > build/web/_headers
+          mkdir -p ../device_artifacts/safari
+          cp -R build/web/. ../device_artifacts/safari/
+          echo "Web artifact is NOT deployed; Safari device validation pending." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify both artifacts are wired to the same temporary URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s device_artifacts/android/PRIVATE-DRIVE-cabinet-sync-QA.apk
+          test -s device_artifacts/safari/main.dart.js
+          python3 - <<'PY'
+          from pathlib import Path
+          address = Path(__import__('os').environ['RUNNER_TEMP'], 'cabinet-address.txt').read_text().strip()
+          bundle = Path('device_artifacts/safari/main.dart.js').read_text()
+          assert address in bundle, "Web bundle has a different Mock API URL"
+          assert address.startswith('https://') and address.endswith('.trycloudflare.com')
+          print('Flutter Web embedded the verified synthetic HTTPS endpoint.')
+          PY
+          curl --fail --silent --show-error --max-time 15 "$PD_MOCK_CABINET_API_URL/healthz" | python3 -c \
+            'import json,sys; assert json.load(sys.stdin)["status"] == "ok"'
+          echo "Android QA package: $QA_PACKAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "WARNING: Temporary API and embedded URL expire with the current GitHub runner; do not treat this as a permanent device-test release." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compiled Android APK and Safari Web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-isolated-cabinets-android-safari
+          path: device_artifacts/
+          retention-days: 3
+          if-no-files-found: error

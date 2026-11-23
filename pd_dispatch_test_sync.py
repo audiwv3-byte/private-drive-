@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import re
+import secrets
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -150,26 +151,52 @@ def register(app, authorized, valid_csrf):
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
         day = int(time.time()) // 86400
+        nonce = secrets.token_urlsafe(18)
         page = render_template_string("""<!doctype html><html lang="ru">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Тестовая связь — PRIVATE DRIVE</title>
 <style>
 :root{color-scheme:dark}body{max-width:42rem;margin:2rem auto;padding:0 1rem;background:#110f0c;color:#f6efdf;font:1rem/1.5 system-ui}
 h1,a{color:#e8c581}label{display:block;margin-top:1rem}input{box-sizing:border-box;width:100%;padding:.6rem}
+button{margin-top:.4rem;padding:.55rem .8rem;cursor:pointer}
 </style>
 <h1>Тестовая связь между устройствами</h1>
-<p>На экране выбора кабинета в Android QA 0.2.32 открой «Тестовая связь с диспетчерской». Введи токен своей роли.</p>
+<p>После входа в Android QA открой «Тестовая связь с диспетчерской». Вставь скопированный токен в поле «Временный токен».</p>
 <label>Адрес сервера<input readonly value="https://private-drive-dispatcher-staging.onrender.com"></label>
-<label>Токен пилота<input readonly value="{{ pilot }}"></label>
-<label>Токен пассажира<input readonly value="{{ passenger }}"></label>
+<label>Токен пилота<input id="pilot-token" readonly spellcheck="false" value="{{ pilot }}"></label>
+<button type="button" data-copy="pilot-token">Скопировать токен пилота</button>
+<label>Токен пассажира<input id="passenger-token" readonly spellcheck="false" value="{{ passenger }}"></label>
+<button type="button" data-copy="passenger-token">Скопировать токен пассажира</button>
+<p id="copy-status" role="status"></p>
+<p>Токен состоит из 64 символов. На экране «Тестовый вход» используй пароль QA-сборки.</p>
 <p>Используй тестовые адреса. Статус пилота отображается, пока открыт экран тестовой связи. На карте видно последнее местоположение, если пилот включил передачу GPS. Оплата выключена.</p>
-<a href="/dispatch/map">Открыть карту диспетчерской</a></html>""",
-            pilot=token("pilot", day), passenger=token("passenger", day))
+<a href="/dispatch/map">Открыть карту диспетчерской</a>
+<script nonce="{{ nonce }}">
+document.querySelectorAll('[data-copy]').forEach((button) => {
+    button.addEventListener('click', async () => {
+        const input = document.getElementById(button.dataset.copy);
+        const status = document.getElementById('copy-status');
+        try {
+            await navigator.clipboard.writeText(input.value);
+            status.textContent = 'Токен скопирован целиком.';
+        } catch (_) {
+            input.focus();
+            input.select();
+            input.setSelectionRange(0, input.value.length);
+            status.textContent = 'Токен выделен. Нажми «Копировать».';
+        }
+    });
+});
+</script></html>""",
+            pilot=token("pilot", day), passenger=token("passenger", day), nonce=nonce)
         return page, {
             "Cache-Control": "private, no-store",
             "Referrer-Policy": "no-referrer",
             "X-Robots-Tag": "noindex, nofollow",
-            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+            "Content-Security-Policy": (
+                f"default-src 'none'; script-src 'nonce-{nonce}'; "
+                "style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'"
+            ),
         }
 
     @app.get("/dispatch/test-sync/state")

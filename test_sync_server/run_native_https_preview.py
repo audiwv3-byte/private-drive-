@@ -61,7 +61,7 @@ def request(url, path, token=None, body=None, expected=200):
 
 
 def verify(url, inbox):
-    for _ in range(15):
+    for _ in range(40):
         try:
             health = request(url, "/healthz")
             if health["service"] == "private-drive-cabinet-mock":

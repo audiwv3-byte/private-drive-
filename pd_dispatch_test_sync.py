@@ -14,6 +14,7 @@ from tempfile import TemporaryDirectory
 from flask import jsonify, redirect, render_template_string, request, url_for
 
 from test_sync_server.pd_demo_server import DB_LOCK, MAX_BODY, DemoStore, TripError
+from test_sync_server.pd_passenger_location import PassengerLocations
 
 
 PILOT = "pilot_test"
@@ -26,6 +27,10 @@ class StagingTripStore(DemoStore):
     last_pilot_poll = float("-inf")
     pilot_position = None
     last_pilot_fix = float("-inf")
+
+    def __init__(self, path):
+        super().__init__(path)
+        self.passenger_locations = PassengerLocations()
 
     def ping_pilot(self):
         with DB_LOCK:
@@ -47,10 +52,11 @@ class StagingTripStore(DemoStore):
                        i.trip_date, i.trip_time
                 FROM trips t LEFT JOIN qa_source_imports i ON i.trip_id=t.id
                 ORDER BY t.created DESC LIMIT 50
-            """)
+            """).fetchall()
             return {
                 "pilot_online": online,
                 "pilot_position": position,
+                "passenger_positions": self.passenger_locations.snapshot(trips),
                 "trips": [dict(row) for row in trips],
             }
 
@@ -147,6 +153,16 @@ def register(app, authorized, valid_csrf):
             if action == ["messages"]:
                 return reply({"messages": store.messages(trip_id, role, actor, cursor())})
         if request.method == "POST":
+            if action == ["passenger-position"]:
+                if role != "passenger":
+                    raise TripError("forbidden", 403)
+                with DB_LOCK:
+                    trip = store.get(trip_id, role, actor)
+                    try:
+                        store.passenger_locations.update(trip, payload())
+                    except ValueError as error:
+                        raise TripError(str(error), 409 if str(error) == "inactive_trip" else 400) from None
+                return reply({"ok": True})
             if action == ["messages"]:
                 return reply({"message": store.send_message(trip_id, role, actor, payload())}, 201)
             if action == ["action"]:

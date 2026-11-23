@@ -19,7 +19,8 @@ class PassengerToDispatcherTests(unittest.TestCase):
     def setUp(self):
         self.app = Flask(__name__)
         self.app.secret_key = "unit-tests-only-not-a-real-token"
-        register(self.app, lambda: True, lambda: True)
+        self.dispatcher_authorized = True
+        register(self.app, lambda: self.dispatcher_authorized, lambda: True)
         self.client = self.app.test_client()
 
     def tearDown(self):
@@ -65,6 +66,28 @@ class PassengerToDispatcherTests(unittest.TestCase):
         self.assertEqual(assigned.get_json()["trip"]["status"], "assigned")
         updated = self.client.get("/dispatch/test-sync/state").get_json()["trips"]
         self.assertEqual(updated[0]["status"], "assigned")
+
+    def test_passenger_position_is_only_in_dispatcher_snapshot_and_can_be_revoked(self):
+        passenger = self.bearer("passenger")
+        pilot = self.bearer("pilot")
+        trip = self.client.post("/v1/trips", json={
+            "from": "QA Pickup", "to": "QA Destination", "payment": "Карта",
+        }, headers=passenger).get_json()["trip"]
+        path = f"/v1/trips/{trip['id']}/passenger-position"
+        point = {"latitude": 54.68457, "longitude": 25.28227}
+        self.assertEqual(self.client.post(path, json=point, headers=pilot).status_code, 403)
+        self.assertEqual(self.client.post(path, json=point, headers=passenger).status_code, 200)
+        poll = "/dispatch/test-sync/state"
+        self.dispatcher_authorized = False
+        self.assertEqual(self.client.get(poll).status_code, 401)
+        self.dispatcher_authorized = True
+        positions = self.client.get(poll).get_json()["passenger_positions"]
+        self.assertEqual(positions[trip["id"]]["longitude"], point["longitude"])
+        self.assertNotIn("passenger_positions", self.client.get("/v1/current", headers=pilot).get_json())
+        self.assertEqual(self.client.post(path, json={
+            "latitude": None, "longitude": None,
+        }, headers=passenger).status_code, 200)
+        self.assertEqual(self.client.get(poll).get_json()["passenger_positions"], {})
 
     def test_bridge_sender_is_opt_in_and_never_uses_prod_host(self):
         payload = self.source_payload()

@@ -158,6 +158,7 @@ function renderTrips(){
     $('pilotName').hidden=onlyOnline&&!online;
     $('pilotStatus').textContent=online?(snapshot.pilot_position?'На линии · GPS на карте':'На линии · без GPS'):onlyOnline?'Пилотов на линии нет':'Вне сети';
     document.dispatchEvent(new CustomEvent('pd-test-gps',{detail:snapshot.pilot_position}));
+    document.dispatchEvent(new CustomEvent('pd-passenger-gps',{detail:snapshot.passenger_positions}));
     const shown=trips.filter(t=>orderFilter==='all'||
         (orderFilter==='new'&&t.status==='requested')||(orderFilter==='active'&&active(t))||
         (orderFilter==='done'&&t.status==='finished'));
@@ -218,6 +219,7 @@ async function refreshTrips(){
         renderTrips();
         $('syncStatus').textContent='Связь с сервером активна.';
     }catch{
+        document.dispatchEvent(new CustomEvent('pd-passenger-gps',{detail:{}}));
         $('syncStatus').textContent='Связь потеряна. Показаны последние доступные данные.';
     }finally{
         setTimeout(refreshTrips,3000);
@@ -232,6 +234,53 @@ const hasToken=typeof token==='string'&&/^pk\.[\w.-]+$/.test(token);
 const osmCredit='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 let raster=null, vector=null, tileLayer=null, marker=null, pilotPoint=null;
 let night=true, mode3d=false, vectorReady=false;
+const passengerMarkers=new Map();
+let passengerPositions={}, passengerExpiry;
+
+function drawPassengers(){
+    const now=performance.now();
+    clearTimeout(passengerExpiry);
+    let nextExpiry=Infinity;
+    for(const [id, marker] of passengerMarkers){
+        if(!passengerPositions[id]||passengerPositions[id].expiresAt<=now){
+            marker.remove();
+            passengerMarkers.delete(id);
+        }
+    }
+    for(const [id, point] of Object.entries(passengerPositions)){
+        if(point.expiresAt<=now){
+            delete passengerPositions[id];
+            continue;
+        }
+        nextExpiry=Math.min(nextExpiry,point.expiresAt);
+        const {latitude:lat,longitude:lng}=point;
+        const existing=passengerMarkers.get(id);
+        if(vector){
+            if(existing)existing.setLngLat([lng,lat]);
+            else passengerMarkers.set(id,new mapboxgl.Marker({color:'#28baef'})
+                .setLngLat([lng,lat])
+                .setPopup(new mapboxgl.Popup().setText('Пассажир · GPS'))
+                .addTo(vector));
+        }else if(raster){
+            if(existing)existing.setLatLng([lat,lng]);
+            else passengerMarkers.set(id,L.circleMarker([lat,lng],{
+                radius:9, color:'#ffffff', weight:2, fillColor:'#28baef', fillOpacity:1
+            }).addTo(raster).bindTooltip('Пассажир · GPS'));
+        }
+    }
+    if(Number.isFinite(nextExpiry))passengerExpiry=setTimeout(drawPassengers,nextExpiry-now);
+}
+
+document.addEventListener('pd-passenger-gps',event=>{
+    passengerPositions={};
+    for(const [id,point] of Object.entries(event.detail||{})){
+        if(/^[a-f0-9]{32}$/.test(id)&&Number.isFinite(point.latitude)&&
+            Number.isFinite(point.longitude)&&point.expires_in>0){
+            passengerPositions[id]={...point,expiresAt:performance.now()+point.expires_in*1000};
+        }
+    }
+    drawPassengers();
+});
 const styleId=()=>night?'dark-v11':'light-v11';
 const buildingLayer='pd-buildings-3d';
 
@@ -287,7 +336,12 @@ function rasterStyle(mapbox){
         'Резервная карта OpenStreetMap';
 }
 function useRaster(){
-    if(vector){vector.remove();vector=null;}
+    if(vector){
+        passengerMarkers.forEach(marker=>marker.remove());
+        passengerMarkers.clear();
+        vector.remove();
+        vector=null;
+    }
     marker=null;
     $('glMap').hidden=true;
     $('rasterMap').hidden=false;
@@ -303,6 +357,7 @@ function useRaster(){
     L.control.zoom({position:'bottomright'}).addTo(raster);
     rasterStyle(hasToken);
     drawPilot();
+    drawPassengers();
 }
 function styleVector(){
     const style=vector.getStyle();
@@ -358,6 +413,7 @@ function startVector(){
         $('modeBtn').disabled=false;
         $('providerStatus').textContent='';
         drawPilot();
+        drawPassengers();
     });
     vector.on('style.load',styleVector);
     vector.on('error',event=>{

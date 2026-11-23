@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/web-dispatcher-browser-auth
+      - test/dispatcher-passenger-location
   workflow_dispatch:
 permissions:
   contents: read

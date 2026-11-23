@@ -73,7 +73,7 @@ class RemoteDemoClient implements RemoteTripGateway {
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $_token'
         ..headers['Accept'] = 'application/json';
-      if (_cabin != null) request.headers['X-PD-Cabin'] = _cabin!;
+      if (_cabin != null) request.headers['X-PD-Cabin'] = _cabin;
       if (payload != null) {
         request.headers['Content-Type'] = 'application/json; charset=utf-8';
         request.bodyBytes = utf8.encode(jsonEncode(payload));

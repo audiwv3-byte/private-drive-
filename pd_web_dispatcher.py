@@ -321,6 +321,32 @@ def register(app, core):
         response.headers["Cache-Control"] = "private, no-store"
         return response
 
+    @app.get("/dispatch/map")
+    def pd_dispatch_map():
+        """Mapbox dashboard shares the existing authenticated dispatcher session."""
+        if not authorized():
+            return redirect(url_for("pd_dispatch_login"))
+        token = os.environ.get("MAPBOX_WEB_PUBLIC_TOKEN", "").strip()
+        if not re.fullmatch(r"pk\\.[A-Za-z0-9_.-]{1,512}", token):
+            token = ""
+        page = Path(__file__).with_name("pd_dispatcher_mapbox.html").read_text(encoding="utf-8")
+        response = app.make_response(render_template_string(page, mapbox_token=token))
+        response.headers.update({
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+            "X-Frame-Options": "DENY",
+            "Content-Security-Policy": (
+                "default-src 'none'; "
+                "script-src 'self' 'unsafe-inline' https://unpkg.com; "
+                "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+                "img-src 'self' data: https://*.mapbox.com https://tile.openstreetmap.org https://unpkg.com; "
+                "connect-src 'self' https://api.mapbox.com; "
+                "font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+            ),
+        })
+        return response
+
     @app.post("/dispatch/logout")
     def pd_dispatch_logout():
         if not valid_csrf():

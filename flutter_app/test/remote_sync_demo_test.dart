@@ -186,6 +186,37 @@ void main() {
     client.close();
   });
 
+  testWidgets('QA booking opens with passenger addresses and confirms server order',
+      (tester) async {
+    final server = FakeDemoServer();
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      gateway: server.actor('passenger'),
+      initialFrom: 'Vilnius, Gedimino pr. 12',
+      initialTo: 'Vilnius Airport',
+      enableMapTiles: false,
+      pollInterval: const Duration(hours: 1),
+    )));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('remote-from')))
+        .controller!.text, 'Vilnius, Gedimino pr. 12');
+    expect(tester.widget<TextField>(find.byKey(const Key('remote-to')))
+        .controller!.text, 'Vilnius Airport');
+    expect(server.trip, isNull); // Opening QA form must not create an order.
+    await tester.tap(find.byKey(const Key('remote-create')));
+    await tester.pumpAndSettle();
+    expect(server.trip!['origin'], 'Vilnius, Gedimino pr. 12');
+    expect(find.text('Заявка создана · ожидает назначения'), findsOneWidget);
+    // A new browser/app session must read the same server order.
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      key: const ValueKey('qa-reconnected'),
+      gateway: server.actor('passenger'),
+      enableMapTiles: false,
+      pollInterval: const Duration(hours: 1),
+    )));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('remote-trip-route')), findsOneWidget);
+  });
+
   testWidgets('Passenger, dispatcher and pilot share test events across screens',
       (tester) async {
     final server = FakeDemoServer();

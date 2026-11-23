@@ -58,7 +58,7 @@ def encrypted_export():
     try:
         with os.fdopen(fd, "wb") as output:
             pg = subprocess.Popen(["pg_dump", "--format=custom", "--no-owner",
-                    "--no-acl", "--schema=public", "--file=-"], stdout=subprocess.PIPE,
+                    "--no-acl", "--schema=public"], stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL, env=env)
             age = subprocess.Popen(["age", "--encrypt", "--recipient", recipient],
                                    stdin=pg.stdout, stdout=output,

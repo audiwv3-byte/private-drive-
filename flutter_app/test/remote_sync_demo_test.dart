@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+// The plugin's platform interface is used to test location without real GPS.
+// ignore: depend_on_referenced_packages
+import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
 import 'package:private_drive/remote_sync_client.dart';
 import 'package:private_drive/remote_sync_demo.dart';
 
@@ -8,6 +11,7 @@ class FakeDemoServer {
   int version = 0;
   List<Map<String, dynamic>> events = [];
   List<Map<String, dynamic>> messages = [];
+  List<Map<String, dynamic>> positions = [];
 
   RemoteTripGateway actor(String role) => FakeGateway(this, role);
 
@@ -52,6 +56,10 @@ class FakeGateway extends RemoteTripGateway {
 
   @override
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> data) async {
+    if (path == '/v1/position' && role == 'pilot') {
+      server.positions.add(data);
+      return {'ok': true};
+    }
     if (path.endsWith('/messages') &&
         (role == 'dispatcher' || role == 'passenger' ||
           (role == 'pilot' && server.trip?['pilot'] == 'pilot_test')) &&
@@ -97,7 +105,46 @@ class FakeGateway extends RemoteTripGateway {
   }
 }
 
+class StationaryLocation extends GeolocatorPlatform {
+  @override
+  Future<bool> isLocationServiceEnabled() async => true;
+
+  @override
+  Future<LocationPermission> checkPermission() async => LocationPermission.whileInUse;
+
+  @override
+  Stream<Position> getPositionStream({LocationSettings? locationSettings}) =>
+    const Stream<Position>.empty();
+
+  @override
+  Future<Position> getCurrentPosition({LocationSettings? locationSettings}) async =>
+    Position(latitude: 54.69, longitude: 25.28, timestamp: DateTime(2026, 11, 23),
+      accuracy: 5, altitude: 0, altitudeAccuracy: 0, heading: 0, headingAccuracy: 0,
+      speed: 0, speedAccuracy: 0);
+}
+
 void main() {
+  testWidgets('Sharing GPS sends a first fix with no stream events and clears on stop',
+      (tester) async {
+    final savedPlatform = GeolocatorPlatform.instance;
+    GeolocatorPlatform.instance = StationaryLocation();
+    addTearDown(() => GeolocatorPlatform.instance = savedPlatform);
+    final server = FakeDemoServer();
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      gateway: server.actor('pilot'), enableMapTiles: false,
+      stagingDispatcher: true, pollInterval: const Duration(hours: 1),
+    )));
+    await tester.pumpAndSettle();
+    expect(server.positions, isEmpty);
+    await tester.tap(find.text('Поделиться GPS'));
+    await tester.pumpAndSettle();
+    expect(server.positions.single, {'latitude': 54.69, 'longitude': 25.28});
+    expect(find.text('GPS передаётся в тестовую диспетчерскую'), findsOneWidget);
+    await tester.tap(find.text('Выключить GPS'));
+    await tester.pumpAndSettle();
+    expect(server.positions.last, {'latitude': null, 'longitude': null});
+  });
+
   test('Safari map tiles have public HTTPS primary and fallback hosts', () {
     expect(remoteDemoTileTemplate(false),
       'https://tile.openstreetmap.org/{z}/{x}/{y}.png');

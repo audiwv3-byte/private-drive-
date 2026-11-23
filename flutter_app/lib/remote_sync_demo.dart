@@ -67,6 +67,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   int chatSeq = 0;
   bool _loadedChatForTrip = false;
   bool _clearLocation = false;
+  bool _requestingGpsPermission = false;
+  int _gpsGeneration = 0;
   bool _backupTiles = false;
   int _tileErrors = 0;
   int _tileGeneration = 0;
@@ -333,17 +335,20 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   );
 
   Future<void> toggleGps() async {
+    if (_requestingGpsPermission) return;
     if (gpsOn) {
-      await gps?.cancel();
+      _gpsGeneration++;
+      final stopped = gps;
       gps = null;
       _clearLocation = widget.stagingDispatcher;
-      if (mounted) setState(() {
+      setState(() {
         gpsOn = false; location = null; gpsLabel = 'GPS выключен';
       });
+      await stopped?.cancel();
       if (_clearLocation) unawaited(refresh());
       return;
     }
-    if (!widget.enableMapTiles) return;
+    _requestingGpsPermission = true;
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
         if (mounted) setState(() => gpsLabel = 'Включи геолокацию');
@@ -359,13 +364,10 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         return;
       }
       if (!mounted) return;
+      final generation = ++_gpsGeneration;
       setState(() { gpsOn = true; gpsLabel = 'Ожидание GPS…'; });
-      gps = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high, distanceFilter: 5,
-        ),
-      ).listen((position) {
-        if (!mounted) return;
+      void updatePosition(Position position) {
+        if (!mounted || !gpsOn || _gpsGeneration != generation) return;
         final point = LatLng(position.latitude, position.longitude);
         setState(() {
           location = point;
@@ -373,12 +375,38 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
               ? 'Координаты получены · отправляем…'
               : 'GPS активен · только на устройстве';
         });
-        map.move(point, map.camera.zoom);
-      }, onError: (Object _) {
-        if (mounted) setState(() => gpsLabel = 'GPS недоступен');
+        if (widget.enableMapTiles) map.move(point, map.camera.zoom);
+        if (widget.stagingDispatcher) unawaited(refresh());
+      }
+      gps = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high, distanceFilter: 5,
+        ),
+      ).listen(updatePosition, onError: (Object _) {
+        if (mounted && _gpsGeneration == generation && location == null) {
+          setState(() => gpsLabel = 'GPS недоступен');
+        }
       });
+      unawaited(_getInitialFix(generation, updatePosition));
     } on Exception {
       if (mounted) setState(() => gpsLabel = 'GPS недоступен');
+    } finally {
+      _requestingGpsPermission = false;
+    }
+  }
+
+  Future<void> _getInitialFix(int generation, ValueChanged<Position> updatePosition) async {
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15)));
+      if (mounted && gpsOn && _gpsGeneration == generation && location == null) {
+        updatePosition(position);
+      }
+    } on Exception {
+      if (mounted && gpsOn && _gpsGeneration == generation && location == null) {
+        setState(() => gpsLabel = 'Нет координат. Проверь геолокацию.');
+      }
     }
   }
 
@@ -556,14 +584,12 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
             )),
         Positioned(top: 8, right: 8,
           child: Column(children: [
-            IconButton.filledTonal(
+            FilledButton.tonalIcon(
               key: Key(gpsOn ? 'remote-disable-gps' : 'remote-enable-gps'),
               onPressed: toggleGps,
-              tooltip: gpsOn ? 'Выключить GPS' : widget.stagingDispatcher
-                  ? 'Поделиться GPS с тестовой диспетчерской' : 'Включить GPS',
+              label: Text(gpsOn ? 'Выключить GPS' : widget.stagingDispatcher
+                  ? 'Поделиться GPS' : 'Включить GPS'),
               icon: Icon(gpsOn ? Icons.location_off : Icons.my_location)),
-            if (widget.stagingDispatcher && !gpsOn)
-              const Text('Поделиться GPS', style: TextStyle(fontSize: 11)),
             Text(gpsLabel, style: const TextStyle(fontSize: 11)),
           ])),
         Align(alignment: Alignment.bottomCenter,

@@ -1,0 +1,80 @@
+name: PRIVATE DRIVE native Bearer three-cabin sync bridge QA
+on:
+  push:
+    branches: [feature/web-dispatcher-browser-auth]
+    paths:
+      - 'test_sync_server/pd_demo_server.py'
+      - 'test_sync_server/pd_native_session_bridge.py'
+      - 'test_native_sync_bridge_postgres.py'
+      - 'flutter_app/lib/remote_sync_client.dart'
+      - 'flutter_app/lib/remote_sync_demo.dart'
+      - 'flutter_app/lib/native_cabin_entry.dart'
+      - 'flutter_app/lib/main.dart'
+      - 'flutter_app/test/native_cabin_sync_bridge_test.dart'
+      - 'flutter_app/test/remote_sync_demo_test.dart'
+      - '.github/workflows/pd-native-session-sync-bridge-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-postgres-and-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pd_schema_ci
+          POSTGRES_USER: pd_ci
+          POSTGRES_PASSWORD: synthetic-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pd_ci -d pd_schema_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PD_CI_FAKE_DB_ONLY: 'YES'
+      PD_CI_POSTGRES_URL: 'postgresql://pd_ci:synthetic-only-password@127.0.0.1:5432/pd_schema_ci'
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+      PYTHONPATH: '.:test_sync_server'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated PostgreSQL driver
+        run: python -m pip install 'psycopg[binary]==3.2.13'
+      - name: Native session authority and three-role end-to-end API
+        run: python -m unittest -v test_native_sync_bridge_postgres.py
+      - name: Regression of isolated orders GPS and chat
+        run: python -m unittest discover -s test_sync_server -p 'test_*.py' -v
+  flutter-native-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: flutter_app
+    env:
+      PD_NATIVE_AUTH_API_URL: ''
+      PD_ISOLATED_NATIVE_SYNC: 'false'
+      PD_ISOLATED_SYNC_API_URL: ''
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Offline assets and Flutter dependencies
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 tool/prepare_transparent_logo.py
+          flutter pub get
+      - name: Native bearer bridge, cabinet roles, trip GPS chat and recovery
+        run: |
+          flutter test --no-pub --reporter expanded test/native_cabin_sync_bridge_test.dart test/remote_sync_demo_test.dart test/native_auth_relaunch_widget_test.dart test/native_cabin_end_to_end_qa_test.dart test/native_logout_api_test.dart
+      - name: Check Flutter analysis
+        run: flutter analyze --no-fatal-infos

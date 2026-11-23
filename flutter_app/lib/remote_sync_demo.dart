@@ -34,17 +34,19 @@ String? newestIncomingChatRole(
 class RemoteSyncDemo extends StatefulWidget {
   const RemoteSyncDemo({super.key, this.gateway, this.enableMapTiles = true,
     this.pollInterval = const Duration(seconds: 3),
-    this.onIncomingMessageVoice});
+    this.onIncomingMessageVoice, this.stagingDispatcher = false});
   final RemoteTripGateway? gateway;
   final bool enableMapTiles;
   final Duration pollInterval;
   final VoidCallback? onIncomingMessageVoice;
+  final bool stagingDispatcher;
 
   @override
   State<RemoteSyncDemo> createState() => _RemoteSyncDemoState();
 }
 
 class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
+  static const stagingUrl = 'https://private-drive-dispatcher-staging.onrender.com';
   final url = TextEditingController();
   final token = TextEditingController();
   final origin = TextEditingController();
@@ -61,6 +63,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   int seq = 0;
   int chatSeq = 0;
   bool _loadedChatForTrip = false;
+  bool _clearLocation = false;
   bool _backupTiles = false;
   int _tileErrors = 0;
   int _tileGeneration = 0;
@@ -85,6 +88,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   @override
   void initState() {
     super.initState();
+    if (widget.stagingDispatcher) url.text = stagingUrl;
     if (widget.gateway != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) connect(widget.gateway!, isOwned: false);
@@ -138,6 +142,23 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         throw const RemoteDemoException('Неверный формат поездки');
       }
       final current = raw as Map<String, dynamic>?;
+      if (widget.stagingDispatcher && role == 'pilot') {
+        final point = gpsOn ? location : null;
+        if (point != null || _clearLocation) {
+          try {
+            await client.post('/v1/position', {'latitude': point?.latitude,
+              'longitude': point?.longitude});
+            if (point == null) _clearLocation = false;
+            if (mounted && gpsOn && point != null) {
+              setState(() => gpsLabel = 'GPS передаётся в тестовую диспетчерскую');
+            }
+          } on RemoteDemoException {
+            if (mounted && gpsOn) {
+              setState(() => gpsLabel = 'Не удалось передать GPS. Повторяем…');
+            }
+          }
+        }
+      }
       final id = current?['id'] as String?;
       if (id != lastTripId) {
         lastTripId = id;
@@ -279,9 +300,11 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     if (gpsOn) {
       await gps?.cancel();
       gps = null;
+      _clearLocation = widget.stagingDispatcher;
       if (mounted) setState(() {
         gpsOn = false; location = null; gpsLabel = 'GPS выключен';
       });
+      if (_clearLocation) unawaited(refresh());
       return;
     }
     if (!widget.enableMapTiles) return;
@@ -310,7 +333,9 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         final point = LatLng(position.latitude, position.longitude);
         setState(() {
           location = point;
-          gpsLabel = 'GPS активен · только на устройстве';
+          gpsLabel = widget.stagingDispatcher
+              ? 'Координаты получены · отправляем…'
+              : 'GPS активен · только на устройстве';
         });
         map.move(point, map.camera.zoom);
       }, onError: (Object _) {
@@ -339,6 +364,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           'Используй HTTPS и временный токен своей роли. '
           'Токен не сохраняется на устройстве.'),
       TextField(key: const Key('remote-server-url'), controller: url,
+        readOnly: widget.stagingDispatcher,
         decoration: const InputDecoration(labelText: 'HTTPS-адрес')),
       TextField(key: const Key('remote-token'), controller: token,
         obscureText: true,
@@ -484,7 +510,11 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
             IconButton.filledTonal(
               key: Key(gpsOn ? 'remote-disable-gps' : 'remote-enable-gps'),
               onPressed: toggleGps,
+              tooltip: gpsOn ? 'Выключить GPS' : widget.stagingDispatcher
+                  ? 'Поделиться GPS с тестовой диспетчерской' : 'Включить GPS',
               icon: Icon(gpsOn ? Icons.location_off : Icons.my_location)),
+            if (widget.stagingDispatcher && !gpsOn)
+              const Text('Поделиться GPS', style: TextStyle(fontSize: 11)),
             Text(gpsLabel, style: const TextStyle(fontSize: 11)),
           ])),
         Align(alignment: Alignment.bottomCenter,

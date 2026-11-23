@@ -8,7 +8,27 @@
   <title>PRIVATE DRIVE — Личный водитель и трансферы</title>
   <link rel="icon" href="assets/pd-logo.webp" type="image/webp">
   <link rel="stylesheet" href="assets/corporate.css">
-<link rel="stylesheet" href="/assets/site-analytics.css"></head>
+<link rel="stylesheet" href="/assets/site-analytics.css"><style>
+/* PRIVATE DRIVE approved photo-price route cards; scoped to this page only. */
+#transfers .routes{align-items:stretch;gap:14px}
+#transfers .catalog-route-link{display:block;position:relative;isolation:isolate;min-width:0;border:1px solid #c39951;border-radius:20px;overflow:hidden;background:#15110f;box-shadow:0 12px 30px #0003;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+#transfers .catalog-route-link:hover{transform:translateY(-4px);border-color:#f3cf86;box-shadow:0 16px 36px #0008}
+#transfers .catalog-route-link:focus-visible{outline:3px solid #f3cf86;outline-offset:4px}
+#transfers .catalog-route-image{position:relative;overflow:hidden;background:#24201b}
+#transfers .catalog-route-image img{width:100%;height:auto;aspect-ratio:4/4.3;object-fit:cover;object-position:center;transition:transform .25s ease}
+#transfers .catalog-route-link:hover img{transform:scale(1.04)}
+#transfers .catalog-route-price{position:absolute;z-index:1;top:14px;right:12px;display:inline-block;margin:0;padding:9px 14px;border:1px solid #eac47d;border-radius:14px;background:linear-gradient(140deg,#3b2810f5,#12100dec);color:#fff2d2;font:700 clamp(1.45rem,2.3vw,2.15rem)/1.15 Georgia,serif;white-space:nowrap;text-shadow:0 2px 4px #000a;box-shadow:0 4px 14px #0009}
+#transfers .catalog-route-image::after{content:"";position:absolute;inset:auto 0 0;height:18%;background:linear-gradient(transparent,#100d0bc9);pointer-events:none}
+#transfers .catalog-route-link .card-content{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;padding:16px 12px 18px;min-height:92px;text-align:center}
+#transfers .catalog-route-link h3{margin:0;color:#f8e9d1;font:700 clamp(1.12rem,1.7vw,1.55rem)/1.18 Georgia,serif}
+#transfers .catalog-route-link .catalog-route-extra{margin:4px 0 0;color:#d8bb88;font-size:.8rem}
+#transfers .catalog-route-link .catalog-route-cta{color:#e8c17a;font-size:.78rem}
+@media(max-width:740px){#transfers .catalog-route-image img{aspect-ratio:4/4.2}#transfers .catalog-route-price{top:10px;right:8px;padding:7px 10px;font-size:clamp(1.2rem,4.2vw,1.7rem)}#transfers .catalog-route-link .card-content{padding:12px 7px;min-height:80px}}
+@media(max-width:530px){#transfers .routes{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#transfers .catalog-route-link{border-radius:13px}#transfers .catalog-route-price{font-size:clamp(1.12rem,4.5vw,1.5rem)}#transfers .catalog-route-link h3{font-size:1rem}}
+@media(max-width:350px){#transfers .routes{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){#transfers .catalog-route-link,#transfers .catalog-route-image img{transition:none}}
+</style>
+</head>
 <body>
   <header class="top" id="top">
     <div class="wrap top-inner">
@@ -76,18 +96,63 @@
       <a class="catalog-more" href="services.html">Все услуги →</a>
     </section>
     <section id="transfers" class="section shaded">
-      <div class="wrap">
-        <h2><a href="directions.html" class="catalog-heading"><span>Популярные направления</span><span class="catalog-heading-motion drive" aria-hidden="true">🚙</span><span class="catalog-heading-arrow" aria-hidden="true">↗</span></a></h2>
-        <div class="grid routes">
-          <a class="card home-route" href="order-map.html?mode=preorder&amp;airport=to"><img src="assets/airport.webp" alt="Аэропорт Вильнюса" loading="lazy"><div class="card-content"><h3>Аэропорт Вильнюса</h3><strong class="price">40 €</strong><p>В одну сторону</p></div></a>
-          <a class="card home-route" href="order-map.html?mode=preorder&amp;route=kaunas"><img src="assets/kaunas.webp" alt="Каунас" loading="lazy"><div class="card-content"><h3>Каунас</h3><strong class="price">130 €</strong><p>Туда-обратно — 200 €</p></div></a>
-          <a class="card home-route" href="order-map.html?mode=preorder&amp;route=klaipeda"><img src="assets/klaipeda.webp" alt="Клайпеда" loading="lazy"><div class="card-content"><h3>Клайпеда</h3><strong class="quote">Цена по запросу</strong></div></a>
-          <a class="card home-route" href="order-map.html?mode=preorder&amp;route=warsaw"><img src="assets/warsaw.webp" alt="Варшава" loading="lazy"><div class="card-content"><h3>Варшава</h3><strong class="quote">Цена по запросу</strong></div></a>
-        </div>
-        <a class="catalog-more" href="directions.html">Все направления →</a>
-      </div>
-    </section>
-    <section id="partners" class="section wrap">
+  <div class="wrap">
+    <h2><a href="directions.html" class="catalog-heading"><span>Популярные направления</span><span class="catalog-heading-motion drive" aria-hidden="true">🚙</span><span class="catalog-heading-arrow" aria-hidden="true">↗</span></a></h2>
+    <div class="grid routes">
+<a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;airport=to" aria-label="Аэропорт Вильнюса, 40 евро — открыть форму заказа">
+            <div class="catalog-route-image"><img src="assets/airport.webp" width="360" height="400" alt="" loading="lazy"><strong class="catalog-route-price">40 €</strong></div>
+            <div class="card-content"><h3>Аэропорт Вильнюса</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+          </a>
+          <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=kaunas" aria-label="Каунас, 130 евро, дополнительный тариф 200 евро — открыть форму заказа">
+            <div class="catalog-route-image"><img src="assets/kaunas.webp" width="344" height="400" alt="" loading="lazy"><strong class="catalog-route-price">130 €</strong></div>
+            <div class="card-content"><h3>Каунас</h3><span class="catalog-route-extra">Дополнительный тариф: 200 €</span><span class="catalog-route-cta">Выбрать поездку →</span></div>
+          </a>
+          <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=klaipeda" aria-label="Вильнюс — Клайпеда, 280 евро — открыть форму заказа">
+            <div class="catalog-route-image"><img src="assets/klaipeda.webp" width="346" height="400" alt="" loading="lazy"><strong class="catalog-route-price">280 €</strong></div>
+            <div class="card-content"><h3>Клайпеда</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+          </a>
+          <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=warsaw" aria-label="Вильнюс — Варшава, 550 евро — открыть форму заказа">
+            <div class="catalog-route-image"><img src="assets/warsaw.webp" width="342" height="400" alt="" loading="lazy"><strong class="catalog-route-price">550 €</strong></div>
+            <div class="card-content"><h3>Варшава</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+          </a>
+
+      <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=trakai" aria-label="Вильнюс — Тракай, 100 евро — открыть форму заказа">
+        <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Trakai%20Island%20Castle.jpg?width=700" width="350" height="380" alt="Тракай" loading="lazy" decoding="async"><strong class="catalog-route-price">100 €</strong></div>
+        <div class="card-content"><h3>Тракай</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+      </a>
+      <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=visaginas" aria-label="Вильнюс — Висагинас, 180 евро — открыть форму заказа">
+        <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Visaginas001.JPG?width=700" width="350" height="380" alt="Висагинас" loading="lazy" decoding="async"><strong class="catalog-route-price">180 €</strong></div>
+        <div class="card-content"><h3>Висагинас</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+      </a>
+      <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=varena" aria-label="Вильнюс — Варена, 120 евро — открыть форму заказа">
+        <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Varenos%20baznycia.jpg?width=700" width="350" height="380" alt="Варена" loading="lazy" decoding="async"><strong class="catalog-route-price">120 €</strong></div>
+        <div class="card-content"><h3>Варена</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+      </a>
+      <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=daugavpils" aria-label="Вильнюс — Даугавпилс, 220 евро — открыть форму заказа">
+        <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Daugavpils%20Fortress%2001.jpg?width=700" width="350" height="380" alt="Даугавпилс" loading="lazy" decoding="async"><strong class="catalog-route-price">220 €</strong></div>
+        <div class="card-content"><h3>Даугавпилс</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+      </a>
+      <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=panevezys" aria-label="Вильнюс — Паневежис, 150 евро — открыть форму заказа">
+        <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Panev%C4%97%C5%BEys001.JPG?width=700" width="350" height="380" alt="Паневежис" loading="lazy" decoding="async"><strong class="catalog-route-price">150 €</strong></div>
+        <div class="card-content"><h3>Паневежис</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+      </a>
+      <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=siauliai" aria-label="Вильнюс — Шяуляй, 220 евро — открыть форму заказа">
+        <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/%C5%A0iauliai%20cathedral.jpg?width=700" width="350" height="380" alt="Шяуляй" loading="lazy" decoding="async"><strong class="catalog-route-price">220 €</strong></div>
+        <div class="card-content"><h3>Шяуляй</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+      </a>
+      <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=pabrade" aria-label="Вильнюс — Пабраде, 100 евро — открыть форму заказа">
+        <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Pabrad%C4%97.jpg?width=700" width="350" height="380" alt="Пабраде" loading="lazy" decoding="async"><strong class="catalog-route-price">100 €</strong></div>
+        <div class="card-content"><h3>Пабраде</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+      </a>
+      <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=druskininkai" aria-label="Вильнюс — Друскининкай, 120 евро — открыть форму заказа">
+        <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Druskininkai%2C%20Lithuania.jpg?width=700" width="350" height="380" alt="Друскининкай" loading="lazy" decoding="async"><strong class="catalog-route-price">120 €</strong></div>
+        <div class="card-content"><h3>Друскининкай</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
+      </a>
+    </div>
+    <a class="catalog-more" href="directions.html">Все направления, включая Палангу →</a>
+  </div>
+</section>
+<section id="partners" class="section wrap">
       <h2>Наши друзья</h2>
       <div class="partner-feature">
         <div class="partner-tech-icon" aria-hidden="true"><span>🤖</span></div>

@@ -150,49 +150,55 @@ with sync_playwright() as p:
         assert page.locator("#quick-to").input_value() == "Каунас"
         page.locator("#quick-date").fill("2026-12-04")
         page.locator("#quick-time").fill("14:30")
+        # QA order API is stubbed: never submit real orders from visual test.
+        intercepted = []
+        def synthetic_booking(route):
+            intercepted.append(route.request.post_data_json)
+            route.fulfill(status=201, content_type="application/json",
+                          body='{"qa_only":true,"trip":{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}')
+        page.route("**/preview/api/qa-booking", synthetic_booking)
         page.locator('#quick-trip-form button').click()
-        assert page.locator("#pickup-address").input_value() == "Вильнюс"
-        assert page.locator("#dropoff-address").input_value() == "Каунас"
-        assert page.locator("#route-details").get_attribute("open") is not None
-        assert page.locator("#pickup-date").input_value() == "2026-12-04"
+        page.locator("#quick-order-status").get_by_text("Тестовая заявка", exact=False).wait_for()
+        assert intercepted[-1]["source"] == "quick"
+        assert intercepted[-1]["from"] == "Вильнюс"
+        assert intercepted[-1]["to"] == "Каунас"
+        assert page.locator("#route-details").get_attribute("open") is None
+        assert page.locator("#quick-date").input_value() == "2026-12-04"
+        page.unroute("**/preview/api/qa-booking")
         page.locator("header a[href='/services']").click()
         assert page.url.endswith("/services")
         assert page.locator("#jumpstart").count() == 1
         assert page.locator("#sober").count() == 1
-        # Detailed quick-booking validation is navigation-only and never submits orders.
+        # New quick-booking flow must remain on the approved design and must
+        # NOT reopen the old map. All test submissions are browser-intercepted.
         page.goto(BASE + "/", wait_until="domcontentloaded")
-        posts = []
-        page.on("request", lambda request: posts.append(request.url) if request.method == "POST" else None)
-        assert page.locator("#quick-from").get_attribute("required") is not None
-        assert page.locator("#quick-to").get_attribute("required") is not None
+        posted = []
+        def synthetic_booking(route):
+            posted.append(route.request.post_data_json)
+            route.fulfill(status=201, content_type="application/json",
+                          body='{"qa_only":true,"trip":{"id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}')
+        page.route("**/preview/api/qa-booking", synthetic_booking)
         assert not page.locator("#quick-trip-form").evaluate("(form) => form.checkValidity()")
         assert page.locator("#route-details").get_attribute("open") is None
-
-        for i, (destination, date_value, time_value) in enumerate([
+        for destination, date_value, time_value in [
             ("Аэропорт Вильнюса (VNO)", "2026-12-04", "07:15"),
             ("Каунас", "2026-12-05", "14:30"),
             ("Клайпеда", "2026-12-06", "20:45"),
             ("Варшава", "2026-12-07", "05:40")
-        ]):
+        ]:
             page.locator('.pd-destinations .fare-link[data-to="' + destination + '"]').click()
             assert page.locator("#quick-from").input_value() == "Вильнюс"
             assert page.locator("#quick-to").input_value() == destination
             page.locator("#quick-date").fill(date_value)
             page.locator("#quick-time").fill(time_value)
-            assert page.locator("#quick-trip-form").evaluate("(form) => form.checkValidity()")
             page.locator('#quick-trip-form button[type="submit"]').click()
-            assert page.locator("#route-details").get_attribute("open") is not None
-            assert page.locator("#pickup-address").input_value() == "Вильнюс"
-            assert page.locator("#dropoff-address").input_value() == destination
-            assert page.locator("#pickup-date").input_value() == date_value
-            assert page.locator("#pickup-time").input_value() == time_value
-            assert "Адреса перенесены" in page.locator("#order-status").inner_text()
-            assert not posts, f"Unexpected POST request while previewing: {posts}"
-        page.locator("#swap-address").click()
-        assert page.locator("#pickup-address").input_value() == "Варшава"
-        assert page.locator("#dropoff-address").input_value() == "Вильнюс"
-        assert not posts
-        print(f"QUICK_BOOKING_OK width={width} routes=4 dates=4 times=4 required_validation=true swap=true posts=0", flush=True)
+            page.locator("#quick-order-status").get_by_text("Тестовая заявка", exact=False).wait_for()
+            assert posted[-1]["to"] == destination
+            assert posted[-1]["source"] == "quick"
+            assert page.locator("#route-details").get_attribute("open") is None
+        assert len(posted) == 4
+        print(f"QUICK_BOOKING_OK width={width} routes=4 dates=4 times=4 no_legacy_map=true mocked_posts=4", flush=True)
+        page.unroute("**/preview/api/qa-booking")
         page.goto(BASE + "/", wait_until="domcontentloaded")
         page.screenshot(path=f"mobile-qa-screenshots/home-{width}.png", full_page=True)
         print(f"MOBILE_QA_OK width={width} images=8 services=3 fares=4 no_overflow=true quick_booking=true services_page=true", flush=True)

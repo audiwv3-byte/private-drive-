@@ -142,6 +142,41 @@ class LogoutHttpPostgresTests(unittest.TestCase):
         self.assertIsNone(self.sessions()[digest(A)])
         self.assertIsNone(self.sessions()[digest(B)])
 
+    def test_restored_session_server_role_revocation_and_expiry(self):
+        status, data = call(type(self).app, B,
+            method="GET", path="/native-auth/session")
+        self.assertEqual(status,"200 OK")
+        self.assertEqual(data["user_id"],"pilot")
+        self.assertEqual(data["role"],"pilot")
+        self.assertGreater(data["expires_at"],NOW)
+
+        # The stored/client role is irrelevant: server changes take precedence.
+        with psycopg.connect(self.privileged) as owner:
+            owner.execute("""UPDATE native_auth_roles SET role='passenger'
+                             WHERE user_id='pilot'""")
+        try:
+            status, data = call(type(self).app, B,
+                method="GET", path="/native-auth/session",
+                payload={"role":"admin"})
+            self.assertEqual(status,"200 OK")
+            self.assertEqual(data["role"],"passenger")
+        finally:
+            with psycopg.connect(self.privileged) as owner:
+                owner.execute("""UPDATE native_auth_roles SET role='pilot'
+                                 WHERE user_id='pilot'""")
+
+        self.assertEqual(call(type(self).app, EXPIRED,
+            method="GET",path="/native-auth/session")[0],"401 Unauthorized")
+        self.assertEqual(call(type(self).app, "bad",
+            method="GET",path="/native-auth/session")[0],"401 Unauthorized")
+        self.assertEqual(call(type(self).app, None,
+            method="GET",path="/native-auth/session")[0],"401 Unauthorized")
+        self.assertEqual(call(type(self).app,A)[0],"200 OK")
+        self.assertEqual(call(type(self).app,A,
+            method="GET",path="/native-auth/session")[0],"401 Unauthorized")
+        self.assertEqual(call(type(self).app,B,
+            method="GET",path="/native-auth/session")[0],"200 OK")
+
     def test_no_direct_session_updates_by_http_db_user(self):
         with psycopg.connect(self.runtime) as client:
             with self.assertRaises(InsufficientPrivilege):

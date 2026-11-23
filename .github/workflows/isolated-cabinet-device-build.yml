@@ -19,6 +19,7 @@ jobs:
     env:
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
       QA_PACKAGE: lt.privatedrive.cabinetsync.qa
+      PYTHONPATH: 'test_sync_server:.'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -9,6 +9,8 @@ import 'native_logout_api.dart';
 import 'native_session_manager.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_identity_notice_page.dart';
+import 'remote_sync_client.dart';
+import 'remote_sync_demo.dart';
 
 typedef PdSignInBuilder = Widget Function(BuildContext context, String role,
     ValueChanged<PdNativeSession> onAuthenticated);
@@ -16,11 +18,16 @@ typedef PdSignInBuilder = Widget Function(BuildContext context, String role,
 /// Cabin choice is navigation intent, never a server role grant.
 class PdNativeCabinEntry extends StatefulWidget {
   const PdNativeCabinEntry({super.key, required this.signInBuilder,
-    required this.identityApiBuilder, this.logoutApi, this.sessionManager});
+    required this.identityApiBuilder, this.logoutApi, this.sessionManager,
+    this.isolatedSyncGatewayBuilder});
   final PdSignInBuilder signInBuilder;
   final PdIdentityApi Function(PdNativeSession session) identityApiBuilder;
   final PdNativeLogoutApi? logoutApi;
   final PdNativeSessionManager? sessionManager;
+  /// Explicit internal QA only. Uses the existing verified phone token,
+  /// never a separate manual demo token or an unverified guest session.
+  final RemoteTripGateway Function(PdNativeSession session, String cabin)?
+      isolatedSyncGatewayBuilder;
   @override
   State<PdNativeCabinEntry> createState() => _PdNativeCabinEntryState();
 }
@@ -169,6 +176,23 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       onSignOut: _signOut, onBackToCabinets: _entry,
     );
     Widget child = PdPermissionsFirstLaunch(child: cabin);
+    if (session != null && widget.isolatedSyncGatewayBuilder != null) {
+      child = Scaffold(
+        body: child,
+        floatingActionButton: FloatingActionButton.extended(
+          key: const Key('native-cabin-isolated-sync'),
+          icon: const Icon(Icons.sync),
+          label: const Text('Синхронизация · тест'),
+          onPressed: () {
+            final gateway = widget.isolatedSyncGatewayBuilder!(session, role);
+            Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => RemoteSyncDemo(gateway: gateway,
+                enableMapTiles: false),
+            ));
+          },
+        ),
+      );
+    }
     if (session != null) {
       child = PdIdentityScope(api: widget.identityApiBuilder(session), child: child);
     } else {

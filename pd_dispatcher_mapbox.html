@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive"><meta name="theme-color" content="#100e0c">
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+<title>PRIVATE DRIVE — Диспетчерская</title>
+<link rel="icon" href="assets/pd-logo.webp" type="image/webp">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyo0SS+uqOGdGQ=" crossorigin="">
+<style>
+:root{color-scheme:dark;--gold:#e8c581;--bg:#110f0c;--panel:#1b1713;--line:#4d402c;--soft:#c8bba3}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#f6efdf}
+button,a{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:3px}a{color:var(--gold)}
+header{height:69px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 18px;border-bottom:1px solid var(--line);background:#12100d}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;font-weight:750;color:var(--gold);letter-spacing:.08em}.brand img{width:43px;height:43px;object-fit:contain}.brand small{display:block;color:var(--soft);letter-spacing:.03em;font-size:11px;font-weight:400}
+.layout{display:grid;grid-template-columns:315px minmax(0,1fr) 305px;min-height:calc(100dvh - 69px)}
+aside{background:#17130f;padding:16px;border-right:1px solid var(--line);overflow:auto}aside.right{border-right:0;border-left:1px solid var(--line)}
+h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 12px}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}p{color:var(--soft);margin:9px 0}
+.label{font-size:11px;letter-spacing:.11em;color:#d5b777;text-transform:uppercase}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.stat,.card{background:#242019;border:1px solid var(--line);border-radius:11px;padding:12px}.stat b{font-size:25px;display:block;color:#f7e7c3}.stat span{font-size:11px;color:var(--soft)}
+.tabs{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0}.btn,.tab{border:1px solid #725c3b;border-radius:8px;background:#292118;color:#f5d9a1;padding:9px 11px;min-height:40px}.tab.active{background:#d7ad65;color:#17100a}
+.card{margin:10px 0}.card strong{display:block;margin:7px 0;color:#f4ead9}.muted{color:var(--soft);font-size:12px}
+#map{min-height:530px;height:calc(100dvh - 69px);background:#24231f;position:relative}
+#mapNotice{position:absolute;z-index:500;left:16px;top:16px;right:16px;max-width:445px;border-radius:10px;background:#15120fe8;border:1px solid #8a7049;padding:12px 15px;pointer-events:none}
+#mapNotice b{display:block;color:var(--gold)}#mapNotice span{font-size:12px;color:#f2e6d2}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.notice{padding:12px;background:#282016;border:1px solid #8b6a39;border-radius:9px}.notice strong{color:var(--gold)}.empty{margin:16px 0;padding:20px 12px;border:1px dashed #675438;border-radius:10px;text-align:center;color:var(--soft)}
+.status{font-size:12px;color:var(--gold);margin:10px 0}.legend{display:flex;gap:8px;flex-wrap:wrap}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:#e2b86e}
+[hidden]{display:none!important}
+@media(max-width:1100px){.layout{grid-template-columns:265px minmax(0,1fr)}aside.right{grid-column:1/-1;border-top:1px solid var(--line);border-left:0}.right .card{max-width:600px}}
+@media(max-width:650px){header{height:auto;min-height:65px;flex-wrap:wrap;padding:9px 12px}.layout{display:flex;flex-direction:column}aside{padding:13px;border-right:0}#map{height:52dvh;min-height:350px}aside.right{border-left:0}.stats{grid-template-columns:repeat(4,minmax(0,1fr))}.stat{padding:8px}.stat b{font-size:19px}.stat span{font-size:10px}}
+</style></head>
+<body>
+<header>
+<a class="brand" href="/dispatch"><img src="/pd-logo-transparent.png" alt=""><span>PRIVATE DRIVE<small>Диспетчерская · тестовый интерфейс</small></span></a>
+<div class="toolbar"><span class="label">Доступ к заказам закрыт</span><a class="btn" href="/dispatch">В панель управления</a></div>
+</header>
+<main class="layout">
+<aside aria-label="Заказы">
+<h1>Диспетчерская</h1>
+<p class="notice"><strong>Безопасный предпросмотр.</strong> Реальные заказы, персональные данные и местоположения пилотов здесь не загружаются. Доступ к ним появится только после серверной проверки роли диспетчера.</p>
+<div class="stats" aria-label="Показатели"><div class="stat"><b>—</b><span>Новые</span></div><div class="stat"><b>—</b><span>Активные</span></div><div class="stat"><b>—</b><span>На линии</span></div><div class="stat"><b>—</b><span>Завершены</span></div></div>
+<div class="tabs" role="group" aria-label="Фильтр заказов"><button class="tab active" data-filter="all" aria-pressed="true">Все</button><button class="tab" data-filter="new" aria-pressed="false">Новые</button><button class="tab" data-filter="active" aria-pressed="false">В пути</button><button class="tab" data-filter="done" aria-pressed="false">История</button></div>
+<h2 id="ordersTitle">Все заказы</h2><div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
+<p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>
+</aside>
+<section id="map" aria-label="Интерактивная карта диспетчерской">
+<div id="mapNotice" role="status"><b id="mapProvider">Загрузка Mapbox…</b><span id="mapStatus">Карта доступна для просмотра. Позиции пилотов и маршруты заказов пока не подключены.</span></div>
+</section>
+<aside class="right" aria-label="Управление пилотами и коммуникации">
+<h2>Пилоты</h2><div class="tabs"><button class="tab active" id="allPilots" aria-pressed="true">Все</button><button class="tab" id="onlinePilots" aria-pressed="false">На линии</button></div>
+<div class="empty">Позиции пилотов появятся после авторизованного подключения GPS к единому серверу.</div>
+<h2>Заказ и связь</h2>
+<div class="card"><span class="label">Выбранный заказ</span><strong>Заказ не выбран</strong><p class="muted">Маршрут, статус, назначение пилота, платежи и чат будут доступны после подключения API.</p><button class="btn" disabled title="Ожидает защищённого API">Назначить пилота</button></div>
+<div class="card"><span class="label">Единая синхронизация</span><p>Сайт · Android/iOS · Telegram-бот</p><p class="muted">Нужны общая база заказов, единые идентификаторы, серверные роли и обновления в реальном времени.</p></div>
+<div class="card"><span class="label">Карта</span><div class="toolbar"><button class="btn" id="themeBtn">Дневная карта</button><button class="btn" id="vilniusBtn">Вильнюс</button></div><p id="providerStatus" class="status" role="status"></p></div>
+</aside>
+</main>
+<script>window.PD_MAPBOX_PUBLIC_TOKEN={{ mapbox_token|tojson }};</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const labels={all:'Все заказы',new:'Новые заказы',active:'Заказы в пути',done:'История заказов'};
+document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});$('ordersTitle').textContent=labels[b.dataset.filter];}));
+['allPilots','onlinePilots'].forEach(id=>$(id).addEventListener('click',()=>{['allPilots','onlinePilots'].forEach(k=>{$(k).classList.toggle('active',k===id);$(k).setAttribute('aria-pressed',String(k===id))})}));
+if(typeof L==='undefined'){$('mapProvider').textContent='Не удалось загрузить карту';$('mapStatus').textContent='Проверь подключение к интернету.';return}
+const map=L.map('map',{zoomControl:false}).setView([54.6872,25.2797],12);
+L.control.zoom({position:'bottomright'}).addTo(map);
+const osmCredit='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const token=window.PD_MAPBOX_PUBLIC_TOKEN;
+let layer=null,night=true;
+const useOsm=()=>{if(layer)layer.remove();layer=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:osmCredit}).addTo(map);$('mapProvider').textContent='Резервная карта OpenStreetMap';$('providerStatus').textContent='Для Mapbox нужен публичный токен в настройках тестового Render.'};
+const showTheme=()=>{
+if(typeof token!=='string'||!/^pk\.[\w.-]+$/.test(token)){useOsm();return}
+if(layer)layer.remove();
+const style=night?'dark-v11':'light-v11';
+const url='https://api.mapbox.com/styles/v1/mapbox/'+style+'/tiles/256/{z}/{x}/{y}?access_token='+encodeURIComponent(token);
+let errors=0;
+const next=L.tileLayer(url,{maxZoom:19,attribution:'&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> '+osmCredit+' <a href="https://apps.mapbox.com/feedback/">Feedback</a>'});
+next.on('tileerror',()=>{if(layer!==next)return;if(++errors>=3){useOsm();$('mapStatus').textContent='Mapbox временно недоступна, работает резервная карта. Данные пилотов не подключены.';}});
+layer=next.addTo(map);$('mapProvider').textContent='Mapbox · '+(night?'ночная':'дневная')+' карта';$('providerStatus').textContent='Активна картографическая подложка Mapbox. GPS пилотов ожидает авторизованный API.';
+};
+$('themeBtn').addEventListener('click',()=>{night=!night;$('themeBtn').textContent=night?'Дневная карта':'Ночная карта';showTheme()});
+$('vilniusBtn').addEventListener('click',()=>map.setView([54.6872,25.2797],12));
+showTheme();
+})();
+</script></body></html>

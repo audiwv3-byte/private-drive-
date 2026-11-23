@@ -323,9 +323,52 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
 .pd-services-three .pd-driver-card img{height:100%;width:80%;margin-inline:auto;aspect-ratio:auto;object-fit:cover;object-position:center 72%}
 .pd-services-three .pd-driver-caption{position:absolute;top:10px;left:10px;right:auto;bottom:auto;max-width:calc(100% - 20px);background:#100e0be6;border:1px solid var(--pd-border);border-radius:8px;padding:7px 10px;color:#fff;font-weight:650;font-size:clamp(13px,1.3vw,17px);display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pd-driver-caption>span{font-size:19px;color:#f0c565}
+
+/* PRIVATE DRIVE approved corporate black-and-gold visual revision.
+   Presentation only: existing IDs, forms, routes, event handlers and QA API remain. */
+.pd-head{background:#100d0b!important;border-bottom:1px solid #705536!important;padding:12px clamp(16px,4vw,60px)!important;min-height:74px}
+.pd-head .pd-brand{font-family:Georgia,"Times New Roman",serif;color:#edcc86!important;letter-spacing:.1em;font-weight:700}
+.pd-head .pd-nav a{color:#faf0df;font-weight:500;letter-spacing:.015em}
+.pd-head .pd-nav a:hover{color:#edcc86}
+.pd-main{max-width:1600px}
+.pd-main .pd-hero{min-height:600px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(285px,.85fr);align-items:center;gap:clamp(18px,4vw,80px);padding:clamp(42px,6vw,100px) clamp(24px,6vw,100px);background:radial-gradient(circle at 77% 42%,#2a261e 0%,#0d0d0d 59%),#080909!important;border-bottom:1px solid #ab8240;position:relative;isolation:isolate}
+.pd-hero-copy{max-width:780px}
+.pd-hero-eyebrow{font:600 12px/1.5 system-ui,sans-serif;color:#e8c581!important;letter-spacing:.16em;text-transform:uppercase;margin:0 0 24px}
+.pd-main .pd-hero h1{font-family:Georgia,"Times New Roman",serif!important;font-weight:500!important;letter-spacing:-.045em;font-size:clamp(45px,5.35vw,82px)!important;line-height:1.07!important;max-width:840px;margin:0 0 22px;color:#fff8eb}
+.pd-main .pd-hero h1 em{font-style:normal;color:#edcc86!important}
+.pd-hero-detail{font-size:clamp(15px,1.4vw,20px);max-width:540px;color:#dfd1ba!important;margin:0 0 22px;line-height:1.65}
+.pd-main .pd-trust{display:flex;gap:12px 22px;flex-wrap:wrap;margin:0 0 26px;color:#e6c782;font-size:13px}
+.pd-trust span{white-space:normal}
+.pd-trust strong{color:#fff2d3}
+.pd-main .pd-buttons .btn{min-height:50px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-weight:650;padding:12px 22px}
+.pd-main .pd-buttons .btn:first-child{background:#e7bb69;color:#181209;border-color:#e7bb69}
+.pd-main .pd-buttons .btn.outline{background:transparent;border:1px solid #927747;color:#f5dca8}
+.pd-main .pd-hero .pd-hero-img{display:block;position:relative;width:100%;height:min(57vw,490px);max-width:560px!important;object-fit:cover;object-position:center 72%;border-radius:15px;border:1px solid #8e744a;box-shadow:0 25px 70px #000c;filter:none}
+.pd-main .pd-section{padding:34px clamp(18px,5vw,74px)!important}
+.pd-main .pd-section h2,.pd-main .pd-quick h2{font-family:Georgia,"Times New Roman",serif!important;font-weight:500!important;color:#edcc86!important;font-size:clamp(28px,3vw,42px)!important}
+.pd-main .pd-img-card{border-radius:13px!important;box-shadow:0 10px 30px #0007!important}
+.pd-main .pd-quick{border:1px solid #947446;background:linear-gradient(135deg,#211b13,#100e0c)!important;border-radius:16px;padding:27px;margin-left:clamp(18px,5vw,74px);margin-right:clamp(18px,5vw,74px)}
+.pd-main .pd-quick #quick-trip-form input{border-radius:9px;min-height:50px;background:#f6f2ea;color:#161412}
+.pd-min-footer{background:#100d0b!important}
+@media(max-width:940px){
+ .pd-main .pd-hero{grid-template-columns:1fr;gap:23px;min-height:0;padding:40px 22px}
+ .pd-main .pd-hero h1{font-size:clamp(40px,7vw,64px)!important}
+ .pd-main .pd-hero .pd-hero-img{width:100%;max-width:660px!important;height:clamp(250px,58vw,400px);margin:0 auto}
+}
+@media(max-width:640px){
+ .pd-head{padding:10px 14px!important}
+ .pd-main .pd-hero{padding:26px 16px 30px;gap:14px}
+ .pd-hero-eyebrow{font-size:10px;margin-bottom:14px}
+ .pd-main .pd-hero h1{font-size:clamp(36px,9.4vw,53px)!important;letter-spacing:-.035em}
+ .pd-hero-detail{font-size:14px;margin-bottom:15px}
+ .pd-main .pd-trust{margin-bottom:19px;font-size:12px}
+ .pd-main .pd-hero .pd-hero-img{height:clamp(235px,67vw,330px);object-position:center 70%}
+ .pd-main .pd-section{padding:25px 15px!important}
+ .pd-main .pd-quick{margin:10px 12px 22px;padding:18px 14px}
+}
 </style></head><body>
 <header class="pd-head"><a class="pd-brand" href="/" aria-label="PRIVATE DRIVE — главная"><img src="/assets/pd-user-logo-4-original.webp" width="54" height="54" alt="Фирменный золотой логотип PD">PRIVATE DRIVE</a><nav class="pd-nav" aria-label="Главное меню"><a href="#top" aria-current="page">Главная</a><a href="/services">Наши услуги</a><a href="#prices">Тарифы</a><a href="#about">О нас</a><details class="pd-contacts-nav" id="contacts" id="contacts"><summary>Контакты</summary><div class="pd-contacts-popup"><a href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Связаться с нами · @PrivateDraive</a><a href="mailto:evrobaltictransfer@gmail.com">evrobaltictransfer@gmail.com</a><a href="https://www.instagram.com/privatedraive/" target="_blank" rel="noopener noreferrer">Instagram @privatedraive</a></div></details></nav></header><main class="pd-main" id="top">
-<section class="pd-hero"><div class="pd-hero-copy"><h1>Ваш личный водитель <em>в Литве и Европе</em></h1><div class="pd-trust"><span>◇ Комфортно</span><span>◇ Надёжно</span><span>◷ Вовремя</span></div><div class="pd-buttons"><a class="btn" href="#quick-order">Забронировать поездку</a><a class="btn outline" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Связаться с нами</a></div></div><img class="pd-hero-img" src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 в ночном Вильнюсе, оригинальное изображение PRIVATE DRIVE без посторонних людей" width="864" height="1536" fetchpriority="high" decoding="async"></section>
+<section class="pd-hero" aria-labelledby="hero-title"><div class="pd-hero-copy"><p class="pd-hero-eyebrow">PRIVATE DRIVE · Вильнюс · Литва · Европа</p><h1 id="hero-title">Город меняется.<br><em>Класс остаётся.</em></h1><p class="pd-hero-detail">Индивидуальные поездки и трансферы на Toyota RAV4 Hybrid. Комфорт, пунктуальность и внимание к деталям.</p><div class="pd-trust"><span>Вильнюс ↔ аэропорт <strong>40 €</strong></span><span>Вильнюс → Каунас <strong>130 €</strong></span></div><div class="pd-buttons"><a class="btn" href="#quick-order">Забронировать поездку</a><a class="btn outline" href="/services">Узнать о сервисе</a></div></div><img class="pd-hero-img" src="/assets/pd-user-photo-6-original.webp" alt="Toyota RAV4 в Вильнюсе — оригинальная фотография PRIVATE DRIVE" width="864" height="1536" fetchpriority="high" decoding="async"></section>
 <section class="pd-section" id="services"><h2>Наши услуги <span class="pd-airplane" aria-hidden="true">✈</span></h2><div class="pd-services-three">
 <a class="pd-img-card" href="#quick-order" aria-label="Трансфер в аэропорт — открыть"><img src="/assets/pd-approved-service_airport.webp" alt="Трансфер в аэропорт, утверждённое изображение" width="480" height="246" loading="lazy"></a>
 <a class="pd-img-card" href="/services#parcel" aria-label="Доставка посылок — открыть"><img src="/assets/pd-approved-service_parcel.webp" alt="Доставка посылок, утверждённое изображение" width="480" height="246" loading="lazy"></a>

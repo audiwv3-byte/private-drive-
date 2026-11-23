@@ -67,6 +67,32 @@ class DispatcherBrowserTests(unittest.TestCase):
         self.assertTrue(app.config["SESSION_COOKIE_SECURE"])
         self.assertEqual(app.config["SESSION_COOKIE_SAMESITE"], "Strict")
 
+    def test_mapbox_page_requires_existing_dispatcher_login(self):
+        app, _ = self.make_app()
+        c = app.test_client()
+        response = c.get("/dispatch/map")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, "/dispatch/login")
+        c.get("/dispatch/login")
+        with c.session_transaction() as s:
+            csrf = s["pd_dispatch_csrf"]
+        self.assertEqual(c.post("/dispatch/login", data={
+            "password": "test-only-password", "csrf": csrf,
+        }).status_code, 302)
+        page = c.get("/dispatch/map")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b"leaflet", page.data)
+        self.assertIn(b"PD_MAPBOX_PUBLIC_TOKEN", page.data)
+        self.assertNotIn(b"pk.fake", page.data)
+        self.assertEqual(page.headers["Cache-Control"], "private, no-store")
+        self.assertIn("frame-ancestors 'none'", page.headers["Content-Security-Policy"])
+        self.assertIn("https://api.mapbox.com", page.headers["Content-Security-Policy"])
+        self.assertIn(b'href="/dispatch/map"', c.get("/dispatch").data)
+        with c.session_transaction() as s:
+            csrf = s["pd_dispatch_csrf"]
+        c.post("/dispatch/logout", data={"csrf": csrf})
+        self.assertEqual(c.get("/dispatch/map").status_code, 302)
+
     def test_no_telegram_admin_impersonation(self):
         app, _ = self.make_app()
         c = app.test_client()

@@ -31,14 +31,18 @@ void main() {
     await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-taxi')), -180);
     await tester.tap(find.byKey(const Key('passenger-entry-taxi')));
     await tester.pumpAndSettle();
+    final bookingScroll = find.descendant(
+      of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable),
+    ).first;
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-booking-jumpstart')), 160,
-      scrollable: find.byType(Scrollable).first);
+      scrollable: bookingScroll);
     final delivery = find.byKey(const Key('passenger-booking-delivery'));
-    await tester.scrollUntilVisible(delivery, 160);
+    await tester.scrollUntilVisible(delivery, 160, scrollable: bookingScroll);
     expect(delivery, findsOneWidget);
     final jumpstart = find.byKey(const Key('passenger-booking-jumpstart'));
-    await tester.scrollUntilVisible(jumpstart, -160);
+    await tester.scrollUntilVisible(jumpstart, -160, scrollable: bookingScroll);
     await tester.tap(jumpstart);
     await tester.pumpAndSettle();
     expect(find.text('Запуск автомобиля'), findsWidgets);

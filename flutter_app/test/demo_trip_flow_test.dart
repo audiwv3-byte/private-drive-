@@ -164,13 +164,14 @@ void main() {
     await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
+    final bookingScroll = find.descendant(
+      of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable),
+    ).first;
     await tester.scrollUntilVisible(
       find.byKey(const Key('route-kaunas')),
       160,
-      scrollable: find.descendant(
-        of: find.byKey(const Key('passenger-form')),
-        matching: find.byType(Scrollable),
-      ).first,
+      scrollable: bookingScroll,
     );
     await tester.pump();
     await tester.tap(find.byKey(const Key('route-kaunas')));
@@ -179,7 +180,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-book-disabled')),
       240,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: bookingScroll,
     );
     final book = find.byKey(const Key('passenger-book-disabled'));
     expect(tester.widget<FilledButton>(book).onPressed, isNotNull);
@@ -189,7 +190,7 @@ void main() {
     await tester.pump();
     expect(find.byKey(const Key('passenger-pd-waiting-indicator')), findsOneWidget);
     final status = find.byKey(const Key('passenger-trip-status'));
-    await tester.scrollUntilVisible(status, -160);
+    await tester.scrollUntilVisible(status, -160, scrollable: bookingScroll);
     expect(tester.widget<Text>(status).data, 'Заявка создана · ожидает назначения');
 
     await tester.pageBack();
@@ -274,7 +275,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-trip-status')),
       240,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: bookingScroll,
     );
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
     expect(find.byKey(const Key('payment-Наличные')), findsNothing);

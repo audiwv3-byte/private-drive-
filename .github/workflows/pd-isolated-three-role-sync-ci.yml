@@ -1,0 +1,58 @@
+name: PRIVATE DRIVE isolated orders GPS chat multi-role sync QA
+on:
+  push:
+    branches: [feature/web-dispatcher-browser-auth]
+    paths:
+      - 'test_sync_server/**'
+      - 'flutter_app/lib/remote_sync_demo.dart'
+      - 'flutter_app/lib/remote_sync_client.dart'
+      - 'flutter_app/test/remote_sync_demo_test.dart'
+      - '.github/workflows/pd-isolated-three-role-sync-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  server-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PD_DEMO_ISOLATED: 'YES'
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+      PYTHONPATH: test_sync_server
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check and localhost role-based API integration
+        run: |
+          python3 -m compileall -q test_sync_server
+          python3 -m unittest discover -s test_sync_server -p 'test_*.py' -v
+      - name: Verify no persistent databases, credentials or real connections
+        run: |
+          test ! -e test_sync_server/.env
+          test ! -e test_sync_server/demo.sqlite
+  flutter-three-roles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: flutter_app
+    env:
+      PD_NATIVE_AUTH_API_URL: ''
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Prepare offline Flutter assets and dependencies
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 tool/prepare_transparent_logo.py
+          flutter pub get
+      - name: Cross-role booking GPS chat loss and reconnect tests
+        run: |
+          flutter test --no-pub --reporter expanded test/remote_sync_demo_test.dart test/three_role_chat_test.dart test/isolated_trip_chat_test.dart test/native_cabin_end_to_end_qa_test.dart
+      - name: Analyze remote sync code
+        run: flutter analyze --no-fatal-infos

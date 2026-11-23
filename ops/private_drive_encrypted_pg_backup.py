@@ -66,8 +66,12 @@ def encrypted_export():
             pg.stdout.close()
             encryption_exit = age.wait()
             dump_exit = pg.wait()
-            if dump_exit or encryption_exit or dest.stat().st_size == 0:
+            if dump_exit or encryption_exit or dest.stat().st_size < 128:
                 raise RuntimeError("encrypted_export_failed")
+        # Verify the public age v1 header, never inspect decrypted contents.
+        with dest.open("rb") as sealed:
+            if sealed.readline(64) != b"age-encryption.org/v1\n":
+                raise RuntimeError("not_an_age_archive")
         os.chmod(dest, 0o600)
         return "ENCRYPTED_BACKUP_CREATED"
     except BaseException:

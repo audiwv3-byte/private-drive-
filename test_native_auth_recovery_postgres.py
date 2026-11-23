@@ -67,7 +67,8 @@ class NativeAuthRecoveryTests(unittest.TestCase):
     @classmethod
     def serve(cls,dsn):
         return make_app(dsn,live=True,start_sms=cls.start,
-                        check_sms=cls.verify,clock=lambda: cls.now[0])
+                        check_sms=cls.verify,clock=lambda: cls.now[0],
+                        readiness_clock=lambda: cls.now[0])
 
     @classmethod
     def complete_login(cls,app):
@@ -98,11 +99,11 @@ class NativeAuthRecoveryTests(unittest.TestCase):
             owner.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
             install_synthetic_phone_auth_grants(owner)
             owner.execute("GRANT pd_ci_phone_auth TO "+CI_LOGIN)
-        # The failed process does not magically enable itself; a new instance
-        # checks the schema and can then operate with restricted SQL grants.
+        # Existing instance remains unavailable during cooldown, then recovers
+        # on its own after next request without a new process or migration.
         status,data=wsgi(app,"GET","/health")
         self.assertEqual(status,"503 Service Unavailable")
-        app=self.serve(self.restricted)
+        self.now[0]+=15
         self.assertEqual(wsgi(app,"GET","/health")[0],"200 OK")
         first=self.complete_login(app)
         self.assertEqual(first["role"],"passenger")
@@ -119,14 +120,25 @@ class NativeAuthRecoveryTests(unittest.TestCase):
             before_roles=db.execute("SELECT user_id,role FROM native_auth_roles").fetchall()
 
         self.invocations.clear()
-        outage=self.serve(self.dead)
-        self.assertEqual(wsgi(outage,"GET","/health"),
+        same_process=self.serve(self.restricted)
+        # Revoke CONNECT to simulate a real connection outage only in disposable
+        # PostgreSQL CI. Owner restores access in finally; no Render connections.
+        with psycopg.connect(self.db_root) as admin:
+            admin.execute("REVOKE CONNECT ON DATABASE pd_recovery_ci FROM PUBLIC")
+            admin.execute("REVOKE CONNECT ON DATABASE pd_recovery_ci FROM pd_ci_recovery_login")
+        try:
+            self.now[0]+=15
+            self.assertEqual(wsgi(same_process,"GET","/health"),
                          ("503 Service Unavailable",{"status":"not_ready",
                            "error":"database_unavailable","sms_enabled":False}))
-        self.assertEqual(wsgi(outage,"POST","/native-auth/request-code",
-                {"channel":"phone","destination":CI_PHONE}),
-                ("503 Service Unavailable",{"error":"database_unavailable"}))
-        self.assertEqual(self.invocations,[])
+            self.assertEqual(wsgi(same_process,"POST","/native-auth/request-code",
+                    {"channel":"phone","destination":CI_PHONE}),
+                    ("503 Service Unavailable",{"error":"database_unavailable"}))
+            self.assertEqual(self.invocations,[])
+        finally:
+            with psycopg.connect(self.db_root) as admin:
+                admin.execute("GRANT CONNECT ON DATABASE pd_recovery_ci TO pd_ci_recovery_login")
+
         with psycopg.connect(self.privileged) as db:
             self.assertEqual(db.execute(
                 "SELECT id,channel,destination FROM native_auth_users").fetchall(),before_users)
@@ -135,9 +147,8 @@ class NativeAuthRecoveryTests(unittest.TestCase):
                 before_sessions)
 
         self.now[0]+=61  # Synthetic time passes cooldown before re-login
-        restarted=self.serve(self.restricted)
-        self.assertEqual(wsgi(restarted,"GET","/health")[0],"200 OK")
-        second=self.complete_login(restarted)
+        self.assertEqual(wsgi(same_process,"GET","/health")[0],"200 OK")
+        second=self.complete_login(same_process)
         self.assertEqual(second["user_id"],original["user_id"])
         self.assertEqual(second["role"],"passenger")
         self.assertNotEqual(second["access_token"],original["access_token"])

@@ -12,6 +12,7 @@ import 'pd_pickup_fee.dart';
 import 'demo_rating_panel.dart';
 import 'company_info.dart';
 import 'passenger_orders_demo.dart';
+import 'remote_sync_demo.dart';
 import 'passenger_extra_services.dart';
 import 'pd_pilot_assignment_waiting.dart';
 import 'passenger_preferences_storage.dart';
@@ -617,6 +618,20 @@ class _PassengerDemoState extends State<PassengerDemo> {
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => PdPassengerLanguageScope(
         child: PassengerOrdersDemo(tripStore: store))));
+  }
+
+  void _openServerBookingQa() {
+    // Never silently create a local order and report it to the dispatcher.
+    // Server creation is explicit, authorized with a temporary QA credential,
+    // and confirmed by the isolated HTTPS API before showing success.
+    if (!_canCreateLocalTrip) return;
+    Navigator.push(context, MaterialPageRoute<void>(
+      builder: (_) => RemoteSyncDemo(
+        stagingDispatcher: true,
+        initialFrom: _from.text.trim(),
+        initialTo: _to.text.trim(),
+      ),
+    ));
   }
 
   void _createLocalTrip() {
@@ -1815,14 +1830,21 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ],
             FilledButton(
               key: const Key('passenger-book-disabled'),
-              onPressed: _canCreateLocalTrip ? _createLocalTrip : null,
+              onPressed: _canCreateLocalTrip
+                  ? (const bool.fromEnvironment('PD_INTERNAL_QA')
+                      ? _openServerBookingQa : _createLocalTrip)
+                  : null,
               child: Text(widget.tripStore == null
                   ? pdTr(context, 'Заказать поездку — недоступно в демоверсии',
                       'Užsakyti kelionę — demo versijoje nepasiekiama',
                       'Book ride — unavailable in demo')
-                  : pdTr(context, 'Создать тестовую заявку · без сервера',
-                      'Sukurti bandomąjį užsakymą · be serverio',
-                      'Create demo booking · no server')),
+                  : const bool.fromEnvironment('PD_INTERNAL_QA')
+                      ? pdTr(context, 'Отправить тестовый заказ диспетчеру',
+                          'Siųsti bandomąjį užsakymą dispečeriui',
+                          'Send test booking to dispatcher')
+                      : pdTr(context, 'Создать тестовую заявку · без сервера',
+                          'Sukurti bandomąjį užsakymą · be serverio',
+                          'Create demo booking · no server')),
             ),
             const SizedBox(height: 12),
           ],

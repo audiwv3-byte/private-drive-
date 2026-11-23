@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math';
 import 'native_session.dart';
 
 /// Keychain (iOS) / encrypted Android storage. No SharedPreferences tokens.
@@ -10,6 +12,30 @@ class PdNativeSessionVault {
 
   final FlutterSecureStorage storage;
   static const _key = 'pd_native_session_v1';
+  static const _installKey = 'pd_native_install_id_v1';
+  // iOS Keychain may survive app deletion. A non-secret installation marker
+  // prevents a previous credential from being reused after reinstall.
+  static const _ios = IOSOptions(
+    accessibility: KeychainAccessibility.unlocked_this_device,
+    synchronizable: false,
+  );
+  static const _android = AndroidOptions(
+    storageNamespace: 'pd_native_auth_session',
+  );
+
+  Future<String?> _installationMarker({bool create = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(_installKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+    if (!create) return null;
+    final random = Random.secure();
+    final marker = List<int>.generate(24, (_) => random.nextInt(256))
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    if (!await prefs.setString(_installKey, marker)) {
+      throw StateError('Unable to initialize native install marker');
+    }
+    return marker;
+  }
 
   Future<void> save(PdNativeSession session) async {
     if (!session.active || session.token.length < 40 ||
@@ -17,7 +43,10 @@ class PdNativeSessionVault {
         !const {'passenger', 'pilot', 'admin'}.contains(session.role)) {
       throw const FormatException('Invalid verified native session');
     }
-    await storage.write(key: _key, value: jsonEncode({
+    final marker = await _installationMarker(create: true);
+    await storage.write(key: _key, iOptions: _ios, aOptions: _android,
+      value: jsonEncode({
+      'installation': marker,
       'token': session.token,
       'user_id': session.userId,
       'role': session.role,
@@ -26,11 +55,14 @@ class PdNativeSessionVault {
   }
 
   Future<PdNativeSession?> read() async {
-    final raw = await storage.read(key: _key);
+    final marker = await _installationMarker();
+    if (marker == null) return null;
+    final raw = await storage.read(key: _key, iOptions: _ios, aOptions: _android);
     if (raw == null) return null;
     try {
       final data = jsonDecode(raw);
-      if (data is! Map<String, dynamic>) return null;
+      if (data is! Map<String, dynamic> ||
+          data['installation'] != marker) return null;
       final token = data['token'], id = data['user_id'],
           role = data['role'], expires = data['expires_at'];
       if (token is! String || token.length < 40 || token.length > 256 ||
@@ -49,5 +81,6 @@ class PdNativeSessionVault {
   }
 
   /// Call only after HTTP 200 confirms current-device server logout.
-  Future<void> clearAfterConfirmedLogout() => storage.delete(key: _key);
+  Future<void> clearAfterConfirmedLogout() =>
+      storage.delete(key: _key, iOptions: _ios, aOptions: _android);
 }

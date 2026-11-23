@@ -1,0 +1,55 @@
+name: PRIVATE DRIVE live staging website booking smoke
+on:
+  push:
+    branches: [feature/web-dispatcher-browser-auth]
+    paths:
+      - '.github/workflows/staging-website-booking-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  staging-qa-order:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify public website and submit exactly one synthetic QA order
+        env:
+          BASE_URL: https://private-drive-dispatcher-staging.onrender.com
+        run: |
+          python3 - <<'PY'
+          import json, os, secrets, urllib.request, urllib.error
+          base = os.environ["BASE_URL"]
+          with urllib.request.urlopen(base + "/", timeout=45) as response:
+              html = response.read(250_000).decode("utf-8")
+              assert response.status == 200
+              assert 'id="submit-qa-order"' in html, "Website booking button missing"
+              assert 'id="quick-trip-form"' in html, "Quick booking form missing"
+              assert '/preview/api/qa-booking' in html, "Website intake API client missing"
+          print("SITE_FORM_OK: quick and detailed forms share QA intake")
+          reference = secrets.token_hex(16)
+          data = json.dumps({
+              "from": "TEST QA Vilnius pickup " + reference[:8],
+              "to": "TEST QA Vilnius destination " + reference[:8],
+              "reference": reference,
+              "source": "detailed",
+          }).encode("utf-8")
+          request = urllib.request.Request(
+              base + "/preview/api/qa-booking", data,
+              {"Content-Type": "application/json", "Origin": base, "Accept": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request, timeout=45) as response:
+              body = json.load(response)
+              assert response.status == 201, response.status
+          trip = body["trip"]
+          assert body["qa_only"] is True
+          assert trip["status"] == "requested"
+          assert len(trip["id"]) == 32
+          print("SITE_POST_OK: HTTP 201, synthetic trip ID prefix", trip["id"][:8])
+          # Idempotent retry of same web request cannot add a second trip.
+          with urllib.request.urlopen(request, timeout=45) as response:
+              again = json.load(response)
+              assert response.status == 200
+          assert again["trip"]["id"] == trip["id"]
+          print("SITE_RETRY_OK: HTTP 200, same trip")
+          PY

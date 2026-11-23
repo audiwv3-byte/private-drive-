@@ -15,7 +15,7 @@ permissions:
 jobs:
   build-isolated-clients:
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 95
     env:
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
       QA_PACKAGE: lt.privatedrive.cabinetsync.qa
@@ -208,12 +208,12 @@ jobs:
 
       - name: Keep isolated QA HTTPS API and Safari page available for physical testing
         shell: bash
-        timeout-minutes: 22
+        timeout-minutes: 40
         run: |
           set -euo pipefail
           echo "Temporary browser page: $PD_MOCK_CABINET_API_URL/app/" >> "$GITHUB_STEP_SUMMARY"
           echo "No production services or user data are used. Endpoint expires when this job exits." >> "$GITHUB_STEP_SUMMARY"
-          for attempt in {1..120}; do
+          for attempt in {1..228}; do
             kill -0 "$(cat "$RUNNER_TEMP/cabinet-preview.pid")"
             curl --fail --silent --show-error --max-time 12 "$PD_MOCK_CABINET_API_URL/healthz" >/dev/null
             curl --fail --silent --show-error --max-time 12 "$PD_MOCK_CABINET_API_URL/app/" >/dev/null

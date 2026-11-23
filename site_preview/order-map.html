@@ -28,9 +28,10 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
 .btn:disabled{opacity:.5;cursor:not-allowed}.note{font-size:12px;color:#cbbda5}.status{min-height:22px;font-size:13px;color:#eed3a1}
 .payment-methods{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}.payment-methods span{border:1px solid #9d7c4b;background:#29231c;color:#f9e8c7;padding:8px 10px;border-radius:7px;font-size:13px;font-weight:700}
 .leaflet-control-attribution{font-size:10px!important}
-.map-theme{min-height:44px;background:#15110e;color:var(--gold);border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-weight:700}
+.map-theme{position:absolute;top:54px;right:0;min-height:44px;background:#15110e;color:var(--gold);border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-weight:700}
 .mapbox-logo{display:block;background:#15110e;border-radius:5px;padding:3px 5px}
 .mapbox-logo img{display:block;width:72px;height:auto}
+.vehicle-marker svg{display:block;width:36px;height:36px;filter:drop-shadow(0 2px 4px #000a)}
 @media(max-width:640px){.topbar{top:8px;left:8px;right:8px}.panel{top:auto;bottom:8px;left:8px;width:calc(100% - 16px);max-height:min(65dvh,540px);padding:13px}.brand{padding:5px 9px}.brand img{width:29px;height:29px}.back{padding:9px 11px}h1{font-size:22px}.leaflet-bottom.leaflet-right{bottom:calc(min(65dvh,540px) + 16px)}}
 </style>
 </head>
@@ -153,7 +154,7 @@ $('radio').addEventListener('change',()=>{
  $('radioOther').required=other;
  if(!other)$('radioOther').value='';
 });
-let map=null,markers=[],selectedPosition=null;
+let map=null,markers=[],selectedPosition=null,vehicleMarker=null;
 function say(s){status.textContent=s}
 try{
  if(typeof L!=='undefined'){
@@ -229,7 +230,15 @@ $('locate').addEventListener('click',()=>{
   const cityField=airportDirection==='from'?'to':'from';
   $(cityField).value=selectedPosition.map(v=>v.toFixed(6)).join(', ');
   verifiedPair=null;
-  clearPins();pin(...selectedPosition,'Твоё местоположение');
+  if(map){
+   const heading=Number.isFinite(p.coords.heading)?p.coords.heading:0;
+   const arrow=L.divIcon({
+    className:'vehicle-marker',iconSize:[36,36],iconAnchor:[18,18],
+    html:'<svg viewBox="0 0 36 36" aria-hidden="true"><path transform="rotate('+heading+' 18 18)" d="M18 3 31 31 18 24 5 31Z" fill="#edcc86" stroke="#17130c" stroke-width="2" stroke-linejoin="round"/></svg>'
+   });
+   if(vehicleMarker){vehicleMarker.setLatLng(selectedPosition).setIcon(arrow);}
+   else{vehicleMarker=L.marker(selectedPosition,{icon:arrow,zIndexOffset:400,alt:'Твоё местоположение'}).addTo(map).bindPopup('Твоё местоположение');}
+  }
   map?.setView(selectedPosition,15);say('Местоположение отмечено на карте. При необходимости впиши точный адрес.');
  },()=>say('Не удалось получить геолокацию. Разреши доступ к местоположению или введи адрес вручную.'),{enableHighAccuracy:false,timeout:10000,maximumAge:60000});
 });

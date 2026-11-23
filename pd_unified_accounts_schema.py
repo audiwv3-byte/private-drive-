@@ -38,7 +38,8 @@ SCHEMA = (
     )""",
     """CREATE OR REPLACE FUNCTION pd_validate_pilot_review_actor()
        RETURNS trigger
-       LANGUAGE plpgsql
+       LANGUAGE plpgsql SECURITY DEFINER
+       SET search_path=pg_catalog,public
        AS $pd$
        BEGIN
          IF NEW.review_status IN ('approved','rejected','suspended') THEN

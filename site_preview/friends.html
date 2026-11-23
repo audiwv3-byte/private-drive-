@@ -19,6 +19,11 @@
 .friends-main .friend-contact-details{font-size:.88rem;line-height:1.7;color:#d9cfb9}
 .friends-main .friend-contact-details a{color:#f0d08e}
 @media(max-width:740px){.friends-main .partner-feature{gap:16px}.friends-main .partner-info h2{font-size:1.45rem}}
+.partner-avatar{overflow:hidden;padding:0;display:block;background:#101418}
+.partner-avatar img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover}
+.partner-feature .partner-links{display:flex;flex-direction:column;align-items:stretch;gap:8px;flex:none}
+.partner-feature .partner-links .button{white-space:nowrap;text-align:center}
+@media(max-width:740px){.partner-feature .partner-links{width:100%;flex-direction:row;flex-wrap:wrap}.partner-feature .partner-links .button{flex:1 1 auto}}
 </style>
 </head>
 <body>
@@ -31,14 +36,14 @@
 <h1 class="friends-title">Наши друзья <span aria-hidden="true">🤝</span></h1>
 <p class="friends-intro">Знакомься с друзьями и партнёрами PRIVATE DRIVE.</p>
 <section class="partner-feature" aria-labelledby="friend-work-www">
-<div class="partner-tech-icon" aria-hidden="true"><span>🤖</span></div>
-<div class="partner-info"><h2 id="friend-work-www">Work.www | IT-разработка</h2>
+<div class="partner-tech-icon partner-avatar" aria-label="Фото профиля AI Fast Work"><img src="assets/ai-fast-work-avatar.webp" width="112" height="112" loading="lazy" alt="Синий робот — аватар AI Fast Work"></div>
+<div class="partner-info"><h2 id="friend-work-www">AI Fast Work | Telegram-боты</h2>
 <span class="partner-role">Разработчик сайта · Друг PRIVATE DRIVE</span>
-<p>Разработка сайтов, веб-сервисов, приложений и Telegram-ботов.</p></div>
-<a class="button outline" href="https://t.me/ai_fast_work" target="_blank" rel="noopener noreferrer">Связаться в Telegram</a>
+<p>Создаю и сопровождаю Telegram-ботов: заявки, запись, каталоги и автоматизация. Напиши «БОТ» в Instagram Direct.</p></div>
+<div class="partner-links"><a class="button outline" href="https://t.me/ai_fast_work" target="_blank" rel="noopener noreferrer">Telegram</a><a class="button outline" href="https://www.instagram.com/ai_fast_work/" target="_blank" rel="noopener noreferrer">Instagram</a></div>
 </section>
 <section class="partner-feature" aria-labelledby="friend-liana-flowers">
-<div class="partner-tech-icon partner-flower-icon" aria-hidden="true"><span>💐</span></div>
+<div class="partner-tech-icon partner-avatar" aria-label="Фото Liana Flowers"><img src="assets/liana-flowers-avatar.webp" width="112" height="112" loading="lazy" alt="Флорист с цветочным букетом — Liana Flowers"></div>
 <div class="partner-info"><h2 id="friend-liana-flowers">Liana Flowers | Цветы и букеты</h2>
 <span class="partner-role">Цветочный магазин · Вильнюс</span>
 <p>Цветы и букеты в Вильнюсе. Подбор цветов и букетов для особых случаев.</p>

@@ -66,7 +66,7 @@ class PhoneAuthStartupWithoutDDLTests(unittest.TestCase):
     def request(app, endpoint, payload):
         body = json.dumps(payload).encode()
         environ = {
-            "REQUEST_METHOD":"POST", "PATH_INFO":endpoint,
+            "REQUEST_METHOD":"GET" if endpoint=="/health" else "POST", "PATH_INFO":endpoint,
             "CONTENT_TYPE":"application/json",
             "CONTENT_LENGTH":str(len(body)), "wsgi.input":io.BytesIO(body)
         }

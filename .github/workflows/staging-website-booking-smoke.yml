@@ -4,6 +4,7 @@ on:
     branches: [feature/web-dispatcher-browser-auth]
     paths:
       - '.github/workflows/staging-website-booking-smoke.yml'
+      - 'pd_public_home_preview.html'
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,6 +26,11 @@ jobs:
               assert 'id="submit-qa-order"' in html, "Website booking button missing"
               assert 'id="quick-trip-form"' in html, "Quick booking form missing"
               assert '/preview/api/qa-booking' in html, "Website intake API client missing"
+              assert 'id="quick-order-status"' in html, "Quick booking response status missing"
+              assert 'source:"quick"' in html, "Quick booking must submit directly"
+              section = html.split('quickTripForm.addEventListener("submit"',1)[1].split("const fields=",1)[0]
+              assert '/preview/api/qa-booking' in section, "Quick booking must call QA API"
+              assert 'details.open=true' not in section, "Quick booking still opens old map form"
           print("SITE_FORM_OK: quick and detailed forms share QA intake")
           reference = secrets.token_hex(16)
           data = json.dumps({

@@ -227,9 +227,13 @@ if(selectedRoute && !airportDirection){
  $('to').closest('.field').after(explanation);
 }
 
-const serviceNames={'flowers':'Цветы к поездке','surprise':'Поездка-сюрприз','sober-driver':'Трезвый водитель','jump-start':'Запуск автомобиля · 20 €','meet-sign':'Встреча с табличкой · +15 €','luggage':'Помощь с багажом','parcel':'Доставка посылки','personal-driver':'Персональный водитель'};
+const serviceNames={'flowers':'Цветы к поездке','surprise':'Поездка-сюрприз','sober-driver':'Трезвый водитель','jump-start':'Запуск автомобиля · 20 €','meet-sign':'Встреча с табличкой · +15 €','luggage':'Помощь с багажом','parcel':'Доставка посылки','personal-driver':'Персональный водитель','music':'Выбор радиостанции или любимой композиции'};
 const selectedService=Object.prototype.hasOwnProperty.call(serviceNames,params.get('service'))?serviceNames[params.get('service')]:null;
 if(selectedService){
+ if(params.get('service')==='music'){
+  const extras=document.querySelector('.ride-extras');
+  if(extras)extras.open=true;
+ }
  const info=document.createElement('p');info.className='note';
  info.textContent='Выбрана услуга: '+selectedService+'. Доступность и окончательная стоимость подтверждаются отдельно.';
  $('rideDate').closest('.field').before(info);

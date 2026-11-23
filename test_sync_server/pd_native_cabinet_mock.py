@@ -203,6 +203,21 @@ class CabinetStore(DemoStore):
             except ValueError as error:
                 raise TripError(str(error), 409 if str(error) == "inactive_trip" else 400) from None
 
+    def dispatcher_snapshot(self, actor):
+        with DB_LOCK:
+            current = self.current_with_gps("dispatcher", actor)
+            rows = self.db.execute(
+                "SELECT id, origin, destination, status, version FROM trips "
+                "ORDER BY created DESC, id DESC LIMIT 50"
+            ).fetchall()
+            gps = current["gps"]
+            return {
+                "trips": [dict(row) for row in rows],
+                "pilot_online": self.online,
+                "pilot_position": [gps["latitude"], gps["longitude"]] if gps else None,
+                "passenger_positions": current["passenger_positions"],
+            }
+
     def current_with_gps(self, role, actor):
         with DB_LOCK:
             if role == "dispatcher":
@@ -260,6 +275,11 @@ class CabinetHandler(ApiHandler):
                 status, response = self._native_auth(path.path, self._body())
             elif path.path.startswith("/native-identity/"):
                 status, response = 200, self._identity(method, path.path)
+            elif method == "GET" and path.path == "/v1/dispatch/state":
+                role, actor = self._auth()
+                if role != "dispatcher":
+                    raise TripError("forbidden", 403)
+                status, response = 200, self.server.store.dispatcher_snapshot(actor)
             elif method == "POST" and path.path == "/v1/gps":
                 role, actor = self._auth()
                 if role != "pilot":

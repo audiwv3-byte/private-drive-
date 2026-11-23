@@ -12,6 +12,8 @@ void main() {
   testWidgets('synthetic Safari login stays in the authenticated passenger cabin',
       (tester) async {
     if (!const bool.fromEnvironment('PD_ISOLATED_QA_AUTH')) return;
+    await tester.binding.setSurfaceSize(const Size(430, 940));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     var sessions = 0;
     final client = MockClient((request) async {
@@ -46,10 +48,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byKey(const Key('native-legal-acknowledgement')), 180,
       scrollable: find.byType(Scrollable).last);
+    await tester.ensureVisible(find.byKey(const Key('native-legal-acknowledgement')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('native-legal-acknowledgement')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byKey(const Key('qa-sign-in')), 180,
       scrollable: find.byType(Scrollable).last);
+    await tester.ensureVisible(find.byKey(const Key('qa-sign-in')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('qa-sign-in')));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();

@@ -111,7 +111,7 @@ def register(app, authorized):
             return jsonify(error="invalid_invitation"), 403
         name, phone = (request.form.get("full_name", "").strip(),
                        request.form.get("phone", "").strip())
-        if (not 2 <= len(name) <= 160 or not re.fullmatch(r"\\+?[0-9 -]{8,32}", phone)):
+        if (not 2 <= len(name) <= 160 or not re.fullmatch(r"\+?[0-9 -]{8,32}", phone)):
             return jsonify(error="invalid_contact"), 400
         if set(request.files) != set(FILE_FIELDS):
             return jsonify(error="required_photos_missing"), 400

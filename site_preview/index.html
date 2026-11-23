@@ -113,6 +113,49 @@
  #partners .partner-feature .button,.friends-main .partner-feature .button{width:auto;flex:none}
 }
 
+
+/* Compact partner photo tiles, matching the approved service-card proportions. */
+#partners .partner-photo-grid,.friends-main .partner-photo-grid{
+ display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,270px));gap:14px;justify-content:start
+}
+#partners .partner-feature,.friends-main .partner-feature{
+ width:100%;min-width:0;min-height:330px;height:330px;padding:14px;
+ border-radius:17px;display:flex;flex-direction:column;justify-content:flex-end;
+}
+#partners .partner-feature::after,.friends-main .partner-feature::after{
+ background:linear-gradient(to top,rgba(7,7,7,.96) 0%,rgba(7,7,7,.83) 22%,rgba(7,7,7,.1) 53%,transparent 72%)
+}
+#partners .partner-avatar img,.friends-main .partner-avatar img{
+ object-fit:cover;object-position:center center;filter:none;opacity:1
+}
+#partners .partner-info h3,.friends-main .partner-info h2{
+ font:700 1.12rem/1.18 Georgia,serif;margin:0 0 5px;text-shadow:0 2px 5px #000
+}
+#partners .partner-role,.friends-main .partner-role{
+ font-size:.65rem;line-height:1.25;padding:4px 7px;border-radius:7px
+}
+#partners .partner-info p,.friends-main .partner-info p{
+ font-size:.75rem;line-height:1.33;margin:6px 0 0;
+ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden
+}
+#partners .partner-links,.friends-main .partner-links{margin-top:8px;gap:6px}
+#partners .partner-feature .button,.friends-main .partner-feature .button{
+ min-height:33px;padding:6px 9px;font-size:.75rem;border-radius:8px
+}
+.friends-main .friend-contact-details{display:none!important}
+@media(max-width:570px){
+ #partners .partner-photo-grid,.friends-main .partner-photo-grid{
+   grid-template-columns:repeat(2,minmax(0,1fr));gap:9px
+ }
+ #partners .partner-feature,.friends-main .partner-feature{
+   min-height:265px;height:300px;padding:9px;border-radius:12px
+ }
+ #partners .partner-info h3,.friends-main .partner-info h2{font-size:.95rem}
+ #partners .partner-info p,.friends-main .partner-info p{font-size:.7rem;-webkit-line-clamp:2}
+ #partners .partner-feature .button,.friends-main .partner-feature .button{font-size:.69rem;padding:5px 7px}
+}
+@media(max-width:360px){#partners .partner-photo-grid,.friends-main .partner-photo-grid{grid-template-columns:1fr}#partners .partner-feature,.friends-main .partner-feature{max-width:275px}}
+
 </style>
 </head>
 <body>

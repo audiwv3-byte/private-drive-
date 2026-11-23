@@ -1,0 +1,54 @@
+name: PRIVATE DRIVE Mini App top-menu checks
+on:
+  push:
+    branches: [feature/flutter-independent-auth]
+    paths:
+      - miniapp/templates/index.html
+      - .github/workflows/miniapp-top-menu-check.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  menu-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify restored menu and preserved booking navigation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          from collections import Counter
+          s=Path('miniapp/templates/index.html').read_text(encoding='utf-8')
+          class Inspect(HTMLParser):
+              def __init__(self): super().__init__();self.ids=[];self.buttons=[]
+              def handle_starttag(self,tag,attrs):
+                  d=dict(attrs)
+                  if 'id' in d:self.ids.append(d['id'])
+                  if tag=='button':self.buttons.append(d)
+          doc=Inspect();doc.feed(s)
+          needed=('pdTopMenuButton','pdTopMenuPanel','mainNav','pdbExtras','pdbPrice','pdbPays','pdbWishes')
+          for key in needed:
+              assert doc.ids.count(key)==1,(key,doc.ids.count(key))
+          assert 'aria-controls="pdTopMenuPanel"' in s
+          assert 'aria-expanded="false"' in s
+          assert 'body.pd-onboarding-active #pdTopMenuButton' in s
+          assert 'function pdToggleTopMenu(' in s and 'function pdMenuNavigate(' in s
+          for key in ['extras','tariffs','payment','preferences','contacts']:
+              assert f"pdMenuNavigate('{key}')" in s,key
+          assert '<nav class="nav" id="mainNav">' in s
+          assert "go(11)" in s and 'pdOpenSupport' in s
+          print('PASS: menu accessibility, navigation targets, booking controls and bottom nav')
+          PY
+      - name: Validate menu JavaScript syntax with Node
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          html=Path('miniapp/templates/index.html').read_text(encoding='utf-8')
+          match=re.search(r'<script id="pd-top-menu-behavior">(.*?)</script>',html,re.S)
+          assert match,'Menu JavaScript is missing'
+          Path('/tmp/pd-top-menu.js').write_text(match.group(1),encoding='utf-8')
+          PY
+          node --check /tmp/pd-top-menu.js

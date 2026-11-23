@@ -79,7 +79,7 @@ class CredentialTransitionTests(unittest.TestCase):
         matrix=compatibility_matrix()
         self.assertIn("insert session"," ".join(matrix["native_phone_auth"]))
         self.assertIn("recover"," ".join(matrix["dispatcher_auth"]))
-        self.assertIn("no DDL"," ".join(matrix["migrations"]))
+        self.assertIn("explicit DDL"," ".join(matrix["migrations"]))
 
 
 if __name__=="__main__":

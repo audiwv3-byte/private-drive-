@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:private_drive/main.dart';
-import 'package:private_drive/native_cabin_entry.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

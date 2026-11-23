@@ -353,7 +353,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
               IconButton(
                 tooltip: 'Выйти',
                 icon: const Icon(Icons.logout),
-                onPressed: signOut,
+                onPressed: loggingOut ? null : remoteSignOut,
               ),
             ],
           ),

@@ -76,7 +76,7 @@ void main() {
     for (final data in [
       {'user_id':'other','role':'admin','expires_at':9999999999},
       {'user_id':'pilot-123','role':'admin','expires_at':1},
-      {'user_id':'pilot-123','role':'pilot_dispatcher','expires_at':9999999999},
+      {'user_id':'pilot-123','role':'super_admin','expires_at':9999999999},
     ]) {
       final client=MockClient((_) async => http.Response(jsonEncode(data),200));
       final manager=PdNativeSessionManager(baseUrl:api,vault:vault,client:client);
@@ -84,6 +84,24 @@ void main() {
       client.close();
     }
     expect((await vault.read())?.token, token);
+  });
+
+  test('dispatcher and pilot_dispatcher session roles come only from server', () async {
+    for (final role in ['dispatcher', 'pilot_dispatcher']) {
+      await vault.save(valid(role: 'passenger'));
+      final expiration = DateTime.now().add(const Duration(hours: 1))
+          .millisecondsSinceEpoch ~/ 1000;
+      final client = MockClient((_) async => http.Response(jsonEncode({
+        'user_id': 'pilot-123', 'role': role, 'expires_at': expiration,
+      }), 200));
+      final manager = PdNativeSessionManager(
+          baseUrl: api, vault: vault, client: client);
+      final restored = await manager.restore();
+      expect(restored?.role, role);
+      expect(restored?.canDispatch, isTrue);
+      expect(restored?.canPilot, role == 'pilot_dispatcher');
+      client.close();
+    }
   });
 
   test('an expired encrypted token cannot restore or grant privileges', () async {

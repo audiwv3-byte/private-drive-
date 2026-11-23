@@ -16,6 +16,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     var sessions = 0;
+    var acceptSession = false;
     final client = MockClient((request) async {
       if (request.url.path == '/native-auth/qa-session') {
         expect(request.method, 'POST');
@@ -33,6 +34,9 @@ void main() {
       }
       if (request.url.path == '/v1/me') {
         expect(request.headers['Authorization'], 'Bearer ${'a' * 64}');
+        if (!acceptSession) {
+          return http.Response('{"error":"unauthorized"}', 401);
+        }
         return http.Response('{"role":"passenger","user_id":"passenger-qa"}', 200);
       }
       if (request.url.path == '/v1/current') {
@@ -60,6 +64,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
     expect(sessions, 1);
+    expect(find.text('Тестовый сервер отклонил сессию (HTTP 401).'),
+      findsOneWidget);
+    expect(find.byKey(const Key('qa-sign-in')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-entry-taxi')), findsNothing);
+    acceptSession = true;
+    await tester.ensureVisible(find.byKey(const Key('qa-sign-in')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('qa-sign-in')));
+    await tester.pumpAndSettle();
+    expect(sessions, 2);
     expect(find.byKey(const Key('entry-cabin-selection')), findsNothing);
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
     // Reopening the role chooser must preserve the live bearer session.
@@ -69,7 +83,7 @@ void main() {
     await tester.tap(find.byKey(const Key('entry-passenger')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
-    expect(sessions, 1);
+    expect(sessions, 2);
     final storedQaSession = (await SharedPreferences.getInstance())
         .getString('pd_isolated_qa_session_v1');
     expect(storedQaSession, isNotNull);
@@ -85,7 +99,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
-    expect(sessions, 1);
+    expect(sessions, 2);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

@@ -72,6 +72,13 @@ def verify(url, inbox):
         raise RuntimeError("Mock API did not answer through HTTPS")
 
     request(url, "/v1/me", expected=401)
+    qa = request(url, "/native-auth/qa-session", body={"role": "passenger"})
+    identity = request(url, "/v1/me", qa["access_token"])
+    if (qa.get("qa") is not True or qa.get("verified") is not False or
+            qa.get("token_type") != "Bearer" or
+            identity.get("role") != "passenger" or
+            identity.get("user_id") != qa.get("user_id")):
+        raise RuntimeError("HTTPS QA sign-in did not yield a valid passenger session")
     sessions = {}
     for index, role in enumerate(("passenger", "pilot", "dispatcher"), start=1):
         phone = f"+1202555010{index}"

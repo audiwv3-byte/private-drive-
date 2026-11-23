@@ -144,10 +144,14 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       allowLoopback: widget.allowLoopback);
   }
 
+  bool get _qaSignInEnabled =>
+      const bool.fromEnvironment('PD_ISOLATED_QA_AUTH') &&
+      widget.allowLoopback &&
+      widget.onAuthenticated != null;
+
   /// QA sessions are synthetic and never represent verified phone ownership.
   Future<void> signInSyntheticQa() async {
-    if (busy || !_acknowledgedLegal || widget.onAuthenticated == null ||
-        !const bool.fromEnvironment('PD_ISOLATED_QA_AUTH')) return;
+    if (busy || !_acknowledgedLegal || !_qaSignInEnabled) return;
     setState(() { busy = true; message = 'Подключаем тестовый кабинет…'; });
     try {
       final result = await post('/native-auth/qa-session', {'role': widget.qaRole});
@@ -161,14 +165,32 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
           expires is! int || expires <= 0) {
         throw const FormatException('Некорректная тестовая сессия');
       }
-      if (!mounted) return;
-      widget.onAuthenticated!(PdNativeSession(
+      final session = PdNativeSession(
         token: token, userId: userId, role: widget.qaRole,
         expiresAt: DateTime.now().add(Duration(seconds: expires)),
-      ));
+      );
+      final api = RemoteDemoClient(widget.authApiUrl, session.token,
+        client: widget.httpClient);
+      try {
+        final identity = await api.get('/v1/me');
+        if (identity['role'] != session.role ||
+            identity['user_id'] != session.userId) {
+          throw const FormatException('Тестовый сервер вернул другой аккаунт.');
+        }
+      } finally {
+        api.close();
+      }
+      if (mounted) widget.onAuthenticated!(session);
     } on PdHttpStatusException catch (error) {
       if (mounted) setState(() => message =
         'Тестовый вход недоступен (HTTP ${error.statusCode}).');
+    } on RemoteDemoException catch (error) {
+      if (mounted) setState(() => message = error.status == null
+        ? 'Тестовый сервер не ответил. Проверь актуальность ссылки.'
+        : 'Тестовый сервер отклонил сессию (HTTP ${error.status}).');
+    } on FormatException {
+      if (mounted) setState(() => message =
+        'Тестовый сервер не подтвердил аккаунт. Попробуй войти ещё раз.');
     } catch (_) {
       if (mounted) setState(() => message =
         'Нет подключения к тестовому серверу. Проверь актуальность ссылки.');
@@ -475,7 +497,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
-                  'Версия 0.2.27 · сборка 2026112103',
+                  String.fromEnvironment('PD_QA_BUILD_LABEL',
+                    defaultValue: 'Версия 0.2.27 · сборка 2026112103'),
                   key: Key('app-demo-version'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),
@@ -508,17 +531,19 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 ],
                 const SizedBox(height: 20),
-                TextField(
-                  controller: destination,
-                  enabled: !busy && challengeId == null,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: tr('Телефон в формате +370...',
-                      'Telefono numeris +370...', 'Phone number +370...'),
-                    border: const OutlineInputBorder(),
+                if (!_qaSignInEnabled) ...[
+                  TextField(
+                    controller: destination,
+                    enabled: !busy && challengeId == null,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: tr('Телефон в формате +370...',
+                        'Telefono numeris +370...', 'Phone number +370...'),
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
                 if (challengeId == null) ...[
                   CheckboxListTile(
                     key: const Key('native-legal-acknowledgement'),
@@ -542,8 +567,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                if (const bool.fromEnvironment('PD_ISOLATED_QA_AUTH') &&
-                    widget.onAuthenticated != null) ...[
+                if (_qaSignInEnabled) ...[
                   const Text('Синтетический тест. Телефон не подтверждается, '
                     'SMS не отправляются. Права определяются Mock API.',
                     textAlign: TextAlign.center,
@@ -558,6 +582,19 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     Text(message, key: const Key('qa-auth-feedback'),
                       textAlign: TextAlign.center),
                   const SizedBox(height: 16),
+                ],
+                if (_qaSignInEnabled) ...[
+                  TextField(
+                    controller: destination,
+                    enabled: !busy && challengeId == null,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: tr('Телефон в формате +370...',
+                        'Telefono numeris +370...', 'Phone number +370...'),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                 ],
                 if (challengeId == null)
                   FilledButton(

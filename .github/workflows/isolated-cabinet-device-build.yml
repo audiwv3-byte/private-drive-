@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-isolated-clients:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 55
     env:
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
@@ -156,7 +156,8 @@ jobs:
           flutter build web --release --base-href /app/ --target lib/main.dart \
             --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
             --dart-define=PD_ISOLATED_WEB_PREVIEW=false \
-            --dart-define=PD_ISOLATED_QA_AUTH=true
+            --dart-define=PD_ISOLATED_QA_AUTH=true \
+            --dart-define="PD_QA_BUILD_LABEL=Safari QA · ${GITHUB_SHA:0:7}"
           test -s build/web/index.html
           test -s build/web/main.dart.js
           grep -F "trycloudflare.com" build/web/main.dart.js
@@ -170,12 +171,12 @@ jobs:
           test -s "$RUNNER_TEMP/qa-web-bundle.js"
           echo "Safari QA frontend served at $PD_MOCK_CABINET_API_URL/app/ while runner remains alive." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Test actual Flutter Web synthetic login in mobile Chromium
+      - name: Test compiled Flutter Web sign-in and reload in Chromium and WebKit
         shell: bash
         run: |
           set -euo pipefail
           python3 -m pip install --quiet playwright==1.58.0
-          python3 -m playwright install --with-deps chromium
+          python3 -m playwright install --with-deps chromium webkit
           python3 test_sync_server/qa_browser_smoke.py
 
       - name: Verify both artifacts are wired to the same temporary URL

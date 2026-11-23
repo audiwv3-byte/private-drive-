@@ -43,6 +43,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   bool _testSyncStarted = false;
   bool _showTestSync = false;
   bool _localPilotOpened = false;
+  bool _restoringQaSession = false;
   static const _qaSessionKey = 'pd_isolated_qa_session_v1';
   bool get _persistQaOnly => _serverSync &&
       const bool.fromEnvironment('PD_ISOLATED_QA_AUTH');
@@ -50,7 +51,10 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   @override
   void initState() {
     super.initState();
-    if (_persistQaOnly) unawaited(_restoreQaSession());
+    if (_persistQaOnly) {
+      _restoringQaSession = true;
+      unawaited(_restoreQaSession());
+    }
   }
 
   Future<void> _restoreQaSession() async {
@@ -88,6 +92,14 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
           await prefs.remove(_qaSessionKey);
           return;
         }
+      } on RemoteDemoException catch (error) {
+        if (error.status == 401 || error.status == 403) {
+          await prefs.remove(_qaSessionKey);
+          if (mounted) _message = 'Тестовая сессия истекла. Войди ещё раз.';
+        } else if (mounted) {
+          _message = 'Тестовый сервер не ответил при восстановлении входа.';
+        }
+        return;
       } finally {
         api.close();
       }
@@ -95,7 +107,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       _requestedRole = session.role;
       _authenticated(session);
     } catch (_) {
-      // Offline or expired mock: show the role chooser, never fabricate auth.
+      // Browser storage may be unavailable. Allow a new sign-in.
+    } finally {
+      if (mounted) setState(() => _restoringQaSession = false);
     }
   }
 
@@ -287,6 +301,11 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
 
   Widget _buildCabin(BuildContext context) {
+    if (_restoringQaSession) {
+      return const Scaffold(
+        body: Center(child: Text('Проверяем сохранённый тестовый вход…')),
+      );
+    }
     if (_localQa) {
       if (!_qaUnlocked) {
         return _LocalQaSignIn(
@@ -382,7 +401,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             Text(_localQa
               ? String.fromEnvironment('PD_QA_BUILD_LABEL',
                 defaultValue: 'Внутренняя сборка')
-              : 'Версия 0.2.27 · сборка 2026112103', key: Key('app-demo-version'),
+              : const String.fromEnvironment('PD_QA_BUILD_LABEL',
+                   defaultValue: 'Версия 0.2.27 · сборка 2026112103'),
+               key: const Key('app-demo-version'),
               textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
           ]),
         ))),

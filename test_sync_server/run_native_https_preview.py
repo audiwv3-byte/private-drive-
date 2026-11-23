@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import queue
 import subprocess
 import tempfile
@@ -9,6 +10,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit, unquote
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -20,6 +22,22 @@ class PreviewHandler(CabinetHandler):
     def do_GET(self):
         if self.path in ("/", "/healthz"):
             self._reply(200, {"status": "ok", "service": "private-drive-cabinet-mock"})
+        elif self.path.startswith("/app/") and getattr(self.server, "web_root", None):
+            root = self.server.web_root.resolve()
+            relative = unquote(urlsplit(self.path).path[len("/app/"):])
+            target = (root / (relative or "index.html")).resolve()
+            if not target.is_relative_to(root) or not target.is_file():
+                self.send_error(404)
+                return
+            data = target.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Robots-Tag", "noindex, nofollow, noarchive")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(data)
         else:
             super().do_GET()
 
@@ -105,11 +123,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cloudflared", required=True)
     parser.add_argument("--address-file", type=Path, required=True)
+    parser.add_argument("--web-root", type=Path, default=None)
     options = parser.parse_args()
     inbox = {}
     with tempfile.TemporaryDirectory(prefix="pd-native-preview-") as temp:
         store = CabinetStore(Path(temp) / "synthetic.sqlite")
         with make_mock_server(store, inbox.__setitem__, handler=PreviewHandler) as server:
+            server.web_root = options.web_root
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             tunnel = subprocess.Popen([

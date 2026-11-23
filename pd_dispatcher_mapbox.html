@@ -7,6 +7,7 @@
 <title>PRIVATE DRIVE — Диспетчерская</title>
 <link rel="icon" href="assets/pd-logo.webp" type="image/webp">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" integrity="sha384-WR3U1V0+1MbG/yqoN2/UUbE92aMWypbO0XZyEPFDxl2zZgg3ppqJGUq3gqgaEZbX" crossorigin="anonymous">
 <style>
 :root{color-scheme:dark;--gold:#e8c581;--bg:#110f0c;--panel:#1b1713;--line:#4d402c;--soft:#c8bba3}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#f6efdf}
@@ -16,7 +17,13 @@ header{height:69px;display:flex;align-items:center;justify-content:space-between
 .layout{display:grid;grid-template-columns:315px minmax(0,1fr) 305px;min-height:calc(100dvh - 69px)}
 aside{background:#17130f;padding:16px;border-right:1px solid var(--line);overflow:auto}aside.right{border-right:0;border-left:1px solid var(--line)}
 .toolbar form{margin:0}.test-order strong{overflow-wrap:anywhere}.test-order button{margin-top:5px}
-.pilot-marker{border:1px solid #ffe2a3;border-radius:50%;background:#1b1713;color:#ffd889;display:grid;place-items:center;font-size:22px;box-shadow:0 2px 8px #000a}
+.pilot-marker{border:1px solid #ffe2a3;border-radius:50%;background:#1b1713;color:#ffd889;display:grid;place-items:center;width:35px;height:35px;font-size:22px;box-shadow:0 2px 8px #000a}
+#glMap,#rasterMap{position:absolute;inset:0;background:#10100f}
+.map-actions{position:absolute;bottom:34px;left:16px;z-index:510;display:flex;gap:8px;flex-wrap:wrap}
+.map-actions .btn{background:#18140f;color:#f5d9a1}
+.map-actions .btn[aria-pressed="true"]{background:#d7ad65;color:#17100a}
+.map-actions .btn:disabled{opacity:.6;cursor:default}
+#rasterMap.night .leaflet-tile-pane{filter:sepia(.65) saturate(1.3)}
 @media(max-width:930px){header{height:auto;min-height:69px;flex-wrap:wrap}}
 h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 12px}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}p{color:var(--soft);margin:9px 0}
 .label{font-size:11px;letter-spacing:.11em;color:#d5b777;text-transform:uppercase}
@@ -58,7 +65,14 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
 </aside>
 <section id="map" aria-label="Интерактивная карта диспетчерской">
+<div id="rasterMap"></div><div id="glMap" hidden></div>
 <div id="mapNotice" role="status"><b id="mapProvider">Загрузка Mapbox…</b><span id="mapStatus">{% if test_sync_enabled %}Местоположение появится, когда тестовый пилот поделится GPS.{% else %}Карта доступна для просмотра. Позиции пилотов и маршруты заказов пока не подключены.{% endif %}</span></div>
+<div class="map-actions" role="group" aria-label="Управление картой">
+<button class="btn" id="modeBtn" type="button" aria-pressed="false" disabled>3D</button>
+<button class="btn" id="themeBtn" type="button">Дневная карта</button>
+<button class="btn" id="vilniusBtn" type="button">Вильнюс</button>
+{% if test_sync_enabled %}<button class="btn" id="pilotBtn" type="button" disabled>К пилоту</button>{% endif %}
+</div>
 </section>
 <aside class="right" aria-label="Управление пилотами и коммуникации">
 <h2 id="pilotsTitle">Пилоты</h2><div class="tabs"><button class="tab active" id="allPilots" aria-pressed="true">Все</button><button class="tab" id="onlinePilots" aria-pressed="false">На линии</button></div>
@@ -68,11 +82,12 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <h2>Заказ и связь</h2>
 <div class="card"><span class="label">Выбранный заказ</span><strong>Заказ не выбран</strong><p class="muted">Маршрут, статус, назначение пилота, платежи и чат будут доступны после подключения API.</p><button class="btn" disabled title="Ожидает защищённого API">Назначить пилота</button></div>
 <div class="card"><span class="label">Единая синхронизация</span><p>Сайт · Android/iOS · Telegram-бот</p><p class="muted">Нужны общая база заказов, единые идентификаторы, серверные роли и обновления в реальном времени.</p></div>{% endif %}
-<div class="card"><span class="label">Карта</span><div class="toolbar"><button class="btn" id="themeBtn">Дневная карта</button><button class="btn" id="vilniusBtn">Вильнюс</button></div><p id="providerStatus" class="status" role="status"></p></div>
+<p id="providerStatus" class="status" role="status"></p>
 </aside>
 </main>
 <script>window.PD_MAPBOX_PUBLIC_TOKEN={{ mapbox_token|tojson }};</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js" integrity="sha384-acS2vHk2htvkMzGXnu5MTQNaFwFexCnoKasF90zPaHihi5xhWMsTcvVvTAJHXuHH" crossorigin="anonymous"></script>
 <script>
 (()=>{
 'use strict';
@@ -160,46 +175,179 @@ async function refreshTrips(){
 document.addEventListener('pd-test-filter',renderTrips);
 refreshTrips();
 {% endif %}
-if(typeof L==='undefined'){$('mapProvider').textContent='Не удалось загрузить карту';$('mapStatus').textContent='Проверь подключение к интернету.';return}
-const map=L.map('map',{zoomControl:false}).setView([54.6872,25.2797],12);
-L.control.zoom({position:'bottomright'}).addTo(map);
-{% if test_sync_enabled %}
-let pilotMarker=null;
-document.addEventListener('pd-test-gps',event=>{
-    const point=event.detail;
-    const status=$('mapStatus');
-    if(!point){
-        if(pilotMarker){pilotMarker.remove();pilotMarker=null;}
-        status.textContent='Местоположение появится, когда тестовый пилот поделится GPS.';
+const vilnius=[25.2797,54.6872];
+const token=window.PD_MAPBOX_PUBLIC_TOKEN;
+const hasToken=typeof token==='string'&&/^pk\.[\w.-]+$/.test(token);
+const osmCredit='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+let raster=null, vector=null, tileLayer=null, marker=null, pilotPoint=null;
+let night=true, mode3d=false, vectorReady=false;
+const styleId=()=>night?'dark-v11':'light-v11';
+const buildingLayer='pd-buildings-3d';
+
+function drawPilot(){
+    if($('pilotBtn'))$('pilotBtn').disabled=!pilotPoint;
+    if(!pilotPoint){
+        if(marker){marker.remove();marker=null;}
         return;
     }
-    if(pilotMarker){pilotMarker.setLatLng(point);}
-    else{
-        pilotMarker=L.marker(point,{
-            title:'Тестовый пилот',
-            icon:L.divIcon({className:'pilot-marker',html:'➤',iconSize:[35,35],iconAnchor:[17,17]})
-        }).addTo(map).bindTooltip('Тестовый пилот');
-        if(!map.getBounds().contains(point))map.setView(point,12);
+    const [lat,lng]=pilotPoint;
+    if(vector){
+        if(!marker){
+            const arrow=document.createElement('span');
+            arrow.className='pilot-marker';
+            arrow.textContent='➤';
+            arrow.setAttribute('aria-label','Тестовый пилот');
+            marker=new mapboxgl.Marker({element:arrow})
+                .setLngLat([lng,lat])
+                .setPopup(new mapboxgl.Popup().setText('Тестовый пилот'))
+                .addTo(vector);
+        }else marker.setLngLat([lng,lat]);
+    }else if(raster){
+        if(!marker){
+            marker=L.marker(pilotPoint,{
+                title:'Тестовый пилот',
+                icon:L.divIcon({className:'pilot-marker',html:'➤',iconSize:[35,35],iconAnchor:[17,17]})
+            }).addTo(raster).bindTooltip('Тестовый пилот');
+        }else marker.setLatLng(pilotPoint);
     }
-    status.textContent='GPS тестового пилота отображается на карте.';
+}
+document.addEventListener('pd-test-gps',event=>{
+    pilotPoint=event.detail;
+    $('mapStatus').textContent=pilotPoint?'GPS тестового пилота отображается на карте.':
+        'Местоположение появится, когда тестовый пилот поделится GPS.';
+    drawPilot();
 });
-{% endif %}
-const osmCredit='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-const token=window.PD_MAPBOX_PUBLIC_TOKEN;
-let layer=null,night=true;
-const useOsm=()=>{if(layer)layer.remove();layer=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:osmCredit}).addTo(map);$('mapProvider').textContent='Резервная карта OpenStreetMap';$('providerStatus').textContent='Для Mapbox нужен публичный токен в настройках тестового Render.'};
-const showTheme=()=>{
-if(typeof token!=='string'||!/^pk\.[\w.-]+$/.test(token)){useOsm();return}
-if(layer)layer.remove();
-const style=night?'dark-v11':'light-v11';
-const url='https://api.mapbox.com/styles/v1/mapbox/'+style+'/tiles/256/{z}/{x}/{y}?access_token='+encodeURIComponent(token);
-let errors=0;
-const next=L.tileLayer(url,{maxZoom:19,attribution:'&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> '+osmCredit+' <a href="https://apps.mapbox.com/feedback/">Feedback</a>'});
-next.on('tileerror',()=>{if(layer!==next)return;if(++errors>=3){useOsm();$('providerStatus').textContent='Mapbox временно недоступна, работает резервная карта.';}});
-layer=next.addTo(map);$('mapProvider').textContent='Mapbox · '+(night?'ночная':'дневная')+' карта';$('providerStatus').textContent='Активна картографическая подложка Mapbox.';
-};
-$('themeBtn').addEventListener('click',()=>{night=!night;$('themeBtn').textContent=night?'Дневная карта':'Ночная карта';showTheme()});
-$('vilniusBtn').addEventListener('click',()=>map.setView([54.6872,25.2797],12));
-showTheme();
+
+function rasterStyle(mapbox){
+    if(tileLayer)tileLayer.remove();
+    $('rasterMap').classList.toggle('night',night&&mapbox);
+    const url=mapbox?
+        'https://api.mapbox.com/styles/v1/mapbox/'+styleId()+'/tiles/256/{z}/{x}/{y}?access_token='+encodeURIComponent(token):
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const layer=L.tileLayer(url,{maxZoom:19,attribution:mapbox?
+        '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> '+osmCredit+
+            ' <a href="https://apps.mapbox.com/feedback/">Feedback</a>':osmCredit});
+    let errors=0;
+    if(mapbox)layer.on('tileerror',()=>{
+        if(layer===tileLayer&&++errors>=3)rasterStyle(false);
+    });
+    tileLayer=layer.addTo(raster);
+    $('mapProvider').textContent=mapbox?'Mapbox · '+(night?'ночная':'дневная')+' карта':
+        'Резервная карта OpenStreetMap';
+}
+function useRaster(){
+    if(vector){vector.remove();vector=null;}
+    marker=null;
+    $('glMap').hidden=true;
+    $('rasterMap').hidden=false;
+    $('modeBtn').disabled=true;
+    $('modeBtn').textContent='3D';
+    $('modeBtn').setAttribute('aria-pressed','false');
+    $('providerStatus').textContent='Доступна карта 2D. Для режима 3D нужен WebGL.';
+    if(typeof L==='undefined'){
+        $('mapProvider').textContent='Не удалось загрузить карту';
+        return;
+    }
+    raster=L.map('rasterMap',{zoomControl:false}).setView([vilnius[1],vilnius[0]],12);
+    L.control.zoom({position:'bottomright'}).addTo(raster);
+    rasterStyle(hasToken);
+    drawPilot();
+}
+function styleVector(){
+    const style=vector.getStyle();
+    if(night){
+        for(const layer of style.layers){
+            if(layer.type==='background')vector.setPaintProperty(layer.id,'background-color','#10100f');
+            if(layer.type==='line'&&/^(road|bridge|tunnel)/.test(layer.id)&&
+                /motorway|trunk|primary/.test(layer.id)){
+                vector.setPaintProperty(layer.id,'line-color',layer.id.includes('case')?'#392b1a':'#a88348');
+            }
+            if(layer.type==='fill'&&layer.id==='water')vector.setPaintProperty(layer.id,'fill-color','#151d22');
+        }
+    }
+    if(vector.getSource('composite')){
+        const label=style.layers.find(layer=>layer.type==='symbol'&&layer.layout?.['text-field']);
+        vector.addLayer({
+            id:buildingLayer,type:'fill-extrusion',source:'composite','source-layer':'building',
+            minzoom:14.5,filter:['==',['get','extrude'],'true'],
+            layout:{visibility:mode3d?'visible':'none'},
+            paint:{
+                'fill-extrusion-color':night?'#aa8550':'#c4ad82',
+                'fill-extrusion-height':['coalesce',['get','height'],0],
+                'fill-extrusion-base':['coalesce',['get','min_height'],0],
+                'fill-extrusion-opacity':.86,
+            },
+        },label?.id);
+    }
+    $('mapProvider').textContent=night?'Mapbox · чёрно-золотая карта':'Mapbox · дневная карта';
+}
+function startVector(){
+    if(!hasToken||typeof mapboxgl==='undefined'||!mapboxgl.supported()){
+        useRaster();
+        return;
+    }
+    $('rasterMap').hidden=true;
+    $('glMap').hidden=false;
+    try{
+        vector=new mapboxgl.Map({
+            container:'glMap',accessToken:token,style:'mapbox://styles/mapbox/'+styleId(),
+            center:vilnius,zoom:12,pitch:0,bearing:0,dragRotate:false,pitchWithRotate:false,
+        });
+    }catch{
+        useRaster();
+        return;
+    }
+    vector.touchZoomRotate.disableRotation();
+    vector.touchPitch.disable();
+    vector.addControl(new mapboxgl.NavigationControl({visualizePitch:true}),'bottom-right');
+    const startup=setTimeout(()=>{if(!vectorReady)useRaster();},14000);
+    vector.on('load',()=>{
+        vectorReady=true;
+        clearTimeout(startup);
+        $('modeBtn').disabled=false;
+        $('providerStatus').textContent='';
+        drawPilot();
+    });
+    vector.on('style.load',styleVector);
+    vector.on('error',event=>{
+        if(!vectorReady&&[401,403].includes(event.error?.status)){
+            clearTimeout(startup);
+            useRaster();
+        }
+    });
+}
+$('modeBtn').addEventListener('click',()=>{
+    if(!vectorReady||!vector)return;
+    mode3d=!mode3d;
+    $('modeBtn').textContent=mode3d?'2D':'3D';
+    $('modeBtn').setAttribute('aria-pressed',String(mode3d));
+    if(vector.getLayer(buildingLayer))vector.setLayoutProperty(buildingLayer,'visibility',mode3d?'visible':'none');
+    if(mode3d){
+        vector.dragRotate.enable();
+        vector.touchZoomRotate.enableRotation();
+        vector.touchPitch.enable();
+    }else{
+        vector.dragRotate.disable();
+        vector.touchZoomRotate.disableRotation();
+        vector.touchPitch.disable();
+    }
+    vector.easeTo({pitch:mode3d?55:0,bearing:mode3d?-22:0,
+        zoom:mode3d?Math.max(15.5,vector.getZoom()):vector.getZoom(),duration:600});
+});
+$('themeBtn').addEventListener('click',()=>{
+    night=!night;
+    $('themeBtn').textContent=night?'Дневная карта':'Ночная карта';
+    if(vector)vector.setStyle('mapbox://styles/mapbox/'+styleId());
+    else if(raster)rasterStyle(hasToken);
+});
+function focusMap(center){
+    if(vector)vector.easeTo({center,zoom:mode3d?15.5:13,duration:500});
+    else if(raster)raster.setView([center[1],center[0]],13);
+}
+$('vilniusBtn').addEventListener('click',()=>focusMap(vilnius));
+$('pilotBtn')?.addEventListener('click',()=>{
+    if(pilotPoint)focusMap([pilotPoint[1],pilotPoint[0]]);
+});
+startVector();
 })();
 </script></body></html>

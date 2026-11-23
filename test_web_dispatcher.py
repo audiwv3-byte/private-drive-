@@ -150,6 +150,7 @@ class DispatcherBrowserTests(unittest.TestCase):
             "dark-v11", "light-v11", "themeBtn",
             "@media(max-width:650px)", "tile.openstreetmap.org",
             "api.mapbox.com", "mapbox_token|tojson",
+            'id="modeBtn"', "fill-extrusion", "pitch:mode3d?55:0",
         ):
             self.assertIn(expected, page)
 
@@ -173,6 +174,7 @@ class DispatcherBrowserTests(unittest.TestCase):
         self.assertEqual(page.headers["Cache-Control"], "private, no-store")
         self.assertIn("frame-ancestors 'none'", page.headers["Content-Security-Policy"])
         self.assertIn("https://api.mapbox.com", page.headers["Content-Security-Policy"])
+        self.assertIn("worker-src blob:", page.headers["Content-Security-Policy"])
         self.assertIn(b'href="/dispatch/map"', c.get("/dispatch").data)
         with c.session_transaction() as s:
             csrf = s["pd_dispatch_csrf"]

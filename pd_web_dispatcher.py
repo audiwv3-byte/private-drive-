@@ -355,10 +355,11 @@ def register(app, core):
             "X-Frame-Options": "DENY",
             "Content-Security-Policy": (
                 "default-src 'none'; "
-                "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-                "style-src 'self' 'unsafe-inline' https://unpkg.com; "
-                "img-src 'self' data: https://*.mapbox.com https://tile.openstreetmap.org https://unpkg.com; "
-                "connect-src 'self' https://api.mapbox.com; "
+                "script-src 'self' 'unsafe-inline' https://unpkg.com https://api.mapbox.com; "
+                "style-src 'self' 'unsafe-inline' https://unpkg.com https://api.mapbox.com; "
+                "img-src 'self' data: blob: https://*.mapbox.com https://tile.openstreetmap.org https://unpkg.com; "
+                "worker-src blob:; "
+                "connect-src 'self' https://api.mapbox.com https://events.mapbox.com; "
                 "font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
             ),
         })

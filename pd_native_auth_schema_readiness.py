@@ -4,6 +4,8 @@ Never creates, alters, or migrates a table. It inspects only PostgreSQL
 catalog metadata; no rows, phone numbers, secrets, or tokens are read.
 """
 import psycopg
+import threading
+import time
 
 REQUIRED_COLUMNS = {
     "native_twilio_challenges": frozenset(
@@ -41,3 +43,45 @@ def inspect_native_auth_schema(database_url):
         return True, "ready"
     except (psycopg.Error, ValueError, TypeError):
         return False, "database_unavailable"
+
+
+class SchemaReadinessGate:
+    """Per-process, monotonic, throttled catalog probe; no background polling.
+
+    Each request may initiate a read-only probe only after the cooldown.
+    An RLock prevents concurrent requests from stampeding a recovering DB.
+    Fail closed on failures, preserve the last known internal error code.
+    """
+
+    def __init__(self, database_url, *, monotonic=None, retry_seconds=15,
+                 inspector=None):
+        if retry_seconds < 5:
+            raise ValueError("retry interval must be >= 5 seconds")
+        self._url = database_url
+        self._now = monotonic or time.monotonic
+        self._inspector = inspector or inspect_native_auth_schema
+        self._interval = retry_seconds
+        self._lock = threading.Lock()
+        self._checked_at = None
+        self._cached = (False, "database_unavailable")
+
+    def status(self):
+        with self._lock:
+            now = self._now()
+            if self._checked_at is not None and (
+                    0 <= now - self._checked_at < self._interval):
+                return self._cached
+            # Reserve the cooldown before I/O, even if the connection fails.
+            self._checked_at = now
+            try:
+                self._cached = self._inspector(self._url)
+            except Exception:
+                # Do not log credentials or exception messages from drivers.
+                self._cached = (False, "database_unavailable")
+            return self._cached
+
+    def mark_database_unavailable(self):
+        """Throttle retries after a runtime connection failure as well."""
+        with self._lock:
+            self._cached = (False, "database_unavailable")
+            self._checked_at = self._now()

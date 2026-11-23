@@ -67,6 +67,24 @@ class DispatcherBrowserTests(unittest.TestCase):
         self.assertTrue(app.config["SESSION_COOKIE_SECURE"])
         self.assertEqual(app.config["SESSION_COOKIE_SAMESITE"], "Strict")
 
+    def test_mapbox_public_token_configuration_diagnostic(self):
+        """Report only token presence and validity, never the token itself."""
+        import re
+        token = os.environ.get("MAPBOX_WEB_PUBLIC_TOKEN", "").strip()
+        valid = bool(re.fullmatch(r"pk\\.[A-Za-z0-9_.-]{1,512}", token))
+        state = "VALID" if valid else ("INVALID" if token else "ABSENT")
+        print("PD_STAGING_MAPBOX_PUBLIC_TOKEN_STATUS=" + state, flush=True)
+
+    def test_mapbox_mobile_theme_contract(self):
+        from pathlib import Path
+        page = Path(__file__).with_name("pd_dispatcher_mapbox.html").read_text(encoding="utf-8")
+        for expected in (
+            "dark-v11", "light-v11", "themeBtn",
+            "@media(max-width:650px)", "tile.openstreetmap.org",
+            "api.mapbox.com", "mapbox_token|tojson",
+        ):
+            self.assertIn(expected, page)
+
     def test_mapbox_page_requires_existing_dispatcher_login(self):
         app, _ = self.make_app()
         c = app.test_client()

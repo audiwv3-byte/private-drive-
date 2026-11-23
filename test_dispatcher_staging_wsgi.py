@@ -24,6 +24,7 @@ class DispatcherStagingTests(unittest.TestCase):
             client = app.test_client()
             self.assertEqual(client.post("/pilot-registration").status_code, 503)
             self.assertEqual(client.get("/dispatch/qa-pilot-applications").status_code, 401)
+            self.assertEqual(client.get("/dispatch/pilot-applications").status_code, 401)
             self.assertEqual(client.get(
                 "/dispatch/qa-pilot-applications/" + "a"*32 +
                 "/documents/license_front").status_code, 401)
@@ -41,7 +42,7 @@ class DispatcherStagingTests(unittest.TestCase):
 
     def test_pilot_photo_validation_rejects_malformed_and_oversized_data(self):
         from pd_pilot_qa_intake import MAX_FILE, image_as_private_webp
-        for data in (b"", b"0"*(MAX_FILE+1)):
+        for data in (b"", b"not an image", b"0"*(MAX_FILE+1)):
             with self.assertRaises(ValueError):
                 image_as_private_webp(data)
 

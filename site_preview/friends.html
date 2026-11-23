@@ -112,6 +112,24 @@
 }
 @media(max-width:360px){#partners .partner-photo-grid,.friends-main .partner-photo-grid{grid-template-columns:1fr}#partners .partner-feature,.friends-main .partner-feature{max-width:275px}}
 
+
+/* Photo-first partner tiles: minimal masking, clearer crops, text kept below faces. */
+#partners .partner-photo-grid,.friends-main .partner-photo-grid{grid-template-columns:repeat(auto-fill,minmax(220px,275px));gap:14px}
+#partners .partner-feature,.friends-main .partner-feature{height:338px;min-height:338px;justify-content:flex-end;padding:10px;border-radius:16px}
+#partners .partner-feature::after,.friends-main .partner-feature::after{background:linear-gradient(to top,#080807f7 0%,#080807d9 18%,#08080765 37%,transparent 57%);z-index:0}
+#partners .partner-tech-icon.partner-avatar,.friends-main .partner-tech-icon.partner-avatar{z-index:0}
+#partners .partner-avatar img,.friends-main .partner-avatar img{filter:contrast(1.09) saturate(1.08);image-rendering:auto;object-position:center 28%}
+#partners .partner-info,.friends-main .partner-info,
+#partners .partner-links,.friends-main .partner-links,
+#partners .partner-feature>a.button,.friends-main .partner-feature>a.button{position:relative;z-index:2}
+#partners .partner-info h3,.friends-main .partner-info h2{font-size:1.07rem}
+#partners .partner-info p,.friends-main .partner-info p{font-size:.72rem;-webkit-line-clamp:2}
+#partners .partner-feature .button,.friends-main .partner-feature .button{background:#1b150dc9}
+@media(max-width:570px){
+ #partners .partner-photo-grid,.friends-main .partner-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ #partners .partner-feature,.friends-main .partner-feature{height:290px;min-height:290px}
+}
+
 </style>
 </head>
 <body>

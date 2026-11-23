@@ -38,6 +38,9 @@ class FakeGateway extends RemoteTripGateway {
       }
       return {'trip': server.trip};
     }
+    if (path.endsWith('/gps')) {
+      return {'gps': {'available': false}};
+    }
     if (path.contains('/messages?after=')) {
       final after = int.parse(path.split('after=').last);
       return {'messages': server.messages.where((x) =>

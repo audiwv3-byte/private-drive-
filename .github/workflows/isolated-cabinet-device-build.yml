@@ -187,6 +187,15 @@ jobs:
           cp ../apk-certificate.txt ../apk-badging.txt ../apk-permissions.txt ../device_artifacts/android/
           (cd ../device_artifacts/android && sha256sum PRIVATE-DRIVE-cabinet-sync-QA.apk > SHA256SUMS)
 
+      - name: Upload QA browser screenshots when an interactive check fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-qa-browser-diagnostics
+          path: device_artifacts/browser/
+          retention-days: 3
+          if-no-files-found: ignore
+
       - name: Verify both artifacts are wired to the same temporary URL
         shell: bash
         run: |

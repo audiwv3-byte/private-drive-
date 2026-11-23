@@ -192,9 +192,6 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     if (!mounted || !session.active) return;
     unawaited(_saveQaSession(session));
     _expiry?.cancel();
-    _expiry = Timer(session.expiresAt.difference(DateTime.now()), () {
-      if (mounted) _signOut();
-    });
     setState(() {
       _session = session;
       if (_canOpen(session, _requestedRole)) {
@@ -204,7 +201,24 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
         _message = 'У аккаунта нет серверных прав для выбранного кабинета.';
       }
     });
+    _scheduleSessionExpiry(session);
   }
+
+  void _scheduleSessionExpiry(PdNativeSession session) {
+    final remaining = session.expiresAt.difference(DateTime.now());
+    // Browser timers use a signed 32-bit millisecond delay. A full 30-day
+    // session exceeds that limit and can trigger immediate sign-out.
+    const maxDelay = Duration(days: 1);
+    _expiry = Timer(remaining > maxDelay ? maxDelay : remaining, () {
+      if (!mounted || !identical(_session, session)) return;
+      if (session.active) {
+        _scheduleSessionExpiry(session);
+      } else {
+        _signOut();
+      }
+    });
+  }
+
   void _photoApproved() {
     final session = _activeSession;
     if (session == null || !_canOpen(session, 'pilot')) return;

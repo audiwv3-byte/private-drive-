@@ -29,7 +29,7 @@ void main() {
           'token_type': 'Bearer',
           'access_token': 'a' * 64,
           'user_id': 'passenger-qa',
-          'expires_in': 3600,
+          'expires_in': const Duration(days: 30).inSeconds,
         }), 200, headers: {'content-type': 'application/json'});
       }
       if (request.url.path == '/v1/me') {

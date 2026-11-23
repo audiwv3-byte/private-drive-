@@ -1,0 +1,41 @@
+name: PRIVATE DRIVE Flutter native logout QA
+on:
+  push:
+    branches:
+      - feature/web-dispatcher-browser-auth
+    paths:
+      - 'flutter_app/lib/native_logout_api.dart'
+      - 'flutter_app/lib/native_cabin_entry.dart'
+      - 'flutter_app/lib/main.dart'
+      - 'flutter_app/test/native_logout_api_test.dart'
+      - '.github/workflows/pd-flutter-native-logout-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-logout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: flutter_app
+    env:
+      PD_NATIVE_AUTH_API_URL: ''
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Prepare existing logo assets
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 tool/prepare_transparent_logo.py
+      - name: Fetch dependencies
+        run: flutter pub get
+      - name: Check secure logout and cabin widgets with mock HTTP only
+        run: flutter test --no-pub --reporter expanded test/native_logout_api_test.dart test/native_cabin_entry_test.dart
+      - name: Check Flutter static analysis
+        run: flutter analyze --no-fatal-infos

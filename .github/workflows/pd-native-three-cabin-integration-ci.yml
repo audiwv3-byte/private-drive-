@@ -1,0 +1,47 @@
+name: PRIVATE DRIVE full three-cabin native auth and GPS QA
+on:
+  push:
+    branches: [feature/web-dispatcher-browser-auth]
+    paths:
+      - 'flutter_app/lib/native_cabin_entry.dart'
+      - 'flutter_app/lib/demo_interfaces.dart'
+      - 'flutter_app/lib/demo_dispatcher_cabinet.dart'
+      - 'flutter_app/lib/passenger_ride_entry.dart'
+      - 'flutter_app/lib/pilot_cabin.dart'
+      - 'flutter_app/lib/demo_trip_store.dart'
+      - 'flutter_app/lib/native_session*.dart'
+      - 'flutter_app/test/native_cabin_end_to_end_qa_test.dart'
+      - '.github/workflows/pd-native-three-cabin-integration-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  all-cabins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: flutter_app
+    env:
+      PD_NATIVE_AUTH_API_URL: ''
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Install local fixtures and Flutter dependencies
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 tool/prepare_transparent_logo.py
+          flutter pub get
+      - name: End-to-end widget roles, GPS, navigation and logout
+        run: |
+          flutter test --no-pub --reporter expanded test/native_cabin_end_to_end_qa_test.dart test/native_auth_relaunch_widget_test.dart test/native_cabin_entry_test.dart test/native_logout_api_test.dart test/native_session_persistence_test.dart
+      - name: Real cabin widget suites for passenger, pilot and dispatcher
+        run: |
+          flutter test --no-pub --reporter expanded test/passenger_ride_entry_test.dart test/pilot_cabin_test.dart test/pilot_shift_persistence_test.dart test/pilot_map_day_night_test.dart test/dispatcher_cabinet_test.dart test/dispatcher_map_rating_test.dart test/permissions_onboarding_test.dart
+      - name: Analyze source for regression
+        run: flutter analyze --no-fatal-infos

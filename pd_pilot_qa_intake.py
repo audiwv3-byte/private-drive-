@@ -143,6 +143,59 @@ def register(app, authorized):
             app.logger.exception("QA pilot intake storage unavailable")
             return jsonify(error="storage_unavailable"), 503
 
+    @app.get("/dispatch/pilot-applications")
+    def qa_pilot_review_page():
+        if not authorized():
+            return jsonify(error="unauthorized"), 401
+        # The review page never embeds PII into HTML; the protected API returns
+        # decrypted values only to the currently authenticated dispatcher.
+        page = """<!doctype html><html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>PRIVATE DRIVE — анкеты пилотов QA</title>
+<style>body{margin:0;padding:24px;background:#100f0d;color:#f2ede1;font:15px system-ui}
+main{max-width:850px;margin:auto}h1,a{color:#e8c581}
+article{border:1px solid #675234;padding:15px;margin:12px 0;border-radius:12px;background:#201b14}
+small{color:#c8bba3}a{display:inline-block;margin:8px 14px 4px 0}
+a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
+<body><main><h1>Анкеты пилотов — тестовая модерация</h1>
+<p>Защищённая очередь. Статус новых анкет: «На проверке».</p>
+<p id="status" role="status">Проверяем подключение…</p>
+<div id="applications"></div>
+<a href="/dispatch/map">Вернуться в диспетчерскую</a></main>
+<script>
+(async()=>{
+ const target=document.getElementById("applications"),status=document.getElementById("status");
+ try{
+   const response=await fetch("/dispatch/qa-pilot-applications",{credentials:"same-origin",cache:"no-store"});
+   const data=await response.json();
+   if(!response.ok)throw Error(response.status===503?"Защищённое хранилище пока не настроено.":"Нет доступа к анкетам.");
+   status.textContent="Анкет: "+data.applications.length;
+   for(const app of data.applications){
+     const card=document.createElement("article");
+     for(const text of [app.full_name,app.phone,app.label,"Подана: "+app.created_at]){
+       const p=document.createElement("p");p.textContent=text;card.append(p);
+     }
+     for(const [kind,label] of [["portrait","Фото пилота"],["license_front","Права"],["car_front","Автомобиль спереди"],["car_rear","Автомобиль сзади"]]){
+       const link=document.createElement("a");
+       link.href="/dispatch/qa-pilot-applications/"+encodeURIComponent(app.id)+"/documents/"+kind;
+       link.textContent=label;link.rel="noreferrer";card.append(link);
+     }
+     target.append(card);
+   }
+   if(!data.applications.length)target.textContent="Анкет на проверке пока нет.";
+ }catch(error){status.textContent=error.message}
+})();
+</script></body></html>"""
+        return Response(page, mimetype="text/html", headers={
+            "Cache-Control":"private, no-store",
+            "X-Content-Type-Options":"nosniff",
+            "Referrer-Policy":"no-referrer",
+            "X-Frame-Options":"DENY",
+            "Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; "
+                "style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+        })
+
     @app.get("/dispatch/qa-pilot-applications")
     def qa_pilots_for_dispatcher():
         if not authorized():

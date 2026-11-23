@@ -14,7 +14,7 @@ import psycopg
 
 from pd_native_auth import native_phone_role_resolver, normalize_destination
 from pd_twilio_verify import VerifyError, start_verification, check_verification
-from pd_native_auth_schema_readiness import inspect_native_auth_schema
+from pd_native_auth_schema_readiness import SchemaReadinessGate
 
 TTL = 300
 COOLDOWN = 60
@@ -25,7 +25,7 @@ MAX_BODY = 2048
 
 def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_phone=None,
              live=False,
-             start_sms=None, check_sms=None, clock=None):
+             start_sms=None, check_sms=None, clock=None, readiness_clock=None):
     if not database_url or not database_url.startswith(("postgresql://", "postgres://")):
         raise ValueError("A private PostgreSQL DATABASE_URL is required")
     role_for_phone = native_phone_role_resolver(
@@ -36,7 +36,8 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
             check_sms = check_sms or check_verification
     clock = clock or time.time
     # Schema installation is an explicit, separate migration step. No runtime DDL.
-    schema_ready, schema_status = inspect_native_auth_schema(database_url)
+    readiness = SchemaReadinessGate(database_url, monotonic=readiness_clock)
+    readiness.status()  # initial fail-closed probe; subsequent checks are throttled
 
     def reply(start_response, status, payload):
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -51,6 +52,7 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
     def app(environ, start_response):
         route = environ.get("PATH_INFO", "")
         method = environ.get("REQUEST_METHOD", "")
+        schema_ready, schema_status = readiness.status()
         if method == "GET" and route == "/health":
             if not schema_ready:
                 return reply(start_response, "503 Service Unavailable",
@@ -111,6 +113,7 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
                     "challenge_id": challenge_id, "expires_in": TTL,
                     "resend_after": COOLDOWN})
             except psycopg.Error:
+                readiness.mark_database_unavailable()
                 return reply(start_response, "503 Service Unavailable",
                              {"error": "database_unavailable"})
 
@@ -165,6 +168,7 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
                 "expires_in": SESSION_TTL,
             })
         except psycopg.Error:
+            readiness.mark_database_unavailable()
             return reply(start_response, "503 Service Unavailable",
                          {"error": "database_unavailable"})
 

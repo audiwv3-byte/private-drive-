@@ -300,12 +300,24 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
     final hasFix = store.pilotOnline &&
         latitude != null && longitude != null;
     final point = hasFix ? LatLng(latitude, longitude) : null;
+    final passengerPoints = store.dispatcherPassengerLocations.entries
+        .map((entry) => MapEntry(entry.key, LatLng(entry.value.$1, entry.value.$2)))
+        .toList();
+    final markerStatus = [
+      if (hasFix)
+        store.serverBacked
+            ? '1 пилот с GPS · тестовый сервер'
+            : '1 пилот с GPS · только локальная сессия',
+      if (passengerPoints.isNotEmpty)
+        'Пассажиры с GPS · ${passengerPoints.length}',
+    ];
     return Stack(key: const Key('dispatcher-map-tab'), children: [
       Positioned.fill(child: widget.enableMapTiles
         ? FlutterMap(
             key: const Key('dispatcher-live-map'),
             options: MapOptions(
-              initialCenter: point ?? const LatLng(54.6872, 25.2797),
+              initialCenter: point ?? passengerPoints.firstOrNull?.value ??
+                  const LatLng(54.6872, 25.2797),
               initialZoom: 12,
             ),
             children: [
@@ -313,14 +325,27 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'lt.privatedrive.privateDrive',
               ),
-              if (point != null) MarkerLayer(markers: [
-                Marker(
-                  point: point, width: 64, height: 64,
-                  child: const CustomPaint(
-                    key: Key('dispatcher-pilot-marker'),
-                    painter: _GoldPilotArrowPainter(),
+              MarkerLayer(markers: [
+                if (point != null)
+                  Marker(
+                    point: point, width: 64, height: 64,
+                    child: const CustomPaint(
+                      key: Key('dispatcher-pilot-marker'),
+                      painter: _GoldPilotArrowPainter(),
+                    ),
                   ),
-                ),
+                for (final passenger in passengerPoints)
+                  Marker(
+                    point: passenger.value, width: 42, height: 42,
+                    child: Tooltip(
+                      key: ValueKey('dispatcher-passenger-marker-${passenger.key}'),
+                      message: 'Пассажир · GPS',
+                      child: const CircleAvatar(
+                        backgroundColor: Color(0xFF1F759D),
+                        child: Icon(Icons.person, color: Colors.white),
+                      ),
+                    ),
+                  ),
               ]),
               const RichAttributionWidget(attributions: [
                 TextSourceAttribution('© OpenStreetMap contributors'),
@@ -339,9 +364,8 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
           borderRadius: BorderRadius.circular(10), child: Padding(
         padding: const EdgeInsets.all(12),
         child: Text(
-          hasFix
-            ? (store.serverBacked ? '1 пилот с GPS · тестовый сервер'
-                : '1 пилот с GPS · только локальная сессия')
+          markerStatus.isNotEmpty
+            ? markerStatus.join('\n')
             : 'Подтверждённых GPS-точек нет. Для нескольких пилотов '
               'нужна защищённая серверная синхронизация.',
           key: const Key('dispatcher-fleet-status'),

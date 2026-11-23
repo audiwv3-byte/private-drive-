@@ -153,6 +153,7 @@ class DemoTripStore extends ChangeNotifier {
   }
 
   String? get passengerLocationTripId => null;
+  Map<String, (double, double)> get dispatcherPassengerLocations => const {};
 
   Future<void> sharePassengerLocation(double? latitude, double? longitude) async {}
 

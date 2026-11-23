@@ -18,6 +18,7 @@ class ServerTripStore extends DemoTripStore {
   Future<void> _tail = Future.value();
   Future<void> _passengerLocationWrites = Future.value();
   String? _sharedPassengerTripId;
+  final _passengerFixes = <String, (double, double, DateTime)>{};
   bool _reading = false;
   bool _writing = false;
   bool _verified = false;
@@ -38,6 +39,7 @@ class ServerTripStore extends DemoTripStore {
 
   void _report(Object error) {
     if (_disposed) return;
+    if (_role == 'dispatcher') _passengerFixes.clear();
     final seen = _pilotLastSeen;
     if (_role != 'pilot' &&
         seen != null &&
@@ -92,6 +94,38 @@ class ServerTripStore extends DemoTripStore {
     if (_gpsDirty) _sendGps();
   }
 
+  @override
+  Map<String, (double, double)> get dispatcherPassengerLocations {
+    final now = DateTime.now();
+    return {
+      for (final entry in _passengerFixes.entries)
+        if (entry.value.$3.isAfter(now)) entry.key: (entry.value.$1, entry.value.$2),
+    };
+  }
+
+  bool _updateDispatcherPassengerLocations(Object? snapshot) {
+    final previous = Map.of(_passengerFixes);
+    _passengerFixes.clear();
+    if (snapshot is Map<String, dynamic>) {
+      final now = DateTime.now();
+      for (final entry in snapshot.entries) {
+        final point = entry.value;
+        if (point is! Map<String, dynamic>) continue;
+        final lat = (point['latitude'] as num?)?.toDouble();
+        final lon = (point['longitude'] as num?)?.toDouble();
+        final ttl = (point['expires_in'] as num?)?.toDouble();
+        if (!_validGps(lat, lon) || ttl == null || !ttl.isFinite || ttl <= 0) continue;
+        final expires = now.add(Duration(milliseconds: (ttl.clamp(0, 45) * 1000).round()));
+        _passengerFixes[entry.key] = (lat!, lon!, expires);
+      }
+    }
+    if (_passengerFixes.length != previous.length) return true;
+    return _passengerFixes.entries.any((entry) {
+      final old = previous[entry.key];
+      return old == null || old.$1 != entry.value.$1 || old.$2 != entry.value.$2;
+    });
+  }
+
   Future<void> _pull() async {
     final response = await _api.get('/v1/current');
     if (_disposed) return;
@@ -117,7 +151,9 @@ class ServerTripStore extends DemoTripStore {
       _pilotLastSeen = valid ? seen : null;
       _pilotOnline = valid;
     }
-    if (changed || gpsChanged) notifyListeners();
+    final passengerGpsChanged = _role == 'dispatcher' &&
+        _updateDispatcherPassengerLocations(response['passenger_positions']);
+    if (changed || gpsChanged || passengerGpsChanged) notifyListeners();
     if (id == null) return;
     final batch = await _api.get('/v1/trips/$id/messages?after=$_cursor');
     if (_disposed) return;

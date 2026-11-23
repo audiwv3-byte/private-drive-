@@ -298,6 +298,28 @@ void main() {
 
       await select(2);
       expect(find.text('1 пилот с GPS · тестовый сервер'), findsOneWidget);
+      final passengerPosition = await tester.runAsync(() async {
+        final link = links[0];
+        final headers = {
+          'Authorization': 'Bearer ${link.token}',
+          'Content-Type': 'application/json',
+        };
+        final current = await link.get(
+          Uri.parse('$address/v1/current'), headers: headers);
+        final order = jsonDecode(current.body)['trip'] as Map<String, dynamic>;
+        return link.post(
+          Uri.parse('$address/v1/trips/${order['id']}/passenger-position'),
+          headers: headers,
+          body: jsonEncode({'latitude': 54.69, 'longitude': 25.27}),
+        );
+      });
+      expect(passengerPosition?.statusCode, 200);
+      await until(
+        () => dis.dispatcherPassengerLocations.values.contains((54.69, 25.27)),
+        'GPS of both pilot and passenger at dispatcher',
+      );
+      expect(find.textContaining('1 пилот с GPS'), findsOneWidget);
+      expect(find.textContaining('Пассажиры с GPS · 1'), findsOneWidget);
       await tap(byKey('dispatcher-open-drawer'));
       await tap(byKey('dispatcher-menu-0'));
       await tap(byKey('dispatcher-assign-pilot'));

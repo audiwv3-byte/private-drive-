@@ -864,6 +864,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
       });
       return;
     }
+    // Mapbox tile callbacks report real provider health; an OSM probe must
+    // never switch a working Mapbox map to the backup provider.
+    if (PdMapboxQaConfig.canUseMapbox && !_useBackupTiles) {
+      if (mounted) setState(() => _checkingMapNetwork = false);
+      return;
+    }
     final client = http.Client();
     try {
       final uri = Uri.parse(
@@ -951,6 +957,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
             (start.longitude + finish.longitude) / 2)
         : start ?? const LatLng(54.6872, 25.2797);
     final mapGeneration = _tileRetry;
+    final mapboxUrl = _useBackupTiles ? null : PdMapboxQaConfig.rasterTileUrl;
+    final usesMapbox = mapboxUrl != null;
     final mapZoom = start != null && finish != null
         ? (start.longitude - finish.longitude).abs() > 2 ? 6.3 : 8.2
         : 10.0;
@@ -1020,7 +1028,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             key: ValueKey('passenger-raster-tile-generation-$mapGeneration'),
                             child: ColorFiltered(
                             key: const Key('passenger-map-night-filter'),
-                            colorFilter: _nightMap
+                            colorFilter: _nightMap && !usesMapbox
                                 ? const ColorFilter.matrix(<double>[
                                     -0.65, 0, 0, 0, 170,
                                     0, -0.65, 0, 0, 170,
@@ -1036,14 +1044,16 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             child: TileLayer(
                             key: const Key('passenger-map-tiles'),
                             tileProvider: demoTileProvider(),
-                            // Both modes use keyless OSM raster tiles; fallback is for isolated tests.
-                            urlTemplate: PdMapboxQaConfig.rasterTileUrl ??
+                            // Switch the actual provider when Mapbox tiles fail.
+                            urlTemplate: (usesMapbox
+                                ? (_nightMap ? mapboxUrl : mapboxUrl!.replaceFirst('/dark-v11/', '/streets-v12/'))
+                                : null) ??
                                 (_useBackupTiles
                                     ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
                                     : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
                             userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
                             errorTileCallback: (tile, error, stackTrace) {
-                              debugPrint('PD_PASSENGER_TILE_ERROR: $error');
+                              debugPrint('PD_PASSENGER_TILE_ERROR: ${error.runtimeType}');
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 if (!mounted || _mapTilesFailed ||
                                     mapGeneration != _tileRetry ||
@@ -1052,7 +1062,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                                     (widget.mapConnectivityCheck != null &&
                                      _mapNetworkError != null)) return;
                                 setState(() {
-                                  _lastTileError = error.toString();
+                                  _lastTileError = 'Ошибка загрузки карты (${error.runtimeType})';
                                   _mapTileErrors++;
                                   if (_mapTileErrors >= 3) {
                                     if (!_useBackupTiles) {
@@ -1084,10 +1094,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
                               ],
                             ),
                           MarkerLayer(markers: mapMarkers),
-                          const RichAttributionWidget(
+                          RichAttributionWidget(
                             attributions: [
-                              TextSourceAttribution('© OpenStreetMap contributors'),
-                              TextSourceAttribution('© OpenStreetMap.de'),
+                              const TextSourceAttribution('© OpenStreetMap contributors'),
+                              if (usesMapbox) const TextSourceAttribution('© Mapbox'),
+                              if (_useBackupTiles) const TextSourceAttribution('© OpenStreetMap.de'),
                             ],
                           ),
                         ],

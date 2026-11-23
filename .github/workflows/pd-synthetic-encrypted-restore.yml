@@ -1,0 +1,73 @@
+name: PRIVATE DRIVE synthetic age backup restore CI
+on:
+  push:
+    branches:
+      - feature/web-dispatcher-browser-auth
+    paths:
+      - 'ops/pd_synthetic_encrypted_restore_ci.py'
+      - '.github/workflows/pd-synthetic-encrypted-restore.yml'
+      - 'pd_unified_accounts_schema.py'
+      - 'test_unified_accounts_postgres_integration.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  encrypted-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pd_schema_ci
+          POSTGRES_USER: pd_ci
+          POSTGRES_PASSWORD: synthetic-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pd_ci -d pd_schema_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PD_CI_FAKE_DB_ONLY: "YES"
+      PD_CI_POSTGRES_URL: "postgresql://pd_ci:synthetic-only-password@127.0.0.1:5432/pd_schema_ci"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install synthetic-test-only tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+          python -m pip install 'psycopg[binary]==3.2.13'
+      - name: Create only synthetic fixtures
+        run: python ops/pd_synthetic_encrypted_restore_ci.py seed
+      - name: Stream pg_dump through age and restore to different empty DB
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          dir="$(mktemp -d)"
+          trap 'rm -rf "$dir"' EXIT
+          age-keygen -o "$dir/key.txt" 2>/dev/null
+          recipient="$(age-keygen -y "$dir/key.txt")"
+          # PostgreSQL 18 client is run in a temporary local Docker container.
+          # Neither an unencrypted dump nor keys are uploaded as artifacts.
+          docker run --rm --network host -e PGPASSWORD=synthetic-only-password postgres:18 \
+            pg_dump -h 127.0.0.1 -U pd_ci -d pd_schema_ci \
+            --format=custom --no-owner --no-acl --schema=public --file=- \
+            | age --encrypt --recipient "$recipient" > "$dir/backup.age"
+          test "$(head -c 22 "$dir/backup.age")" = "age-encryption.org/v1"
+          test "$(stat -c '%s' "$dir/backup.age")" -gt 128
+          # An unrelated empty DB proves restoration cannot overwrite source.
+          docker run --rm --network host -e PGPASSWORD=synthetic-only-password postgres:18 \
+            createdb -h 127.0.0.1 -U pd_ci pd_schema_restored
+          age --decrypt --identity "$dir/key.txt" "$dir/backup.age" \
+            | docker run --rm -i --network host -e PGPASSWORD=synthetic-only-password postgres:18 \
+                pg_restore -h 127.0.0.1 -U pd_ci -d pd_schema_restored \
+                --no-owner --no-acl --exit-on-error
+          echo "SYNTHETIC_ENCRYPTED_RESTORE_COMPLETED"
+      - name: Compare every synthetic table and schema fingerprint
+        run: python ops/pd_synthetic_encrypted_restore_ci.py verify

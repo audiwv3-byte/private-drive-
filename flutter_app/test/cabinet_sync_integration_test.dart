@@ -34,6 +34,7 @@ class _Link extends http.BaseClient {
   final Zone zone;
   final IOClient _io;
   String? token;
+  int verifiedSessions = 0;
   bool offline = false;
   bool dropNextMessageAck = false;
 
@@ -51,6 +52,7 @@ class _Link extends http.BaseClient {
       final path = request.url.path;
       if (path == '/native-auth/verify-code' && response.statusCode == 200) {
         token = (jsonDecode(response.body) as Map)['access_token'] as String;
+        verifiedSessions++;
       }
       if (dropNextMessageAck &&
           request.method == 'POST' &&
@@ -61,7 +63,8 @@ class _Link extends http.BaseClient {
       }
       return response;
     });
-    if (loseAck || response == null) throw const SocketException('test link interrupted');
+    if (loseAck || response == null)
+      throw const SocketException('test link interrupted');
     return http.StreamedResponse(
       Stream.value(response.bodyBytes),
       response.statusCode,
@@ -172,12 +175,18 @@ void main() {
 
       Future<void> tap(Finder finder, {Finder? scrollable}) async {
         if (finder.evaluate().isEmpty && scrollable != null) {
-          await tester.scrollUntilVisible(finder, 280, scrollable: scrollable.first);
+          await tester.scrollUntilVisible(
+            finder,
+            280,
+            scrollable: scrollable.first,
+          );
         }
         await until(() => finder.evaluate().length == 1, finder.toString());
         await tester.ensureVisible(finder);
-        await until(() => finder.hitTestable().evaluate().length == 1,
-            '$finder to be tappable');
+        await until(
+          () => finder.hitTestable().evaluate().length == 1,
+          '$finder to be tappable',
+        );
         await tester.tap(finder);
 
         await tick();
@@ -267,7 +276,7 @@ void main() {
       await tap(find.widgetWithText(FilledButton, 'Подтвердить'));
       await tester.pageBack();
       await tick();
-      final dis = tester
+      var dis = tester
           .widget<DemoDispatcherCabinet>(find.byType(DemoDispatcherCabinet))
           .tripStore;
       expect(dis.pilotLatitude, isNull);
@@ -280,9 +289,7 @@ void main() {
         scrollable: find.byType(Scrollable).last,
       );
       await skipPermissions();
-      final pilot = tester
-          .widget<PilotCabin>(find.byType(PilotCabin))
-          .tripStore!;
+      var pilot = tester.widget<PilotCabin>(find.byType(PilotCabin)).tripStore!;
       await tap(byKey('pilot-power-toggle'));
       pilot.updatePilotLocation(0, 0);
       expect(pilot.pilotLatitude, isNull);
@@ -320,6 +327,10 @@ void main() {
         final handle = byKey('pilot-next-trip-handle');
         await until(() => handle.evaluate().isNotEmpty, 'pilot swipe');
         await tester.ensureVisible(handle);
+        await until(
+          () => handle.hitTestable().evaluate().length == 1,
+          "visible pilot swipe handle",
+        );
         await tester.drag(handle, Offset(tester.getSize(track).width - 48, 0));
         await until(state, description);
       }
@@ -369,14 +380,87 @@ void main() {
         () => dis.passengerChatMessages.length == 1,
         'dispatcher sees passenger reply',
       );
-      await until(() => pilot.passengerChatMessages.length == 1,
-          'pilot sees passenger reply');
+      await until(
+        () => pilot.passengerChatMessages.length == 1,
+        'pilot sees passenger reply',
+      );
       expect(pilot.passengerChatMessages, ['Synthetic reply']);
 
-      await select(1);
+      // Dispose each cabinet's store by returning to the role selector.
+      // The existing native session should reopen the role and reload the
+      // trip and messages from the server into a newly created store.
+      Future<void> popRoute(String visibleKey) async {
+        final finder = byKey(visibleKey);
+        await until(() => finder.evaluate().length == 1, visibleKey);
+        Navigator.of(tester.element(finder)).pop();
+        await tick();
+        await tick();
+      }
 
-      await tester.pageBack();
-      await tick();
+      await popRoute('passenger-orders-list');
+      await popRoute('passenger-orders-button');
+      await tap(find.byType(BackButton).hitTestable());
+      await tap(byKey('entry-passenger'));
+      await skipPermissions();
+      await tap(byKey('passenger-entry-transfer'));
+      await tap(byKey('passenger-orders-button'));
+      Finder orderMessage(String body) => find.descendant(
+        of: byKey('passenger-orders-list'),
+        matching: find.text(body),
+      );
+      await until(
+        () => orderMessage('Synthetic chat').evaluate().isNotEmpty,
+        'passenger reloads trip chat',
+      );
+      expect(orderMessage('Synthetic chat'), findsOneWidget);
+      expect(orderMessage('Synthetic reply'), findsOneWidget);
+
+      await select(2);
+      final previousDispatcher = dis;
+      await tap(find.byType(BackButton).hitTestable());
+      await tap(byKey('entry-dispatcher'));
+      await skipPermissions();
+      dis = tester
+          .widget<DemoDispatcherCabinet>(find.byType(DemoDispatcherCabinet))
+          .tripStore;
+      expect(dis, isNot(same(previousDispatcher)));
+      await until(
+        () =>
+            dis.status == DemoTripStatus.underway &&
+            dis.passengerChatMessages.length == 1,
+        'dispatcher reloads trip and chat',
+      );
+      expect(dis.pilotChatMessages, ['Synthetic chat']);
+
+      await select(1);
+      await popRoute('pilot-chat-messages');
+      await swipeUntil(
+        () => pilot.paused,
+        'second stop before leaving the cabin',
+      );
+      final previousPilot = pilot;
+      await popRoute('pilot-next-trip');
+      await tap(find.byType(BackButton).hitTestable());
+      await tap(byKey('entry-pilot'));
+      await tap(byKey('pilot-identity-notice-acknowledge'));
+      await tap(byKey('pilot-identity-notice-continue'));
+      await tap(
+        byKey('pilot-identity-refresh'),
+        scrollable: find.byType(Scrollable).last,
+      );
+      await skipPermissions();
+      pilot = tester.widget<PilotCabin>(find.byType(PilotCabin)).tripStore!;
+      expect(pilot, isNot(same(previousPilot)));
+      await until(
+        () => pilot.paused && pilot.passengerChatMessages.length == 1,
+        'pilot reloads the active stop and chat',
+      );
+      expect(pilot.completedStopWaits, hasLength(1));
+      expect(pilot.pilotChatMessages, ['Synthetic chat']);
+      expect(links.map((link) => link.verifiedSessions), [1, 1, 1]);
+
+      await tap(byKey('pilot-power-toggle'));
+      await swipeUntil(() => !pilot.paused, 'resume the restored stop');
       await tap(byKey('pilot-final-destination-mode'));
       await swipeUntil(() => pilot.status == DemoTripStatus.finished, 'finish');
       await until(

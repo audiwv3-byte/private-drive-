@@ -60,6 +60,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   bool owned = false, busy = false, refreshing = false, gpsOn = false;
   String? role, lastTripId;
   String error = '', gpsLabel = 'GPS выключен';
+  String orderError = '';
   int seq = 0;
   int chatSeq = 0;
   bool _loadedChatForTrip = false;
@@ -237,6 +238,39 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       await client.post(path, body);
     } on Exception catch (e) {
       if (mounted) setState(() => error = e.toString());
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+    await refresh();
+  }
+
+  Future<void> createOrder() async {
+    final client = api;
+    if (client == null || busy) return;
+    final from = origin.text.trim();
+    final to = destination.text.trim();
+    if (from.isEmpty || to.isEmpty || from.toLowerCase() == to.toLowerCase()) {
+      setState(() => orderError = 'Укажи разные точки отправления и назначения.');
+      return;
+    }
+    setState(() { busy = true; orderError = ''; });
+    try {
+      final response = await client.post('/v1/trips', {
+        'from': from, 'to': to, 'payment': 'Карта',
+      });
+      final created = response['trip'];
+      if (created is! Map<String, dynamic> || created['id'] is! String) {
+        throw const RemoteDemoException('Сервер не подтвердил отправку заявки.');
+      }
+      if (mounted) setState(() => trip = created);
+    } on RemoteDemoException catch (failure) {
+      if (mounted) setState(() {
+        orderError = switch (failure.message) {
+          'active_trip_exists' => 'У тебя уже есть активная тестовая заявка.',
+          'invalid_route' => 'Проверь адреса отправления и назначения.',
+          _ => 'Отправка не подтверждена. Проверь статус заявки перед повтором.',
+        };
+      });
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -460,14 +494,16 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
               key: const Key('remote-trip-route')),
           if (isPassenger && (trip == null || status == 'finished')) ...[
             TextField(key: const Key('remote-from'), controller: origin,
+              maxLength: 200,
               decoration: const InputDecoration(labelText: 'Откуда')),
             TextField(key: const Key('remote-to'), controller: destination,
+              maxLength: 200,
               decoration: const InputDecoration(labelText: 'Куда')),
             FilledButton(key: const Key('remote-create'),
-              onPressed: busy ? null : () => send('/v1/trips', {
-                'from': origin.text, 'to': destination.text, 'payment': 'Карта',
-              }),
-              child: const Text('Создать тестовую заявку')),
+              onPressed: busy ? null : createOrder,
+              child: Text(busy ? 'Отправляем заявку…' : 'Создать тестовую заявку')),
+            if (orderError.isNotEmpty)
+              Text(orderError, key: const Key('remote-order-error')),
           ],
           if (!isPassenger && status == 'requested')
             FilledButton(key: const Key('remote-assign'),

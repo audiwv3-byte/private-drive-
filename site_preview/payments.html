@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#100e0c">
+<meta name="description" content="PRIVATE DRIVE — способы оплаты трансферов и форма запроса платёжной ссылки.">
+<title>Оплата поездки — PRIVATE DRIVE</title>
+<link rel="icon" href="assets/pd-logo.webp" type="image/webp">
+<link rel="stylesheet" href="assets/corporate.css">
+<style>
+:root{color-scheme:dark}
+.payment-wrap{width:min(1060px,calc(100% - 32px));margin:0 auto;padding:46px 0 64px}
+.pay-header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 0;border-bottom:1px solid #7a5d35}
+.pay-brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:#efce90;font:700 18px Georgia,serif;letter-spacing:.06em}
+.pay-brand img{width:44px;height:44px;object-fit:contain}
+.pay-menu{display:flex;gap:12px;flex-wrap:wrap}
+.pay-menu a{color:#e9ce9e;text-decoration:none;padding:10px 12px;border:1px solid #745c3c;border-radius:10px}
+.pay-hero{padding:30px 0}
+.pay-kicker{font-size:12px;letter-spacing:.18em;color:#d6b476;font-weight:700}
+.pay-hero h1{font:normal clamp(2.3rem,5vw,4.2rem)/1.1 Georgia,serif;color:#f9e9cf;margin:10px 0 14px}
+.pay-hero p{max-width:730px;line-height:1.6}
+.pay-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(290px,.85fr);gap:24px;align-items:start}
+.pay-panel{background:linear-gradient(145deg,#201911,#131413);border:1px solid #9f7e49;border-radius:20px;padding:clamp(18px,3vw,30px);box-shadow:0 14px 40px #0005;min-width:0}
+.pay-panel h2{font:normal 1.7rem/1.25 Georgia,serif;color:#f9e6c8;margin:0 0 14px}
+.pay-panel p{font-size:.9rem;line-height:1.6}
+.pay-field{margin:15px 0}
+.pay-field label{display:block;font-size:.88rem;color:#eac790;font-weight:700;margin-bottom:7px}
+.pay-field input,.pay-field textarea,.pay-field select{width:100%;padding:12px;border:1px solid #9e8056;border-radius:10px;background:#161f23;color:#fff6e9;min-height:46px;font:inherit}
+.pay-field textarea{min-height:94px;resize:vertical}
+.pay-field input:focus,.pay-field textarea:focus,.pay-field select:focus{outline:2px solid #f6d292;outline-offset:2px}
+.pay-submit{cursor:pointer;width:100%;min-height:50px;border:0;border-radius:11px;background:linear-gradient(125deg,#ffebb7,#e9bf78 58%,#c2934a);font:700 1rem system-ui,sans-serif;color:#241506}
+.pay-methods{display:grid;gap:11px;margin:14px 0}
+.pay-method{padding:13px;border:1px solid #766044;border-radius:12px;background:#151816}
+.pay-method strong{display:block;color:#f2d395;margin-bottom:4px}
+.pay-method small{display:block;color:#d5c7ae;line-height:1.5}
+.pay-note{padding:13px 15px;border-left:3px solid #d6af66;background:#2a2218;color:#e1d3bc;border-radius:0 9px 9px 0;margin-top:18px}
+.pay-foot{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;border-top:1px solid #654d2b;padding:18px 0 32px;font-size:.85rem}
+.pay-foot a{color:#e6c586}
+@media(max-width:760px){.payment-wrap{padding-top:26px}.pay-layout{grid-template-columns:1fr}.pay-panel{padding:20px}}
+</style>
+</head>
+<body>
+<header class="pay-header payment-wrap" style="padding-top:14px;padding-bottom:14px">
+<a class="pay-brand" href="index.html"><img src="assets/pd-logo.webp" alt=""><span>PRIVATE DRIVE</span></a>
+<nav class="pay-menu" aria-label="Разделы сайта"><a href="index.html">Главная</a><a href="directions.html">Направления</a><a href="order-map.html?mode=preorder">Заказать</a></nav>
+</header>
+<main class="payment-wrap">
+ <section class="pay-hero">
+  <p class="pay-kicker">PRIVATE DRIVE · VILNIUS</p>
+  <h1>Оплата поездки</h1>
+  <p>Здесь можно запросить ссылку на оплату подтверждённого заказа и посмотреть платёжные способы PRIVATE DRIVE. Платёж проводится только на официальной защищённой странице платёжного провайдера.</p>
+ </section>
+ <div class="pay-layout">
+ <section class="pay-panel" aria-labelledby="pay-form-title">
+  <h2 id="pay-form-title">Запросить ссылку на оплату</h2>
+  <p>После согласования поездки укажи номер заказа и сумму. Мы подготовим реквизиты или индивидуальную ссылку на оплату.</p>
+  <form id="paymentRequest">
+    <div class="pay-field"><label for="booking">Номер заказа или маршрут *</label><input id="booking" name="booking" required maxlength="160" placeholder="Например: Вильнюс — Каунас"></div>
+    <div class="pay-field"><label for="amount">Сумма, € *</label><input id="amount" name="amount" type="number" min="1" max="10000" step="0.01" inputmode="decimal" placeholder="130.00" required></div>
+    <div class="pay-field"><label for="method">Предпочтительный способ оплаты</label><select id="method" name="method"><option value="Без предпочтений">Выбрать доступный способ</option><option value="Visa / Mastercard">Visa / Mastercard</option><option value="Apple Pay">Apple Pay</option><option value="Google Pay">Google Pay</option><option value="PayPal">PayPal</option><option value="Paysera">Paysera</option></select></div>
+    <div class="pay-field"><label for="comment">Комментарий (необязательно)</label><textarea id="comment" name="comment" maxlength="350" placeholder="Дата поездки или другие уточнения"></textarea></div>
+    <button class="pay-submit" type="submit">Запросить платёжную ссылку в Telegram</button>
+    <p id="payStatus" role="status" aria-live="polite"></p>
+    <p class="pay-note">Это <strong>запрос платёжной ссылки</strong>, а не списание денег. Не вводи здесь номер карты, CVV, пароль или коды подтверждения.</p>
+  </form>
+ </section>
+ <aside class="pay-panel" aria-labelledby="pay-methods-title">
+  <h2 id="pay-methods-title">Платёжные способы</h2>
+  <div class="pay-methods">
+   <div class="pay-method"><strong>Stripe · Visa / Mastercard</strong><small>Карты предусмотрены для защищённой оплаты через Stripe после выдачи индивидуальной платёжной ссылки.</small></div>
+   <div class="pay-method"><strong>Apple Pay · Google Pay</strong><small>Отображаются на странице оплаты при поддержке устройства, браузера и настроек Stripe.</small></div>
+   <div class="pay-method"><strong>PayPal</strong><small>Возможность оплаты зависит от доступности PayPal в конкретном Stripe Checkout. Пока не подтверждена тестовым платежом.</small></div>
+   <div class="pay-method"><strong>Paysera</strong><small>Платёжный аккаунт указан в проекте, но постоянная ссылка и публичные реквизиты ещё не подтверждены. Запроси детали перед оплатой.</small></div>
+  </div>
+  <p class="pay-note">Сейчас на сайте <strong>нет подключённой автоматической оплаты</strong> и подтверждённой общей Stripe Payment Link. Не переводи деньги по непроверенным реквизитам.</p>
+  <p style="margin-top:18px"><a href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Связаться по оплате в Telegram</a></p>
+  <p><a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a></p>
+  <p><a href="terms.html">Условия поездок и возвратов</a></p>
+ </aside>
+ </div>
+</main>
+<footer class="payment-wrap pay-foot"><span>© 2026 PRIVATE DRIVE · Вильнюс, Литва</span><span><a href="privacy.html">Конфиденциальность</a> · <a href="index.html">На главную</a></span></footer>
+<script>
+(()=>{
+ const form=document.getElementById('paymentRequest');
+ const status=document.getElementById('payStatus');
+ const params=new URLSearchParams(location.search);
+ const ref=params.get('booking');
+ if(ref && ref.length<=160)document.getElementById('booking').value=ref;
+ form.addEventListener('submit',e=>{
+  e.preventDefault();
+  if(!form.reportValidity())return;
+  const booking=document.getElementById('booking').value.trim();
+  const amount=Number(document.getElementById('amount').value);
+  if(!booking||!Number.isFinite(amount)||amount<1||amount>10000){status.textContent='Укажи корректный заказ и сумму.';return}
+  const method=document.getElementById('method').value;
+  const comment=document.getElementById('comment').value.trim();
+  const request=['PRIVATE DRIVE — запрос ссылки на оплату','Заказ / маршрут: '+booking,'Сумма: '+amount.toFixed(2)+' EUR','Способ: '+method,comment?'Комментарий: '+comment:''].filter(Boolean).join('\n');
+  status.textContent='Открываем Telegram с готовым запросом. Отправь его вручную для получения ссылки.';
+  window.location.href='https://t.me/PrivateDraive?text='+encodeURIComponent(request);
+ });
+})();
+</script>
+</body></html>

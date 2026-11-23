@@ -1,0 +1,154 @@
+name: PRIVATE DRIVE comprehensive native auth security QA
+on:
+  push:
+    branches: [feature/web-dispatcher-browser-auth]
+    paths:
+      - 'flutter_app/lib/**'
+      - 'flutter_app/test/native*'
+      - 'flutter_app/test/pd_http_api_test.dart'
+      - 'flutter_app/pubspec.yaml'
+      - 'flutter_app/tool/harden_android_native_auth.py'
+      - 'pd_native_auth_postgres_http.py'
+      - 'pd_native_auth_postgres_session_lifecycle.py'
+      - 'pd_native_auth_logout_schema_ci.py'
+      - 'test_native_auth_*postgres.py'
+      - '.github/workflows/pd-native-comprehensive-security-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  flutter-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: flutter_app
+    env:
+      PD_NATIVE_AUTH_API_URL: ''
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: |
+          python3 -m pip install --quiet Pillow
+          python3 tool/prepare_transparent_logo.py
+          flutter pub get
+      - name: Run native OTP recovery, role, logout and storage widget tests
+        run: |
+          flutter test --no-pub --reporter expanded test/native_session_persistence_test.dart test/native_auth_relaunch_widget_test.dart test/native_logout_api_test.dart test/native_cabin_entry_test.dart test/pd_http_api_test.dart
+          flutter analyze --no-fatal-infos
+
+  postgres-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pd_schema_ci
+          POSTGRES_USER: pd_ci
+          POSTGRES_PASSWORD: synthetic-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pd_ci -d pd_schema_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PD_CI_FAKE_DB_ONLY: 'YES'
+      PD_CI_POSTGRES_URL: 'postgresql://pd_ci:synthetic-only-password@127.0.0.1:5432/pd_schema_ci'
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install 'psycopg[binary]==3.2.13'
+      - name: Test concurrent OTP, existing user, one-time challenge, sessions and roles
+        run: |
+          python -m unittest -v test_native_auth_concurrency_postgres.py
+          python -m unittest -v test_native_auth_recovery_postgres.py test_native_auth_readiness_gate.py
+          python -m unittest -v test_native_auth_logout_http_postgres.py
+
+  android-security-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PD_NATIVE_AUTH_API_URL: ''
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create disposable Android app with distinct package and hardened manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_security_qa
+          cp -R flutter_app/lib/. private_drive_security_qa/lib/
+          cp -R flutter_app/assets/. private_drive_security_qa/assets/
+          cp flutter_app/pubspec.yaml private_drive_security_qa/pubspec.yaml
+          cp flutter_app/analysis_options.yaml private_drive_security_qa/analysis_options.yaml
+          python3 -m pip install --quiet Pillow
+          (cd flutter_app && python3 tool/prepare_transparent_logo.py)
+          cp flutter_app/assets/brand/private_drive_logo_transparent.png private_drive_security_qa/assets/brand/
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('private_drive_security_qa/pubspec.yaml')
+          s=p.read_text()
+          anchor='    - assets/brand/private_drive_logo.webp'
+          assert s.count(anchor)==1
+          p.write_text(s.replace(anchor,anchor+'\n    - assets/brand/private_drive_logo_transparent.png'))
+          gradle=Path('private_drive_security_qa/android/app/build.gradle.kts')
+          g=gradle.read_text()
+          expected='applicationId = "lt.privatedrive.private_drive"'
+          assert expected in g
+          gradle.write_text(g.replace(expected,'applicationId = "lt.privatedrive.private_drive.security_qa"'))
+          PY
+          python3 flutter_app/tool/harden_android_native_auth.py private_drive_security_qa
+          python3 -m unittest discover -s flutter_app/tool -p test_harden_android_native_auth.py -v
+      - name: Compile offline debug APK with no real credentials or SMS
+        working-directory: private_drive_security_qa
+        run: |
+          flutter pub get
+          flutter build apk --debug --target lib/main.dart --dart-define=PD_NATIVE_AUTH_API_URL= --dart-define=PD_INTERNAL_QA=false
+      - name: Check merged Android APK backup flags and protection resource IDs
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=private_drive_security_qa/build/app/outputs/flutter-apk/app-debug.apk
+          test -s "$APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/aapt" dump xmltree "$APK" AndroidManifest.xml > /tmp/pd-apk-manifest.txt
+          "$BUILD_TOOLS/aapt" dump resources "$APK" > /tmp/pd-apk-resources.txt
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > /tmp/pd-apk-badging.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          m=Path('/tmp/pd-apk-manifest.txt').read_text()
+          r=Path('/tmp/pd-apk-resources.txt').read_text()
+          b=Path('/tmp/pd-apk-badging.txt').read_text()
+          assert re.search(r'android:allowBackup\b[^\n]*\(type 0x12\)0x0\b',m), 'APK must disable backup'
+          assert 'android:dataExtractionRules' in m, 'Android 12+ transfer rules missing in APK'
+          assert 'android:fullBackupContent' in m, 'Legacy backup rules missing in APK'
+          for item in ('pd_native_no_backup','pd_native_no_extract'):
+              assert item in r, f'{item} not packaged as resource'
+          assert "name='lt.privatedrive.private_drive.security_qa'" in b, 'APK must have isolated test package'
+          print('Verified merged APK: backup disabled, both protection XML resources packaged, isolated package ID')
+          PY
+      - name: Publish only non-sensitive merged manifest check artifact (no APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pd-security-apk-manifest-audit
+          path: |
+            /tmp/pd-apk-manifest.txt
+            /tmp/pd-apk-badging.txt
+          retention-days: 5

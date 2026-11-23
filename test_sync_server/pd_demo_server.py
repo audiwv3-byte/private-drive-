@@ -90,6 +90,9 @@ class DemoStore:
                 trip_id TEXT PRIMARY KEY REFERENCES trips(id),
                 pilot TEXT NOT NULL, latitude REAL NOT NULL,
                 longitude REAL NOT NULL, updated_at REAL NOT NULL)""")
+            self.db.execute("""CREATE TABLE IF NOT EXISTS native_pilot_presence (
+                actor TEXT PRIMARY KEY,
+                seen_at REAL NOT NULL)""")
 
     def close(self):
         with DB_LOCK:
@@ -111,6 +114,22 @@ class DemoStore:
             raise TripError("not_found", 404)
         if role == "pilot" and row["pilot"] != actor:
             raise TripError("not_found", 404)
+
+    def register_pilot_presence(self, actor):
+        if not isinstance(actor, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", actor):
+            return
+        with DB_LOCK, self.db:
+            self.db.execute("""INSERT INTO native_pilot_presence(actor,seen_at)
+                VALUES (?,?) ON CONFLICT(actor) DO UPDATE
+                SET seen_at=excluded.seen_at""", (actor, time.time()))
+
+    def recent_pilots(self):
+        # This list contains ONLY previously authenticated pilot sessions.
+        # Presence is not a GPS location, and never creates a location marker.
+        with DB_LOCK:
+            return [row["actor"] for row in self.db.execute(
+                "SELECT actor FROM native_pilot_presence WHERE seen_at>=? ORDER BY actor LIMIT 100",
+                (time.time()-300,))]
 
     def create(self, actor, data):
         origin, destination = data.get("from"), data.get("to")
@@ -395,7 +414,14 @@ class ApiHandler(BaseHTTPRequestHandler):
                 raise TripError("invalid_query")
             parts = path.path.strip("/").split("/")
             if method == "GET" and parts == ["v1", "me"]:
+                if role == "pilot":
+                    self.server.store.register_pilot_presence(actor)
                 self._reply(200, {"role": role, "actor": actor, "demo": True})
+                return
+            if method == "GET" and parts == ["v1", "pilots"]:
+                if role != "dispatcher":
+                    raise TripError("forbidden", 403)
+                self._reply(200, {"pilots": self.server.store.recent_pilots()})
                 return
             if method == "GET" and parts == ["v1", "current"]:
                 self._reply(200, {"trip": self.server.store.current(role, actor)})

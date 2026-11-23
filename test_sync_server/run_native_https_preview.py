@@ -128,7 +128,7 @@ def main():
     inbox = {}
     with tempfile.TemporaryDirectory(prefix="pd-native-preview-") as temp:
         store = CabinetStore(Path(temp) / "synthetic.sqlite")
-        with make_mock_server(store, inbox.__setitem__, handler=PreviewHandler) as server:
+        with make_mock_server(store, inbox.__setitem__, handler=PreviewHandler, isolated_qa_auth=True) as server:
             server.web_root = options.web_root
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()

@@ -11,6 +11,7 @@ on:
       - 'pd_native_auth_postgres_http.py'
       - 'pd_native_auth_postgres_session_lifecycle.py'
       - 'pd_native_auth_logout_schema_ci.py'
+      - 'pd_native_auth_role_migration.py'
       - 'test_native_auth_*postgres.py'
       - '.github/workflows/pd-native-comprehensive-security-ci.yml'
   workflow_dispatch:
@@ -74,6 +75,7 @@ jobs:
           python -m unittest -v test_native_auth_concurrency_postgres.py
           python -m unittest -v test_native_auth_recovery_postgres.py test_native_auth_readiness_gate.py
           python -m unittest -v test_native_auth_logout_http_postgres.py
+          python -m unittest -v test_native_auth_role_migration_postgres.py
 
   android-security-apk:
     runs-on: ubuntu-latest
@@ -113,6 +115,8 @@ jobs:
           assert expected in g
           gradle.write_text(g.replace(expected,'applicationId = "lt.privatedrive.private_drive.security_qa"'))
           PY
+          # Apply backup protections after generating the isolated Flutter
+          # Android app, before Gradle manifest merging.
           python3 flutter_app/tool/harden_android_native_auth.py private_drive_security_qa
           python3 -m unittest discover -s flutter_app/tool -p test_harden_android_native_auth.py -v
       - name: Compile offline debug APK with no real credentials or SMS

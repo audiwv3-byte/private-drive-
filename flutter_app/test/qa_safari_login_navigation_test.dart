@@ -44,10 +44,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('entry-passenger')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('qa-sign-in')), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('native-legal-acknowledgement')), 180,
+      scrollable: find.byType(Scrollable).last);
     await tester.tap(find.byKey(const Key('native-legal-acknowledgement')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('qa-sign-in')));
+    await tester.scrollUntilVisible(find.byKey(const Key('qa-sign-in')), 180,
+      scrollable: find.byType(Scrollable).last);
     await tester.tap(find.byKey(const Key('qa-sign-in')));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();

@@ -44,6 +44,21 @@
 #partners .partner-info h3{color:#f6dfb7;font-family:Georgia,serif}
 #partners .partner-feature .button{border-color:#ad874c;color:#f7d997}
 @media(max-width:740px){#partners{padding-top:2.4rem;padding-bottom:2.4rem}#partners .partner-feature{gap:16px;padding:18px}#partners .partner-section-title{font-size:clamp(1.2rem,6vw,1.8rem)}}
+
+/* Contacts and payment information aligned in two responsive columns */
+#contact .contact-payment-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(270px,.8fr);gap:clamp(24px,4vw,60px);align-items:start}
+#contact .contact-main{min-width:0}
+#contact .contact-lead{margin:0 0 18px;color:var(--muted);max-width:540px}
+#contact h2{margin-bottom:18px}
+#contact .catalog-heading{width:max-content;max-width:100%}
+#contact .contact-payments{border:1px solid #ad874c;background:linear-gradient(135deg,#211b14,#120f0e);border-radius:16px;padding:24px;min-width:0}
+#contact .contact-payments h3{color:#f2d7a1;font-size:clamp(1.25rem,2vw,1.55rem);margin-bottom:12px}
+#contact .contact-payments p{line-height:1.6}
+#contact .contact-payment-note{font-size:.82rem;margin:12px 0 16px}
+#contact .contact-payments .button{max-width:100%}
+.footer-heading-link{color:inherit;text-decoration:none}
+.footer-heading-link:hover,.footer-heading-link:focus-visible{color:var(--gold);text-decoration:underline}
+@media(max-width:740px){#contact .contact-payment-layout{grid-template-columns:1fr;gap:24px}#contact .contact-payments{padding:20px}}
 </style>
 </head>
 <body>
@@ -149,12 +164,30 @@
       </div>
     </section>
     <section id="about" class="section shaded"><div class="wrap contact-block"><div><h2>PRIVATE DRIVE</h2><p>Индивидуальные поездки на Toyota RAV4 Hybrid, такси в Вильнюсе, трансферы по Литве и Европе.</p></div><div><h2>Заказ поездки</h2><p>Задай маршрут, дату и пожелания — мы уточним доступность и стоимость.</p><a class="button gold" href="order-map.html?mode=preorder">Быстрый заказ поездки</a></div></div></section>
-    <section id="contact" class="section wrap"><h2>Контакты</h2><div class="actions"><a class="button gold" href="https://t.me/PrivateDraive">Telegram PRIVATE DRIVE</a><a class="button outline" href="mailto:eurobaltictransfer@gmail.com">Написать на email</a><a class="button outline" href="https://www.instagram.com/privatedraive/">Instagram</a></div></section>
+    <section id="contact" class="section wrap">
+  <div class="contact-payment-layout">
+    <div class="contact-main">
+      <h2><a class="catalog-heading" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer" aria-label="Контакты PRIVATE DRIVE — связаться в Telegram"><span>Контакты</span><span class="catalog-heading-arrow" aria-hidden="true">↗</span></a></h2>
+      <p class="contact-lead">Свяжись с PRIVATE DRIVE для бронирования поездки и уточнения деталей.</p>
+      <div class="actions">
+        <a class="button gold" href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Telegram PRIVATE DRIVE</a>
+        <a class="button outline" href="mailto:eurobaltictransfer@gmail.com">Написать на email</a>
+        <a class="button outline" href="https://www.instagram.com/privatedraive/" target="_blank" rel="noopener noreferrer">Instagram</a>
+      </div>
+    </div>
+    <aside class="contact-payments" aria-labelledby="contact-payments-title">
+      <h3 id="contact-payments-title">Способы оплаты</h3>
+      <p>Visa · Mastercard · Apple Pay · Google Pay · PayPal · Paysera · Криптовалюта</p>
+      <p class="contact-payment-note">Оплата после подтверждения заказа. Доступность каждого способа уточняется при оформлении.</p>
+      <a class="button outline" href="payments.html">Платёжная информация →</a>
+    </aside>
+  </div>
+</section>
   <div class="wrap"><p class="small-print" style="font-size:.72rem;opacity:.82">Фотографии Клайпеды и Варшавы: <a href="https://commons.wikimedia.org/wiki/File:Klaipeda%20old%20town.jpg" target="_blank" rel="noopener noreferrer">Панорама Клайпеды</a> · <a href="https://commons.wikimedia.org/wiki/File:Skyline%20of%20Warsaw%2C%20Poland.jpg" target="_blank" rel="noopener noreferrer">Панорама Варшавы</a>. Авторство и условия использования — на страницах файлов Wikimedia Commons.</p></div>
 </main>
   <footer id="documents" class="home-footer"><div class="wrap footer-columns">
     <div><a href="#top" class="brand"><img src="assets/pd-logo.webp" width="52" height="52" alt=""><span>PRIVATE DRIVE</span></a><p class="small-print">Трансферы · Поездки · Сопровождение</p></div>
-    <div><h3>Контакты</h3><a href="https://t.me/PrivateDraive">Telegram: @PrivateDraive</a><a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a></div>
+    <div><h3><a class="footer-heading-link" href="#contact">Контакты</a></h3><a href="https://t.me/PrivateDraive"Telegram: @PrivateDraive</a><a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a></div>
     <div><h3>Полезные ссылки</h3><a href="services.html">Наши услуги</a><a href="directions.html">Направления</a><a href="payments.html">Оплата</a><a href="#partners">Друзья</a><a href="documents.html">Документы</a><a href="privacy.html">Конфиденциальность</a><a href="terms.html">Условия поездок и возвратов</a><a href="pilot-privacy.html">Данные пилотов</a></div>
     <div><h3>Связаться с нами</h3>
       <div class="footer-contact-buttons">

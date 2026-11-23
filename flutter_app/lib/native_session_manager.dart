@@ -41,7 +41,7 @@ class PdNativeSessionManager {
       final role = decoded['role'];
       final expiry = decoded['expires_at'];
       if (id != stored.userId || role is! String ||
-          !const {'passenger', 'pilot', 'admin'}.contains(role) ||
+          !const {'passenger', 'pilot', 'dispatcher', 'pilot_dispatcher', 'admin'}.contains(role) ||
           expiry is! int) return null;
       final serverExpiry = DateTime.fromMillisecondsSinceEpoch(
         expiry * 1000, isUtc: true);

@@ -1,0 +1,40 @@
+name: PRIVATE DRIVE synthetic native phone grants
+on:
+  push:
+    branches: [feature/web-dispatcher-browser-auth]
+    paths:
+      - 'pd_native_phone_grants_ci.py'
+      - 'test_native_phone_grants_postgres.py'
+      - '.github/workflows/pd-native-phone-grants-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  phone-grants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pd_schema_ci
+          POSTGRES_USER: pd_ci
+          POSTGRES_PASSWORD: synthetic-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pd_ci -d pd_schema_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PD_CI_FAKE_DB_ONLY: 'YES'
+      PD_CI_POSTGRES_URL: 'postgresql://pd_ci:synthetic-only-password@127.0.0.1:5432/pd_schema_ci'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated PostgreSQL test driver
+        run: python -m pip install 'psycopg[binary]==3.2.13'
+      - name: Verify column-scoped grants and role escalation denials
+        run: python -m unittest -v test_native_phone_grants_postgres.py

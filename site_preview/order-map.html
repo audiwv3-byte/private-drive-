@@ -187,7 +187,7 @@ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
 </main>
 <script src="assets/mapbox-config.js"></script>
 <!-- Public pk token config emitted by existing Mapbox QA Render build. No secret tokens exposed here. -->
-<script src="https://private-drive-dispatcher-mapbox-qa.onrender.com/assets/mapbox-config.js"></script>
+<!-- Mapbox token generated from GitHub Actions MAPBOX_PUBLIC_TOKEN in local assets/mapbox-config.js -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 (()=>{
@@ -325,7 +325,7 @@ try{
   }else{
     say('Публичная конфигурация Mapbox пока не загружена. Уточни подключение Mapbox для тестового сайта.');
     const fallback=$('mapFallback');
-    if(fallback)fallback.textContent='Ожидание подключения Mapbox. Заявку можно оформить по адресам вручную.';
+    if(fallback)fallback.textContent='Mapbox пока не настроен для этого сайта. Заявку можно оформить по адресам вручную.';
   }
   L.control.zoom({position:'bottomright'}).addTo(map);
   if(typeof token==='string' && /^pk\.[\w.-]+$/.test(token)) $('mapFallback')?.remove();

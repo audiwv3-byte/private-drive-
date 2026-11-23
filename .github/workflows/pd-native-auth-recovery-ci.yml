@@ -4,6 +4,7 @@ on:
     branches: [feature/web-dispatcher-browser-auth]
     paths:
       - 'test_native_auth_recovery_postgres.py'
+      - 'test_native_auth_readiness_gate.py'
       - 'pd_native_auth_postgres_http.py'
       - 'pd_native_auth_schema_readiness.py'
       - 'pd_native_auth_schema_migration.py'
@@ -42,4 +43,4 @@ jobs:
       - name: Install local PostgreSQL test dependency
         run: python -m pip install 'psycopg[binary]==3.2.13'
       - name: Test schema recovery, simulated outage and repeat phone login
-        run: python -m unittest -v test_native_auth_recovery_postgres.py
+        run: python -m unittest -v test_native_auth_recovery_postgres.py test_native_auth_readiness_gate.py

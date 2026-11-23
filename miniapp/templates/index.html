@@ -124,6 +124,18 @@ body.pdb-active .shell{max-width:860px}
   .pd-branded-header .pd-brand-wordmark strong{font-size:13px;letter-spacing:1px}
   .pd-branded-header .pd-brand-wordmark span{font-size:7px;letter-spacing:.6px}
 }
+
+/* Test-only restored top navigation. Bottom navigation and existing booking form remain untouched. */
+.pd-branded-header{position:relative}
+.pd-top-menu-button{position:absolute;top:65px;right:12px;z-index:15;display:inline-flex;align-items:center;gap:7px;justify-content:center;min-height:42px;padding:9px 13px;background:#141210!important;color:#f2d498!important;border:1px solid #b18a4b!important;border-radius:11px;font-weight:700}
+.pd-top-menu-panel{position:fixed;z-index:9500;top:max(75px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));width:min(330px,calc(100vw - 24px));max-height:calc(100dvh - 100px);overflow-y:auto;display:flex;flex-direction:column;gap:9px;padding:16px;background:#131211;border:1px solid #b18a4b;border-radius:15px;box-shadow:0 16px 48px #000c}
+.pd-top-menu-panel.hidden{display:none!important}
+.pd-top-menu-heading{display:flex;align-items:center;justify-content:space-between;color:#eccd8c;margin-bottom:5px}
+.pd-top-menu-heading button{width:auto;min-height:36px;padding:5px 12px}
+.pd-top-menu-panel>button{min-height:46px;display:block;width:100%;padding:12px 14px;text-align:left;background:#242018!important;color:#f2dfba!important;border:1px solid #6f5936!important;border-radius:10px}
+.pd-top-menu-panel>button:focus-visible,.pd-top-menu-button:focus-visible{outline:2px solid #f0ca7e;outline-offset:3px}
+body.pd-onboarding-active #pdTopMenuButton,body.pd-onboarding-active #pdTopMenuPanel{display:none!important}
+@media(max-width:480px){.pd-top-menu-button{top:64px;right:9px;min-height:39px;padding:7px 10px;font-size:13px}.pd-top-menu-panel{top:max(76px,env(safe-area-inset-top));right:9px}}
 </style><style id="pd-role-visibility">
 body:not(.pd-role-admin) #pdRoleBar,body:not(.pd-role-admin) #adminNav,
 body:not(.pd-role-pilot) #pdPilotBack,
@@ -131,7 +143,14 @@ body.pd-passenger-view #pdRoleBar,body.pd-passenger-view #adminNav,
 body.pd-passenger-view #pdPilotBack,body.pd-passenger-view .pd-driver-entry,
 body.pd-passenger-view #step10,body.pd-passenger-view #step13,
 body.pd-passenger-view #pdPilotWork{display:none!important}
-</style></head><body class="pd-onboarding-active"><main class="shell"><header class="brand pd-branded-header"><div class="pd-brand-lockup"><img class="pd-monogram pd-official-logo" src="/assets/private-drive-official-logo.jpeg" alt="Фирменный логотип PD — privatdrive" width="76" height="76" fetchpriority="high"><div class="pd-brand-wordmark"><strong>privatdrive</strong><span>EURO BALTIC TRANSFER</span></div></div><small>Premium Transfers</small><button type="button" class="secondary" id="pdTipsAlways" onclick="pdOpenTipInfo()" style="flex:none;padding:10px 12px;font-size:13px">💛 Чаевые</button><div class="pd-language-switch"><label for="pdLangSelect" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">Язык</label><select id="pdLangSelect" onchange="pdSwitchLanguage(this.value)"><option value="en" lang="en">🇬🇧 EN</option><option value="lt" lang="lt">🇱🇹 LT</option><option value="ru" lang="ru">🇷🇺 RU</option></select></div><div class="pd-privacy-bar"><a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="/legal" target="_blank" rel="noopener noreferrer">Условия поездки и оплаты</a> · <a href="mailto:eurobaltictransfer@gmail.com" data-pd-contact="true">Связаться с нами</a></div></header><section id="pdOnboarding" class="panel pd-onboarding-panel" aria-live="polite">
+</style></head><body class="pd-onboarding-active"><main class="shell"><header class="brand pd-branded-header"><button type="button" id="pdTopMenuButton" class="secondary pd-top-menu-button" aria-label="Открыть меню PRIVATE DRIVE" aria-controls="pdTopMenuPanel" aria-expanded="false" onclick="pdToggleTopMenu()">☰ <span>Меню</span></button><div class="pd-brand-lockup"><img class="pd-monogram pd-official-logo" src="/assets/private-drive-official-logo.jpeg" alt="Фирменный логотип PD — privatdrive" width="76" height="76" fetchpriority="high"><div class="pd-brand-wordmark"><strong>privatdrive</strong><span>EURO BALTIC TRANSFER</span></div></div><small>Premium Transfers</small><button type="button" class="secondary" id="pdTipsAlways" onclick="pdOpenTipInfo()" style="flex:none;padding:10px 12px;font-size:13px">💛 Чаевые</button><div class="pd-language-switch"><label for="pdLangSelect" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">Язык</label><select id="pdLangSelect" onchange="pdSwitchLanguage(this.value)"><option value="en" lang="en">🇬🇧 EN</option><option value="lt" lang="lt">🇱🇹 LT</option><option value="ru" lang="ru">🇷🇺 RU</option></select></div><div class="pd-privacy-bar"><a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="/legal" target="_blank" rel="noopener noreferrer">Условия поездки и оплаты</a> · <a href="mailto:eurobaltictransfer@gmail.com" data-pd-contact="true">Связаться с нами</a></div></header><nav id="pdTopMenuPanel" class="pd-top-menu-panel hidden" aria-label="Меню PRIVATE DRIVE" aria-hidden="true">
+  <div class="pd-top-menu-heading"><strong>PRIVATE DRIVE</strong><button type="button" class="secondary" aria-label="Закрыть меню" onclick="pdToggleTopMenu(false)">✕</button></div>
+  <button type="button" data-pd-menu="extras" onclick="pdMenuNavigate('extras')">Дополнительные услуги</button>
+  <button type="button" data-pd-menu="tariffs" onclick="pdMenuNavigate('tariffs')">Тарифы и расчёт поездки</button>
+  <button type="button" data-pd-menu="payment" onclick="pdMenuNavigate('payment')">Способы оплаты</button>
+  <button type="button" data-pd-menu="preferences" onclick="pdMenuNavigate('preferences')">Настройки поездки</button>
+  <button type="button" data-pd-menu="contacts" onclick="pdMenuNavigate('contacts')">Контакты и поддержка</button>
+</nav><section id="pdOnboarding" class="panel pd-onboarding-panel" aria-live="polite">
 <div id="pdObLoading">Загрузка…</div>
 <div id="pdObLanguage" class="hidden"><h1>Выберите язык</h1><p class="muted">Choose language · Pasirinkite kalbą</p><div class="pd-ob-language-options"><button type="button" lang="en" onclick="pdChooseInitialLanguage('en')"><span class="pd-lang-flag" aria-hidden="true">🇬🇧</span><span class="pd-lang-name">English</span><span class="pd-lang-code">EN</span></button><button type="button" lang="lt" onclick="pdChooseInitialLanguage('lt')"><span class="pd-lang-flag" aria-hidden="true">🇱🇹</span><span class="pd-lang-name">Lietuvių</span><span class="pd-lang-code">LT</span></button><button type="button" lang="ru" onclick="pdChooseInitialLanguage('ru')"><span class="pd-lang-flag" aria-hidden="true">🇷🇺</span><span class="pd-lang-name">Русский</span><span class="pd-lang-code">RU</span></button></div></div>
 <div id="pdObRole" class="hidden"><h1>Добро пожаловать</h1><p>Как вы хотите зарегистрироваться?</p><div class="pd-ob-role-options"><button type="button" onclick="pdShowOnboarding('passenger')">Пассажир</button><button type="button" onclick="pdShowOnboarding('driver')">Пилоты</button></div></div>
@@ -1160,4 +1179,34 @@ setInterval(pdCheckTripCompletion,15000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)pdCheckTripCompletion()});
 setTimeout(pdCheckTripCompletion,1200);
 </script>
-<script src="/assets/pd-trip-runtime-v4.js"></script><script src="/assets/pd-pilot-cabinet-v4.js?v=20261028-roles"></script><script src="/assets/pd-admin-console-v4.js"></script></body></html>
+<script src="/assets/pd-trip-runtime-v4.js"></script><script src="/assets/pd-pilot-cabinet-v4.js?v=20261028-roles"></script><script src="/assets/pd-admin-console-v4.js"></script><script id="pd-top-menu-behavior">
+function pdToggleTopMenu(force){
+ const panel=document.getElementById('pdTopMenuPanel');
+ const trigger=document.getElementById('pdTopMenuButton');
+ if(!panel||!trigger)return;
+ const open=typeof force==='boolean'?force:panel.classList.contains('hidden');
+ panel.classList.toggle('hidden',!open);
+ panel.setAttribute('aria-hidden',String(!open));
+ trigger.setAttribute('aria-expanded',String(open));
+ trigger.setAttribute('aria-label',open?'Закрыть меню PRIVATE DRIVE':'Открыть меню PRIVATE DRIVE');
+ if(!open)trigger.focus({preventScroll:true});
+}
+function pdMenuNavigate(target){
+ pdToggleTopMenu(false);
+ if(target==='contacts'){if(typeof pdOpenSupport==='function')pdOpenSupport();return}
+ if(typeof go!=='function')return;
+ go(11);
+ const targetIds={extras:'pdbExtras',tariffs:'pdbPrice',payment:'pdbPays',preferences:'pdbWishes'};
+ const el=document.getElementById(targetIds[target]);
+ if(!el)return;
+ requestAnimationFrame(()=>{
+   el.scrollIntoView({behavior:'smooth',block:'center'});
+   if(target==='preferences')el.focus({preventScroll:true});
+ });
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('pdTopMenuPanel')?.classList.contains('hidden'))pdToggleTopMenu(false)});
+document.addEventListener('pointerdown',e=>{
+ const panel=document.getElementById('pdTopMenuPanel'),trigger=document.getElementById('pdTopMenuButton');
+ if(panel&&!panel.classList.contains('hidden')&&!panel.contains(e.target)&&!trigger?.contains(e.target))pdToggleTopMenu(false);
+});
+</script></body></html>

@@ -10,6 +10,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import math
+import time
 import os
 import re
 import sqlite3
@@ -83,6 +85,11 @@ class DemoStore:
                 self.db.execute("DROP TABLE trip_messages")
                 self.db.execute("ALTER TABLE trip_messages_upgrade RENAME TO trip_messages")
             self.db.execute("CREATE INDEX IF NOT EXISTS idx_trip_messages_cursor ON trip_messages(trip_id,seq)")
+            # Synthetic, explicit opt-in pilot GPS: never infer from order/city.
+            self.db.execute("""CREATE TABLE IF NOT EXISTS pilot_gps (
+                trip_id TEXT PRIMARY KEY REFERENCES trips(id),
+                pilot TEXT NOT NULL, latitude REAL NOT NULL,
+                longitude REAL NOT NULL, updated_at REAL NOT NULL)""")
 
     def close(self):
         with DB_LOCK:
@@ -195,6 +202,49 @@ class DemoStore:
                 "SELECT seq, trip_id, actor, status, event, version, at "
                 "FROM events WHERE trip_id=? AND seq>? ORDER BY seq LIMIT 100",
                 (trip_id, after))]
+
+    def set_pilot_gps(self, trip_id, role, actor, payload):
+        if role != "pilot":
+            raise TripError("forbidden", 403)
+        if not isinstance(payload, dict):
+            raise TripError("invalid_gps")
+        enabled = payload.get("enabled")
+        if type(enabled) is not bool:
+            raise TripError("invalid_gps")
+        with DB_LOCK, self.db:
+            row = self._get(trip_id)
+            self._allowed(row, role, actor)
+            if not enabled:
+                self.db.execute("DELETE FROM pilot_gps WHERE trip_id=?", (trip_id,))
+                return {"available": False}
+            lat, lon = payload.get("latitude"), payload.get("longitude")
+            if (type(lat) not in (float, int) or type(lon) not in (float, int)
+                    or not math.isfinite(lat) or not math.isfinite(lon)
+                    or not -90 <= lat <= 90 or not -180 <= lon <= 180):
+                raise TripError("invalid_gps")
+            if row["status"] not in ("assigned", "approaching", "underway"):
+                raise TripError("gps_unavailable", 409)
+            self.db.execute("""INSERT INTO pilot_gps
+                  (trip_id,pilot,latitude,longitude,updated_at)
+                  VALUES (?,?,?,?,?)
+                  ON CONFLICT(trip_id) DO UPDATE SET
+                  pilot=excluded.pilot,latitude=excluded.latitude,
+                  longitude=excluded.longitude,updated_at=excluded.updated_at""",
+                (trip_id, actor, lat, lon, time.time()))
+            return {"available": True}
+
+    def pilot_gps(self, trip_id, role, actor):
+        with DB_LOCK:
+            trip = self._get(trip_id)
+            self._allowed(trip, role, actor)
+            if trip["status"] not in ("assigned", "approaching", "underway"):
+                return {"available": False}
+            row = self.db.execute("""SELECT pilot,latitude,longitude,updated_at
+                FROM pilot_gps WHERE trip_id=?""", (trip_id,)).fetchone()
+            if row is None or row["pilot"] != trip["pilot"] or time.time()-row["updated_at"] > 30:
+                return {"available": False}
+            return {"available": True, "latitude": row["latitude"],
+                    "longitude": row["longitude"]}
 
     def _chat_access(self, trip_id, role, actor, *, sending=False):
         if role not in ("pilot", "passenger", "dispatcher"):
@@ -360,6 +410,14 @@ class ApiHandler(BaseHTTPRequestHandler):
                         return
                     if method == "POST":
                         self._reply(201, {"message": self.server.store.send_message(
+                            trip_id, role, actor, self._body())})
+                        return
+                if len(parts) == 4 and parts[3] == "gps":
+                    if method == "GET":
+                        self._reply(200, {"gps": self.server.store.pilot_gps(trip_id, role, actor)})
+                        return
+                    if method == "POST":
+                        self._reply(200, {"gps": self.server.store.set_pilot_gps(
                             trip_id, role, actor, self._body())})
                         return
                 if method == "POST" and len(parts) == 4 and parts[3] == "assign":

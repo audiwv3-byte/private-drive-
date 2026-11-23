@@ -27,9 +27,13 @@ class PilotApprovalAuthorizationTests(unittest.TestCase):
                 or parsed.port != 5432 or parsed.path != "/pd_schema_ci"):
             raise RuntimeError("Non-synthetic database refused")
         cls.db = psycopg.connect(url)
+        # The other integration suite shares the disposable CI database.
+        # Reuse its synthetic base schema rather than trying to create it twice.
         with cls.db.cursor() as cur:
-            for ddl in SYNTHETIC_OLD_SCHEMA:
-                cur.execute(ddl)
+            cur.execute("""SELECT to_regclass('public.native_auth_users')""")
+            if cur.fetchone()[0] is None:
+                for ddl in SYNTHETIC_OLD_SCHEMA:
+                    cur.execute(ddl)
         cls.db.commit()
 
     @classmethod

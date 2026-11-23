@@ -508,23 +508,6 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 ],
                 const SizedBox(height: 20),
-                if (const bool.fromEnvironment('PD_ISOLATED_QA_AUTH') &&
-                    widget.onAuthenticated != null) ...[
-                  const Text('Синтетический тест. Телефон не подтверждается, '
-                    'SMS не отправляются. Права определяются Mock API.',
-                    textAlign: TextAlign.center,
-                    key: Key('qa-auth-explanation')),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    key: const Key('qa-sign-in'),
-                    onPressed: busy || !_acknowledgedLegal ? null : signInSyntheticQa,
-                    child: const Text('Войти в тестовый кабинет без SMS'),
-                  ),
-                  if (message.isNotEmpty)
-                    Text(message, key: const Key('qa-auth-feedback'),
-                      textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                ],
                 TextField(
                   controller: destination,
                   enabled: !busy && challengeId == null,
@@ -559,6 +542,23 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   ),
                 ],
                 const SizedBox(height: 8),
+                if (const bool.fromEnvironment('PD_ISOLATED_QA_AUTH') &&
+                    widget.onAuthenticated != null) ...[
+                  const Text('Синтетический тест. Телефон не подтверждается, '
+                    'SMS не отправляются. Права определяются Mock API.',
+                    textAlign: TextAlign.center,
+                    key: Key('qa-auth-explanation')),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    key: const Key('qa-sign-in'),
+                    onPressed: busy || !_acknowledgedLegal ? null : signInSyntheticQa,
+                    child: const Text('Войти в тестовый кабинет без SMS'),
+                  ),
+                  if (message.isNotEmpty)
+                    Text(message, key: const Key('qa-auth-feedback'),
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                ],
                 if (challengeId == null)
                   FilledButton(
                     onPressed: busy || widget.authApiUrl.isEmpty || !_acknowledgedLegal

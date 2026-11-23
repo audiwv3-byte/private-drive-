@@ -5,6 +5,7 @@ on:
       - feature/website-private-drive-preview
     paths:
       - .github/workflows/site-mapbox-config.yml
+      - site_preview/order-map.html
   workflow_dispatch:
 
 permissions:

@@ -5,6 +5,7 @@ Used only for future internal Android build staging; also tested on synthetic
 flutter-create Android fixtures in GitHub Actions. No release signing access.
 """
 import sys
+import re
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -15,15 +16,33 @@ def harden_android(project: Path) -> None:
     manifest = project / "android/app/src/main/AndroidManifest.xml"
     if not manifest.is_file():
         raise FileNotFoundError("generated AndroidManifest.xml required")
-    xml = ET.parse(manifest)
-    root = xml.getroot()
-    app = root.find("application")
-    if app is None:
+    # Preserve the original android: prefixes and Flutter embedding v2
+    # metadata. ElementTree re-serialization changes the prefix and can
+    # break Flutter's embedding detection in generated Android projects.
+    text = manifest.read_text(encoding="utf-8")
+    root = ET.fromstring(text)
+    if root.find("application") is None:
         raise ValueError("Android application element missing")
-    app.set(A + "allowBackup", "false")
-    app.set(A + "fullBackupContent", "@xml/pd_native_no_backup")
-    app.set(A + "dataExtractionRules", "@xml/pd_native_no_extract")
-    xml.write(manifest, encoding="unicode", xml_declaration=True)
+    if 'xmlns:android=' not in text:
+        raise ValueError("Android namespace is required")
+    match = re.search(r"<application\\b[^>]*>", text, flags=re.DOTALL)
+    if match is None:
+        raise ValueError("Android application opening tag missing")
+    app_tag = match.group(0)
+    for attribute, value in (
+        ("allowBackup", "false"),
+        ("fullBackupContent", "@xml/pd_native_no_backup"),
+        ("dataExtractionRules", "@xml/pd_native_no_extract"),
+    ):
+        pattern = r'android:' + attribute + r'\\s*=\\s*["\\x27][^"\\x27]*["\\x27]'
+        replacement = 'android:' + attribute + '="' + value + '"'
+        if re.search(pattern, app_tag):
+            app_tag = re.sub(pattern, replacement, app_tag)
+        else:
+            app_tag = app_tag[:-1] + ' ' + replacement + '>'
+    updated = text[:match.start()] + app_tag + text[match.end():]
+    ET.fromstring(updated)  # Reject malformed XML before writing.
+    manifest.write_text(updated, encoding="utf-8")
 
     folder = manifest.parent / "res/xml"
     folder.mkdir(parents=True, exist_ok=True)

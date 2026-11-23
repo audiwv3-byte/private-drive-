@@ -416,7 +416,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         adminOnly: role == 'dispatcher',
         pilotOnly: role == 'pilot',
         passengerOnly: role == 'passenger',
-        onSignOut: signOut,
+        onSignOut: remoteSignOut,
         onBackToCabinets: () => setState(() => selectedStaffRole = null),
       ));
     }

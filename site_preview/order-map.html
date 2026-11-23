@@ -181,15 +181,15 @@ if(airportDirection){
  $('to').value=airportDirection==='to'?airportLabel:vilnius;
  updateAirportDirection();
  document.querySelector('h1').textContent='Трансфер · 40 €';
- document.querySelector('main.panel > p').textContent='Фиксированная цена 40 € в одну сторону. Уточни адрес в Вильнюсе и выбери дату и время.';
+ document.querySelector('.booking-intro').textContent='Трансфер аэропорт ↔ Вильнюс · 40 €. Уточни адрес подачи и выбери дату и время.';
  const fare=document.createElement('p');
  fare.className='note';
- fare.textContent='Стоимость трансфера: 40 € в одну сторону. Дополнительные услуги оплачиваются отдельно.';
+ fare.textContent='Стоимость трансфера: 40 €. Дополнительные услуги оплачиваются отдельно.';
  $('to').closest('.field').after(fare);
 }
 if(preorder){
  if(!airportDirection)document.querySelector('h1').textContent='Предварительный заказ';
- if(!airportDirection)document.querySelector('main.panel > p').textContent='Укажи маршрут, дату и время поездки для предварительного запроса.';
+ if(!airportDirection)document.querySelector('.booking-intro').textContent='Укажи маршрут, дату и время поездки для предварительного запроса.';
  $('rideDate').required=true;
  $('rideTime').required=true;
  $('rideDate').closest('.field').querySelector('label').textContent='Дата поездки *';

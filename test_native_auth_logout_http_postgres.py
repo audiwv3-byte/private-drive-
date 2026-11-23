@@ -91,8 +91,9 @@ class LogoutHttpPostgresTests(unittest.TestCase):
         # without committing any changes to production or real accounts.
         self.db.rollback()
         with psycopg.connect(self.privileged) as fresh:
-            fresh.execute("UPDATE native_auth_sessions SET revoked_at=NULL WHERE token_hash=%s",
-                          (digest(A),))
+            fresh.execute("""UPDATE native_auth_sessions SET revoked_at=NULL
+                           WHERE token_hash=ANY(%s)""",
+                          ([digest(A),digest(B),digest(OTHER)],))
         self.db.execute("SELECT 1")
 
     def tearDown(self):

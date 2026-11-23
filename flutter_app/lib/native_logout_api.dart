@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 import 'pd_http_api.dart';
@@ -13,7 +15,7 @@ class PdNativeLogoutApi {
   Future<void> revokeCurrentDevice(String accessToken) async {
     if (accessToken.length < 40 ||
         accessToken.length > 256 ||
-        RegExp(r'\\s').hasMatch(accessToken)) {
+        RegExp(r'\s').hasMatch(accessToken)) {
       throw const FormatException('Недействительная сессия.');
     }
     final uri = PdHttpApi.secureUri(baseUrl, '/native-auth/logout');
@@ -28,7 +30,7 @@ class PdNativeLogoutApi {
       final body = await http.Response.fromStream(response)
           .timeout(const Duration(seconds: 10));
       if (body.statusCode != 200 ||
-          body.body.trim() != '{"status":"logged_out"}') {
+          jsonDecode(body.body)['status'] != 'logged_out') {
         throw PdHttpStatusException(body.statusCode);
       }
     } finally {

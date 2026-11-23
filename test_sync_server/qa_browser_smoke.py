@@ -1,5 +1,9 @@
-"""Smoke-test the compiled QA app against its isolated HTTPS Mock API."""
+"""Smoke-test the compiled QA app against its isolated Mock API."""
 import os
+from contextlib import contextmanager
+from threading import Thread
+from tempfile import TemporaryDirectory
+from urllib.parse import urlsplit
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -56,7 +60,34 @@ def smoke(browser_type, device):
             raise
 
 
+@contextmanager
+def local_server(web_root):
+    if web_root is None:
+        yield
+        return
+
+    from run_native_https_preview import CabinetStore, PreviewHandler, make_mock_server
+
+    url = urlsplit(ADDRESS)
+    if url.scheme != "http" or url.hostname != "127.0.0.1" or not url.port:
+        raise ValueError("An explicit IPv4 loopback URL is required for local QA")
+    with TemporaryDirectory(prefix="pd-browser-qa-") as temp:
+        store = CabinetStore(Path(temp) / "qa.sqlite")
+        with make_mock_server(store, lambda *_: None, port=url.port,
+                              browser_origin=ADDRESS, handler=PreviewHandler,
+                              isolated_qa_auth=True) as server:
+            server.web_root = Path(web_root)
+            worker = Thread(target=server.serve_forever, daemon=True)
+            worker.start()
+            try:
+                yield
+            finally:
+                server.shutdown()
+                worker.join()
+                store.close()
+
+
 ADDRESS = os.environ["PD_MOCK_CABINET_API_URL"].rstrip("/")
-with sync_playwright() as playwright:
+with local_server(os.environ.get("PD_QA_WEB_ROOT")), sync_playwright() as playwright:
     smoke(playwright.webkit, playwright.devices["iPhone 13"])
     smoke(playwright.chromium, playwright.devices["Pixel 7"])

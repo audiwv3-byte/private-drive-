@@ -40,3 +40,46 @@ jobs:
       - name: Run all three cabinets against the loopback Mock API
         working-directory: flutter_app
         run: flutter test --no-pub --reporter expanded --dart-define=PD_CABINET_SYNC_INTEGRATION=true test/cabinet_sync_integration_test.dart
+
+  browser-login:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      PYTHONPATH: 'test_sync_server:.'
+      PD_MOCK_CABINET_API_URL: 'http://127.0.0.1:8765'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Build the isolated Flutter web client
+        run: |
+          set -euo pipefail
+          flutter create --platforms=web --project-name=private_drive qa_web
+          cp -R flutter_app/lib/. qa_web/lib/
+          cp -R flutter_app/assets/. qa_web/assets/
+          cp flutter_app/pubspec.yaml qa_web/
+          cd qa_web
+          flutter build web --release --base-href /app/ \
+            --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
+            --dart-define=PD_ISOLATED_QA_AUTH=true
+      - name: Verify QA sign-in and reload against the loopback Mock API
+        env:
+          PD_QA_WEB_ROOT: qa_web/build/web
+        run: |
+          python3 -m pip install --quiet playwright==1.58.0
+          python3 -m playwright install --with-deps chromium webkit
+          python3 test_sync_server/qa_browser_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: loopback-browser-diagnostics
+          path: device_artifacts/browser/
+          if-no-files-found: ignore
+          retention-days: 1

@@ -62,6 +62,44 @@ class PassengerToDispatcherTests(unittest.TestCase):
         updated = self.client.get("/dispatch/test-sync/state").get_json()["trips"]
         self.assertEqual(updated[0]["status"], "assigned")
 
+    def test_website_booking_shares_dispatcher_queue_and_is_idempotent(self):
+        payload = {
+            "from": "Вильнюс, Лукишкю 10", "to": "Аэропорт Вильнюса",
+            "reference": "a" * 32, "source": "detailed",
+        }
+        headers = {"Origin": "http://localhost"}
+        created = self.client.post("/preview/api/qa-booking",
+                                   json=payload, headers=headers)
+        self.assertEqual(created.status_code, 201, created.get_json())
+        self.assertTrue(created.get_json()["qa_only"])
+        trip_id = created.get_json()["trip"]["id"]
+        board = self.client.get("/dispatch/test-sync/state").get_json()
+        self.assertEqual(board["trips"][0]["id"], trip_id)
+
+        # Lost HTTP responses must not create duplicate records.
+        retry = self.app.test_client().post(
+            "/preview/api/qa-booking", json=payload, headers=headers)
+        self.assertEqual(retry.status_code, 200)
+        self.assertEqual(retry.get_json()["trip"]["id"], trip_id)
+        self.assertEqual(len(
+            self.client.get("/dispatch/test-sync/state").get_json()["trips"]), 1)
+
+    def test_website_booking_rejects_cross_origin_and_limits_spam(self):
+        payload = {"from": "A", "to": "B",
+                   "reference": "1" * 32, "source": "quick"}
+        self.assertEqual(self.client.post("/preview/api/qa-booking",
+            json=payload, headers={"Origin": "https://evil.example"}).status_code, 403)
+        for i in range(3):
+            payload["reference"] = f"{i+1:032x}"
+            self.assertEqual(self.client.post("/preview/api/qa-booking",
+                json=payload, headers={"Origin": "http://localhost"}).status_code, 201)
+        payload["reference"] = "f" * 32
+        limited = self.client.post("/preview/api/qa-booking",
+            json=payload, headers={"Origin": "http://localhost"})
+        self.assertEqual(limited.status_code, 429)
+        self.assertEqual(len(self.client.get(
+            "/dispatch/test-sync/state").get_json()["trips"]), 3)
+
     def test_unauthorized_client_cannot_create_order_or_read_queue(self):
         self.assertEqual(self.client.post("/v1/trips", json={
             "from": "A", "to": "B"

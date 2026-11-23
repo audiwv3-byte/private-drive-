@@ -327,6 +327,11 @@ def register(app, core):
         from pd_dispatch_test_sync import register as register_test_sync
         register_test_sync(app, authorized, valid_csrf)
 
+    # Unified registry has no write routes and stays disabled until reviewed migration.
+    if os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
+        from pd_dispatch_accounts import register as register_dispatch_accounts
+        register_dispatch_accounts(app, authorized, passwords.connect if passwords else None)
+
     # Separate, fail-closed pilot intake shares the existing dispatcher session.
     if os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
         from pd_pilot_qa_intake import register as register_qa_pilots

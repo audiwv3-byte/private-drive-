@@ -29,6 +29,39 @@ class DispatcherBrowserTests(unittest.TestCase):
         app.config["TESTING"] = True
         return app, result
 
+    def test_persistent_order_validation_and_signature(self):
+        import json
+        import hmac
+        from pd_dispatch_persistent import validated_order, verified_request, fingerprint
+        order = {"source": "telegram_miniapp", "source_order_id": "123",
+                 "from": "Vilnius", "to": "Vilnius Airport",
+                 "trip_date": "2026-11-24", "trip_time": "12:00"}
+        expected = ("telegram_miniapp", "123", "Vilnius", "Vilnius Airport",
+                    "2026-11-24", "12:00")
+        self.assertEqual(validated_order(order), expected)
+        self.assertEqual(fingerprint(expected), fingerprint(expected))
+        key = "staging-only-server-bridge-secret-32characters"
+        ts = str(int(time.time()))
+        raw = json.dumps(order).encode()
+        mac = hmac.new(key.encode(), ts.encode()+b"."+raw, hashlib.sha256).hexdigest()
+        header = {"X-PD-Order-Timestamp": ts, "X-PD-Order-Signature": mac}
+        self.assertTrue(verified_request(raw, header, key))
+        self.assertFalse(verified_request(raw+b" ", header, key))
+        self.assertFalse(verified_request(raw, header, key, now=int(ts)+301))
+        with self.assertRaises(ValueError):
+            validated_order({**order, "source": "fake_client"})
+        with self.assertRaises(ValueError):
+            validated_order({**order, "to": "Vilnius"})
+        with self.assertRaises(ValueError):
+            validated_order({**order, "trip_time": "27:99"})
+
+    def test_persistent_orders_closed_by_default(self):
+        app, _ = self.make_app(enabled=True, test_sync=False)
+        c = app.test_client()
+        self.assertEqual(c.post("/v1/dispatch/orders/import",
+                                json={"test":True}).status_code, 503)
+        self.assertEqual(c.get("/dispatch/orders/state").status_code, 401)
+
     def test_staging_mobile_pilot_and_order_appear_in_dispatcher(self):
         app, _ = self.make_app(test_sync=True)
         directory, store = app.extensions["pd_dispatch_test_sync"]

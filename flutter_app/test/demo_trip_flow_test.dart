@@ -161,6 +161,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
@@ -267,6 +268,7 @@ void main() {
     expect(find.text('Поездка завершена · демо'), findsOneWidget);
     await tester.tap(find.byKey(const Key('open-passenger-preview')));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(

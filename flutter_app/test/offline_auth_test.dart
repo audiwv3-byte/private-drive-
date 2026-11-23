@@ -100,6 +100,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     expect(find.byKey(const Key('passenger-entry-transfer')), findsOneWidget);
     expect(find.byKey(const Key('open-pilot-preview')), findsNothing);
     expect(find.byKey(const Key('open-dispatcher-preview')), findsNothing);

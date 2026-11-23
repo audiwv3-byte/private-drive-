@@ -46,7 +46,7 @@ void main() {
     expect(find.text('Pasirink kelionės tipą'), findsOneWidget);
     expect(pdLanguage.value, 'LT');
 
-    await tester.ensureVisible(find.byKey(const Key('passenger-entry-transfer')));
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
     expect(find.text('Bandomasis kelionės užsakymas'), findsOneWidget);
@@ -80,8 +80,8 @@ void main() {
       ),
     ));
     expect(find.text('Pasirink kelionės tipą'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     expect(find.text('Pervežimas'), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('passenger-entry-transfer')));
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
     expect(find.text('Bandomasis kelionės užsakymas'), findsOneWidget);
@@ -127,6 +127,7 @@ void main() {
     ));
     expect(find.byKey(const Key('passenger-entry-title')), findsOneWidget);
     expect(find.byKey(const Key('pilot-offline-vilnius-background')), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     expect(find.descendant(
       of: find.byKey(const Key('passenger-entry-transfer')),
       matching: find.byIcon(Icons.directions_car_filled),
@@ -136,7 +137,7 @@ void main() {
       matching: find.byIcon(Icons.airport_shuttle),
     ), findsNothing);
     expect(find.byKey(const Key('passenger-form')), findsNothing);
-    await tester.ensureVisible(find.byKey(const Key('passenger-entry-taxi')));
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-taxi')), -180);
     await tester.tap(find.byKey(const Key('passenger-entry-taxi')));
     await tester.pumpAndSettle();
     expect(find.byType(PassengerDemo), findsOneWidget);
@@ -153,7 +154,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: PassengerRideEntry(enableMapTiles: false, tripStore: store),
     ));
-    await tester.ensureVisible(find.byKey(const Key('passenger-entry-transfer')));
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
     expect(find.text('Трансфер · выбранный тип поездки'), findsOneWidget);

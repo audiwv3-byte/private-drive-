@@ -26,8 +26,9 @@ void main() {
       enableMapTiles: false, tripStore: store)));
     // Standalone delivery is on the entry screen; assistance is on the
     // subsequent booking screen as requested.
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-delivery')), 180);
     expect(find.byKey(const Key('passenger-entry-delivery')), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('passenger-entry-taxi')));
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-taxi')), -180);
     await tester.tap(find.byKey(const Key('passenger-entry-taxi')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(

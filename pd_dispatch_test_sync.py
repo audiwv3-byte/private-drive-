@@ -146,6 +146,54 @@ def register(app, authorized, valid_csrf):
         except TripError as exc:
             return reply({"error": exc.code}, exc.status)
 
+    # Public-facing staging website intake. This deliberately creates only a
+    # synthetic QA trip in the existing dispatcher queue; no live booking,
+    # payments, SMS, credentials or production database is involved.
+    # A per-IP cap and a one-use browser reference reduce accidental duplicates.
+    web_attempts = {}
+    web_references = {}
+
+    @app.post("/preview/api/qa-booking")
+    def pd_test_website_booking():
+        origin = request.headers.get("Origin", "")
+        expected_origin = request.host_url.rstrip("/")
+        if origin != expected_origin:
+            return reply({"error": "invalid_origin"}, 403)
+        if request.mimetype != "application/json":
+            return reply({"error": "invalid_body"}, 400)
+        try:
+            body = payload()
+            if set(body) != {"from", "to", "reference", "source"}:
+                raise TripError("invalid_body", 400)
+            source = body["source"]
+            if source not in ("quick", "detailed"):
+                raise TripError("invalid_source", 400)
+            reference = body["reference"]
+            if not isinstance(reference, str) or not TRIP_ID.fullmatch(reference):
+                raise TripError("invalid_reference", 400)
+            now = time.monotonic()
+            remote = request.remote_addr or "unknown"
+            # Test-only memory limiter: max 3 submissions per IP each hour.
+            with DB_LOCK:
+                recent = [t for t in web_attempts.get(remote, []) if now - t < 3600]
+                # The same reference can be retried safely after a lost response.
+                if reference in web_references:
+                    trip_id = web_references[reference]
+                    return reply({"trip": store.get(trip_id, "dispatcher", "dispatcher_test"),
+                                  "qa_only": True})
+                if len(recent) >= 3:
+                    raise TripError("rate_limited", 429)
+                web_attempts[remote] = recent + [now]
+            actor = "website_qa_" + reference
+            trip = store.create(actor, {
+                "from": body["from"], "to": body["to"], "payment": "Карта"
+            })
+            with DB_LOCK:
+                web_references[reference] = trip["id"]
+            return reply({"trip": trip, "qa_only": True}, 201)
+        except TripError as exc:
+            return reply({"error": exc.code}, exc.status)
+
     @app.get("/dispatch/test-sync")
     def pd_test_sync_setup():
         if not authorized():

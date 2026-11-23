@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="theme-color" content="#100e0c">
 <title>Заказать поездку — PRIVATE DRIVE</title>
 <link rel="icon" href="assets/pd-logo.webp" type="image/webp">
@@ -27,6 +28,9 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
 .btn:disabled{opacity:.5;cursor:not-allowed}.note{font-size:12px;color:#cbbda5}.status{min-height:22px;font-size:13px;color:#eed3a1}
 .payment-methods{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}.payment-methods span{border:1px solid #9d7c4b;background:#29231c;color:#f9e8c7;padding:8px 10px;border-radius:7px;font-size:13px;font-weight:700}
 .leaflet-control-attribution{font-size:10px!important}
+.map-theme{min-height:44px;background:#15110e;color:var(--gold);border:1px solid var(--border);border-radius:9px;padding:6px 12px;font-weight:700}
+.mapbox-logo{display:block;background:#15110e;border-radius:5px;padding:3px 5px}
+.mapbox-logo img{display:block;width:72px;height:auto}
 @media(max-width:640px){.topbar{top:8px;left:8px;right:8px}.panel{top:auto;bottom:8px;left:8px;width:calc(100% - 16px);max-height:min(65dvh,540px);padding:13px}.brand{padding:5px 9px}.brand img{width:29px;height:29px}.back{padding:9px 11px}h1{font-size:22px}.leaflet-bottom.leaflet-right{bottom:calc(min(65dvh,540px) + 16px)}}
 </style>
 </head>
@@ -34,6 +38,7 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
 <div id="map" aria-label="Интерактивная карта Вильнюса"><div id="mapFallback" class="map-fallback">Загрузка карты…</div></div>
 <div class="topbar">
  <a class="brand" href="index.html" aria-label="PRIVATE DRIVE — вернуться на сайт"><img src="assets/pd-logo.webp" alt=""><span>PRIVATE DRIVE<small>КАРТА ПОЕЗДКИ</small></span></a>
+ <button class="map-theme" type="button" id="mapTheme" hidden>Дневная карта</button>
  <a class="back" href="index.html">← На сайт</a>
 </div>
 <main class="panel">
@@ -68,6 +73,7 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
   <p class="note">Это предварительная заявка, не подтверждённый заказ. Telegram откроет чат с уже заполненным сообщением — проверь его и нажми «Отправить». Сайт не списывает деньги и не отправляет сообщения автоматически.</p>
  </form>
 </main>
+<script src="assets/mapbox-config.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 (()=>{
@@ -152,7 +158,49 @@ function say(s){status.textContent=s}
 try{
  if(typeof L!=='undefined'){
   map=L.map('map',{zoomControl:false}).setView([54.6872,25.2797],12);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+  const token=window.PD_MAPBOX_PUBLIC_TOKEN;
+  const osmCredit='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+  const theme=$('mapTheme');
+  const addOsm=()=>L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+   maxZoom:19,attribution:osmCredit+' contributors'
+  }).addTo(map);
+  if(typeof token==='string' && /^pk\.[\w.-]+$/.test(token)){
+   let layer,night=true,logo;
+   function showTheme(){
+    if(layer)layer.remove();
+    const style=night?'dark-v11':'light-v11';
+    const url='https://api.mapbox.com/styles/v1/mapbox/'+style+'/tiles/256/{z}/{x}/{y}?access_token='+encodeURIComponent(token);
+    const mapbox=L.tileLayer(url,{maxZoom:19,
+     attribution:'&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> '+osmCredit+
+      ' <a href="https://apps.mapbox.com/feedback/">Сообщить об ошибке</a>'
+    });
+    let failures=0;
+    mapbox.on('tileerror',()=>{
+     if(layer!==mapbox || ++failures<3)return;
+     mapbox.remove();
+     logo.remove();
+     layer=addOsm();
+     theme.hidden=true;
+     say('Mapbox временно недоступна. Открыта резервная карта.');
+    });
+    layer=mapbox.addTo(map);
+    theme.textContent=night?'Дневная карта':'Ночная карта';
+   }
+   logo=L.control({position:'bottomright'});
+   logo.onAdd=()=>{
+    const link=L.DomUtil.create('a','mapbox-logo');
+    link.href='https://www.mapbox.com/about/maps/';
+    const mark=document.createElement('img');
+    mark.src='assets/mapbox-logo.png';
+    mark.alt='Mapbox';
+    link.append(mark);
+    return link;
+   };
+   logo.addTo(map);
+   theme.hidden=false;
+   theme.addEventListener('click',()=>{night=!night;showTheme();});
+   showTheme();
+  }else{addOsm();}
   L.control.zoom({position:'bottomright'}).addTo(map);
   $('mapFallback').remove();
   setTimeout(()=>map.invalidateSize(),200);

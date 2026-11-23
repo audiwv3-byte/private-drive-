@@ -1,0 +1,1 @@
+window.PD_MAPBOX_PUBLIC_TOKEN = "";

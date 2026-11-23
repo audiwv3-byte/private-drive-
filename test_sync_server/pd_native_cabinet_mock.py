@@ -239,7 +239,7 @@ class CabinetHandler(ApiHandler):
         try:
             if path.query and not path.path.endswith(("/events", "/messages")):
                 raise TripError("invalid_query")
-            if method == "POST" and path.path in ("/native-auth/request-code", "/native-auth/verify-code"):
+            if method == "POST" and path.path in ("/native-auth/request-code", "/native-auth/verify-code", "/native-auth/qa-session"):
                 status, response = self._native_auth(path.path, self._body())
             elif path.path.startswith("/native-identity/"):
                 status, response = 200, self._identity(method, path.path)
@@ -278,6 +278,22 @@ class CabinetHandler(ApiHandler):
     def _native_auth(self, path, body):
         store = self.server.store
         with DB_LOCK, store.db:
+            if path.endswith("/qa-session"):
+                if not getattr(self.server, "isolated_qa_auth", False):
+                    raise TripError("forbidden", 403)
+                requested_role = body.get("role")
+                qa_phones = {
+                    "passenger": "+12025550101",
+                    "pilot": "+12025550102",
+                    "dispatcher": "+12025550103",
+                }
+                target = qa_phones.get(requested_role)
+                if target is None:
+                    raise TripError("invalid_role", 403)
+                session = issue_session(store.db, "phone", target)
+                if requested_role == "pilot":
+                    store.pilot_id = session["user_id"]
+                return 200, {"verified": False, "qa": True, "role": requested_role, **session}
             if path.endswith("/request-code"):
                 target = body.get("destination")
                 if body.get("channel") != "phone" or not isinstance(target, str) or target not in PHONES:
@@ -329,11 +345,12 @@ class CabinetHandler(ApiHandler):
             raise TripError("forbidden", 403)
 
 
-def make_mock_server(store, deliver, *, port=0, browser_origin=None, handler=CabinetHandler):
+def make_mock_server(store, deliver, *, port=0, browser_origin=None, handler=CabinetHandler, isolated_qa_auth=False):
     server = ApiServer(("127.0.0.1", port), store, {},
                        browser_origin=browser_origin, handler=handler)
     server.deliver = deliver
     server.otp_key = secrets.token_bytes(32)
+    server.isolated_qa_auth = isolated_qa_auth
     return server
 
 

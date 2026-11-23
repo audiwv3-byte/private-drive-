@@ -15,6 +15,7 @@ import psycopg
 from pd_native_auth import native_phone_role_resolver, normalize_destination
 from pd_twilio_verify import VerifyError, start_verification, check_verification
 from pd_native_auth_schema_readiness import SchemaReadinessGate
+from pd_native_auth_postgres_session_lifecycle import _digest
 
 TTL = 300
 COOLDOWN = 60
@@ -64,6 +65,35 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
         if not schema_ready:
             return reply(start_response, "503 Service Unavailable",
                          {"error": schema_status})
+        if method == "POST" and route == "/native-auth/logout":
+            # A per-device logout is independent of whether SMS is enabled.
+            # Never accept user_id, token hash or a role in the request body.
+            auth = environ.get("HTTP_AUTHORIZATION", "")
+            if not isinstance(auth, str) or not auth.startswith("Bearer "):
+                return reply(start_response, "401 Unauthorized",
+                             {"error": "invalid_session"})
+            token = auth[7:]
+            digest = _digest(token)
+            if digest is None or any(ch.isspace() for ch in token):
+                return reply(start_response, "401 Unauthorized",
+                             {"error": "invalid_session"})
+            try:
+                with psycopg.connect(database_url) as conn:
+                    with conn.cursor() as cur:
+                        # Privileged, narrow PostgreSQL function accepts ONLY
+                        # the cryptographic digest of THIS bearer token.
+                        cur.execute(
+                            "SELECT public.pd_revoke_current_session(%s,%s)",
+                            (digest,int(clock())))
+                        revoked = cur.fetchone()[0]
+                if not revoked:
+                    return reply(start_response, "401 Unauthorized",
+                                 {"error": "invalid_session"})
+                return reply(start_response, "200 OK", {"status":"logged_out"})
+            except psycopg.Error:
+                readiness.mark_database_unavailable()
+                return reply(start_response, "503 Service Unavailable",
+                             {"error": "database_unavailable"})
         if method != "POST" or route not in (
                 "/native-auth/request-code", "/native-auth/verify-code"):
             return reply(start_response, "404 Not Found", {"error": "not_found"})

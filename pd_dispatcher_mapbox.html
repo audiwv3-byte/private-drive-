@@ -129,6 +129,14 @@ function renderTrips(){
         const status=document.createElement('p');
         status.textContent=trip.paused?'Остановка':statusLabels[trip.status];
         card.append(route,status);
+        if(trip.source&&trip.source_order_id){
+            const source=document.createElement('p');
+            const label=trip.source==='telegram_miniapp'?'Telegram Mini App':'Telegram-бот';
+            source.textContent=label+' · исходный заказ №'+trip.source_order_id+
+                (trip.trip_date?' · '+trip.trip_date:'')+
+                (trip.trip_time?' '+trip.trip_time:'');
+            card.append(source);
+        }
         if(trip.status==='requested'){
             const button=document.createElement('button');
             button.type='button';

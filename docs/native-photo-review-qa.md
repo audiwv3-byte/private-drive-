@@ -1,8 +1,9 @@
 # PRIVATE DRIVE Android QA — cabin entry
 
-## Local Android QA build 0.2.29
+## Local Android QA build 0.2.30
 
 The internal Android APK opens a local PIN prompt before the cabin selector.
+The on-screen digit buttons also accept the PIN when the Android keyboard is unavailable.
 The PIN is a build fixture carried only by that APK; it establishes no native
 session, server role, or phone or photo verification. Passenger and Pilot use a shared local QA order scope separate from authenticated
 accounts. Android Back returns from a cabin to the selector. Signing out

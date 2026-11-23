@@ -19,14 +19,16 @@ def snapshot():
     return adb('exec-out', 'cat', '/sdcard/pd-window.xml').decode('utf-8')
 
 
-def click_node(label, *, timeout=60):
+def click_node(label, *, timeout=60, announce=True):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         text = snapshot()
         root = ET.fromstring(text)
         for node in root.iter('node'):
             props = ' '.join(node.get(key, '') for key in ('text', 'content-desc', 'resource-id'))
-            if label not in props:
+            if announce and label not in props:
+                continue
+            if not announce and label != node.get('text') and label != node.get('content-desc'):
                 continue
             values = [int(n) for n in re.findall(r'\d+', node.get('bounds', ''))]
             if len(values) != 4:
@@ -35,12 +37,13 @@ def click_node(label, *, timeout=60):
             if x2 <= x1 or y2 <= y1:
                 continue
             adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
-            print('Tapped:', label, flush=True)
+            if announce:
+                print('Tapped:', label, flush=True)
             return True
         time.sleep(1)
     Path('android-launch-last-window.xml').write_text(text, encoding='utf-8')
     Path('android-launch-last-window.png').write_bytes(adb('exec-out', 'screencap', '-p'))
-    raise AssertionError('Required app control not found: ' + label)
+    raise AssertionError('Required app control not found: ' + (label if announce else 'PIN digit'))
 
 
 def wait_for_labels(*labels, timeout=45):
@@ -70,9 +73,9 @@ def scroll_to_passenger_option(label, xml):
 
 
 wait_for_labels('Тестовый вход')
-click_node('pd-qa-pin')
-adb('shell', 'input', 'text', os.environ['PD_QA_LOCAL_PIN'])
-adb('shell', 'input', 'keyevent', '4')
+click_node('Ввести цифрами на экране')
+for digit in os.environ['PD_QA_LOCAL_PIN']:
+    click_node(digit, announce=False)
 click_node('Войти в тест')
 entry = wait_for_labels('Выбери кабинет', 'Пассажир', 'Пилот')
 assert 'Диспетчер' not in entry, 'Dispatcher must stay on the website'

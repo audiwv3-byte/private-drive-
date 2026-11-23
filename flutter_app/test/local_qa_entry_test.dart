@@ -33,7 +33,16 @@ void main() {
     await tap(enter);
     expect(find.text('Неверный тестовый пароль'), findsOneWidget);
     expect(find.byKey(const Key('entry-dispatcher')), findsNothing);
-    await tester.enterText(pin, const String.fromEnvironment('PD_QA_LOCAL_PIN'));
+    await tester.enterText(pin, '');
+    await tap(find.byKey(const Key('local-qa-toggle-keypad')));
+    expect(tester.widget<TextField>(pin).readOnly, isTrue);
+    await tap(find.byKey(const Key('local-qa-digit-0')));
+    await tap(find.byKey(const Key('local-qa-delete-digit')));
+    expect(tester.widget<TextField>(pin).controller!.text, isEmpty);
+    const localPin = String.fromEnvironment('PD_QA_LOCAL_PIN');
+    for (final digit in localPin.split('')) {
+      await tap(find.byKey(ValueKey('local-qa-digit-$digit')));
+    }
     await tap(enter);
 
     expect(find.byKey(const Key('entry-dispatcher')), findsNothing);

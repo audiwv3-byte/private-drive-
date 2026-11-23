@@ -198,7 +198,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
               textAlign: TextAlign.center),
             const SizedBox(height: 12),
             const Text(pdLocalQaEntryEnabled
-              ? 'Версия 0.2.28 · внутренняя сборка'
+              ? String.fromEnvironment('PD_QA_BUILD_LABEL',
+                defaultValue: 'Внутренняя сборка')
               : 'Версия 0.2.27 · сборка 2026112103', key: Key('app-demo-version'),
               textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
           ]),
@@ -220,6 +221,7 @@ class _LocalQaSignIn extends StatefulWidget {
 
 class _LocalQaSignInState extends State<_LocalQaSignIn> {
   final _pin = TextEditingController();
+  bool _showKeypad = false;
   String? _error;
 
   @override
@@ -227,6 +229,42 @@ class _LocalQaSignInState extends State<_LocalQaSignIn> {
     _pin.dispose();
     super.dispose();
   }
+
+  void _toggleKeypad() {
+    FocusScope.of(context).unfocus();
+    setState(() => _showKeypad = !_showKeypad);
+  }
+
+  void _setPin(String value) {
+    _pin.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+    if (_error != null) setState(() => _error = null);
+  }
+
+  void _deleteDigit() {
+    final value = _pin.text;
+    if (value.isNotEmpty) _setPin(value.substring(0, value.length - 1));
+  }
+
+  Widget _digitButton(int digit) => OutlinedButton(
+    key: ValueKey('local-qa-digit-$digit'),
+    onPressed: () => _setPin('${_pin.text}$digit'),
+    child: Text('$digit'),
+  );
+
+  Widget _keypadRow(List<Widget> buttons) => Row(
+    children: [
+      for (final button in buttons)
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: button,
+          ),
+        ),
+    ],
+  );
 
   void _submit() {
     if (_pin.text.trim() != _localQaPin) {
@@ -254,12 +292,36 @@ class _LocalQaSignInState extends State<_LocalQaSignIn> {
             key: const Key('local-qa-pin'),
             controller: _pin,
             obscureText: true,
+            readOnly: _showKeypad,
             keyboardType: TextInputType.number,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submit(),
             decoration: InputDecoration(labelText: 'Тестовый пароль', errorText: _error),
           ),
         ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          key: const Key('local-qa-toggle-keypad'),
+          onPressed: _toggleKeypad,
+          child: Text(_showKeypad ? 'Системная клавиатура' : 'Ввести цифрами на экране'),
+        ),
+        if (_showKeypad) ...[
+          for (var start = 1; start <= 7; start += 3)
+            _keypadRow([
+              _digitButton(start),
+              _digitButton(start + 1),
+              _digitButton(start + 2),
+            ]),
+          _keypadRow([
+            const SizedBox.shrink(),
+            _digitButton(0),
+            OutlinedButton(
+              key: const Key('local-qa-delete-digit'),
+              onPressed: _deleteDigit,
+              child: const Icon(Icons.backspace_outlined, semanticLabel: 'Стереть цифру'),
+            ),
+          ]),
+        ],
         const SizedBox(height: 16),
         FilledButton(
           key: const Key('local-qa-enter'),

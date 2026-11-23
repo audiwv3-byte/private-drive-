@@ -54,6 +54,9 @@ class LeastPrivilegePostgresTests(unittest.TestCase):
     def setUp(self):
         self.db=self.__class__.db
         self.db.rollback()
+        # Keep one outer transaction for each test; nested transaction() uses
+        # SAVEPOINT, so successful approval is never committed into later tests.
+        self.db.execute("SELECT 1")
 
     def tearDown(self):
         self.db.rollback()

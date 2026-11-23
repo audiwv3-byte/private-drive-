@@ -1,23 +1,23 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#100e0c"><meta name="description" content="Направления и трансферы PRIVATE DRIVE по Литве и Европе."><title>Все направления — PRIVATE DRIVE</title><link rel="icon" href="assets/pd-logo.webp" type="image/webp"><link rel="stylesheet" href="assets/corporate.css"><style>
 /* PRIVATE DRIVE approved photo-price route cards; scoped to this page only. */
-:is(#transfers,#new-destinations) .routes{align-items:stretch;gap:14px}
-:is(#transfers,#new-destinations) .catalog-route-link{display:block;position:relative;isolation:isolate;min-width:0;border:1px solid #c39951;border-radius:20px;overflow:hidden;background:#15110f;box-shadow:0 12px 30px #0003;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
-:is(#transfers,#new-destinations) .catalog-route-link:hover{transform:translateY(-4px);border-color:#f3cf86;box-shadow:0 16px 36px #0008}
-:is(#transfers,#new-destinations) .catalog-route-link:focus-visible{outline:3px solid #f3cf86;outline-offset:4px}
-:is(#transfers,#new-destinations) .catalog-route-image{position:relative;overflow:hidden;background:#24201b}
-:is(#transfers,#new-destinations) .catalog-route-image img{width:100%;height:auto;aspect-ratio:4/4.3;object-fit:cover;object-position:center;transition:transform .25s ease}
-:is(#transfers,#new-destinations) .catalog-route-link:hover img{transform:scale(1.04)}
-:is(#transfers,#new-destinations) .catalog-route-price{position:absolute;z-index:1;top:14px;right:12px;display:inline-block;margin:0;padding:9px 14px;border:1px solid #eac47d;border-radius:14px;background:linear-gradient(140deg,#3b2810f5,#12100dec);color:#fff2d2;font:700 clamp(1.45rem,2.3vw,2.15rem)/1.15 Georgia,serif;white-space:nowrap;text-shadow:0 2px 4px #000a;box-shadow:0 4px 14px #0009}
-:is(#transfers,#new-destinations) .catalog-route-image::after{content:"";position:absolute;inset:auto 0 0;height:18%;background:linear-gradient(transparent,#100d0bc9);pointer-events:none}
-:is(#transfers,#new-destinations) .catalog-route-link .card-content{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;padding:16px 12px 18px;min-height:92px;text-align:center}
-:is(#transfers,#new-destinations) .catalog-route-link h3{margin:0;color:#f8e9d1;font:700 clamp(1.12rem,1.7vw,1.55rem)/1.18 Georgia,serif}
-:is(#transfers,#new-destinations) .catalog-route-link .catalog-route-extra{margin:4px 0 0;color:#d8bb88;font-size:.8rem}
-:is(#transfers,#new-destinations) .catalog-route-link .catalog-route-cta{color:#e8c17a;font-size:.78rem}
-@media(max-width:740px){:is(#transfers,#new-destinations) .catalog-route-image img{aspect-ratio:4/4.2}:is(#transfers,#new-destinations) .catalog-route-price{top:10px;right:8px;padding:7px 10px;font-size:clamp(1.2rem,4.2vw,1.7rem)}:is(#transfers,#new-destinations) .catalog-route-link .card-content{padding:12px 7px;min-height:80px}}
-@media(max-width:530px){:is(#transfers,#new-destinations) .routes{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}:is(#transfers,#new-destinations) .catalog-route-link{border-radius:13px}:is(#transfers,#new-destinations) .catalog-route-price{font-size:clamp(1.12rem,4.5vw,1.5rem)}:is(#transfers,#new-destinations) .catalog-route-link h3{font-size:1rem}}
-@media(max-width:350px){:is(#transfers,#new-destinations) .routes{grid-template-columns:minmax(0,1fr)}}
-@media(prefers-reduced-motion:reduce){:is(#transfers,#new-destinations) .catalog-route-link,:is(#transfers,#new-destinations) .catalog-route-image img{transition:none}}
+#transfers .routes{align-items:stretch;gap:14px}
+#transfers .catalog-route-link{display:block;position:relative;isolation:isolate;min-width:0;border:1px solid #c39951;border-radius:20px;overflow:hidden;background:#15110f;box-shadow:0 12px 30px #0003;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+#transfers .catalog-route-link:hover{transform:translateY(-4px);border-color:#f3cf86;box-shadow:0 16px 36px #0008}
+#transfers .catalog-route-link:focus-visible{outline:3px solid #f3cf86;outline-offset:4px}
+#transfers .catalog-route-image{position:relative;overflow:hidden;background:#24201b}
+#transfers .catalog-route-image img{width:100%;height:auto;aspect-ratio:4/4.3;object-fit:cover;object-position:center;transition:transform .25s ease}
+#transfers .catalog-route-link:hover img{transform:scale(1.04)}
+#transfers .catalog-route-price{position:absolute;z-index:1;top:14px;right:12px;display:inline-block;margin:0;padding:9px 14px;border:1px solid #eac47d;border-radius:14px;background:linear-gradient(140deg,#3b2810f5,#12100dec);color:#fff2d2;font:700 clamp(1.45rem,2.3vw,2.15rem)/1.15 Georgia,serif;white-space:nowrap;text-shadow:0 2px 4px #000a;box-shadow:0 4px 14px #0009}
+#transfers .catalog-route-image::after{content:"";position:absolute;inset:auto 0 0;height:18%;background:linear-gradient(transparent,#100d0bc9);pointer-events:none}
+#transfers .catalog-route-link .card-content{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;padding:16px 12px 18px;min-height:92px;text-align:center}
+#transfers .catalog-route-link h3{margin:0;color:#f8e9d1;font:700 clamp(1.12rem,1.7vw,1.55rem)/1.18 Georgia,serif}
+#transfers .catalog-route-link .catalog-route-extra{margin:4px 0 0;color:#d8bb88;font-size:.8rem}
+#transfers .catalog-route-link .catalog-route-cta{color:#e8c17a;font-size:.78rem}
+@media(max-width:740px){#transfers .catalog-route-image img{aspect-ratio:4/4.2}#transfers .catalog-route-price{top:10px;right:8px;padding:7px 10px;font-size:clamp(1.2rem,4.2vw,1.7rem)}#transfers .catalog-route-link .card-content{padding:12px 7px;min-height:80px}}
+@media(max-width:530px){#transfers .routes{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#transfers .catalog-route-link{border-radius:13px}#transfers .catalog-route-price{font-size:clamp(1.12rem,4.5vw,1.5rem)}#transfers .catalog-route-link h3{font-size:1rem}}
+@media(max-width:350px){#transfers .routes{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){#transfers .catalog-route-link,#transfers .catalog-route-image img{transition:none}}
 </style><link rel="stylesheet" href="/assets/site-analytics.css"></head>
 <body><header class="catalog-top"><div class="wrap catalog-top-row"><a href="index.html" class="catalog-back">← Главная</a><a href="index.html" class="brand"><img src="assets/pd-logo.webp" width="52" height="52" alt=""><span>PRIVATE DRIVE</span></a><a class="button outline" href="order-map.html?mode=preorder">Заказать</a></div></header><main>
 <section class="catalog-intro wrap"><span class="catalog-intro-icon drive-in" aria-hidden="true">🚙</span><p class="eyebrow">ЛИТВА · ЕВРОПА</p><h1>Все направления</h1><p>Трансферы из Вильнюса и индивидуальные маршруты. Выбери направление и отправь заявку на расчёт.</p></section>
@@ -41,16 +41,7 @@
             <div class="catalog-route-image"><img src="assets/warsaw.webp" width="342" height="400" alt="" loading="lazy"><strong class="catalog-route-price">550 €</strong></div>
             <div class="card-content"><h3>Варшава</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
           </a>
-        </div>
-        <p class="small-print">Также доступны поездки в Тракай, Друскининкай и Палангу. Стоимость уточни у PRIVATE DRIVE.</p>
-      </div>
-    </section>
 
-<section id="new-destinations" class="section shaded">
-  <div class="wrap">
-    <h2>Другие популярные направления</h2>
-    <p class="catalog-note">Из Вильнюса — выбери город, чтобы оформить предварительный заказ.</p>
-    <div class="grid routes">
       <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=trakai" aria-label="Вильнюс — Тракай, 100 евро — открыть форму заказа">
         <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Trakai%20Island%20Castle.jpg?width=700" width="350" height="380" alt="Тракай" loading="lazy" decoding="async"><strong class="catalog-route-price">100 €</strong></div>
         <div class="card-content"><h3>Тракай</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
@@ -83,10 +74,11 @@
         <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Druskininkai%2C%20Lithuania.jpg?width=700" width="350" height="380" alt="Друскининкай" loading="lazy" decoding="async"><strong class="catalog-route-price">120 €</strong></div>
         <div class="card-content"><h3>Друскининкай</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
       </a>
-    </div>
-    <p class="small-print">Фото и лицензии Wikimedia Commons: <a href="https://commons.wikimedia.org/wiki/File:Trakai%20Island%20Castle.jpg" target="_blank" rel="noopener noreferrer">Тракай</a>, <a href="https://commons.wikimedia.org/wiki/File:Visaginas001.JPG" target="_blank" rel="noopener noreferrer">Висагинас</a>, <a href="https://commons.wikimedia.org/wiki/File:Varenos%20baznycia.jpg" target="_blank" rel="noopener noreferrer">Варена</a>, <a href="https://commons.wikimedia.org/wiki/File:Daugavpils%20Fortress%2001.jpg" target="_blank" rel="noopener noreferrer">Даугавпилс</a>, <a href="https://commons.wikimedia.org/wiki/File:Panev%C4%97%C5%BEys001.JPG" target="_blank" rel="noopener noreferrer">Паневежис</a>, <a href="https://commons.wikimedia.org/wiki/File:%C5%A0iauliai%20cathedral.jpg" target="_blank" rel="noopener noreferrer">Шяуляй</a>, <a href="https://commons.wikimedia.org/wiki/File:Pabrad%C4%97.jpg" target="_blank" rel="noopener noreferrer">Пабраде</a>, <a href="https://commons.wikimedia.org/wiki/File:Druskininkai%2C%20Lithuania.jpg" target="_blank" rel="noopener noreferrer">Друскининкай</a>.</p>
-  </div>
-</section>
+    
+          <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=palanga" aria-label="Запросить поездку в Палангу"><div class="card-content"><span class="catalog-location-icon" aria-hidden="true">⌁</span><h3>Паланга</h3><p>Из Вильнюса</p><strong class="quote">Цена по запросу</strong><span class="catalog-open">Рассчитать поездку →</span></div></a>
+        </div>
+        <p class="small-print">Фото и лицензии Wikimedia Commons: <a href="https://commons.wikimedia.org/wiki/File:Trakai%20Island%20Castle.jpg" target="_blank" rel="noopener noreferrer">Тракай</a>, <a href="https://commons.wikimedia.org/wiki/File:Visaginas001.JPG" target="_blank" rel="noopener noreferrer">Висагинас</a>, <a href="https://commons.wikimedia.org/wiki/File:Varenos%20baznycia.jpg" target="_blank" rel="noopener noreferrer">Варена</a>, <a href="https://commons.wikimedia.org/wiki/File:Daugavpils%20Fortress%2001.jpg" target="_blank" rel="noopener noreferrer">Даугавпилс</a>, <a href="https://commons.wikimedia.org/wiki/File:Panev%C4%97%C5%BEys001.JPG" target="_blank" rel="noopener noreferrer">Паневежис</a>, <a href="https://commons.wikimedia.org/wiki/File:%C5%A0iauliai%20cathedral.jpg" target="_blank" rel="noopener noreferrer">Шяуляй</a>, <a href="https://commons.wikimedia.org/wiki/File:Pabrad%C4%97.jpg" target="_blank" rel="noopener noreferrer">Пабраде</a>, <a href="https://commons.wikimedia.org/wiki/File:Druskininkai%2C%20Lithuania.jpg" target="_blank" rel="noopener noreferrer">Друскининкай</a>.</p>
+      </div>
+    </section>
 
-<section class="section wrap"><h2>Другие направления</h2><p class="catalog-note">Маршруты по Литве и Европе — по предварительной заявке. Для поездок без опубликованного тарифа цена рассчитывается индивидуально.</p><div class="grid routes"><a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=palanga" aria-label="Запросить поездку в Палангу"><div class="card-content"><span class="catalog-location-icon" aria-hidden="true">⌁</span><h3>Паланга</h3><p>Из Вильнюса</p><strong class="quote">Цена по запросу</strong><span class="catalog-open">Рассчитать поездку →</span></div></a></div></section>
 </main><footer class="catalog-footer wrap"><a href="index.html">← Вернуться на главную</a><span>PRIVATE DRIVE · Вильнюс, Литва</span></footer><script src="/assets/site-analytics.js"></script></body></html>

@@ -36,6 +36,14 @@
 #transfers .catalog-route-link .card-content h3{color:#fff2db;text-shadow:0 2px 10px #000}
 #transfers .catalog-route-link .catalog-route-cta{color:#ffd891;text-shadow:0 2px 7px #000}
 @media(max-width:530px){#transfers .catalog-route-link .card-content{padding:12px 7px}}
+
+/* PRIVATE DRIVE: partner block follows the featured directions visual language. */
+#partners{padding-top:3.5rem;padding-bottom:3.5rem}
+#partners .partner-section-title{display:inline-flex;align-items:center;gap:.75rem;width:max-content;max-width:100%;padding:.32rem .7rem;border:1px solid #ad874c;border-radius:12px;color:var(--gold);background:#17110e;font:inherit}
+#partners .partner-feature{border:1px solid #ad874c;border-radius:14px;background:linear-gradient(145deg,#17110e,#100e0c);box-shadow:0 10px 25px #0003;max-width:100%}
+#partners .partner-info h3{color:#f6dfb7;font-family:Georgia,serif}
+#partners .partner-feature .button{border-color:#ad874c;color:#f7d997}
+@media(max-width:740px){#partners{padding-top:2.4rem;padding-bottom:2.4rem}#partners .partner-feature{gap:16px;padding:18px}#partners .partner-section-title{font-size:clamp(1.2rem,6vw,1.8rem)}}
 </style>
 </head>
 <body>
@@ -133,7 +141,7 @@
   </div>
 </section>
 <section id="partners" class="section wrap">
-      <h2>Наши друзья</h2>
+      <h2><span class="catalog-heading partner-section-title"><span>Наши друзья</span><span class="catalog-heading-motion" aria-hidden="true">🤝</span></span></h2>
       <div class="partner-feature">
         <div class="partner-tech-icon" aria-hidden="true"><span>🤖</span></div>
         <div class="partner-info"><h3>Work.www | IT-разработка</h3><span class="partner-role">Разработчик сайта · Друг PRIVATE DRIVE</span><p>Разработка сайтов, веб-сервисов, приложений и Telegram-ботов.</p></div>

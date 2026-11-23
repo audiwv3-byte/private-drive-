@@ -16,6 +16,8 @@ import 'pilot_photo_capture.dart';
 import 'native_cabin_entry.dart';
 import 'native_session.dart';
 import 'native_logout_api.dart';
+import 'native_session_vault.dart';
+import 'native_session_manager.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 // Opt-in only for the isolated static Safari/Android browser test artifact.
@@ -65,6 +67,8 @@ class PrivateDriveApp extends StatelessWidget {
               identityApiBuilder: (session) => PdIdentityApi(
                 baseUrl: apiBaseUrl, token: session.token),
               logoutApi: const PdNativeLogoutApi(baseUrl: apiBaseUrl),
+              sessionManager: const PdNativeSessionManager(
+                baseUrl: apiBaseUrl, vault: PdNativeSessionVault()),
             ),
       ),
     );

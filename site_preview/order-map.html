@@ -75,7 +75,15 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
 const $=id=>document.getElementById(id),status=$('status');
 const params=new URLSearchParams(location.search);
 const preorder=params.get('mode')==='preorder';
-const airportDirection=['to','from'].includes(params.get('airport'))?params.get('airport'):null;
+let airportDirection=['to','from'].includes(params.get('airport'))?params.get('airport'):null;
+const airportLabel='Аэропорт Вильнюса (VNO)';
+function updateAirportDirection(){
+ const fromAirport=airportDirection==='from';
+ $('from').readOnly=fromAirport;
+ $('to').readOnly=!fromAirport;
+ $('swapAddresses').textContent=fromAirport?'⇅ Поехать в аэропорт':'⇅ Поехать из аэропорта';
+ $('swapAddresses').setAttribute('aria-label',$('swapAddresses').textContent.slice(2).trim());
+}
 const routeDestinations={
  'kaunas':'Каунас, Литва',
  'klaipeda':'Клайпеда, Литва',
@@ -104,10 +112,10 @@ if(selectedService){
 }
 
 if(airportDirection){
- const airport='Аэропорт Вильнюса (VNO)';
  const vilnius='Вильнюс, точный адрес уточнить';
- $('from').value=airportDirection==='to'?vilnius:airport;
- $('to').value=airportDirection==='to'?airport:vilnius;
+ $('from').value=airportDirection==='to'?vilnius:airportLabel;
+ $('to').value=airportDirection==='to'?airportLabel:vilnius;
+ updateAirportDirection();
  document.querySelector('h1').textContent='Трансфер · 40 €';
  document.querySelector('main.panel > p').textContent='Фиксированная цена 40 € в одну сторону. Уточни адрес в Вильнюсе и выбери дату и время.';
  const fare=document.createElement('p');
@@ -152,18 +160,33 @@ try{
 }catch(e){$('mapFallback').textContent='Не удалось открыть карту. Заявку можно отправить без неё.'}
 function pin(lat,lon,label){if(!map)return;const marker=L.marker([lat,lon]).addTo(map).bindPopup(label);markers.push(marker)}
 function clearPins(){if(map)markers.forEach(m=>map.removeLayer(m));markers=[]}
-$('swapAddresses').addEventListener('click',()=>{const a=$('from').value;$('from').value=$('to').value;$('to').value=a;say('Адреса поменяны местами.');});
+$('swapAddresses').addEventListener('click',()=>{
+ if(busy||verifying)return;
+ const previousOrigin=$('from').value;
+ $('from').value=$('to').value;
+ $('to').value=previousOrigin;
+ if(airportDirection){
+  airportDirection=airportDirection==='to'?'from':'to';
+  updateAirportDirection();
+ }
+ verifiedPair=null;
+ clearPins();
+ say(needsVerification?'Адреса поменяны местами. Проверь их перед переходом в Telegram.':'Адреса поменяны местами.');
+});
 $('locate').addEventListener('click',()=>{
  if(!navigator.geolocation){say('Геолокация недоступна. Введи адрес вручную.');return}
  say('Определяем местоположение…');
  navigator.geolocation.getCurrentPosition(p=>{
   selectedPosition=[p.coords.latitude,p.coords.longitude];
-  $('from').value=selectedPosition.map(v=>v.toFixed(6)).join(', ');
+  const cityField=airportDirection==='from'?'to':'from';
+  $(cityField).value=selectedPosition.map(v=>v.toFixed(6)).join(', ');
+  verifiedPair=null;
   clearPins();pin(...selectedPosition,'Твоё местоположение');
   map?.setView(selectedPosition,15);say('Местоположение отмечено на карте. При необходимости впиши точный адрес.');
  },()=>say('Не удалось получить геолокацию. Разреши доступ к местоположению или введи адрес вручную.'),{enableHighAccuracy:false,timeout:10000,maximumAge:60000});
 });
 async function geocode(value){
+ if(airportDirection&&value===airportLabel)return [54.6341,25.2858];
  const coords=value.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
  if(coords)return [+coords[1],+coords[2]];
  const q=new URL('https://nominatim.openstreetmap.org/search');q.searchParams.set('q',value);q.searchParams.set('format','jsonv2');q.searchParams.set('limit','1');
@@ -195,7 +218,6 @@ $('showRoute').addEventListener('click',async()=>{
 });
 // Airport is a fixed landmark; all other quick-route endpoints need a confirmed address.
 const needsVerification=Boolean(selectedRoute||airportDirection);
-const airportLabel='Аэропорт Вильнюса (VNO)';
 const verificationButton=$('verifyAddresses'),verificationHint=$('addressCheckHint');
 verificationButton.hidden=!needsVerification;
 verificationHint.hidden=!needsVerification;

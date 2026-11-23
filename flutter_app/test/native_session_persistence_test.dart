@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:private_drive/native_session.dart';
@@ -16,6 +17,7 @@ void main() {
 
   setUp(() {
     FlutterSecureStorage.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({});
     vault = const PdNativeSessionVault();
   });
 
@@ -99,10 +101,32 @@ void main() {
     expect(await vault.read(),isNull);
   });
 
+  test('reinstall cannot reuse old Keychain record without install marker', () async {
+    await vault.save(valid());
+    expect((await vault.read())?.token, token);
+    // Simulate app-data deletion on reinstall while Keychain still retains item.
+    SharedPreferences.setMockInitialValues({});
+    final fresh = const PdNativeSessionVault();
+    expect(await fresh.read(), isNull);
+    // A new verified OTP login establishes a new installation marker.
+    await fresh.save(valid(userId: 'new-verified-account'));
+    expect((await fresh.read())?.userId, 'new-verified-account');
+  });
+
+  test('restored preferences with a mismatching install id reject old token', () async {
+    await vault.save(valid());
+    SharedPreferences.setMockInitialValues({
+      'pd_native_install_id_v1': 'restored-different-installation',
+    });
+    expect(await const PdNativeSessionVault().read(), isNull);
+  });
+
   test('plaintext local preferences are never used for credentials', () async {
     await vault.save(valid());
-    final stored=await const FlutterSecureStorage().read(key:'pd_native_session_v1');
-    expect(stored, contains(token));
-    expect(stored, contains('expires_at'));
+    final prefs = await SharedPreferences.getInstance();
+    final values = prefs.getKeys().map((key) => prefs.get(key).toString()).join();
+    expect(values, isNot(contains(token)));
+    expect(prefs.getString('pd_native_install_id_v1'), isNotEmpty);
+    expect((await vault.read())?.token, token);
   });
 }

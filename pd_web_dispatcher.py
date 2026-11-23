@@ -34,16 +34,16 @@ small{color:var(--pd-muted,#c7b79e)}
 {% if registered %}<p role="status">Пароль создан. Теперь войди в диспетчерскую.</p>{% endif %}
 {% if ready %}
 <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
-{% if registration %}<label for="invite">Код приглашения</label>
+{% if registration %}<label for="invite">{{ 'Код восстановления' if recovery else 'Код приглашения' }}</label>
 <input id="invite" name="invite" required maxlength="128" autocomplete="off" autocapitalize="none" spellcheck="false">
 {% endif %}<label for="password">Пароль</label>
 <input id="password" type="password" name="password" autocomplete="{{ 'new-password' if registration else 'current-password' }}" required maxlength="{{ 128 if registration else 512 }}" {% if registration %}minlength="12"{% endif %}>
 {% if registration %}<label for="confirmation">Повтори пароль</label>
 <input id="confirmation" type="password" name="confirmation" autocomplete="new-password" required minlength="12" maxlength="128">
-{% endif %}<button>{{ 'Создать пароль' if registration else 'Войти' }}</button></form>
+{% endif %}<button>{{ 'Сохранить новый пароль' if recovery else ('Создать пароль' if registration else 'Войти') }}</button></form>
 {% endif %}
 {% if registration %}<a href="/dispatch/login">Войти в диспетчерскую</a>
-{% else %}<a href="/dispatch/register">Регистрация по приглашению</a>{% endif %}
+{% else %}<a href="/dispatch/register">Регистрация по приглашению</a> · <a href="/dispatch/recover">Восстановить пароль</a>{% endif %}
 </main></html>"""
 
 
@@ -89,10 +89,38 @@ class DispatcherPasswords:
             return result.rowcount == 1
 
 
-def auth_page(app, registration=False, ready=False, status=200, **context):
-    title = "Регистрация диспетчера" if registration else "Вход диспетчера"
+    def recover(self, admin_id, previous_hash, new_hash, token_hash):
+        with self.connect() as db:
+            db.execute("SELECT pg_advisory_xact_lock(192784221, 1)")
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS private_drive_dispatcher_recoveries (
+                    token_hash text PRIMARY KEY
+                )
+            """)
+            if db.execute(
+                "SELECT 1 FROM private_drive_dispatcher_recoveries WHERE token_hash = %s",
+                (token_hash,),
+            ).fetchone():
+                return False
+            result = db.execute("""
+                UPDATE private_drive_dispatcher_passwords SET password_hash = %s
+                WHERE admin_id = %s AND password_hash = %s
+            """, (new_hash, admin_id, previous_hash))
+            if result.rowcount != 1:
+                return False
+            db.execute(
+                "INSERT INTO private_drive_dispatcher_recoveries VALUES (%s)",
+                (token_hash,),
+            )
+            return True
+
+
+def auth_page(app, registration=False, ready=False, status=200, recovery=False, **context):
+    title = "Восстановление пароля" if recovery else (
+        "Регистрация диспетчера" if registration else "Вход диспетчера"
+    )
     page = render_template_string(AUTH_PAGE, title=title, registration=registration,
-                                  ready=ready, **context)
+                                  ready=ready, recovery=recovery, **context)
     return app.make_response((page, status, {
         "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer",
@@ -114,6 +142,9 @@ def register(app, core):
         invite_hash = hashlib.sha256(invite_code.encode()).hexdigest()
     raw_expiration = os.environ.get("PD_DISPATCH_INVITE_EXPIRES", "")
     expires = int(raw_expiration) if re.fullmatch(r"[0-9]{1,12}", raw_expiration) else 0
+    recovery_hash = os.environ.get("PD_DISPATCH_RECOVERY_SHA256", "")
+    recovery_expiry = os.environ.get("PD_DISPATCH_RECOVERY_EXPIRES", "")
+    recovery_deadline = int(recovery_expiry) if re.fullmatch(r"[0-9]{1,12}", recovery_expiry) else 0
     passwords = DispatcherPasswords(dsn) if dsn else None
     valid_admin = re.fullmatch(r"[0-9]{1,18}", raw_admin) and int(raw_admin) in core.ADMIN_IDS
     configured = password_hash.startswith(("scrypt:", "pbkdf2:")) or passwords is not None
@@ -149,9 +180,19 @@ def register(app, core):
         return bool(value) and secrets.compare_digest(value, supplied)
 
     def authorized():
-        return (session.get("pd_dispatch_authenticated") is True
+        if not (session.get("pd_dispatch_authenticated") is True
                 and session.get("pd_dispatch_admin_id") == admin_id
-                and core.is_admin(admin_id))
+                and core.is_admin(admin_id)):
+            return False
+        try:
+            credential = passwords.read(admin_id) if passwords else password_hash
+        except Exception as exc:
+            app.logger.error("Dispatcher credential unavailable (%s)", type(exc).__name__)
+            return False
+        return bool(credential) and secrets.compare_digest(
+            session.get("pd_dispatch_credential_version", ""),
+            hashlib.sha256(credential.encode()).hexdigest(),
+        )
 
     def within_attempt_limit(kind):
         ip = request.remote_addr or "unknown"
@@ -209,6 +250,41 @@ def register(app, core):
         session.clear()
         return redirect(url_for("pd_dispatch_login", registered=1), code=303)
 
+    @app.route("/dispatch/recover", methods=["GET", "POST"])
+    def pd_dispatch_recover():
+        def page(error="", status=200, ready=False):
+            return auth_page(app, registration=True, recovery=True, status=status,
+                             error=error, ready=ready, csrf=csrf() if ready else "")
+
+        if (not passwords or not core.is_admin(admin_id)
+                or not re.fullmatch(r"[0-9a-f]{64}", recovery_hash)
+                or time.time() >= recovery_deadline):
+            return page("Нет действующего кода восстановления.", 403)
+        if request.method == "GET":
+            return page(ready=True)
+        failure = verify_form("recover")
+        if failure:
+            return failure
+        supplied = request.form.get("invite", "").strip()
+        if not secrets.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(), recovery_hash):
+            return page("Код восстановления неверен или уже использован.", 403, ready=True)
+        password = request.form.get("password", "")
+        if not 12 <= len(password) <= 128 or password.isspace():
+            return page("Введи пароль длиной от 12 до 128 символов.", 400, ready=True)
+        if password != request.form.get("confirmation", ""):
+            return page("Пароли не совпадают.", 400, ready=True)
+        try:
+            previous = passwords.read(admin_id)
+            if not previous or not passwords.recover(
+                admin_id, previous, generate_password_hash(password), recovery_hash
+            ):
+                return page("Код восстановления неверен или уже использован.", 403)
+        except Exception as exc:
+            app.logger.error("Dispatcher recovery unavailable (%s)", type(exc).__name__)
+            return page("Восстановление временно недоступно.", 503)
+        session.clear()
+        return redirect(url_for("pd_dispatch_login", registered=1), code=303)
+
     @app.route("/dispatch/login", methods=["GET", "POST"])
     def pd_dispatch_login():
         if authorized():
@@ -228,6 +304,7 @@ def register(app, core):
                 session.permanent = True
                 session["pd_dispatch_authenticated"] = True
                 session["pd_dispatch_admin_id"] = admin_id
+                session["pd_dispatch_credential_version"] = hashlib.sha256(credential.encode()).hexdigest()
                 csrf()
                 attempts.pop(("login", request.remote_addr or "unknown"), None)
                 return redirect(url_for("pd_dispatch_home"))

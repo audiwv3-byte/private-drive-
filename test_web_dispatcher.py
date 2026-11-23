@@ -2,6 +2,7 @@
 Uses only a temporary Flask application and synthetic credentials.
 """
 import os
+import hashlib
 import time
 import unittest
 from types import SimpleNamespace
@@ -127,6 +128,57 @@ class DispatcherBrowserTests(unittest.TestCase):
                 "csrf": new_csrf, "password": form["password"],
             }).location, "/dispatch")
             self.assertEqual(client.get("/dispatch").status_code, 200)
+
+    def test_recovery_code_rotates_password_once_and_closes_prior_session(self):
+        code = "synthetic-recovery-code"
+        old = "previous-test-password"
+        new = "replacement-test-password"
+        state = {"credential": generate_password_hash(old)}
+        consumed = set()
+
+        def recover(admin_id, previous, replacement, token):
+            if previous != state["credential"] or token in consumed:
+                return False
+            state["credential"] = replacement
+            consumed.add(token)
+            return True
+
+        store = SimpleNamespace(read=lambda uid: state["credential"], recover=recover)
+        core = SimpleNamespace(ADMIN_IDS={999}, is_admin=lambda uid: uid == 999)
+        cfg = {
+            "PD_DISPATCH_SESSION_SECRET": "synthetic-secret-32-characters-minimum-12345",
+            "PD_DISPATCH_ADMIN_ID": "999",
+            "PD_DISPATCH_DATABASE_URL": "synthetic-db-dsn",
+            "PD_DISPATCH_RECOVERY_SHA256": hashlib.sha256(code.encode()).hexdigest(),
+            "PD_DISPATCH_RECOVERY_EXPIRES": str(int(time.time()) + 60),
+        }
+        with patch.dict(os.environ, cfg, clear=True), patch.object(
+                pd_web_dispatcher, "DispatcherPasswords", return_value=store):
+            app = Flask("dispatch_recovery")
+            self.assertTrue(pd_web_dispatcher.register(app, core))
+            signed_in = app.test_client()
+            recovery = app.test_client()
+
+            def csrf_for(client, route):
+                self.assertEqual(client.get(route).status_code, 200)
+                with client.session_transaction() as session:
+                    return session["pd_dispatch_csrf"]
+
+            login_url, recover_url = "/dispatch/login", "/dispatch/recover"
+            self.assertEqual(signed_in.post(login_url, data={
+                "csrf": csrf_for(signed_in, login_url), "password": old,
+            }).status_code, 302)
+            form = {"csrf": csrf_for(recovery, recover_url), "invite": code,
+                    "password": new, "confirmation": new}
+            self.assertEqual(recovery.post(recover_url, data={**form, "invite": "wrong"}).status_code, 403)
+            self.assertEqual(recovery.post(recover_url, data=form).status_code, 303)
+            self.assertEqual(signed_in.get("/dispatch").location, login_url)
+            self.assertEqual(recovery.post(recover_url, data={
+                **form, "csrf": csrf_for(recovery, recover_url),
+            }).status_code, 403)
+            csrf = csrf_for(recovery, login_url)
+            self.assertEqual(recovery.post(login_url, data={"csrf": csrf, "password": old}).status_code, 200)
+            self.assertEqual(recovery.post(login_url, data={"csrf": csrf, "password": new}).location, "/dispatch")
 
     def test_registration_without_configuration_is_closed(self):
         app, _ = self.make_app(False)

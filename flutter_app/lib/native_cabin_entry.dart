@@ -39,6 +39,13 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   bool _localPilotOpened = false;
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
 
+  void _openTestSync() {
+    setState(() {
+      _testSyncStarted = true;
+      _showTestSync = true;
+    });
+  }
+
   void _entry() {
     Navigator.of(context).popUntil((route) => route.isFirst);
     setState(() { _page = 'entry'; _message = null; });
@@ -102,20 +109,22 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   @override
   void dispose() { _expiry?.cancel(); super.dispose(); }
 
-  Widget _cabin(String role, PdNativeSession? session, {bool localQa = false}) {
+  Widget _cabin(String role, PdNativeSession? session,
+      {bool localQa = false, bool showPilotCockpit = true}) {
     final cabin = PrivateDriveDemo(
       key: ValueKey('entry-$role-${session?.userId ?? (localQa ? 'local-qa' : 'guest')}'),
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',
       showPilotIdentityCheck: !localQa,
+      showPilotCockpit: showPilotCockpit,
       storageScope: session?.userId ?? (localQa ? 'local-qa' : 'internal-guest'),
       onSignOut: _signOut, onBackToCabinets: _entry,
     );
     if (localQa) {
       return Scaffold(body: SafeArea(child: Column(children: [
-        const Padding(
-          padding: EdgeInsets.all(8),
-          child: Text('Внутренний тест · локальные данные',
-            key: Key('local-qa-status'), textAlign: TextAlign.center),
+        TextButton(
+          key: const Key('local-qa-status'),
+          onPressed: _openTestSync,
+          child: const Text('Локальные данные · подключить диспетчерскую'),
         ),
         Expanded(child: cabin),
       ])));
@@ -153,7 +162,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             onPopInvokedWithResult: (didPop, _) {
               if (!didPop && showLocalPilot) _entry();
             },
-            child: _cabin('pilot', null, localQa: true),
+            child: _cabin('pilot', null, localQa: true,
+              showPilotCockpit: showLocalPilot),
           ),
         ),
       ),
@@ -244,10 +254,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 key: const Key('entry-staging-dispatch'),
-                onPressed: () => setState(() {
-                  _testSyncStarted = true;
-                  _showTestSync = true;
-                }),
+                onPressed: _openTestSync,
                 icon: const Icon(Icons.sync_alt),
                 label: const Text('Тестовая связь с диспетчерской'),
               ),

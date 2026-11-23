@@ -24,6 +24,7 @@ class PilotCabin extends StatefulWidget {
     this.onSignOut,
     this.onBackToCabinets,
     this.showIdentityCheck = true,
+    this.showCockpit = true,
   });
 
   final bool enableMapTiles;
@@ -31,6 +32,7 @@ class PilotCabin extends StatefulWidget {
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
   final bool showIdentityCheck;
+  final bool showCockpit;
   /// Test-only hook to verify alert repetition without device audio.
   final VoidCallback? onOfferAlert;
 
@@ -71,14 +73,25 @@ class _PilotCabinState extends State<PilotCabin> {
     PilotPaymentSettings.instance.addListener(_onPaymentSettingsChanged);
     _onPaymentSettingsChanged();
     unawaited(_loadPaymentSettings());
-    if (_onLine) {
+    if (_onLine && widget.showCockpit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
+        if (mounted && widget.showCockpit) {
           _openMap();
           _showCockpitOverlay();
         }
       });
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant PilotCabin oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.showCockpit == oldWidget.showCockpit) return;
+    if (!widget.showCockpit) {
+      _removeCockpitEntry();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showCockpitOverlay());
   }
 
   Future<void> _loadPaymentSettings() async {
@@ -119,7 +132,7 @@ class _PilotCabinState extends State<PilotCabin> {
   }
 
   void _showCockpitOverlay() {
-    if (!_onLine || !mounted || _cockpitEntry != null) return;
+    if (!mounted || !widget.showCockpit || !_onLine || _cockpitEntry != null) return;
     _cockpitEntry = OverlayEntry(
       builder: (_) => PilotCockpitOverlay(
         tripStore: widget.tripStore,
@@ -136,6 +149,10 @@ class _PilotCabinState extends State<PilotCabin> {
     _offerAlert = null;
     _offerTone.stop();
     _hasAnnouncedOffer = false;
+    _removeCockpitEntry();
+  }
+
+  void _removeCockpitEntry() {
     _cockpitEntry?.remove();
     _cockpitEntry?.dispose();
     _cockpitEntry = null;

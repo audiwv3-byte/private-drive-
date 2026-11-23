@@ -56,10 +56,27 @@ void main() {
         expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
       } else {
         expect(find.byType(PilotCabin), findsOneWidget);
+        await tap(find.byKey(const Key('pilot-power-toggle')));
+        expect(find.byKey(const Key('pilot-cockpit-earnings-toggle')), findsOneWidget);
+        await tap(find.byKey(const Key('exit-pilot-preview')));
       }
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
     }
+
+    expect(find.byKey(const Key('pilot-cockpit-earnings-toggle')), findsNothing);
+    await tap(find.byKey(const Key('entry-passenger')));
+    expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
+    expect(find.byKey(const Key('pilot-cockpit-earnings-toggle')), findsNothing);
+    expect(find.byKey(const Key('pilot-stat-acceptance')), findsNothing);
+    expect(find.byKey(const Key('pilot-stat-rating')), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tap(find.byKey(const Key('entry-pilot')));
+    expect(find.text('На линии · демо'), findsOneWidget);
+    expect(find.byKey(const Key('pilot-cockpit-earnings-toggle')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
 
     await tap(find.byTooltip('Выйти'));
     expect(pin, findsOneWidget);

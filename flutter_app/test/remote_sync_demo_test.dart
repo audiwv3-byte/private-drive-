@@ -8,6 +8,8 @@ class FakeDemoServer {
   int version = 0;
   List<Map<String, dynamic>> events = [];
   List<Map<String, dynamic>> messages = [];
+  Map<String, dynamic> gps = {'available': false};
+  bool gpsUnavailable = false;
 
   RemoteTripGateway actor(String role) => FakeGateway(this, role);
 
@@ -39,7 +41,8 @@ class FakeGateway extends RemoteTripGateway {
       return {'trip': server.trip};
     }
     if (path.endsWith('/gps')) {
-      return {'gps': {'available': false}};
+      if (server.gpsUnavailable) throw const RemoteDemoException('gps_offline');
+      return {'gps': server.gps};
     }
     if (path.contains('/messages?after=')) {
       final after = int.parse(path.split('after=').last);
@@ -360,6 +363,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(server.messages,hasLength(1));
     expect(find.text('Пассажир: Проверка'),findsOneWidget);
+  });
+
+  testWidgets('dispatcher GPS is shown only from valid server fix and hidden on outage',
+      (tester) async {
+    final server = FakeDemoServer();
+    server.trip = {
+      'id':'11111111111111111111111111111111',
+      'origin':'Test A','destination':'Test B',
+      'pilot':'pilot_test','status':'assigned','paused':0,'version':2,
+    };
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      gateway:server.actor('dispatcher'), enableMapTiles:false,
+      pollInterval:const Duration(hours:1),
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('Подтверждённых GPS-точек нет'),findsOneWidget);
+    server.gps={'available':true,'latitude':54.6872,'longitude':25.2797};
+    await tester.tap(find.byKey(const Key('remote-refresh')));
+    await tester.pumpAndSettle();
+    expect(find.text('GPS пилота подтверждён · тест'),findsOneWidget);
+    server.gpsUnavailable=true;
+    await tester.tap(find.byKey(const Key('remote-refresh')));
+    await tester.pumpAndSettle();
+    expect(find.text('Подтверждённых GPS-точек нет'),findsOneWidget);
+    expect(find.byKey(const Key('remote-trip-route')),findsOneWidget,
+      reason:'GPS outage must not prevent trip refresh');
+    server.gpsUnavailable=false;
+    server.gps={'available':true,'latitude':999,'longitude':25.2797};
+    await tester.tap(find.byKey(const Key('remote-refresh')));
+    await tester.pumpAndSettle();
+    expect(find.text('Подтверждённых GPS-точек нет'),findsOneWidget);
   });
 
 }

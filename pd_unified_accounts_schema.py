@@ -36,6 +36,28 @@ SCHEMA = (
        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
        CHECK (display_name IS NULL OR length(display_name) <= 160)
     )""",
+    """CREATE OR REPLACE FUNCTION pd_validate_pilot_review_actor()
+       RETURNS trigger
+       LANGUAGE plpgsql
+       AS $pd$
+       BEGIN
+         IF NEW.review_status IN ('approved','rejected','suspended') THEN
+           IF NEW.reviewed_by IS NULL OR NEW.reviewed_at IS NULL
+              OR NEW.reviewed_by = NEW.user_id
+              OR NOT EXISTS (
+                 SELECT 1 FROM native_auth_roles r
+                 WHERE r.user_id=NEW.reviewed_by AND r.role='admin'
+              ) THEN
+              RAISE EXCEPTION 'pilot_review_requires_admin'
+                USING ERRCODE='42501';
+           END IF;
+         END IF;
+         RETURN NEW;
+       END
+       $pd$""",
+    """CREATE OR REPLACE TRIGGER pd_pilot_reviews_admin_gate
+       BEFORE INSERT OR UPDATE ON pd_pilot_reviews
+       FOR EACH ROW EXECUTE FUNCTION pd_validate_pilot_review_actor()""",
     "CREATE INDEX IF NOT EXISTS pd_pilot_reviews_status ON pd_pilot_reviews(review_status, created_at DESC)",
 )
 PILOT_LABELS = {"pending": "На проверке", "approved": "Одобрен",

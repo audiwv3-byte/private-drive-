@@ -88,7 +88,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       try {
         final identity = await api.get('/v1/me');
         if (identity['role'] != session.role ||
-            identity['user_id'] != session.userId) {
+            identity['actor'] != session.userId) {
           await prefs.remove(_qaSessionKey);
           return;
         }

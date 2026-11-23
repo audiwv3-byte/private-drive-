@@ -37,7 +37,7 @@ void main() {
         if (!acceptSession) {
           return http.Response('{"error":"unauthorized"}', 401);
         }
-        return http.Response('{"role":"passenger","user_id":"passenger-qa"}', 200);
+        return http.Response('{"role":"passenger","actor":"passenger-qa"}', 200);
       }
       if (request.url.path == '/v1/current') {
         return http.Response('{"trip":null,"gps":null}', 200);

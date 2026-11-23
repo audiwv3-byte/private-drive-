@@ -77,7 +77,7 @@ def verify(url, inbox):
     if (qa.get("qa") is not True or qa.get("verified") is not False or
             qa.get("token_type") != "Bearer" or
             identity.get("role") != "passenger" or
-            identity.get("user_id") != qa.get("user_id")):
+            identity.get("actor") != qa.get("user_id")):
         raise RuntimeError("HTTPS QA sign-in did not yield a valid passenger session")
     sessions = {}
     for index, role in enumerate(("passenger", "pilot", "dispatcher"), start=1):

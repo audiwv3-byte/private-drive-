@@ -174,7 +174,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       try {
         final identity = await api.get('/v1/me');
         if (identity['role'] != session.role ||
-            identity['user_id'] != session.userId) {
+            identity['actor'] != session.userId) {
           throw const FormatException('Тестовый сервер вернул другой аккаунт.');
         }
       } finally {

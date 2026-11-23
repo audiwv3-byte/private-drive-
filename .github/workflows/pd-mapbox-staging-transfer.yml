@@ -35,11 +35,11 @@ jobs:
           print('MAPBOX_PUBLIC_TOKEN: ' + ('PRESENT' if mapbox else 'ABSENT'))
           print('RENDER_API_KEY: ' + ('PRESENT' if render else 'ABSENT'))
           if not mapbox or not render:
-              print('TRANSFER: SKIPPED_MISSING_SECRET')
-              sys.exit(0)
+              print('TRANSFER: REQUIRED_SECRET_MISSING')
+              sys.exit(1)
           if not re.fullmatch(r'pk\.[A-Za-z0-9_.-]{1,512}', mapbox):
-              print('TRANSFER: SKIPPED_INVALID_PUBLIC_TOKEN')
-              sys.exit(0)
+              print('TRANSFER: INVALID_PUBLIC_TOKEN')
+              sys.exit(1)
           url = ('https://api.render.com/v1/services/'
                  'srv-dc0qfsp42hec73c7ff3g/env-vars/MAPBOX_WEB_PUBLIC_TOKEN')
           req = urllib.request.Request(

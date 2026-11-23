@@ -300,12 +300,12 @@ def create_order():
         quote_status='Предварительная' if price else 'Не рассчитано')
     core.initialize()
     if request_key:
-        oid,created=core.order_save(uid,st,request_key,fingerprint)
+        oid,created=core.order_save(uid,st,request_key,fingerprint,booking_source='telegram_miniapp')
         if not created:
             previous=core.order_find(oid)
             return jsonify(ok=True,order_id=oid,status=previous['status'],price=previous['price'],replayed=True)
     else:
-        oid=core.order_save(uid,st)
+        oid=core.order_save(uid,st,booking_source='telegram_miniapp')
     with core.db(core.ORDERS_DB) as conn:
         conn.execute('UPDATE orders SET stop_address=? WHERE id=? AND telegram_id=?',(stop_address,oid,uid))
     r=core.order_find(oid)

@@ -87,9 +87,24 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
         check(call('/api/order',booking|{'passengers':2}),400)
     oid=first['order_id'];r=core.order_find(oid)
     assert repeat['order_id']==oid and repeat['replayed']
+    assert r['booking_source'] == 'telegram_miniapp'
     assert (r['passengers'],r['luggage'],r['stop_address'],r['price'])==(3,'2 чемодана','Trakai','107.80')
     check(call('/api/payment/'+str(oid),uid=103),403)
     print('PASS route, pet pricing, map validation, passengers, luggage, stop and duplicate prevention')
+    with core.db(core.ORDERS_DB) as conn:
+        for _ in range(101):
+            conn.execute("""INSERT INTO orders
+                (telegram_id, order_type, origin, destination, trip_date, trip_time, passengers, luggage)
+                VALUES(101, 'Test', 'Vilnius', 'Kaunas', ?, '14:00', 1, '')""", (future,))
+    page = check(call('/api/admin/orders', uid=999), 200)
+    assert len(page['orders']) == 100 and page['next_before'] == page['orders'][-1]['id']
+    older = check(call('/api/admin/orders?before='+str(page['next_before']), uid=999), 200)
+    assert older['next_before'] is None and any(row['id']==oid for row in older['orders'])
+    assert not ({row['id'] for row in page['orders']} & {row['id'] for row in older['orders']})
+    console = check(call('/api/admin/console/orders?q='+str(oid), uid=999), 200)
+    assert next(row for row in console['orders'] if row['id']==oid)['booking_source']=='telegram_miniapp'
+    with core.db(core.ORDERS_DB) as conn:
+        conn.execute('DELETE FROM orders WHERE id > ?', (oid,))
     check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=999),200)
     check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=999),400)
     bank=check(call(f'/api/payment/{oid}/bank',{}),200)

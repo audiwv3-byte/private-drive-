@@ -60,7 +60,11 @@ class FakeGateway extends RemoteTripGateway {
           (role == 'pilot' && server.trip?['pilot'] == 'pilot_test')) &&
         ['requested', 'assigned', 'approaching', 'underway']
             .contains(server.trip?['status'])) {
+      final dup = server.messages.where(
+        (m) => m['client_id'] == data['client_id'] && m['role'] == role);
+      if (dup.isNotEmpty) return {'message': dup.first};
       final message = <String, dynamic>{
+        'client_id': data['client_id'],
         'seq': server.messages.length + 1,
         'role': role,
         'body': data['text'],
@@ -97,6 +101,20 @@ class FakeGateway extends RemoteTripGateway {
       return server.advance(next, 'advance');
     }
     throw StateError('Forbidden fake route: $path');
+  }
+}
+
+class FlakyChatGateway extends FakeGateway {
+  FlakyChatGateway(super.server, super.role);
+  bool loseResponse = true;
+  @override
+  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> data) async {
+    if (path.endsWith('/messages') && loseResponse) {
+      loseResponse = false;
+      await super.post(path, data);
+      throw const RemoteDemoException('lost response after commit');
+    }
+    return super.post(path, data);
   }
 }
 
@@ -319,5 +337,29 @@ void main() {
     expect(alerts, 2);
   });
 
+
+  testWidgets('lost response reuses chat client_id and never duplicates',
+      (tester) async {
+    final server=FakeDemoServer();
+    server.trip={
+      'id':'11111111111111111111111111111111',
+      'origin':'Test A','destination':'Test B',
+      'pilot':'pilot_test','status':'assigned','paused':0,'version':2,
+    };
+    final gateway=FlakyChatGateway(server,'passenger');
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      gateway:gateway,enableMapTiles:false,
+      pollInterval:const Duration(hours:1),
+    )));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('remote-chat-input')),'Проверка');
+    await tester.tap(find.byKey(const Key('remote-chat-send')));
+    await tester.pumpAndSettle();
+    expect(server.messages,hasLength(1));
+    await tester.tap(find.byKey(const Key('remote-chat-send')));
+    await tester.pumpAndSettle();
+    expect(server.messages,hasLength(1));
+    expect(find.text('Пассажир: Проверка'),findsOneWidget);
+  });
 
 }

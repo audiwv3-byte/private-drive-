@@ -106,8 +106,8 @@ with sync_playwright() as p:
             duplicateServicesStrip: !!document.querySelector('.pd-extra')
         })""")
         assert visual["sectionBg"] == "rgb(16, 14, 11)", visual
-        assert visual["headingColor"] == "rgb(237, 202, 130)", visual
-        assert visual["fieldBg"] == "rgb(22, 18, 13)", visual
+        assert visual["headingColor"] == "rgb(237, 204, 134)", visual
+        assert visual["fieldBg"] == "rgb(246, 242, 234)", visual
         assert "gradient" in visual["heroBg"], visual
         assert not visual["duplicateContactStrip"] and not visual["duplicateServicesStrip"], visual
         page.locator(".pd-contacts-nav summary").click()

@@ -316,6 +316,11 @@ def register(app, core):
         from pd_site_analytics import register as register_site_analytics
         register_site_analytics(app, authorized, passwords.connect)
 
+    from pd_dispatch_persistent import enabled as persistent_queue_ready
+    from pd_dispatch_persistent import register as register_persistent_queue
+    register_persistent_queue(app, authorized)
+    persistent_queue_enabled = persistent_queue_ready()
+
     test_sync_enabled = (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
                          and os.environ.get("PD_DISPATCH_TEST_SYNC") == "1")
     if test_sync_enabled:
@@ -329,7 +334,7 @@ def register(app, core):
 
     @app.get("/dispatch")
     def pd_dispatch_home():
-        if test_sync_enabled:
+        if test_sync_enabled or persistent_queue_enabled:
             return pd_dispatch_map()
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
@@ -349,7 +354,8 @@ def register(app, core):
             token = ""
         page = Path(__file__).with_name("pd_dispatcher_mapbox.html").read_text(encoding="utf-8")
         response = app.make_response(render_template_string(
-            page, mapbox_token=token, test_sync_enabled=test_sync_enabled,
+            page, mapbox_token=token, test_sync_enabled=test_sync_enabled and not persistent_queue_enabled,
+            persistent_queue_enabled=persistent_queue_enabled,
             analytics_enabled="pd_site_analytics" in app.view_functions,
             csrf=csrf() if test_sync_enabled else "",
         ))

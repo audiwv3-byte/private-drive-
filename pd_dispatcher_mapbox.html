@@ -48,6 +48,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <a href="#pilotsTitle">Пилоты</a>
 {% if analytics_enabled %}<a href="/dispatch/analytics">Воронка сайта</a>{% endif %}
 <a href="/pilot-registration">Регистрация пилота</a>
+<a href="/dispatch/qa-pilot-applications" target="_blank" rel="noopener">Анкеты пилотов (QA)</a>
 <a class="btn" href="/dispatch/test-sync">Тестовая связь</a>
 <form method="post" action="/dispatch/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Выйти</button></form>
 {% else %}<span class="label">Доступ к заказам закрыт</span><a class="btn" href="/dispatch">В панель управления</a>{% endif %}

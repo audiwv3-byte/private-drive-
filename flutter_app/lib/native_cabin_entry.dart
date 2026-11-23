@@ -47,7 +47,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     try {
       final restored = await widget.sessionManager!.restore();
       if (!mounted || restored == null || _session != null) return;
-      _authenticated(restored, persist: false);
+      _authenticated(restored, persist: false, restored: true);
     } catch (_) {
       // No session or role is granted until the server validates the token.
     } finally {
@@ -112,7 +112,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       }
     });
   }
-  void _authenticated(PdNativeSession session, {bool persist = true}) {
+  void _authenticated(PdNativeSession session, {
+    bool persist = true, bool restored = false,
+  }) {
     if (!mounted || !session.active) return;
     if (persist && widget.sessionManager != null) {
       // Persist only OTP-verified sessions received from the existing
@@ -125,7 +127,11 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     });
     setState(() {
       _session = session;
-      if (_requestedRole == 'pilot' && session.canPilot) {
+      // After a cold start, never auto-enter a previously chosen staff cabin.
+      // Require explicit cabin selection from freshly verified server rights.
+      if (restored) {
+        _page = 'entry';
+      } else if (_requestedRole == 'pilot' && session.canPilot) {
         _page = 'photo';
       } else if (_requestedRole == 'dispatcher' && session.canDispatch) {
         _page = 'dispatcher';

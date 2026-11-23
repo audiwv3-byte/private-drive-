@@ -19,3 +19,30 @@ jobs:
         run: python -m pip install 'Flask==3.0.3' 'Werkzeug==3.1.9'
       - name: Test browser dispatcher in isolation
         run: python -m unittest -v test_web_dispatcher.py test_dispatcher_staging_wsgi.py test_passenger_dispatch_qa.py test_unified_accounts_schema.py test_dispatch_accounts.py test_private_drive_encrypted_pg_backup.py test_db_connection_transition.py
+
+  dispatcher-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pd_dispatch_ci
+          POSTGRES_USER: pd_ci
+          POSTGRES_PASSWORD: local-synthetic-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pd_ci -d pd_dispatch_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dispatcher and Postgres test dependencies
+        run: python -m pip install 'Flask==3.0.3' 'Werkzeug==3.1.9' 'psycopg[binary]==3.2.13'
+      - name: Verify the shared order inbox survives a service restart
+        env:
+          PD_DISPATCH_LOCAL_POSTGRES_CI: '1'
+        run: python -m unittest -v test_dispatcher_persistent_postgres

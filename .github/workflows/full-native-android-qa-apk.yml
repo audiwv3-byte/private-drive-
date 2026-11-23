@@ -112,8 +112,7 @@ jobs:
           flutter test
           flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_check_page_test.dart
           flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_notice_page_test.dart test/offline_auth_test.dart test/internal_guest_sign_in_test.dart test/native_cabin_entry_test.dart
-          flutter test --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN" test/local_qa_entry_test.dart \\
-            --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com
+          flutter test --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN" test/local_qa_entry_test.dart
       - name: Compile full main.dart debug APK for local QA
         working-directory: private_drive_build
         shell: bash
@@ -153,7 +152,8 @@ jobs:
           flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112308 \
             --dart-define="PD_QA_BUILD_LABEL=Версия $QA_VERSION · внутренняя сборка" \
             --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN" \
-            --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN"
+            --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN" \
+            --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com
           APK=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$APK"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"

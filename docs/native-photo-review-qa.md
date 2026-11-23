@@ -1,6 +1,6 @@
 # PRIVATE DRIVE Android QA — cabin entry
 
-## Local Android QA build 0.2.28
+## Local Android QA build 0.2.29
 
 The internal Android APK opens a local PIN prompt before the cabin selector.
 The PIN is a build fixture carried only by that APK; it establishes no native

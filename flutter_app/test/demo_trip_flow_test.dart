@@ -187,10 +187,10 @@ void main() {
     await tester.pump();
     await tester.tap(book);
     await tester.pump();
-    expect(find.text('Заявка создана · ожидает назначения'), findsOneWidget);
-    // The booking form may be replaced after submission; the order status
-    // and lack of a second create action prove submission is complete.
-    expect(find.byKey(const Key('passenger-trip-status')), findsWidgets);
+    expect(find.byKey(const Key('passenger-pd-waiting-indicator')), findsOneWidget);
+    final status = find.byKey(const Key('passenger-trip-status'));
+    await tester.scrollUntilVisible(status, -160);
+    expect(tester.widget<Text>(status).data, 'Заявка создана · ожидает назначения');
 
     await tester.pageBack();
     await tester.pumpAndSettle();

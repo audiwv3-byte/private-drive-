@@ -5,6 +5,10 @@ on:
       - feature/web-dispatcher-browser-auth
     paths:
       - 'flutter_app/lib/native_logout_api.dart'
+      - 'flutter_app/lib/native_session_manager.dart'
+      - 'flutter_app/lib/native_session_vault.dart'
+      - 'flutter_app/test/native_session_persistence_test.dart'
+      - 'flutter_app/pubspec.yaml'
       - 'flutter_app/lib/native_cabin_entry.dart'
       - 'flutter_app/lib/main.dart'
       - 'flutter_app/test/native_logout_api_test.dart'
@@ -36,6 +40,6 @@ jobs:
       - name: Fetch dependencies
         run: flutter pub get
       - name: Check secure logout and cabin widgets with mock HTTP only
-        run: flutter test --no-pub --reporter expanded test/native_logout_api_test.dart test/native_cabin_entry_test.dart
+        run: flutter test --no-pub --reporter expanded test/native_logout_api_test.dart test/native_cabin_entry_test.dart test/native_session_persistence_test.dart
       - name: Check Flutter static analysis
         run: flutter analyze --no-fatal-infos

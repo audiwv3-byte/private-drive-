@@ -343,7 +343,7 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
 <details class="pd-route-details" id="route-details"><summary>Карта и подробный расчёт маршрута</summary><section id="order" class="order-section" aria-label="Форма поездки и трансфера">
 <div class="order-shell">
 <div class="order-panel">
-<h2>Заказать поездку</h2><p>Выбери тип поездки, укажи адреса и время подачи. Пока это тестовый предпросмотр без отправки заказа.</p>
+<h2>Заказать поездку</h2><p>Выбери тип поездки, укажи адреса и время подачи. Тестовая отправка заявки на сервер доступна после указания маршрута; реальные заказы и платежи отключены.</p>
 <div class="order-tabbar" role="tablist" aria-label="Тип поездки">
 <button class="order-tab" id="trip-tab" role="tab" type="button" aria-selected="true">Поездка</button>
 <button class="order-tab" id="transfer-tab" role="tab" type="button" aria-selected="false">Трансфер</button>
@@ -356,8 +356,8 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
 <div class="order-field"><label for="pickup-time">Время подачи</label><input id="pickup-time" name="time" type="time"></div>
 <div class="order-field full"><label for="car-category">Класс автомобиля</label><select id="car-category" name="category"><option value="comfort">Комфорт</option></select></div>
 </div>
-<div class="order-controls"><button type="button" id="use-location">◎ Моё местоположение</button><button type="button" id="swap-address">⇄ Поменять адреса</button><button class="primary" type="button" id="preview-route">Показать маршрут</button></div>
-<p class="order-hint">Геолокация запрашивается только после нажатия. Координаты остаются в браузере до нажатия «Показать маршрут»; затем выбранные точки передаются тестовому серверу и, если подключён, сервису OpenRouteService. Предварительная стоимость для класса Комфорт появится, когда подключён тестовый сервис маршрутов. Заказы и платежи отключены.</p>
+<div class="order-controls"><button type="button" id="use-location">◎ Моё местоположение</button><button type="button" id="swap-address">⇄ Поменять адреса</button><button class="primary" type="button" id="preview-route">Показать маршрут</button><button class="primary" type="button" id="submit-qa-order">Отправить тестовую заявку диспетчеру</button></div>
+<p class="order-hint">Геолокация запрашивается только после нажатия. Координаты остаются в браузере до нажатия «Показать маршрут»; затем выбранные точки передаются тестовому серверу и, если подключён, сервису OpenRouteService. Предварительная стоимость для класса Комфорт появится, когда подключён тестовый сервис маршрутов. Только тестовые заявки отправляются в кабинет диспетчера; реальные заказы и платежи отключены.</p>
 <p class="order-hint"><a href="/payment/paysera">Оплата через Paysera</a></p>
 <div class="order-result" id="order-status" role="status" aria-live="polite">Выбери адреса. Карта справа интерактивная.</div>
 </form></div>
@@ -460,6 +460,40 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
   });
  }
  $("passenger-preview").addEventListener("submit",e=>e.preventDefault());
+
+// All website entry points converge on the isolated dispatcher queue.
+// Never submit silently when selecting a fare, route, or displaying the map.
+ let pendingWebsiteReference=null;
+ let websiteSending=false;
+ $("submit-qa-order").addEventListener("click",async()=>{
+   if(websiteSending)return;
+   const from=fields.origin.value.trim(),to=fields.destination.value.trim();
+   if(!from||!to||from.toLowerCase()===to.toLowerCase()){
+     setStatus("Для отправки заявки укажи разные адреса отправления и назначения.");return;
+   }
+   if(!pendingWebsiteReference){
+     const bytes=crypto.getRandomValues(new Uint8Array(16));
+     pendingWebsiteReference=Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+   }
+   websiteSending=true;
+   const button=$("submit-qa-order");button.disabled=true;
+   setStatus("Отправляем тестовую заявку в диспетчерскую…");
+   try{
+     const response=await fetch("/preview/api/qa-booking",{
+       method:"POST",credentials:"same-origin",
+       headers:{"Content-Type":"application/json","Accept":"application/json"},
+       body:JSON.stringify({from,to,reference:pendingWebsiteReference,source:"detailed"})
+     });
+     const data=await response.json();
+     if(!response.ok||!data.qa_only||!data.trip||!data.trip.id)
+       throw new Error(response.status===429?"Слишком много тестовых заявок. Повтори позже.":"Сервер не подтвердил заявку.");
+     setStatus("Тестовая заявка №"+data.trip.id.slice(0,8)+" принята сервером и добавлена в очередь диспетчера. Оплата не выполнялась.");
+     pendingWebsiteReference=null;
+   }catch(error){
+     setStatus(error.message||"Заявка не подтверждена. Проверь соединение перед повтором.");
+   }finally{websiteSending=false;button.disabled=false;}
+ });
+
  $("swap-address").addEventListener("click",()=>{
   [fields.origin.value,fields.destination.value]=[fields.destination.value,fields.origin.value];
   [selected.origin,selected.destination]=[selected.destination,selected.origin];

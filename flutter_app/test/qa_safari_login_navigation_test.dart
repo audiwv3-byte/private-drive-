@@ -70,12 +70,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
     expect(sessions, 1);
+    final storedQaSession = await SharedPreferencesAsync()
+        .getString('pd_isolated_qa_session_v1');
+    expect(storedQaSession, isNotNull);
+    expect(jsonDecode(storedQaSession!)['role'], 'passenger');
     // Simulate a Safari Flutter page restart without resetting browser storage.
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
     await tester.pumpWidget(PrivateDriveApp(
       mockApiUrl: 'https://qa.invalid', httpClient: client, enableMapTiles: false));
     await tester.pump(const Duration(milliseconds: 100));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
     expect(sessions, 1);

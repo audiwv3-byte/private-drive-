@@ -33,6 +33,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   Timer? _expiry;
   bool _loggingOut = false;
   bool _restoring = false;
+  Future<void>? _pendingSessionSave;
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
   @override
   void initState() {
@@ -85,6 +86,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       // A confirmed server logout is the only path that removes the stored
       // credential. If secure-storage deletion fails, retain fail-closed UI.
       if (widget.sessionManager != null) {
+        // A delayed secure-storage write must never resurrect a token after
+        // the server has revoked that same session.
+        await _pendingSessionSave;
         await widget.sessionManager!.forgetConfirmedSession(session.token);
       }
       if (!mounted || !identical(_session, session)) return;
@@ -119,7 +123,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     if (persist && widget.sessionManager != null) {
       // Persist only OTP-verified sessions received from the existing
       // authenticated callback; no guest mode or role picker can write tokens.
-      unawaited(widget.sessionManager!.remember(session).catchError((_) {}));
+      _pendingSessionSave =
+          widget.sessionManager!.remember(session).catchError((_) {});
     }
     _expiry?.cancel();
     _expiry = Timer(session.expiresAt.difference(DateTime.now()), () {

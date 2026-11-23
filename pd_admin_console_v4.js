@@ -26,6 +26,11 @@ async function renderList(append=false){
    const b=btn('',()=>openOrder(o.id));b.className='pda-order'+(selected===Number(o.id)?' selected':'');b.dataset.orderId=o.id;
    const head=el('div',undefined,'pda-order-head');head.append(el('strong','№'+o.id),el('span',pdL(o.status),'pill'));b.append(head);
    b.append(el('p',o.origin+' → '+o.destination),el('small',o.trip_date+' · '+o.trip_time));
+   const source={
+    telegram_bot:text('Telegram-бот','Telegram bot','Telegram robotas'),
+    telegram_miniapp:text('Telegram Mini App','Telegram Mini App','Telegram Mini App'),
+   }[o.booking_source];
+   if(source)b.append(el('small',source));
    b.append(el('p',o.customer_name||text('Клиент','Customer','Klientas'),'pda-muted'));
    b.append(el('small',(o.pilot_name||text('Пилот не назначен','Pilot not assigned','Pilotas nepriskirtas'))+(o.plate?' · '+o.plate:'')));
    const cost=o.final_cents!==null?euros(o.final_cents):(o.price?o.price+' €':text('Нужен пересчёт','Repricing needed','Reikia perskaičiuoti'));

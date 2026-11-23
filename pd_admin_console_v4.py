@@ -75,7 +75,7 @@ def register(app,core,auth):
             c.create_function('pd_fold',1,lambda value:str(value or '').casefold(),deterministic=True)
             c.execute('ATTACH DATABASE ? AS console_users',(str(core.USERS_DB),))
             sql='''SELECT o.id,o.telegram_id,o.origin,o.destination,o.stop_address,o.trip_date,o.trip_time,
-             o.status,o.price,o.payment_status,o.payment_method,o.passengers,o.luggage,o.details,
+             o.status,o.price,o.payment_status,o.payment_method,o.passengers,o.luggage,o.details,o.booking_source,
              a.pilot_id,u.name AS customer_name,u.phone AS customer_phone,p.name AS pilot_name,p.plate,
              t.arrived_at,t.started_at,t.ended_at,t.final_cents,t.wait_cents
              FROM orders o LEFT JOIN pd_pilot_assignments a ON a.order_id=o.id

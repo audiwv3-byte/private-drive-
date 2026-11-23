@@ -120,7 +120,8 @@ def initialize():
             'crypto_txid': "TEXT NOT NULL DEFAULT ''",
             'stripe_session_id': "TEXT NOT NULL DEFAULT ''",
             'stripe_amount_cents': 'INTEGER',
-            'request_key': 'TEXT', 'request_fingerprint': 'TEXT'
+            'request_key': 'TEXT', 'request_fingerprint': 'TEXT',
+            'booking_source': "TEXT NOT NULL DEFAULT 'unknown'",
         })
         conn.execute('CREATE UNIQUE INDEX IF NOT EXISTS pd_order_request_key ON orders(telegram_id,request_key) WHERE request_key IS NOT NULL')
 
@@ -329,7 +330,7 @@ def estimate_costs(distance_km, is_roundtrip):
     return euro(driven), euro(cost)
 
 
-def order_save(uid, st, request_key=None, request_fingerprint=''):
+def order_save(uid, st, request_key=None, request_fingerprint='', *, booking_source='telegram_bot'):
     with db(ORDERS_DB) as conn:
         conn.execute('BEGIN IMMEDIATE')
         if request_key:
@@ -341,13 +342,14 @@ def order_save(uid, st, request_key=None, request_fingerprint=''):
         cur = conn.execute('''INSERT INTO orders
           (telegram_id,order_type,origin,destination,trip_date,trip_time,passengers,luggage,
           details,status,price,payment_method,distance_km,duration_min,route_source,quote_status,
-          updated_at,roundtrip_wait,passenger_count_confirmed,request_key,request_fingerprint)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', (
+          updated_at,roundtrip_wait,passenger_count_confirmed,request_key,request_fingerprint,booking_source)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', (
           uid, st['order_type'], st['origin'], st['destination'], st['trip_date'], st['trip_time'],
           st['passengers'], st['luggage'], st.get('details',''), 'Новая', st.get('price',''),
           st['payment_method'], st.get('distance_km'), st.get('duration_min'),
           st.get('route_source',''), st.get('quote_status','Не рассчитано'), now().isoformat(),
-          st.get('roundtrip_wait',''), int(st.get('passenger_count_confirmed', 1)), request_key, request_fingerprint))
+          st.get('roundtrip_wait',''), int(st.get('passenger_count_confirmed', 1)), request_key,
+          request_fingerprint, booking_source))
         return (cur.lastrowid,True) if request_key else cur.lastrowid
 
 

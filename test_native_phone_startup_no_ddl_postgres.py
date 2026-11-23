@@ -48,6 +48,15 @@ class PhoneAuthStartupWithoutDDLTests(unittest.TestCase):
         cls.runtime_dsn = (
             f"postgresql://{USER}:{AUTH_PASSWORD}@127.0.0.1:5432/pd_schema_ci"
         )
+        # Separate disposable databases model missing/incomplete migrations.
+        with psycopg.connect(raw, autocommit=True) as owner_admin:
+            owner_admin.execute("CREATE DATABASE pd_schema_empty")
+            owner_admin.execute("CREATE DATABASE pd_schema_partial")
+        partial_owner_dsn=raw.replace("/pd_schema_ci","/pd_schema_partial")
+        with psycopg.connect(partial_owner_dsn) as partial_owner:
+            partial_owner.execute("CREATE TABLE native_auth_users(id TEXT PRIMARY KEY)")
+        cls.empty_dsn=cls.runtime_dsn.replace("/pd_schema_ci","/pd_schema_empty")
+        cls.partial_dsn=cls.runtime_dsn.replace("/pd_schema_ci","/pd_schema_partial")
 
     @classmethod
     def tearDownClass(cls):
@@ -64,6 +73,43 @@ class PhoneAuthStartupWithoutDDLTests(unittest.TestCase):
         status=[]
         response=b"".join(app(environ,lambda s,h: status.append(s)))
         return status[0],json.loads(response)
+
+    def test_missing_schema_returns_503_and_never_sends_sms(self):
+        invoked=[]
+        app=make_app(self.empty_dsn,live=True,
+                     start_sms=lambda *a,**k: invoked.append("start"),
+                     check_sms=lambda *a,**k: invoked.append("verify"))
+        health_status,health=self.request(app,"/health",{})
+        self.assertEqual(health_status,"503 Service Unavailable")
+        self.assertEqual(health["status"],"not_ready")
+        self.assertEqual(health["error"],"schema_not_ready")
+        self.assertFalse(health["sms_enabled"])
+        for endpoint,payload in (
+            ("/native-auth/request-code",{"channel":"phone","destination":"+37060001234"}),
+            ("/native-auth/verify-code",{"challenge_id":"test","code":"123456"}),
+        ):
+            status,data=self.request(app,endpoint,payload)
+            self.assertEqual(status,"503 Service Unavailable")
+            self.assertEqual(data,{"error":"schema_not_ready"})
+        self.assertEqual(invoked,[])
+        with psycopg.connect(self.empty_dsn) as conn:
+            self.assertIsNone(conn.execute(
+                "SELECT to_regclass('public.native_auth_users')").fetchone()[0])
+
+    def test_incomplete_schema_returns_503_without_auto_repair(self):
+        app=make_app(self.partial_dsn,live=False)
+        status,data=self.request(app,"/health",{})
+        self.assertEqual(status,"503 Service Unavailable")
+        self.assertEqual(data["error"],"schema_not_ready")
+        with psycopg.connect(self.partial_dsn) as conn:
+            self.assertIsNone(conn.execute(
+                "SELECT to_regclass('public.native_auth_sessions')").fetchone()[0])
+
+    def test_ready_database_returns_healthy_status(self):
+        app=make_app(self.runtime_dsn,live=False)
+        status,data=self.request(app,"/health",{})
+        self.assertEqual(status,"200 OK")
+        self.assertEqual(data,{"status":"ok","sms_enabled":False})
 
     def test_normal_startup_does_not_execute_migration_or_create_tables(self):
         # If startup still executes initialize_database, the restricted

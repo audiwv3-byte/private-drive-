@@ -105,16 +105,16 @@ class LeastPrivilegePostgresTests(unittest.TestCase):
                 row=self.role_sql("pd_ci_reviewer",
                     "SELECT pd_ci_approve_pilot(%s,%s)",(fake,"ci-pilot")).fetchone()
                 self.assertEqual(row,(False,))
-            self.assertEqual(self.db.execute(
-                "SELECT review_status FROM pd_ci_public_accounts WHERE user_id='ci-pilot'").fetchone()[0],"pending")
+        self.assertEqual(self.db.execute(
+            "SELECT pilot_review_status FROM pd_ci_public_accounts WHERE user_id='ci-pilot'").fetchone()[0],"pending")
 
     def test_reviewer_function_allows_real_admin_and_preserves_roles(self):
         with self.db.transaction():
             row=self.role_sql("pd_ci_reviewer",
                 "SELECT pd_ci_approve_pilot(%s,%s)",(HASH,"ci-pilot")).fetchone()
             self.assertEqual(row,(True,))
-            self.assertEqual(self.db.execute(
-                "SELECT pilot_review_status FROM pd_ci_public_accounts WHERE user_id='ci-pilot'").fetchone()[0],"approved")
+        self.assertEqual(self.db.execute(
+            "SELECT pilot_review_status FROM pd_ci_public_accounts WHERE user_id='ci-pilot'").fetchone()[0],"approved")
         with self.db.cursor() as cur:
             cur.execute("SELECT role FROM native_auth_roles WHERE user_id='ci-pilot'")
             self.assertEqual(cur.fetchone()[0],"pilot")

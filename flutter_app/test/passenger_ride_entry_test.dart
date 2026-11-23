@@ -17,8 +17,12 @@ void main() {
     expect(find.byKey(const Key('passenger-entry-advance-booking')), findsOneWidget);
     expect(find.byKey(const Key('passenger-entry-vilnius-panorama')), findsNothing);
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
-    expect(find.byKey(const Key('passenger-entry-transfer')), findsOneWidget);
-    expect(find.byKey(const Key('passenger-entry-delivery')), findsOneWidget);
+    final transfer = find.byKey(const Key('passenger-entry-transfer'));
+    await tester.scrollUntilVisible(transfer, 180);
+    expect(transfer, findsOneWidget);
+    final delivery = find.byKey(const Key('passenger-entry-delivery'));
+    await tester.scrollUntilVisible(delivery, 180);
+    expect(delivery, findsOneWidget);
   });
 
   testWidgets('Passenger language picker changes all screens without returning to login',

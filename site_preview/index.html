@@ -68,6 +68,51 @@
 .partner-feature .partner-links{display:flex;flex-direction:column;align-items:stretch;gap:8px;flex:none}
 .partner-feature .partner-links .button{white-space:nowrap;text-align:center}
 @media(max-width:740px){.partner-feature .partner-links{width:100%;flex-direction:row;flex-wrap:wrap}.partner-feature .partner-links .button{flex:1 1 auto}}
+
+/* Partners use the same photographic overlay treatment as primary service cards. */
+#partners .partner-feature,.friends-main .partner-feature{
+ position:relative;isolation:isolate;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;
+ min-height:320px;padding:20px;border:1px solid #bf8f45;border-radius:19px;overflow:hidden;
+ background:#14100e;box-shadow:0 10px 28px #0007;
+}
+#partners .partner-feature::after,.friends-main .partner-feature::after{
+ content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+ background:linear-gradient(0deg,#100c09 0%,#100c09f5 30%,#100c09aa 58%,#100c092b 100%);
+}
+#partners .partner-tech-icon.partner-avatar,.friends-main .partner-tech-icon.partner-avatar{
+ position:absolute;inset:0;z-index:-2;width:100%;height:100%;border:0;border-radius:0;box-shadow:none;
+ overflow:hidden;background:#15110e;
+}
+#partners .partner-avatar img,.friends-main .partner-avatar img{
+ display:block;width:100%;height:100%;object-fit:cover;object-position:center 35%;border-radius:0;
+}
+#partners .partner-info,.friends-main .partner-info{flex:none;position:relative;z-index:1}
+#partners .partner-info h3,.friends-main .partner-info h2{
+ font:700 clamp(1.35rem,2vw,1.9rem)/1.18 Georgia,serif;color:#fff2dc;text-shadow:0 2px 8px #000;
+ margin:0 0 8px;
+}
+#partners .partner-info p,.friends-main .partner-info p{
+ color:#f4e8d1;text-shadow:0 1px 5px #000;margin:9px 0 0;line-height:1.4;
+}
+#partners .partner-role,.friends-main .partner-role{
+ display:inline-block;margin:0;padding:4px 10px;border-radius:9px;background:#dcae55ed;color:#1d150a;
+ font-size:.75rem;font-weight:750;
+}
+#partners .partner-feature .button,.friends-main .partner-feature .button{
+ position:relative;z-index:1;min-height:39px;width:auto;max-width:100%;border-color:#d9b56e;
+ background:#201910de;color:#ffe2aa;padding:8px 13px;font-size:.84rem;
+}
+#partners .partner-links,.friends-main .partner-links{display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;margin-top:13px}
+#partners .partner-feature>a.button,.friends-main .partner-feature>a.button{align-self:flex-start;margin-top:13px}
+#partners .partner-feature+.partner-feature,.friends-main .partner-feature+.partner-feature{margin-top:0}
+#partners .partner-photo-grid,.friends-main .partner-photo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+#partners .partner-feature:hover,.friends-main .partner-feature:hover{border-color:#f2d18b}
+@media(max-width:740px){
+ #partners .partner-photo-grid,.friends-main .partner-photo-grid{grid-template-columns:1fr;gap:14px}
+ #partners .partner-feature,.friends-main .partner-feature{min-height:340px;padding:16px}
+ #partners .partner-feature .button,.friends-main .partner-feature .button{width:auto;flex:none}
+}
+
 </style>
 </head>
 <body>
@@ -166,6 +211,7 @@
 </section>
 <section id="partners" class="section wrap">
       <h2><a class="catalog-heading partner-section-title" href="friends.html" aria-label="Открыть страницу Наши друзья"><span>Наши друзья</span><span class="catalog-heading-motion" aria-hidden="true">🤝 ↗</span></a></h2>
+      <div class="partner-photo-grid">
       <div class="partner-feature">
         <div class="partner-tech-icon partner-avatar" aria-label="Фото профиля AI Fast Work"><img src="assets/ai-fast-work-avatar.webp" width="112" height="112" loading="lazy" alt="Синий робот — аватар AI Fast Work"></div>
         <div class="partner-info"><h3>AI Fast Work | Telegram-боты</h3><span class="partner-role">Разработчик сайта · Друг PRIVATE DRIVE</span><p>Создаю и сопровождаю Telegram-ботов: заявки, запись, каталоги и автоматизация. Напиши «БОТ» в Instagram Direct.</p></div>
@@ -175,6 +221,7 @@
         <div class="partner-tech-icon partner-avatar" aria-label="Фото Liana Flowers"><img src="assets/liana-flowers-avatar.webp" width="112" height="112" loading="lazy" alt="Флорист с цветочным букетом — Liana Flowers"></div>
         <div class="partner-info"><h3>Liana Flowers | Цветы и букеты</h3><span class="partner-role">Цветочный магазин · Вильнюс</span><p>Букеты и цветы для особых случаев. Geležinkelio g. 6, Vilnius · +370 648 23574</p></div>
         <a class="button outline" href="https://www.instagram.com/liana_florist_vilnius/" target="_blank" rel="noopener noreferrer">Instagram ↗</a>
+      </div>
       </div>
     </section>
     <section id="about" class="section shaded"><div class="wrap contact-block"><div><h2>PRIVATE DRIVE</h2><p>Индивидуальные поездки на Toyota RAV4 Hybrid, такси в Вильнюсе, трансферы по Литве и Европе.</p></div><div><h2>Заказ поездки</h2><p>Задай маршрут, дату и пожелания — мы уточним доступность и стоимость.</p><a class="button gold" href="order-map.html?mode=preorder">Быстрый заказ поездки</a></div></div></section>

@@ -1,13 +1,11 @@
-"""Explicit PostgreSQL logout function DDL for privileged migration only.
+"""PostgreSQL session operations, for explicit migration and synthetic CI only.
 
-Not installed at import, not mounted into production. The function acts on
-ONLY the supplied bearer-token digest; callers cannot select user IDs or roles.
-Keep its PostgreSQL owner as the privileged migration account, never the app.
+Never auto-apply on Render. The privileged function owner must remain outside
+HTTP login credentials. No SMS or production operations.
 """
 import os
-from urllib.parse import urlsplit
 
-LOGOUT_DDL = (
+SESSION_DDL = (
     """CREATE OR REPLACE FUNCTION public.pd_revoke_current_session(
          supplied_digest text, observed_at bigint
        ) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
@@ -15,7 +13,6 @@ LOGOUT_DDL = (
        AS $pd_logout$
        BEGIN
          IF supplied_digest IS NULL OR length(supplied_digest) <> 64
-            OR supplied_digest !~ '^[0-9a-f]{64}$'
             OR observed_at IS NULL OR observed_at < 0 THEN
            RETURN false;
          END IF;
@@ -31,33 +28,23 @@ LOGOUT_DDL = (
     "REVOKE ALL ON FUNCTION public.pd_revoke_current_session(text,bigint) FROM PUBLIC",
     "GRANT EXECUTE ON FUNCTION public.pd_revoke_current_session(text,bigint) TO pd_ci_phone_auth",
     """CREATE OR REPLACE FUNCTION public.pd_validate_native_session(
-         supplied_digest text, observed_at bigint
+          supplied_digest text, observed_at bigint
        ) RETURNS TABLE(user_id text, server_role text, expires_at bigint)
        LANGUAGE sql SECURITY DEFINER STABLE
        SET search_path = pg_catalog, public
-       AS $pd_session$
-         SELECT s.user_id, COALESCE(r.role,'passenger'), s.expires_at
+       AS $pd_verify$
+         SELECT s.user_id, COALESCE(r.role, 'passenger'), s.expires_at
            FROM public.native_auth_sessions s
-           JOIN public.native_auth_users u ON u.id=s.user_id
-           LEFT JOIN public.native_auth_roles r ON r.user_id=s.user_id
-          WHERE supplied_digest ~ '^[0-9a-f]{64}
-)
-
-
-def install_synthetic_logout_function(conn):
-    if os.environ.get("PD_CI_FAKE_DB_ONLY") != "YES":
-        raise PermissionError("synthetic_ci_only")
-    with conn.cursor() as cur:
-        for statement in LOGOUT_DDL:
-            cur.execute(statement)
-
-            AND s.token_hash=supplied_digest
-            AND s.revoked_at IS NULL AND s.created_at<=observed_at
-            AND s.expires_at>observed_at
-       $pd_session$""",
+           JOIN public.native_auth_users u ON u.id = s.user_id
+           LEFT JOIN public.native_auth_roles r ON r.user_id = s.user_id
+          WHERE length(supplied_digest) = 64
+            AND s.token_hash = supplied_digest
+            AND s.revoked_at IS NULL
+            AND s.created_at <= observed_at
+            AND s.expires_at > observed_at
+       $pd_verify$""",
     "REVOKE ALL ON FUNCTION public.pd_validate_native_session(text,bigint) FROM PUBLIC",
     "GRANT EXECUTE ON FUNCTION public.pd_validate_native_session(text,bigint) TO pd_ci_phone_auth",
-
 )
 
 
@@ -65,5 +52,5 @@ def install_synthetic_logout_function(conn):
     if os.environ.get("PD_CI_FAKE_DB_ONLY") != "YES":
         raise PermissionError("synthetic_ci_only")
     with conn.cursor() as cur:
-        for statement in LOGOUT_DDL:
+        for statement in SESSION_DDL:
             cur.execute(statement)

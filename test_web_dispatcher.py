@@ -29,6 +29,27 @@ class DispatcherBrowserTests(unittest.TestCase):
         app.config["TESTING"] = True
         return app, result
 
+    def test_postgres_restart_probe_blocks_wrong_environment_and_db(self):
+        from pd_dispatch_db_restart_probe import assert_staging_configuration, check_id
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(RuntimeError):
+                assert_staging_configuration()
+        with patch.dict(os.environ, {
+                "PD_DISPATCH_STAGING_ONLY": "1",
+                "PD_DISPATCH_ORDERS_DATABASE_URL":
+                    "postgresql://example:unused@localhost/private_drive_prod"}, clear=True):
+            with self.assertRaises(RuntimeError):
+                assert_staging_configuration()
+        with patch.dict(os.environ, {
+                "PD_DISPATCH_STAGING_ONLY": "1",
+                "PD_DISPATCH_ORDERS_DATABASE_URL":
+                    "postgresql://example:unused@localhost/private_drive_test"}, clear=True):
+            self.assertTrue(assert_staging_configuration().endswith("/private_drive_test"))
+        self.assertEqual(check_id("b"*8+"-"+"b"*4+"-"+"b"*4+"-"+"b"*4+"-"+"b"*12),
+                         "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+        with self.assertRaises(ValueError):
+            check_id("production-order")
+
     def test_persistent_order_validation_and_signature(self):
         import json
         import hmac

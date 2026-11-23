@@ -34,6 +34,12 @@ def image_as_private_webp(raw):
     """Decode, reject unsafe/unparseable formats and strip source metadata."""
     if not raw or len(raw) > MAX_FILE:
         raise ValueError("invalid_photo_size")
+    # Reject unknown uploads before invoking the image decoder.
+    is_jpeg = raw.startswith(bytes.fromhex("ffd8ff"))
+    is_png = raw.startswith(bytes.fromhex("89504e470d0a1a0a"))
+    is_webp = raw[:4] == b"RIFF" and raw[8:12] == b"WEBP"
+    if not (is_jpeg or is_png or is_webp):
+        raise ValueError("invalid_photo_format")
     from PIL import Image, ImageOps, UnidentifiedImageError
     Image.MAX_IMAGE_PIXELS = 16_000_000
     try:

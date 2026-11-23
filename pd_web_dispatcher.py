@@ -312,12 +312,17 @@ def register(app, core):
         return auth_page(app, csrf=csrf(), error=error, ready=True,
                          registered=bool(passwords) and request.args.get("registered") == "1")
 
+    if passwords and os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
+        from pd_site_analytics import register as register_site_analytics
+        register_site_analytics(app, authorized, passwords.connect)
+
     @app.get("/dispatch")
     def pd_dispatch_home():
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
         dashboard = Path(__file__).with_name("pd_dispatcher_dashboard.html").read_text(encoding="utf-8")
-        response = app.make_response(render_template_string(dashboard, csrf=csrf()))
+        response = app.make_response(render_template_string(dashboard, csrf=csrf(),
+                                     analytics_enabled="pd_site_analytics" in app.view_functions))
         response.headers["Cache-Control"] = "private, no-store"
         return response
 

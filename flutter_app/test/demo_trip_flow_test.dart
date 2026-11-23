@@ -189,9 +189,7 @@ void main() {
     await tester.tap(book);
     await tester.pump();
     expect(find.byKey(const Key('passenger-pd-waiting-indicator')), findsOneWidget);
-    final status = find.byKey(const Key('passenger-trip-status'));
-    await tester.scrollUntilVisible(status, -160, scrollable: bookingScroll);
-    expect(tester.widget<Text>(status).data, 'Заявка создана · ожидает назначения');
+    expect(find.text('Заявка создана · тестовый режим'), findsOneWidget);
 
     await tester.pageBack();
     await tester.pumpAndSettle();

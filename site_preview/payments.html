@@ -37,6 +37,12 @@
 .pay-foot{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;border-top:1px solid #654d2b;padding:18px 0 32px;font-size:.85rem}
 .pay-foot a{color:#e6c586}
 @media(max-width:760px){.payment-wrap{padding-top:26px}.pay-layout{grid-template-columns:1fr}.pay-panel{padding:20px}}
+
+.crypto-wallet{padding:10px 0;border-top:1px solid #705838;margin-top:12px}
+.crypto-wallet b{display:block;font-size:13px;color:#f2d395;margin-bottom:5px}
+.crypto-wallet code{display:block;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;word-break:break-all;color:#f4ebd9;padding:9px;background:#0d151a;border:1px solid #685437;border-radius:7px;user-select:all}
+.wallet-copy{margin-top:8px;padding:8px 12px;border:1px solid #a7844d;border-radius:8px;background:#292116;color:#f5d695;cursor:pointer}
+.wallet-copy:hover,.wallet-copy:focus-visible{border-color:#f4d08a}
 </style>
 </head>
 <body>
@@ -70,9 +76,16 @@
    <div class="pay-method"><strong>Stripe · Visa / Mastercard</strong><small>Карты предусмотрены для защищённой оплаты через Stripe после выдачи индивидуальной платёжной ссылки.</small></div>
    <div class="pay-method"><strong>Apple Pay · Google Pay</strong><small>Отображаются на странице оплаты при поддержке устройства, браузера и настроек Stripe.</small></div>
    <div class="pay-method"><strong>PayPal</strong><small>Возможность оплаты зависит от доступности PayPal в конкретном Stripe Checkout. Пока не подтверждена тестовым платежом.</small></div>
-   <div class="pay-method"><strong>Криптовалюта · USDC / ETH / BTC</strong><small>USDC — сеть Ethereum (ERC-20); ETH — Ethereum Mainnet; BTC — сеть Bitcoin. Курс, точную сумму в криптовалюте, сеть и адрес кошелька согласовывай до перевода. Публичные адреса здесь намеренно не размещены до повторного подтверждения.</small></div>
-   <div class="pay-method"><strong>Paysera</strong><small>Платёжный аккаунт указан в проекте, но постоянная ссылка и публичные реквизиты ещё не подтверждены. Запроси детали перед оплатой.</small></div>
+   <div class="pay-method"><strong>Криптовалюта · ранее указанные реквизиты</strong>
+  <small>Адреса восстановлены из предыдущих материалов PRIVATE DRIVE; сверка с Telegram не выполнена. Перед любым переводом обязательно подтверди адрес и сеть у PRIVATE DRIVE.</small>
+  <div class="crypto-wallet"><b>BTC · Bitcoin Mainnet</b><code>bc1qk7zx59art5cgp3epyrr9kzztnf95j6qagrc7hg</code><button type="button" class="wallet-copy" data-copy="bc1qk7zx59art5cgp3epyrr9kzztnf95j6qagrc7hg" aria-label="Скопировать BTC адрес">Скопировать BTC</button></div>
+  <div class="crypto-wallet"><b>ETH · Ethereum Mainnet</b><code>0xfdfa98ad6f9771e537e16bfdb4d3a47c086bde45</code><button type="button" class="wallet-copy" data-copy="0xfdfa98ad6f9771e537e16bfdb4d3a47c086bde45" aria-label="Скопировать ETH адрес">Скопировать ETH</button></div>
+  <div class="crypto-wallet"><b>USDC · Ethereum ERC-20</b><code>0xfdfa98ad6f9771e537e16bfdb4d3a47c086bde45</code><button type="button" class="wallet-copy" data-copy="0xfdfa98ad6f9771e537e16bfdb4d3a47c086bde45" aria-label="Скопировать USDC адрес">Скопировать USDC</button></div>
+  <small id="walletCopyStatus" role="status" aria-live="polite"></small>
+ </div>
+   <div class="pay-method"><strong>Paysera</strong><small>Ранее предоставлялся Paysera-код. Он не подтверждён как постоянная платёжная ссылка, поэтому перед оплатой запроси актуальные реквизиты PRIVATE DRIVE.</small></div>
   </div>
+  <p class="pay-note">Банковский IBAN, действующая Stripe Payment Link и публичная Paysera-ссылка пока не подтверждены. Не вводи здесь данные банковской карты и не отправляй средства без подтверждения заказа и реквизитов.</p>
   <p class="pay-note">На сайте <strong>нет автоматической криптооплаты и подключённой автоматической оплаты картой</strong> и подтверждённой общей Stripe Payment Link. Не переводи деньги по непроверенным реквизитам.</p>
   <p style="margin-top:18px"><a href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Связаться по оплате в Telegram</a></p>
   <p><a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a></p>
@@ -83,6 +96,12 @@
 <footer class="payment-wrap pay-foot"><span>© 2026 PRIVATE DRIVE · Вильнюс, Литва</span><span><a href="privacy.html">Конфиденциальность</a> · <a href="index.html">На главную</a></span></footer>
 <script>
 (()=>{
+
+ document.querySelectorAll('.wallet-copy').forEach(btn=>btn.addEventListener('click',async()=>{
+  const out=document.getElementById('walletCopyStatus');
+  try{await navigator.clipboard.writeText(btn.dataset.copy);out.textContent='Адрес скопирован. Перед переводом сверь его с PRIVATE DRIVE.'}
+  catch{out.textContent='Не удалось скопировать автоматически. Выдели адрес вручную.'}
+ }));
  const form=document.getElementById('paymentRequest');
  const status=document.getElementById('payStatus');
  const params=new URLSearchParams(location.search);

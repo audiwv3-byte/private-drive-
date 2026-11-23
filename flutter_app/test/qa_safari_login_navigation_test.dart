@@ -60,18 +60,24 @@ void main() {
       scrollable: find.byType(Scrollable).last);
     await tester.ensureVisible(find.byKey(const Key('qa-sign-in')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('qa-sign-in')));
+    await tester.runAsync(() async {
+      final button = tester.widget<FilledButton>(find.byKey(const Key('qa-sign-in')));
+      await (button.onPressed! as Future<void> Function())();
+    });
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
     expect(sessions, 1);
-    expect(find.text('Тестовый сервер отклонил сессию (HTTP 401).'),
-      findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('qa-auth-feedback'))).data,
+      'Тестовый сервер отклонил сессию (HTTP 401).');
     expect(find.byKey(const Key('qa-sign-in')), findsOneWidget);
     expect(find.byKey(const Key('passenger-entry-taxi')), findsNothing);
     acceptSession = true;
     await tester.ensureVisible(find.byKey(const Key('qa-sign-in')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('qa-sign-in')));
+    await tester.runAsync(() async {
+      final button = tester.widget<FilledButton>(find.byKey(const Key('qa-sign-in')));
+      await (button.onPressed! as Future<void> Function())();
+    });
     await tester.pumpAndSettle();
     expect(sessions, 2);
     expect(find.byKey(const Key('entry-cabin-selection')), findsNothing);

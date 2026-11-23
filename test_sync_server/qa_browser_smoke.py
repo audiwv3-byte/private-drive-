@@ -49,6 +49,17 @@ def smoke(browser_type, device):
             assert statuses.count(("/v1/me", 200)) == 4, statuses
             assert not errors, errors
             print(f"PASS: {browser_type.name} opened passenger cabin and restored its Bearer session")
+            if os.environ.get("PD_EXPECT_MAPBOX") == "1":
+                def mapbox_image(response):
+                    url = urlsplit(response.url)
+                    return (url.hostname == "api.mapbox.com"
+                            and url.path.startswith("/styles/v1/mapbox/")
+                            and "/tiles/256/" in url.path and response.ok
+                            and response.headers.get("content-type", "").startswith("image/"))
+
+                with page.expect_response(mapbox_image, timeout=30000):
+                    taxi.click(timeout=15000)
+                print(f"PASS: {browser_type.name} loaded Mapbox tiles in the taxi form")
         except Exception:
             folder = Path("device_artifacts/browser")
             folder.mkdir(parents=True, exist_ok=True)

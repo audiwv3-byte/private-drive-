@@ -123,20 +123,28 @@ jobs:
           flutter test --reporter expanded test/pd_http_api_test.dart
           flutter test --reporter expanded --dart-define=PD_CABINET_SYNC_INTEGRATION=true test/cabinet_sync_integration_test.dart
 
-      - name: Compile existing main Flutter cabinets for Safari
+      - name: Compile existing main Flutter cabinets for Safari with Mapbox
         working-directory: qa_web
         shell: bash
+        env:
+          MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: |
           set -euo pipefail
+          if [[ "$MAPBOX_PUBLIC_TOKEN" != pk.* ]]; then
+            echo "Mapbox QA requires the repository's public Mapbox token." >&2
+            exit 1
+          fi
           flutter pub get
           flutter build web --release --base-href /app/ --target lib/main.dart \
             --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
             --dart-define=PD_ISOLATED_WEB_PREVIEW=false \
             --dart-define=PD_ISOLATED_QA_AUTH=true \
-            --dart-define="PD_QA_BUILD_LABEL=Safari QA · ${GITHUB_SHA:0:7}"
+            --dart-define=PD_MAPBOX_QA=true \
+            --dart-define="MAPBOX_PUBLIC_TOKEN=$MAPBOX_PUBLIC_TOKEN" \
+            --dart-define="PD_QA_BUILD_LABEL=Safari QA · ${GITHUB_SHA:0:7} · Mapbox"
           test -s build/web/index.html
           test -s build/web/main.dart.js
-          grep -F "trycloudflare.com" build/web/main.dart.js
+          grep -Fq "$PD_MOCK_CABINET_API_URL" build/web/main.dart.js
           printf 'User-agent: *\nDisallow: /\n' > build/web/robots.txt
           printf '/*\n  X-Robots-Tag: noindex, nofollow, noarchive\n  Referrer-Policy: no-referrer\n' > build/web/_headers
           mkdir -p ../device_artifacts/safari
@@ -147,8 +155,10 @@ jobs:
           test -s "$RUNNER_TEMP/qa-web-bundle.js"
           echo "Safari QA frontend served at $PD_MOCK_CABINET_API_URL/app/ while runner remains alive." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Test compiled Flutter Web sign-in and reload in Chromium and WebKit
+      - name: Test sign-in, reload and Mapbox taxi tiles in Chromium and WebKit
         shell: bash
+        env:
+          PD_EXPECT_MAPBOX: '1'
         run: |
           set -euo pipefail
           python3 -m pip install --quiet playwright==1.58.0

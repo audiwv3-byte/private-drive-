@@ -209,15 +209,22 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       // Missing, stale and unauthorized GPS are never displayed.
       Map<String, dynamic>? nextFix;
       if (id != null && ['assigned','approaching','underway'].contains(current?['status'])) {
-        final fixReply = await client.get('/v1/trips/$id/gps');
-        final fix = fixReply['gps'];
-        if (fix is Map<String, dynamic> && fix['available'] == true &&
-            fix['latitude'] is num && fix['longitude'] is num) {
-          final lat = (fix['latitude'] as num).toDouble();
-          final lng = (fix['longitude'] as num).toDouble();
-          if (lat.isFinite && lng.isFinite && lat.abs() <= 90 && lng.abs() <= 180) {
-            nextFix = {'latitude':lat,'longitude':lng};
+        try {
+          final fixReply = await client.get('/v1/trips/$id/gps');
+          final fix = fixReply['gps'];
+          if (fix is Map<String, dynamic> && fix['available'] == true &&
+              fix['latitude'] is num && fix['longitude'] is num) {
+            final lat = (fix['latitude'] as num).toDouble();
+            final lng = (fix['longitude'] as num).toDouble();
+            if (lat.isFinite && lng.isFinite &&
+                lat.abs() <= 90 && lng.abs() <= 180) {
+              nextFix = {'latitude':lat,'longitude':lng};
+            }
           }
+        } on Exception {
+          // GPS is optional. Do not block orders/chat on a temporary
+          // GPS route outage, and never display an unverified last fix.
+          nextFix = null;
         }
       }
       if (mounted) setState(() { trip = current; pilotFix = nextFix; error = ''; });

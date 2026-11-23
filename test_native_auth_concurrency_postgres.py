@@ -120,13 +120,13 @@ class ConcurrentNativeAuthTests(unittest.TestCase):
               (challenge_id, phone, NOW - 1, NOW + 300))
 
     def verify(self, challenge_id, **extra):
-        return wsgi(self.app, "/native-auth/verify-code", {
+        return wsgi(type(self).app, "/native-auth/verify-code", {
             "challenge_id": challenge_id, "code": "123456", **extra
         })
 
     def test_01_concurrent_request_code_one_challenge_per_cooldown(self):
         phone = PHONES["race_request"]
-        results = parallel(8, lambda i: wsgi(self.app,
+        results = parallel(8, lambda i: wsgi(type(self).app,
             "/native-auth/request-code", {"channel":"phone","destination":phone}))
         self.assertEqual(sum(status == "202 Accepted" for status, _ in results), 1)
         self.assertEqual(sum(status == "429 Too Many Requests" for status, _ in results), 7)

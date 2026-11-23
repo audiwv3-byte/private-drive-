@@ -130,7 +130,7 @@ class PhoneAuthPostgresGrantsTests(unittest.TestCase):
             "DELETE FROM native_auth_users WHERE id='ci-other'",
             "UPDATE native_auth_sessions SET revoked_at=1",
             "UPDATE native_twilio_challenges SET phone='+37060000099'",
-            "GRANT pd_ci_migrator TO pd_ci_phone_auth",
+            "GRANT pg_read_all_data TO pd_ci_phone_auth",
         )
         for sql in denied:
             with self.subTest(sql=sql),self.assertRaises(InsufficientPrivilege):

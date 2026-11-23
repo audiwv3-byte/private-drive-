@@ -34,7 +34,7 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
 .vehicle-marker svg{display:block;width:36px;height:36px;filter:drop-shadow(0 2px 4px #000a)}
 @media(max-width:640px){.topbar{top:8px;left:8px;right:8px}.panel{top:auto;bottom:8px;left:8px;width:calc(100% - 16px);max-height:min(65dvh,540px);padding:13px}.brand{padding:5px 9px}.brand img{width:29px;height:29px}.back{padding:9px 11px}h1{font-size:22px}.leaflet-bottom.leaflet-right{bottom:calc(min(65dvh,540px) + 16px)}}
 </style>
-</head>
+<link rel="stylesheet" href="/assets/site-analytics.css"></head>
 <body>
 <div id="map" aria-label="Интерактивная карта Вильнюса"><div id="mapFallback" class="map-fallback">Загрузка карты…</div></div>
 <div class="topbar">
@@ -404,8 +404,9 @@ $('orderForm').addEventListener('submit',async e=>{
  // No clipboard permissions, external API calls, booking creation or automatic messages.
  const link='https://t.me/PrivateDraive?text='+encodeURIComponent(draft);
  say('Открываем Telegram с готовым текстом. Проверь заявку и нажми «Отправить».');
+ window.pdSiteEvent?.('telegram');
  window.location.assign(link);
 });
 })();
 </script>
-</body></html>
+<script src="/assets/site-analytics.js"></script></body></html>

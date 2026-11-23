@@ -1,0 +1,12 @@
+.pd-analytics-consent,.pd-analytics-settings{
+  position:fixed;z-index:2000;right:12px;bottom:12px;
+  background:#191511;color:#fff1d9;border:1px solid #ae8348;border-radius:9px;
+  font:14px/1.4 system-ui,sans-serif
+}
+.pd-analytics-consent{max-width:min(390px,calc(100% - 24px));padding:12px}
+.pd-analytics-consent p{margin:0 0 8px;color:inherit}
+.pd-analytics-consent button,.pd-analytics-settings{color:#fff1d9;background:#191511;
+  border:1px solid #ae8348;border-radius:7px;padding:7px;font:inherit;cursor:pointer}
+.pd-analytics-consent a{display:inline-block;color:#edcc86;padding:7px}
+.pd-analytics-settings{font-size:11px;min-height:32px}
+body:has(.pd-analytics-consent:not([hidden])) .pd-analytics-settings{visibility:hidden}

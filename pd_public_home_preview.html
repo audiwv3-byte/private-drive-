@@ -338,9 +338,9 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
 <a class="pd-img-card fare-link" href="#quick-order" data-from="Вильнюс" data-to="Клайпеда" data-type="Трансфер" aria-label="Вильнюс — Клайпеда, 320 евро. Выбрать маршрут"><img src="/assets/pd-approved-klaipeda.webp" alt="Вильнюс — Клайпеда — 320 евро, утверждённое изображение" width="360" height="149" loading="lazy"></a>
 <a class="pd-img-card fare-link" href="#quick-order" data-from="Вильнюс" data-to="Варшава" data-type="Трансфер" aria-label="Вильнюс — Варшава, 460 евро. Выбрать маршрут"><img src="/assets/pd-approved-warsaw.webp" alt="Вильнюс — Варшава — 460 евро, утверждённое изображение" width="360" height="149" loading="lazy"></a>
 </div></section>
-<section class="pd-quick" id="quick-order"><h2>Быстрый заказ поездки</h2><form id="quick-trip-form" autocomplete="off"><label>Откуда<input id="quick-from" name="from" placeholder="Откуда" maxlength="220" required></label><label>Куда<input id="quick-to" name="to" placeholder="Куда" maxlength="220" required></label><label>Дата<input id="quick-date" name="date" type="date"></label><label>Время<input id="quick-time" name="time" type="time"></label><button class="btn" type="submit">Забронировать</button></form><p>Тестовый предпросмотр. Данные переходят в подробную форму ниже; реальные заказы и списания отключены.</p></section>
+<section class="pd-quick" id="quick-order"><h2>Быстрый заказ поездки</h2><form id="quick-trip-form" autocomplete="off"><label>Откуда<input id="quick-from" name="from" placeholder="Откуда" maxlength="220" required></label><label>Куда<input id="quick-to" name="to" placeholder="Куда" maxlength="220" required></label><label>Дата<input id="quick-date" name="date" type="date"></label><label>Время<input id="quick-time" name="time" type="time"></label><button class="btn" type="submit">Забронировать</button></form><p>Форма тестового заказа: заявка поступает в очередь диспетчера. Реальные поездки, SMS и списания отключены.<span id="quick-order-status" role="status" aria-live="polite" style="display:block;margin-top:8px;color:var(--pd-gold)"></span></p></section>
 
-<details class="pd-route-details" id="route-details"><summary>Карта и подробный расчёт маршрута</summary><section id="order" class="order-section" aria-label="Форма поездки и трансфера">
+<details class="pd-route-details" id="route-details"><summary>Дополнительно: подробная карта и расчёт маршрута</summary><section id="order" class="order-section" aria-label="Форма поездки и трансфера">
 <div class="order-shell">
 <div class="order-panel">
 <h2>Заказать поездку</h2><p>Выбери тип поездки, укажи адреса и время подачи. Тестовая отправка заявки на сервер доступна после указания маршрута; реальные заказы и платежи отключены.</p>
@@ -384,17 +384,40 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
    });
  }
  const quickTripForm=document.getElementById("quick-trip-form");
+ let quickOrderReference=null,quickOrderSending=false;
+ const quickStatus=document.getElementById("quick-order-status");
  if(quickTripForm){
-   quickTripForm.addEventListener("submit",e=>{
+   quickTripForm.addEventListener("input",()=>{quickOrderReference=null;});
+   quickTripForm.addEventListener("submit",async e=>{
      e.preventDefault();
-     for(const [src,dst] of [["quick-from","pickup-address"],["quick-to","dropoff-address"],
-                             ["quick-date","pickup-date"],["quick-time","pickup-time"]]){
-       const s=document.getElementById(src),t=document.getElementById(dst);
-       if(s&&t){t.value=s.value.trim();t.dispatchEvent(new Event("input",{bubbles:true}));}
+     if(quickOrderSending)return;
+     const from=document.getElementById("quick-from").value.trim();
+     const to=document.getElementById("quick-to").value.trim();
+     if(!from||!to||from.toLowerCase()===to.toLowerCase()){
+       quickStatus.textContent="Укажи разные адреса отправления и назначения.";return;
      }
-     document.getElementById("order-status").textContent="Адреса перенесены. Выбери адреса из подсказок, чтобы построить маршрут на карте.";
-     const details=document.getElementById("route-details");if(details){details.open=true;setTimeout(()=>{if(map)map.invalidateSize()},100)}
-     document.getElementById("order").scrollIntoView({behavior:"smooth",block:"start"});
+     if(!quickOrderReference){
+       const bytes=crypto.getRandomValues(new Uint8Array(16));
+       quickOrderReference=Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+     }
+     quickOrderSending=true;
+     const button=quickTripForm.querySelector('button[type="submit"]');
+     button.disabled=true;
+     quickStatus.textContent="Отправляем тестовую заявку диспетчеру…";
+     try{
+       const response=await fetch("/preview/api/qa-booking",{
+         method:"POST",credentials:"same-origin",
+         headers:{"Content-Type":"application/json","Accept":"application/json"},
+         body:JSON.stringify({from,to,reference:quickOrderReference,source:"quick"})
+       });
+       const data=await response.json();
+       if(!response.ok||!data.qa_only||!data.trip?.id)
+         throw new Error(response.status===429?"Лимит тестовых заявок. Попробуй позже.":"Сервер не подтвердил заявку.");
+       quickStatus.textContent="Тестовая заявка №"+data.trip.id.slice(0,8)+" принята диспетчерским сервером. Оплата не выполнялась.";
+       quickOrderReference=null;
+     }catch(error){
+       quickStatus.textContent=error.message||"Связь с сервером отсутствует. Заказ не подтверждён.";
+     }finally{quickOrderSending=false;button.disabled=false;}
    });
  }
 

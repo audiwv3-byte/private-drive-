@@ -30,6 +30,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     env:
+      PYTHONPATH: .
       PD_CI_FAKE_DB_ONLY: "YES"
       PD_CI_POSTGRES_URL: "postgresql://pd_ci:synthetic-only-password@127.0.0.1:5432/pd_schema_ci"
     steps:

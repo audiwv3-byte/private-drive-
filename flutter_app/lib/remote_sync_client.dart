@@ -20,13 +20,16 @@ class RemoteDemoException implements Exception {
 }
 
 class RemoteDemoClient implements RemoteTripGateway {
-  RemoteDemoClient(String address, String token)
+  RemoteDemoClient(String address, String token, {http.Client? client})
       : _base = _safeBase(address),
-        _token = _checkToken(token);
+        _token = _checkToken(token),
+        _owned = client == null,
+        _http = client ?? http.Client();
 
   static Uri _safeBase(String address) {
     final uri = Uri.tryParse(address.trim());
     if (uri == null ||
+        uri.host.isEmpty ||
         uri.userInfo.isNotEmpty ||
         uri.hasQuery ||
         uri.hasFragment ||
@@ -52,7 +55,8 @@ class RemoteDemoClient implements RemoteTripGateway {
 
   final Uri _base;
   final String _token;
-  final http.Client _http = http.Client();
+  final bool _owned;
+  final http.Client _http;
 
   Future<Map<String, dynamic>> _request(String method, String path,
       [Map<String, dynamic>? payload]) async {
@@ -112,6 +116,6 @@ class RemoteDemoClient implements RemoteTripGateway {
 
   @override
   void close() {
-    _http.close();
+    if (_owned) _http.close();
   }
 }

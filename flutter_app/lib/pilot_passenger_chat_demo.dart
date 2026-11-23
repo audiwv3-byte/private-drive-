@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'app_language.dart';
@@ -14,7 +16,7 @@ class PilotPassengerChatDemo extends StatefulWidget {
   });
 
   final List<String> messages;
-  final bool Function(String) onSend;
+  final FutureOr<bool> Function(String) onSend;
   final DemoTripStore? tripStore;
 
   @override
@@ -52,11 +54,14 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
     super.dispose();
   }
 
-  void _send([String? quickReply]) {
+  Future<void> _send([String? quickReply]) async {
     final value = (quickReply ?? _draft.text).trim();
     if (value.isEmpty) return;
-    if (!widget.onSend(value)) return;
-    _draft.clear();
+    final original = _draft.text;
+    final action = widget.onSend(value);
+    final sent = action is bool ? action : await action;
+    if (!mounted || !sent) return;
+    if (_draft.text == original && quickReply == null) _draft.clear();
     if (widget.tripStore == null) {
       setState(() => _visibleMessages.add(value));
     }
@@ -72,7 +77,7 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
+            if (widget.tripStore?.serverBacked != true) Padding(
               padding: const EdgeInsets.all(12),
               child: Text(
                 pdLabel(context, 'Локальный чат DEMO: сообщения доступны пассажиру в этом приложении, но не передаются между телефонами.'),
@@ -80,7 +85,7 @@ class _PilotPassengerChatDemoState extends State<PilotPassengerChatDemo> {
                 style: const TextStyle(color: gold),
               ),
             ),
-            const ExpansionTile(
+            if (widget.tripStore?.serverBacked != true) const ExpansionTile(
               key: Key('pilot-isolated-chat-panel'),
               title: Text('Связь между устройствами · тест'),
               children: [Padding(

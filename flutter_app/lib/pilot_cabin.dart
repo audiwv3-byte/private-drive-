@@ -136,8 +136,8 @@ class _PilotCabinState extends State<PilotCabin> {
     _cockpitEntry = OverlayEntry(
       builder: (_) => PilotCockpitOverlay(
         tripStore: widget.tripStore,
-        onAccept: () => widget.tripStore?.acceptAssignedPilot(),
-        onDecline: () => widget.tripStore?.declineAssignedPilot(),
+        onAccept: () => widget.tripStore?.submitAcceptAssignedPilot(),
+        onDecline: () => widget.tripStore?.submitDeclineAssignedPilot(),
       ),
     );
     Overlay.of(context, rootOverlay: true).insert(_cockpitEntry!);
@@ -386,7 +386,9 @@ class _PilotCabinState extends State<PilotCabin> {
                   ],
                   const SizedBox(height: 28),
                   Text(
-                    pdLabel(context, 'Тестовый режим. Статус линии не отправляется на сервер.'),
+                    pdLabel(context, widget.tripStore?.serverBacked == true
+                        ? 'Линия подключена к тестовому серверу.'
+                        : 'Тестовый режим. Статус линии не отправляется на сервер.'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),

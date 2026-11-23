@@ -18,6 +18,7 @@ import 'pilot_passenger_chat_demo.dart';
 import 'isolated_trip_chat.dart';
 import 'message_voice.dart';
 import 'demo_trip_store.dart';
+import 'remote_sync_client.dart';
 import 'demo_dispatcher_cabinet.dart';
 import 'company_info.dart';
 import 'remote_sync_demo.dart';
@@ -44,6 +45,8 @@ class PrivateDriveDemo extends StatefulWidget {
     this.showPilotIdentityCheck = true,
     this.showPilotCockpit = true,
     this.storageScope,
+    this.syncGatewayBuilder,
+    this.syncRole,
     this.onSignOut,
     this.onBackToCabinets,
   });
@@ -59,6 +62,8 @@ class PrivateDriveDemo extends StatefulWidget {
   final bool showPilotIdentityCheck;
   final bool showPilotCockpit;
   final String? storageScope;
+  final RemoteTripGateway Function()? syncGatewayBuilder;
+  final String? syncRole;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
 
@@ -67,7 +72,8 @@ class PrivateDriveDemo extends StatefulWidget {
 }
 
 class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBindingObserver {
-  final DemoTripStore _trip = DemoTripStore();
+  late final DemoTripStore _trip;
+  String? _lastSyncError;
   StreamSubscription<Position>? _pilotLocationStream;
   Timer? _pilotGpsRetry;
   bool _startingLocation = false;
@@ -123,9 +129,33 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _orderPrefs = _openOrderPrefs();
-    _trip.addListener(_onPilotShiftChanged);
-    unawaited(_restoreOrder());
+    final gateway = widget.syncGatewayBuilder?.call();
+    _trip = gateway == null
+        ? DemoTripStore()
+        : ServerTripStore(gateway, widget.syncRole!);
+    // Only the pilot cabinet owns a GPS publisher.
+    if (!_trip.serverBacked || widget.pilotOnly) {
+      _trip.addListener(_onPilotShiftChanged);
+    }
+    if (gateway == null) {
+      _orderPrefs = _openOrderPrefs();
+      unawaited(_restoreOrder());
+    } else {
+      _restoringOrder = false;
+      _trip.addListener(_showSyncError);
+    }
+  }
+
+  void _showSyncError() {
+    final error = _trip.syncError;
+    if (error == _lastSyncError) return;
+    _lastSyncError = error;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _lastSyncError != error) return;
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      messenger?.hideCurrentSnackBar();
+      if (error != null) messenger?.showSnackBar(SnackBar(content: Text(error)));
+    });
   }
 
   Future<void> _requestPilotLocation() async {
@@ -146,7 +176,10 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appInForeground = state == AppLifecycleState.resumed;
-    if (_appInForeground && _trip.pilotOnline) {
+    if (!_appInForeground) return;
+    final store = _trip;
+    if (store is ServerTripStore) unawaited(store.refresh());
+    if ((!store.serverBacked || widget.pilotOnly) && store.pilotOnline) {
       _onPilotShiftChanged();
     }
   }
@@ -220,6 +253,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
     _pilotGpsRetry?.cancel();
     _trip.removeListener(_onPilotShiftChanged);
     _trip.removeListener(_persistOrder);
+    _trip.removeListener(_showSyncError);
     _pilotLocationStream?.cancel();
     _trip.dispose();
     super.dispose();
@@ -547,8 +581,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
           ...widget.tripStore!.passengerChatMessages.map(
             (message) => 'Пассажир: $message'),
         ],
-        onSend: (text) => _hasAssignedPassenger &&
-            widget.tripStore!.addPilotChatMessage(text),
+        onSend: (text) => _hasAssignedPassenger
+            ? widget.tripStore!.submitAddPilotChatMessage(text) : false,
       ),
     ));
   }
@@ -626,10 +660,11 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         '${(seconds % 60).toString().padLeft(2, '0')}';
   }
 
-  void _togglePaidWait() {
+  Future<void> _togglePaidWait() async {
     if (widget.tripStore != null) {
-      final changed = widget.tripStore!.togglePause();
-      if (!changed) return;
+      final action = widget.tripStore!.submitTogglePause();
+      final changed = action is bool ? action : await action;
+      if (!mounted || !changed) return;
       if (widget.tripStore!.paused) {
         _waitingTicker ??= Timer.periodic(const Duration(seconds: 1), (_) {
           if (mounted) setState(() {});
@@ -776,6 +811,14 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
       _waitingTicker?.cancel();
       _waitingTicker = null;
     }
+    if (store?.paused == true) {
+      _waitingTicker ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      _waitingTicker?.cancel();
+      _waitingTicker = null;
+    }
     if (store?.status == DemoTripStatus.finished && _waitingStartedAt != null) {
       _waitingElapsed += DateTime.now().difference(_waitingStartedAt!);
       _waitingStartedAt = null;
@@ -830,7 +873,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     }
     if (store.status == DemoTripStatus.approaching) {
       if (store.arrivalAt == null) {
-        store.markArrived();
+        store.submitMarkArrived();
       } else {
         advance();
       }
@@ -979,9 +1022,11 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     });
   }
 
-  void advance() {
+  Future<void> advance() async {
     if (widget.tripStore != null) {
-      final changed = widget.tripStore!.advancePilot();
+      final action = widget.tripStore!.submitAdvancePilot();
+      final changed = action is bool ? action : await action;
+      if (!mounted) return;
       if (changed && _approachingPassenger) {
         _pickupRouteAttempted = false;
         _pickupRoadPoints = const [];
@@ -1054,8 +1099,13 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
             key: const Key('pilot-drawer-remote-chat'),
             leading: const Icon(Icons.chat_outlined),
             title: const Text('Сообщения между устройствами · тест'),
-            onTap: () {
+            onTap: widget.tripStore?.serverBacked == true && !_hasAssignedPassenger
+                ? null : () {
               Navigator.pop(context);
+              if (widget.tripStore?.serverBacked == true) {
+                _openPassengerChat();
+                return;
+              }
               Navigator.of(context).push(MaterialPageRoute<void>(
                 builder: (_) => Scaffold(
                   appBar: AppBar(title: const Text('Тестовый чат пилота')),
@@ -1504,7 +1554,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                       Expanded(
                                         child: FilledButton(
                                           key: const Key('pilot-accept-assigned'),
-                                          onPressed: widget.tripStore!.acceptAssignedPilot,
+                                          onPressed: widget.tripStore!.submitAcceptAssignedPilot,
                                           child: Text(pdLabel(context, 'Принять')),
                                         ),
                                       ),
@@ -1512,7 +1562,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                       Expanded(
                                         child: OutlinedButton(
                                           key: const Key('pilot-decline-assigned'),
-                                          onPressed: widget.tripStore!.declineAssignedPilot,
+                                          onPressed: widget.tripStore!.submitDeclineAssignedPilot,
                                           child: Text(pdLabel(context, 'Отклонить')),
                                         ),
                                       ),

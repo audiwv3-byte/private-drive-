@@ -9,6 +9,7 @@ import 'native_session.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_identity_notice_page.dart';
 import 'remote_sync_demo.dart';
+import 'remote_sync_client.dart';
 
 typedef PdSignInBuilder = Widget Function(BuildContext context, String role,
     ValueChanged<PdNativeSession> onAuthenticated);
@@ -20,7 +21,10 @@ const pdLocalQaEntryEnabled = !kIsWeb &&
 /// Cabin choice is navigation intent, never a server role grant.
 class PdNativeCabinEntry extends StatefulWidget {
   const PdNativeCabinEntry({super.key, required this.signInBuilder,
-    required this.identityApiBuilder});
+    required this.identityApiBuilder,
+    this.syncGatewayBuilder, this.enableMapTiles = true});
+  final RemoteTripGateway Function(PdNativeSession session)? syncGatewayBuilder;
+  final bool enableMapTiles;
   final PdSignInBuilder signInBuilder;
   final PdIdentityApi Function(PdNativeSession session) identityApiBuilder;
   @override
@@ -38,6 +42,16 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   bool _showTestSync = false;
   bool _localPilotOpened = false;
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
+
+  bool get _serverSync => widget.syncGatewayBuilder != null;
+  bool get _localQa => pdLocalQaEntryEnabled && !_serverSync;
+  bool get _internalGuest => !_serverSync && const bool.fromEnvironment('PD_INTERNAL_QA');
+
+  bool _canOpen(PdNativeSession session, String role) => switch (role) {
+    'pilot' => session.canPilot && (!_serverSync || session.role == 'pilot'),
+    'dispatcher' => session.canDispatch,
+    _ => !_serverSync || session.role == 'passenger',
+  };
 
   void _openTestSync() {
     setState(() {
@@ -60,7 +74,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     _entry();
   }
   void _select(String role) {
-    if (pdLocalQaEntryEnabled) {
+    if (_localQa) {
       if (_qaUnlocked) setState(() {
         _page = role;
         if (role == 'pilot') _localPilotOpened = true;
@@ -73,9 +87,11 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       final session = _activeSession;
       if (role == 'pilot') {
         _page = 'photo';
+      } else if (session != null) {
+        _page = _canOpen(session, role) ? role : 'entry';
+        if (_page == 'entry') _message = 'У аккаунта нет серверных прав для выбранного кабинета.';
       } else {
-        _page = session != null || const bool.fromEnvironment('PD_INTERNAL_QA')
-            ? 'passenger' : 'signin';
+        _page = role == 'passenger' && _internalGuest ? role : 'signin';
       }
     });
   }
@@ -87,10 +103,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     });
     setState(() {
       _session = session;
-      if (_requestedRole == 'pilot' && session.canPilot) {
-        _page = 'photo';
-      } else if (_requestedRole == 'passenger') {
-        _page = 'passenger';
+      if (_canOpen(session, _requestedRole)) {
+        _page = _requestedRole == 'pilot' ? 'photo' : _requestedRole;
       } else {
         _page = 'entry';
         _message = 'У аккаунта нет серверных прав для выбранного кабинета.';
@@ -98,7 +112,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     });
   }
   void _photoApproved() {
-    if (_activeSession?.canPilot != true) return;
+    final session = _activeSession;
+    if (session == null || !_canOpen(session, 'pilot')) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
     setState(() => _page = 'pilot');
   }
@@ -114,6 +129,10 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     final cabin = PrivateDriveDemo(
       key: ValueKey('entry-$role-${session?.userId ?? (localQa ? 'local-qa' : 'guest')}'),
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',
+      adminOnly: role == 'dispatcher', enableMapTiles: widget.enableMapTiles,
+      syncGatewayBuilder: session != null && _serverSync
+          ? () => widget.syncGatewayBuilder!(session) : null,
+      syncRole: role,
       showPilotIdentityCheck: !localQa,
       showPilotCockpit: showPilotCockpit,
       storageScope: session?.userId ?? (localQa ? 'local-qa' : 'internal-guest'),
@@ -146,7 +165,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
 
   @override
   Widget build(BuildContext context) {
-    if (!pdLocalQaEntryEnabled || !_qaUnlocked || (!_testSyncStarted && !_localPilotOpened)) {
+    if (!_localQa || !_qaUnlocked || (!_testSyncStarted && !_localPilotOpened)) {
       return _buildCabin(context);
     }
     final showLocalPilot = _page == 'pilot' && !_showTestSync;
@@ -188,7 +207,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
 
   Widget _buildCabin(BuildContext context) {
-    if (pdLocalQaEntryEnabled) {
+    if (_localQa) {
       if (!_qaUnlocked) {
         return _LocalQaSignIn(
           onUnlocked: () => setState(() => _qaUnlocked = true),
@@ -207,7 +226,10 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       return PopScope(canPop: false,
         onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
         child: Scaffold(
-          appBar: AppBar(title: Text(_requestedRole == 'pilot' ? 'Вход пилота' : 'Вход пассажира'),
+          appBar: AppBar(title: Text(switch (_requestedRole) {
+            'pilot' => 'Вход пилота', 'dispatcher' => 'Вход диспетчера',
+            _ => 'Вход пассажира',
+          }),
             leading: BackButton(onPressed: _entry)),
           body: widget.signInBuilder(context, _requestedRole, _authenticated),
         ),
@@ -217,17 +239,18 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       return PopScope(canPop: false,
         onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
         child: PdPilotIdentityNoticePage(
-        api: session != null && session.canPilot ? widget.identityApiBuilder(session) : null,
+        api: session != null && _canOpen(session, 'pilot') ? widget.identityApiBuilder(session) : null,
         onBack: _entry,
         onRequestSignIn: _photoSignIn,
         onVerificationApproved: _photoApproved,
         onContinueWithoutVerification: _entry,
       ));
     }
-    if (_page == 'passenger' && (session != null || const bool.fromEnvironment('PD_INTERNAL_QA'))) {
+    if (_page == 'passenger' && (session != null || _internalGuest)) {
       return _cabin('passenger', session);
     }
-    if (_page == 'pilot' && session?.canPilot == true) return _cabin('pilot', session);
+    if (session != null && (_page == 'pilot' || _page == 'dispatcher') &&
+        _canOpen(session, _page)) return _cabin(_page, session);
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [
         if (session != null || _qaUnlocked) IconButton(onPressed: _signOut,
@@ -250,7 +273,16 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             FilledButton.icon(key: const Key('entry-pilot'),
               onPressed: () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
               label: const Text('Пилот')),
-            if (pdLocalQaEntryEnabled) ...[
+            if (_serverSync) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                key: const Key('entry-dispatcher'),
+                onPressed: () => _select('dispatcher'),
+                icon: const Icon(Icons.support_agent),
+                label: const Text('Диспетчер'),
+              ),
+            ],
+            if (_localQa) ...[
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 key: const Key('entry-staging-dispatch'),
@@ -261,13 +293,13 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             ],
             if (_message != null) Text(_message!, key: const Key('entry-role-message')),
             const SizedBox(height: 16),
-            const Text(pdLocalQaEntryEnabled
+            Text(_localQa
               ? 'Оба кабинета используют локальные тестовые данные.'
               : 'Фотопроверка требуется только пилоту. '
                 'Доступ пилота подтверждается сервером.',
               textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            const Text(pdLocalQaEntryEnabled
+            Text(_localQa
               ? String.fromEnvironment('PD_QA_BUILD_LABEL',
                 defaultValue: 'Внутренняя сборка')
               : 'Версия 0.2.27 · сборка 2026112103', key: Key('app-demo-version'),

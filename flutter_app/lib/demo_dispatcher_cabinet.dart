@@ -155,7 +155,7 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
                   FilledButton.icon(
                     key: const Key('dispatcher-assign-pilot'),
                     onPressed: widget.tripStore.cashOrderNeedsOtherPilot
-                      ? null : widget.tripStore.assignPilot,
+                      ? null : widget.tripStore.submitAssignPilot,
                     icon: const Icon(Icons.assignment_ind_outlined),
                     label: Text(pdLabel(context, 'Назначить тестового пилота')),
                   ),
@@ -277,9 +277,11 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
             IconButton(
               key: const Key('dispatcher-chat-send'),
               icon: const Icon(Icons.send),
-              onPressed: () {
-                if (widget.tripStore.addDispatcherChatMessage(
-                    _dispatcherDraft.text)) {
+              onPressed: () async {
+                final text = _dispatcherDraft.text;
+                final action = widget.tripStore.submitAddDispatcherChatMessage(text);
+                final sent = action is bool ? action : await action;
+                if (mounted && sent && _dispatcherDraft.text == text) {
                   _dispatcherDraft.clear();
                 }
               },
@@ -338,7 +340,8 @@ class _DemoDispatcherCabinetState extends State<DemoDispatcherCabinet> {
         padding: const EdgeInsets.all(12),
         child: Text(
           hasFix
-            ? '1 пилот с GPS · только локальная сессия'
+            ? (store.serverBacked ? '1 пилот с GPS · тестовый сервер'
+                : '1 пилот с GPS · только локальная сессия')
             : 'Подтверждённых GPS-точек нет. Для нескольких пилотов '
               'нужна защищённая серверная синхронизация.',
           key: const Key('dispatcher-fleet-status'),

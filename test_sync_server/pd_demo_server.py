@@ -106,6 +106,10 @@ class DemoStore:
             raise TripError("not_found", 404)
 
     def create(self, actor, data):
+        with DB_LOCK, self.db:
+            return self._insert_trip(actor, data)
+
+    def _insert_trip(self, actor, data):
         origin, destination = data.get("from"), data.get("to")
         payment = data.get("payment", "Карта")
         if not isinstance(origin, str) or not isinstance(destination, str):
@@ -115,16 +119,15 @@ class DemoStore:
             raise TripError("invalid_route")
         if payment not in ("Карта", "PayPal", "Банковский перевод", "Криптовалюта"):
             raise TripError("invalid_payment")
-        with DB_LOCK, self.db:
-            active = self.db.execute("SELECT id FROM trips WHERE owner=? AND status!='finished'", (actor,)).fetchone()
-            if active:
-                raise TripError("active_trip_exists", 409)
-            trip_id = uuid.uuid4().hex
-            now = datetime.now(timezone.utc).isoformat()
-            self.db.execute("INSERT INTO trips VALUES (?,?,?,?,?,?,?,?,?,?)",
-                            (trip_id, actor, None, origin, destination, payment, "requested", 0, 1, now))
-            self._event(trip_id, actor, "requested", "created", 1)
-            return self._get(trip_id)
+        active = self.db.execute("SELECT id FROM trips WHERE owner=? AND status NOT IN ('finished','cancelled')", (actor,)).fetchone()
+        if active:
+            raise TripError("active_trip_exists", 409)
+        trip_id = uuid.uuid4().hex
+        now = datetime.now(timezone.utc).isoformat()
+        self.db.execute("INSERT INTO trips VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        (trip_id, actor, None, origin, destination, payment, "requested", 0, 1, now))
+        self._event(trip_id, actor, "requested", "created", 1)
+        return self._get(trip_id)
 
     def get(self, trip_id, role, actor):
         with DB_LOCK:
@@ -253,10 +256,10 @@ class ApiServer(ThreadingHTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address, store, credentials, *, browser_origin=None):
+    def __init__(self, address, store, credentials, *, browser_origin=None, handler=None):
         self.store, self.credentials = store, credentials
         self.browser_origin = browser_origin
-        super().__init__(address, ApiHandler)
+        super().__init__(address, handler or ApiHandler)
 
 
 class ApiHandler(BaseHTTPRequestHandler):
@@ -308,6 +311,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             raise TripError("invalid_body")
         return obj
 
+    def _current(self, role, actor):
+        return {"trip": self.server.store.current(role, actor)}
+
     def _request(self, method):
         try:
             origin = self.headers.get("Origin")
@@ -322,7 +328,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._reply(200, {"role": role, "actor": actor, "demo": True})
                 return
             if method == "GET" and parts == ["v1", "current"]:
-                self._reply(200, {"trip": self.server.store.current(role, actor)})
+                self._reply(200, self._current(role, actor))
                 return
             if method == "POST" and parts == ["v1", "trips"]:
                 if role != "passenger":

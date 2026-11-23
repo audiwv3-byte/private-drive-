@@ -8,14 +8,19 @@ import 'package:http/http.dart' as http;
 class PdHttpApi {
   const PdHttpApi();
 
-  static Uri secureUri(String baseUrl, String path) {
+  static bool allowedScheme(Uri uri, {bool allowLoopback = false}) =>
+      uri.scheme == 'https' ||
+      (allowLoopback && uri.scheme == 'http' &&
+          (uri.host == '127.0.0.1' || uri.host == 'localhost'));
+
+  static Uri secureUri(String baseUrl, String path, {bool allowLoopback = false}) {
     final base = Uri.tryParse(baseUrl);
-    if (base == null || base.scheme != 'https' || base.host.isEmpty ||
+    if (base == null || !allowedScheme(base, allowLoopback: allowLoopback) || base.host.isEmpty ||
         base.userInfo.isNotEmpty) {
       throw const FormatException('Безопасный адрес API не настроен.');
     }
     final uri = base.resolve(path);
-    if (uri.scheme != 'https' || uri.host != base.host ||
+    if (uri.scheme != base.scheme || uri.host != base.host ||
         uri.port != base.port || uri.userInfo.isNotEmpty) {
       throw const FormatException('Недопустимый адрес API.');
     }
@@ -26,15 +31,17 @@ class PdHttpApi {
     Uri uri,
     Map<String, String> payload, {
     http.Client? client,
+    bool allowLoopback = false,
     Duration timeout = const Duration(seconds: 10),
   }) async {
-    if (uri.scheme != 'https' || uri.userInfo.isNotEmpty) {
+    if (!allowedScheme(uri, allowLoopback: allowLoopback) || uri.userInfo.isNotEmpty) {
       throw const FormatException('HTTPS обязателен.');
     }
     final owned = client == null;
     final transport = client ?? http.Client();
     try {
       final request = http.Request('POST', uri)
+        ..followRedirects = false
         ..headers['Content-Type'] = 'application/json; charset=utf-8'
         ..body = jsonEncode(payload);
       final response = await transport.send(request).timeout(timeout);

@@ -47,7 +47,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
           return ListView(padding: const EdgeInsets.all(16), children: [
             Text(pdLabel(context, 'Заказов в демосессии пока нет'),
               key: const Key('passenger-orders-empty')),
-            const Card(child: ExpansionTile(
+            if (!store.serverBacked) const Card(child: ExpansionTile(
               key: Key('passenger-isolated-chat-panel'),
               title: Text('Связь между устройствами · тест'),
               children: [Padding(
@@ -127,7 +127,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                               ],
                             ),
                           );
-                          if (approved == true) store.cancelByPassenger();
+                          if (approved == true) store.submitCancelByPassenger();
                         },
                       ),
                     if (!store.canPassengerCancel &&
@@ -174,17 +174,18 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                 IconButton(
                   key: const Key('passenger-chat-send'),
                   icon: const Icon(Icons.send),
-                  onPressed: () {
-                    if (store.addPassengerChatMessage(_draft.text)) {
-                      _draft.clear();
-                    }
+                  onPressed: () async {
+                    final text = _draft.text;
+                    final action = store.submitAddPassengerChatMessage(text);
+                    final sent = action is bool ? action : await action;
+                    if (mounted && sent && _draft.text == text) _draft.clear();
                   },
                 ),
               ]),
-              Text(pdLabel(context, 'Локальный чат DEMO: без отправки через интернет.'),
+              if (!store.serverBacked) Text(pdLabel(context, 'Локальный чат DEMO: без отправки через интернет.'),
                 style: TextStyle(fontSize: 11)),
             ],
-            const Card(child: ExpansionTile(
+            if (!store.serverBacked) const Card(child: ExpansionTile(
               key: Key('passenger-isolated-chat-panel'),
               title: Text('Связь между устройствами · тест'),
               children: [Padding(

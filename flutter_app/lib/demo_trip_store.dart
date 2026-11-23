@@ -1,6 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+
+import 'remote_sync_client.dart';
+
+part 'server_trip_store.dart';
 
 /// In-memory simulated trip. Never talks to production APIs or payments.
 /// A single store instance is shared by demo screens in one app session.
@@ -64,6 +70,30 @@ class DemoArchivedChat {
 }
 
 class DemoTripStore extends ChangeNotifier {
+  bool get serverBacked => false;
+  String? get syncError => null;
+
+  FutureOr<bool> submitBooking(DemoTrip booking) => create(
+    from: booking.from, to: booking.to, paymentMethod: booking.paymentMethod,
+    departure: booking.departure, services: booking.services,
+    rideType: booking.rideType, roundTrip: booking.roundTrip,
+    advanceBooking: booking.advanceBooking,
+    estimatedFareEur: booking.estimatedFareEur,
+    estimatedFareCents: booking.estimatedFareCents,
+    extrasRequireQuote: booking.extrasRequireQuote,
+  );
+
+  FutureOr<bool> submitMarkArrived() => markArrived();
+  FutureOr<bool> submitCancelByPassenger() => cancelByPassenger();
+  FutureOr<bool> submitAssignPilot() => assignPilot();
+  FutureOr<bool> submitAcceptAssignedPilot() => acceptAssignedPilot();
+  FutureOr<bool> submitDeclineAssignedPilot() => declineAssignedPilot();
+  FutureOr<bool> submitAdvancePilot() => advancePilot();
+  FutureOr<bool> submitTogglePause() => togglePause();
+  FutureOr<bool> submitAddDispatcherChatMessage(String text) => addDispatcherChatMessage(text);
+  FutureOr<bool> submitAddPilotChatMessage(String text) => addPilotChatMessage(text);
+  FutureOr<bool> submitAddPassengerChatMessage(String text) => addPassengerChatMessage(text);
+
   DemoTrip? _trip;
   DemoTripStatus? _status;
   bool _paused = false;

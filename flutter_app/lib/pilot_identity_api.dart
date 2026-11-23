@@ -4,8 +4,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'pd_http_api.dart';
+
 class PdIdentityApi {
-  PdIdentityApi({required this.baseUrl, required this.token, this.client});
+  PdIdentityApi({required this.baseUrl, required this.token, this.client,
+    this.allowLoopback = false});
+  final bool allowLoopback;
   final String baseUrl;
   final String token;
   final http.Client? client;
@@ -13,7 +17,7 @@ class PdIdentityApi {
   Future<Map<String, dynamic>> request(String method, String endpoint,
       [Map<String, dynamic>? payload]) async {
     final base = Uri.parse(baseUrl);
-    if (base.scheme != 'https' || base.host.isEmpty ||
+    if (!PdHttpApi.allowedScheme(base, allowLoopback: allowLoopback) || base.host.isEmpty ||
         base.userInfo.isNotEmpty || base.hasQuery || base.hasFragment) {
       throw const FormatException('HTTPS identity API required');
     }

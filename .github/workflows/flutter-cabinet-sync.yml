@@ -1,0 +1,39 @@
+name: PRIVATE DRIVE isolated Flutter cabinet sync
+
+on:
+  push:
+    branches: [test/flutter-cabinet-sync]
+
+permissions:
+  contents: read
+
+jobs:
+  cabinet-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Verify Mock API, native auth and role boundaries
+        run: PYTHONPATH=test_sync_server:. python3 -m unittest discover -s test_sync_server -p 'test_*.py' -v
+      - name: Set up Flutter packages
+        working-directory: flutter_app
+        run: flutter pub get
+      - name: Analyze Flutter
+        working-directory: flutter_app
+        run: flutter analyze --no-fatal-infos
+      - name: Run existing Flutter widget tests
+        working-directory: flutter_app
+        run: flutter test --no-pub --reporter expanded
+      - name: Run all three cabinets against the loopback Mock API
+        working-directory: flutter_app
+        run: flutter test --no-pub --reporter expanded --dart-define=PD_CABINET_SYNC_INTEGRATION=true test/cabinet_sync_integration_test.dart

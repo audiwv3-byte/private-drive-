@@ -59,14 +59,14 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
     super.dispose();
   }
 
-  void _create() {
+  Future<void> _create() async {
     if (!_valid) return;
     final current = DateTime.now();
     final date = _date ?? DateUtils.dateOnly(current);
     final time = _time ?? TimeOfDay.fromDateTime(current);
     final when = DateTime(date.year, date.month, date.day,
         time.hour, time.minute);
-    final created = widget.tripStore.create(
+    final action = widget.tripStore.submitBooking(DemoTrip(
       from: _from.text.trim(),
       to: _jumpstart ? 'Помощь на месте' : _to.text.trim(),
       paymentMethod: _payment,
@@ -79,8 +79,9 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
         if (_notes.text.trim().isNotEmpty)
           'Комментарий: ${_notes.text.trim()}',
       ],
-    );
-    if (created) {
+    ));
+    final created = action is bool ? action : await action;
+    if (mounted && created) {
       Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => PassengerOrdersDemo(tripStore: widget.tripStore)));
     }

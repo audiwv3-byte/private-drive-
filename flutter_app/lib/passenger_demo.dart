@@ -641,7 +641,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final time = _time ?? TimeOfDay.now();
     final departure = DateTime(date.year, date.month, date.day,
         time.hour, time.minute);
-    store.create(
+    store.submitBooking(DemoTrip(
       from: _from.text,
       to: _to.text,
       paymentMethod: _payment,
@@ -675,7 +675,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
         if (_tripWishes.text.trim().isNotEmpty)
           'Пожелания пассажира: ${_tripWishes.text.trim()}',
       ],
-    );
+    ));
   }
 
   bool get _isAdvanceBooking => _taxiAdvanceBooking || _date != null || _time != null;
@@ -1832,6 +1832,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-book-disabled'),
               onPressed: _canCreateLocalTrip
                   ? (const bool.fromEnvironment('PD_INTERNAL_QA')
+                      && widget.tripStore?.serverBacked != true
                       ? _openServerBookingQa : _createLocalTrip)
                   : null,
               child: Text(widget.tripStore == null

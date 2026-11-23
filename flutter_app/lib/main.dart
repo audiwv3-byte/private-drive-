@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:http/http.dart' as http;
 import 'remote_sync_demo.dart';
+import 'remote_sync_client.dart';
 import 'demo_interfaces.dart';
 import 'demo_backup_page.dart';
 import 'brand_logo.dart';
@@ -16,6 +17,7 @@ import 'pilot_photo_capture.dart';
 import 'native_cabin_entry.dart';
 import 'native_session.dart';
 
+const mockCabinetApiUrl = String.fromEnvironment('PD_MOCK_CABINET_API_URL');
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 // Opt-in only for the isolated static Safari/Android browser test artifact.
 // No production auth URL, payment gateway or automatic backend connection.
@@ -31,12 +33,19 @@ Future<void> main() async {
 }
 
 class PrivateDriveApp extends StatelessWidget {
-  const PrivateDriveApp({super.key, this.enableOfflinePreview = false});
+  const PrivateDriveApp({super.key, this.enableOfflinePreview = false,
+    this.mockApiUrl = mockCabinetApiUrl, this.httpClient, this.enableMapTiles = true});
+
+  final String mockApiUrl;
+  final http.Client? httpClient;
+  final bool enableMapTiles;
 
   final bool enableOfflinePreview;
 
   @override
   Widget build(BuildContext context) {
+    final mockSync = mockApiUrl.isNotEmpty;
+    final authUrl = mockSync ? mockApiUrl : apiBaseUrl;
     return PdLanguageScope(
       language: pdLanguage,
       child: MaterialApp(
@@ -50,7 +59,7 @@ class PrivateDriveApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFF111111),
       ),
-      home: kIsWeb && isolatedWebPreview
+      home: !mockSync && kIsWeb && isolatedWebPreview
           ? const RemoteSyncDemo()
           : enableOfflinePreview
           // Explicit developer harness only. Normal launch starts with cabins.
@@ -58,13 +67,21 @@ class PrivateDriveApp extends StatelessWidget {
               child: NativeSignInScreen(enableOfflinePreview: true),
             )
           : PdNativeCabinEntry(
+              enableMapTiles: enableMapTiles,
+              syncGatewayBuilder: mockSync
+                  ? (session) => RemoteDemoClient(authUrl, session.token, client: httpClient)
+                  : null,
               signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
                 enableOfflinePreview: enableOfflinePreview,
-                allowGuestEntry: role == 'passenger',
+                authApiUrl: authUrl,
+                httpClient: httpClient,
+                allowLoopback: mockSync,
+                allowGuestEntry: !mockSync && role == 'passenger',
                 onAuthenticated: onAuthenticated,
               ),
               identityApiBuilder: (session) => PdIdentityApi(
-                baseUrl: apiBaseUrl, token: session.token),
+                baseUrl: authUrl, token: session.token,
+                allowLoopback: mockSync, client: httpClient),
             ),
       ),
     );
@@ -77,6 +94,7 @@ class NativeSignInScreen extends StatefulWidget {
     this.authApiUrl = apiBaseUrl,
     this.enableOfflinePreview = false,
     this.httpClient,
+    this.allowLoopback = false,
     this.allowGuestEntry = true,
     this.onAuthenticated,
   });
@@ -85,6 +103,7 @@ class NativeSignInScreen extends StatefulWidget {
   final bool enableOfflinePreview;
   final http.Client? httpClient;
   final bool allowGuestEntry;
+  final bool allowLoopback;
   final ValueChanged<PdNativeSession>? onAuthenticated;
 
   @override
@@ -117,8 +136,9 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   }
 
   Future<Map<String, dynamic>> post(String path, Map<String, String> payload) {
-    final uri = PdHttpApi.secureUri(widget.authApiUrl, path);
-    return const PdHttpApi().postJson(uri, payload, client: widget.httpClient);
+    final uri = PdHttpApi.secureUri(widget.authApiUrl, path, allowLoopback: widget.allowLoopback);
+    return const PdHttpApi().postJson(uri, payload, client: widget.httpClient,
+      allowLoopback: widget.allowLoopback);
   }
 
   Future<void> requestCode() async {

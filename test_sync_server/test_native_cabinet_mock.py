@@ -51,6 +51,23 @@ class NativeCabinetMockTest(unittest.TestCase):
         self.assertEqual(self.request("/v1/me", token)["role"], role)
         return token
 
+    def test_explicit_isolated_qa_sessions_are_role_bound_and_disabled_by_default(self):
+        endpoint = "/native-auth/qa-session"
+        self.request(endpoint, body={"role": "passenger"}, expected=403)
+        self.server.isolated_qa_auth = True
+        for role in ("passenger", "pilot", "dispatcher"):
+            result = self.request(endpoint, body={"role": role})
+            self.assertIs(result["verified"], False)
+            self.assertIs(result["qa"], True)
+            self.assertEqual(result["token_type"], "Bearer")
+            self.assertNotIn("code", result)
+            self.assertEqual(self.request("/v1/me", result["access_token"])["role"], role)
+            if role == "passenger":
+                self.request("/native-identity/queue", result["access_token"], expected=403)
+        self.request(endpoint, body={"role": "admin"}, expected=403)
+        self.request(endpoint, body={"role": "pilot_dispatcher"}, expected=403)
+        self.request(endpoint, body={"role": "passenger", "phone": "+37000000000"}, expected=200)
+
     def test_native_cabinet_contract(self):
         passenger = self.sign_in(1, "passenger")
         pilot = self.sign_in(2, "pilot")

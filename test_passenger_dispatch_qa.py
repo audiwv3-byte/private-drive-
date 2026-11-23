@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from flask import Flask
 from pd_dispatch_test_sync import register
+from pd_qa_source_bridge_client import signed_qa_request, send_synthetic_qa_order
 
 
 class PassengerToDispatcherTests(unittest.TestCase):
@@ -64,6 +65,20 @@ class PassengerToDispatcherTests(unittest.TestCase):
         self.assertEqual(assigned.get_json()["trip"]["status"], "assigned")
         updated = self.client.get("/dispatch/test-sync/state").get_json()["trips"]
         self.assertEqual(updated[0]["status"], "assigned")
+
+    def test_bridge_sender_is_opt_in_and_never_uses_prod_host(self):
+        payload = self.source_payload()
+        req = signed_qa_request(payload, "test-secret" * 5, timestamp=1763900000)
+        self.assertEqual(req.full_url,
+            "https://private-drive-dispatcher-staging.onrender.com/v1/qa-source/import")
+        self.assertEqual(req.get_method(), "POST")
+        self.assertEqual(json.loads(req.data), payload)
+        self.assertTrue(req.get_header("X-pd-qa-signature"))
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(RuntimeError):
+                send_synthetic_qa_order(payload)
+        with self.assertRaises(ValueError):
+            signed_qa_request(payload, "short")
 
     @staticmethod
     def source_payload(source="telegram_miniapp", source_order_id="451"):

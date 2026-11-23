@@ -108,6 +108,9 @@ class LeastPrivilegePostgresTests(unittest.TestCase):
                 row=self.role_sql("pd_ci_reviewer",
                     "SELECT pd_ci_approve_pilot(%s,%s)",(fake,"ci-pilot")).fetchone()
                 self.assertEqual(row,(False,))
+        # Switch back to the CI owner only after the restricted-role call ends.
+        # This assertion is not performed with the reviewer role.
+        self.db.execute("RESET ROLE")
         self.assertEqual(self.db.execute(
             "SELECT pilot_review_status FROM pd_ci_public_accounts WHERE user_id='ci-pilot'").fetchone()[0],"pending")
 
@@ -116,6 +119,9 @@ class LeastPrivilegePostgresTests(unittest.TestCase):
             row=self.role_sql("pd_ci_reviewer",
                 "SELECT pd_ci_approve_pilot(%s,%s)",(HASH,"ci-pilot")).fetchone()
             self.assertEqual(row,(True,))
+        # Switch back to the CI owner only after the restricted-role call ends.
+        # This assertion is not performed with the reviewer role.
+        self.db.execute("RESET ROLE")
         self.assertEqual(self.db.execute(
             "SELECT pilot_review_status FROM pd_ci_public_accounts WHERE user_id='ci-pilot'").fetchone()[0],"approved")
         with self.db.cursor() as cur:

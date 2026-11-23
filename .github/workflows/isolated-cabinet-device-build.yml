@@ -18,7 +18,8 @@ jobs:
     timeout-minutes: 95
     env:
       FLUTTER_SUPPRESS_ANALYTICS: 'true'
-      QA_PACKAGE: lt.privatedrive.cabinetsync.qa
+      QA_PACKAGE: lt.privatedrive.cabinetsync.qa.parallel
+      QA_APP_LABEL: PRIVATE DRIVE QA 2
       PYTHONPATH: 'test_sync_server:.'
     steps:
       - uses: actions/checkout@v4
@@ -90,8 +91,10 @@ jobs:
             rm -f "$dest/test/widget_test.dart"
           done
           python3 - <<'PY'
+          from os import environ
           from pathlib import Path
-          package = "lt.privatedrive.cabinetsync.qa"
+          package = environ["QA_PACKAGE"]
+          label = environ["QA_APP_LABEL"]
           gradle = Path("qa_android/android/app/build.gradle.kts")
           text = gradle.read_text()
           original = 'applicationId = "lt.privatedrive.private_drive"'
@@ -100,7 +103,7 @@ jobs:
           manifest = Path("qa_android/android/app/src/main/AndroidManifest.xml")
           text = manifest.read_text()
           assert 'android:label="private_drive"' in text
-          text = text.replace('android:label="private_drive"', 'android:label="PD CABINET SYNC QA"')
+          text = text.replace('android:label="private_drive"', f'android:label="{label}"')
           permissions = """
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -188,14 +191,14 @@ jobs:
           "$build_tools/apksigner" verify --verbose --print-certs "$apk" > ../apk-certificate.txt
           "$build_tools/aapt" dump badging "$apk" > ../apk-badging.txt
           grep -F "name='$QA_PACKAGE'" ../apk-badging.txt
-          grep -F "application-label:'PD CABINET SYNC QA'" ../apk-badging.txt
+          grep -F "application-label:'$QA_APP_LABEL'" ../apk-badging.txt
           "$build_tools/aapt" dump permissions "$apk" > ../apk-permissions.txt
           grep -F android.permission.CAMERA ../apk-permissions.txt
           if grep -q 'android.permission.RECORD_AUDIO' ../apk-permissions.txt; then exit 1; fi
           mkdir -p ../device_artifacts/android
-          cp "$apk" ../device_artifacts/android/PRIVATE-DRIVE-cabinet-sync-QA.apk
+          cp "$apk" ../device_artifacts/android/PRIVATE-DRIVE-QA-2.apk
           cp ../apk-certificate.txt ../apk-badging.txt ../apk-permissions.txt ../device_artifacts/android/
-          (cd ../device_artifacts/android && sha256sum PRIVATE-DRIVE-cabinet-sync-QA.apk > SHA256SUMS)
+          (cd ../device_artifacts/android && sha256sum PRIVATE-DRIVE-QA-2.apk > SHA256SUMS)
 
       - name: Upload QA browser screenshots when an interactive check fails
         if: failure()
@@ -210,7 +213,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -s device_artifacts/android/PRIVATE-DRIVE-cabinet-sync-QA.apk
+          test -s device_artifacts/android/PRIVATE-DRIVE-QA-2.apk
           test -s device_artifacts/safari/main.dart.js
           python3 - <<'PY'
           from pathlib import Path

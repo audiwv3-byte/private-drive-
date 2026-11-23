@@ -115,7 +115,7 @@ def main():
             tunnel = subprocess.Popen([
                 options.cloudflared, "tunnel", "--protocol", "http2", "--no-autoupdate",
                 "--url", f"http://127.0.0.1:{server.server_port}",
-            ], stderr=subprocess.PIPE, stdout=subprocess.STDOUT, text=True)
+            ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             urls = queue.Queue()
             threading.Thread(target=drain_tunnel_output, args=(tunnel.stdout, urls), daemon=True).start()
             try:

@@ -322,6 +322,11 @@ def register(app, core):
         from pd_dispatch_test_sync import register as register_test_sync
         register_test_sync(app, authorized, valid_csrf)
 
+    # Separate, fail-closed pilot intake shares the existing dispatcher session.
+    if os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
+        from pd_pilot_qa_intake import register as register_qa_pilots
+        register_qa_pilots(app, authorized)
+
     @app.get("/dispatch")
     def pd_dispatch_home():
         if test_sync_enabled:

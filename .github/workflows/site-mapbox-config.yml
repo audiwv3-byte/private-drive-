@@ -1,47 +1,50 @@
-name: PRIVATE DRIVE Mapbox public map configuration
+name: PRIVATE DRIVE Mapbox test Render configuration
 on:
   push:
-    branches:
-      - feature/website-private-drive-preview
+    branches: [feature/website-private-drive-preview]
     paths:
       - .github/workflows/site-mapbox-config.yml
-      - site_preview/order-map.html
   workflow_dispatch:
-
 permissions:
-  contents: write
-
+  contents: read
 jobs:
-  public-mapbox-config:
+  configure-render:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
+    env:
+      MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SITE_ID: srv-dc1dnbec6qcc73aj44s0
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-          ref: feature/website-private-drive-preview
-      - name: Validate saved public Mapbox token and generate web config
-        env:
-          MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+      - name: Verify saved tokens and configure test Render without committing any key
         run: |
           python - <<'PY'
-          import json, os, re
-          from pathlib import Path
+          import json, os, re, urllib.request, urllib.error
           token=os.environ.get('MAPBOX_PUBLIC_TOKEN','').strip()
+          key=os.environ.get('RENDER_API_KEY','').strip()
           if not re.fullmatch(r'pk\.[A-Za-z0-9_.-]+',token):
-              raise SystemExit('The existing MAPBOX_PUBLIC_TOKEN secret is missing or not a pk. token')
-          Path('site_preview/assets/mapbox-config.js').write_text(
-              'window.PD_MAPBOX_PUBLIC_TOKEN = '+json.dumps(token)+';\n', encoding='utf-8')
-          print('Mapbox public browser configuration created (token not logged).')
+              raise SystemExit('Saved MAPBOX_PUBLIC_TOKEN is not a valid public pk. token')
+          if not key:
+              raise SystemExit('RENDER_API_KEY is not available to this workflow')
+          base='https://api.render.com/v1/services/'+os.environ['RENDER_SITE_ID']
+          def request(method,path,data):
+              body=json.dumps(data).encode('utf-8')
+              req=urllib.request.Request(base+path,method=method,data=body,headers={
+                  'Authorization':'Bearer '+key,
+                  'Content-Type':'application/json',
+                  'Accept':'application/json'
+              })
+              try:
+                  with urllib.request.urlopen(req,timeout=25) as resp:
+                      return resp.status
+              except urllib.error.HTTPError as e:
+                  raise SystemExit(f'Render API {method} {path}: HTTP {e.code}; check API key scope, without logging secrets')
+          # Set only one env var: no overwrite of SMS/Stripe/other service settings.
+          request('PUT','/env-vars/MAPBOX_WEB_PUBLIC_TOKEN',{'value':token})
+          print('Public Mapbox token transferred into the isolated Render test service, not into Git.')
+          request('PATCH','',{'serviceDetails':{'buildCommand':'python build_website_map_config.py'}})
+          print('Test static-site build command configured to generate public browser config.')
+          request('POST','/deploys',{'clearCache':'do_not_clear'})
+          print('Test Render deployment requested; live site and application untouched.')
           PY
-      - name: Commit published browser configuration to website preview branch
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add site_preview/assets/mapbox-config.js
-          if git diff --cached --quiet; then
-            echo 'Mapbox config already up to date'
-          else
-            git commit -m 'chore(site): configure public Mapbox browser token'
-            git push origin HEAD:feature/website-private-drive-preview
-          fi

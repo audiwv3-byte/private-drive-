@@ -14,6 +14,7 @@ import psycopg
 
 from pd_native_auth import native_phone_role_resolver, normalize_destination
 from pd_twilio_verify import VerifyError, start_verification, check_verification
+from pd_native_auth_schema_readiness import inspect_native_auth_schema
 
 TTL = 300
 COOLDOWN = 60
@@ -35,6 +36,7 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
             check_sms = check_sms or check_verification
     clock = clock or time.time
     # Schema installation is an explicit, separate migration step. No runtime DDL.
+    schema_ready, schema_status = inspect_native_auth_schema(database_url)
 
     def reply(start_response, status, payload):
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -50,7 +52,16 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
         route = environ.get("PATH_INFO", "")
         method = environ.get("REQUEST_METHOD", "")
         if method == "GET" and route == "/health":
+            if not schema_ready:
+                return reply(start_response, "503 Service Unavailable",
+                             {"status": "not_ready", "error": schema_status,
+                              "sms_enabled": False})
             return reply(start_response, "200 OK", {"status": "ok", "sms_enabled": live})
+        # Fail closed even with a real SMS provider configured: no SMS or DB
+        # write is allowed until an explicit migration created every table.
+        if not schema_ready:
+            return reply(start_response, "503 Service Unavailable",
+                         {"error": schema_status})
         if method != "POST" or route not in (
                 "/native-auth/request-code", "/native-auth/verify-code"):
             return reply(start_response, "404 Not Found", {"error": "not_found"})

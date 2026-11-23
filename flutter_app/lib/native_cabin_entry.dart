@@ -5,6 +5,7 @@ import 'private_drive_bright_backdrop.dart';
 import 'demo_interfaces.dart';
 import 'permissions_onboarding.dart';
 import 'native_session.dart';
+import 'native_logout_api.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_identity_notice_page.dart';
 
@@ -14,9 +15,10 @@ typedef PdSignInBuilder = Widget Function(BuildContext context, String role,
 /// Cabin choice is navigation intent, never a server role grant.
 class PdNativeCabinEntry extends StatefulWidget {
   const PdNativeCabinEntry({super.key, required this.signInBuilder,
-    required this.identityApiBuilder});
+    required this.identityApiBuilder, this.logoutApi});
   final PdSignInBuilder signInBuilder;
   final PdIdentityApi Function(PdNativeSession session) identityApiBuilder;
+  final PdNativeLogoutApi? logoutApi;
   @override
   State<PdNativeCabinEntry> createState() => _PdNativeCabinEntryState();
 }
@@ -27,16 +29,44 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   String? _message;
   PdNativeSession? _session;
   Timer? _expiry;
+  bool _loggingOut = false;
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
 
   void _entry() {
     Navigator.of(context).popUntil((route) => route.isFirst);
     setState(() { _page = 'entry'; _message = null; });
   }
-  void _signOut() {
+  void _clearExpiredSession() {
     _expiry?.cancel();
     _session = null;
     _entry();
+  }
+
+  Future<void> _signOut() async {
+    if (_loggingOut) return;
+    final session = _activeSession;
+    if (session == null) {
+      _clearExpiredSession();
+      return;
+    }
+    final api = widget.logoutApi;
+    if (api == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Выход с сервера пока недоступен. Сессия сохранена.')));
+      return;
+    }
+    setState(() => _loggingOut = true);
+    try {
+      await api.revokeCurrentDevice(session.token);
+      if (!mounted || !identical(_session, session)) return;
+      _clearExpiredSession();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Не удалось завершить сеанс на сервере. Повтори позже.')));
+    } finally {
+      if (mounted) setState(() => _loggingOut = false);
+    }
   }
   void _select(String role) {
     setState(() {
@@ -57,7 +87,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     if (!mounted || !session.active) return;
     _expiry?.cancel();
     _expiry = Timer(session.expiresAt.difference(DateTime.now()), () {
-      if (mounted) _signOut();
+      if (mounted) _clearExpiredSession();
     });
     setState(() {
       _session = session;
@@ -140,7 +170,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     if (_page == 'dispatcher' && session?.canDispatch == true) return _cabin('dispatcher', session);
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [
-        if (session != null) IconButton(onPressed: _signOut,
+        if (session != null) IconButton(onPressed: _loggingOut ? null : _signOut,
           icon: const Icon(Icons.logout), tooltip: 'Выйти'),
       ]),
       body: Stack(children: [

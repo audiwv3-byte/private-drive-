@@ -20,9 +20,17 @@ class RemoteDemoException implements Exception {
 }
 
 class RemoteDemoClient implements RemoteTripGateway {
-  RemoteDemoClient(String address, String token)
-      : _base = _safeBase(address),
-        _token = _checkToken(token);
+  RemoteDemoClient(String address, String token, {
+    String? cabin, http.Client? httpClient,
+  }) : _base = _safeBase(address),
+       _token = _checkToken(token),
+       _cabin = cabin,
+       _http = httpClient ?? http.Client() {
+    if (cabin != null &&
+        !const {'passenger', 'pilot', 'dispatcher'}.contains(cabin)) {
+      throw const RemoteDemoException('Недопустимый кабинет');
+    }
+  }
 
   static Uri _safeBase(String address) {
     final uri = Uri.tryParse(address.trim());
@@ -52,7 +60,8 @@ class RemoteDemoClient implements RemoteTripGateway {
 
   final Uri _base;
   final String _token;
-  final http.Client _http = http.Client();
+  final String? _cabin;
+  final http.Client _http;
 
   Future<Map<String, dynamic>> _request(String method, String path,
       [Map<String, dynamic>? payload]) async {
@@ -64,6 +73,7 @@ class RemoteDemoClient implements RemoteTripGateway {
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $_token'
         ..headers['Accept'] = 'application/json';
+      if (_cabin != null) request.headers['X-PD-Cabin'] = _cabin!;
       if (payload != null) {
         request.headers['Content-Type'] = 'application/json; charset=utf-8';
         request.bodyBytes = utf8.encode(jsonEncode(payload));

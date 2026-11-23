@@ -110,7 +110,7 @@ class DispatcherStagingTests(unittest.TestCase):
         home = client.get("/")
         self.assertEqual(home.status_code, 200)
         data = home.data.decode("utf-8")
-        for heading in ("Ваш личный водитель", "Наши услуги", "Популярные направления",
+        for heading in ("Город меняется.", "Наши услуги", "Популярные направления",
                         "Быстрый заказ поездки", "© 2026 jenia ai_fast_work"):
             self.assertIn(heading, data)
         for fare in ("40", "120", "320", "460"):

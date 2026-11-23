@@ -68,6 +68,36 @@ class NativeCabinetMockTest(unittest.TestCase):
         self.request(endpoint, body={"role": "pilot_dispatcher"}, expected=403)
         self.request(endpoint, body={"role": "passenger", "phone": "+37000000000"}, expected=200)
 
+    def test_only_dispatcher_sees_authorized_passenger_fix_until_expiry_or_cancellation(self):
+        passenger = self.sign_in(1, "passenger")
+        other = self.sign_in(4, "passenger")
+        pilot = self.sign_in(2, "pilot")
+        dispatcher = self.sign_in(3, "dispatcher")
+        trip = self.request("/v1/trips", passenger, {
+            "from": "QA Pickup", "to": "QA Destination", "client_id": "b" * 32,
+            "departure": self.now.isoformat(),
+        }, expected=201)["trip"]
+        endpoint = f"/v1/trips/{trip['id']}/passenger-position"
+        point = {"latitude": 54.68457, "longitude": 25.28227}
+        self.request(endpoint, pilot, point, expected=403)
+        self.request(endpoint, dispatcher, point, expected=403)
+        self.request(endpoint, other, point, expected=404)
+        self.request(endpoint, passenger, {"latitude": 0, "longitude": 0}, expected=400)
+        self.request(endpoint, passenger, point)
+        positions = self.request("/v1/current", dispatcher)["passenger_positions"]
+        self.assertEqual(positions[trip["id"]]["latitude"], point["latitude"])
+        self.assertNotIn("passenger_positions", self.request("/v1/current", pilot))
+        self.assertNotIn("passenger_positions", self.request("/v1/current", other))
+        self.request(endpoint, passenger, {"latitude": None, "longitude": None})
+        self.assertEqual(self.request("/v1/current", dispatcher)["passenger_positions"], {})
+        self.request(endpoint, passenger, point)
+        self.now += timedelta(seconds=46)
+        self.assertEqual(self.request("/v1/current", dispatcher)["passenger_positions"], {})
+        self.request(endpoint, passenger, point)
+        self.request(f"/v1/trips/{trip['id']}/cancel", passenger, {"version": trip["version"]})
+        self.assertEqual(self.request("/v1/current", dispatcher)["passenger_positions"], {})
+        self.request(endpoint, passenger, point, expected=409)
+
     def test_native_cabinet_contract(self):
         passenger = self.sign_in(1, "passenger")
         pilot = self.sign_in(2, "pilot")

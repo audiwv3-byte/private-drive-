@@ -152,6 +152,10 @@ class DemoTripStore extends ChangeNotifier {
     return true;
   }
 
+  String? get passengerLocationTripId => null;
+
+  Future<void> sharePassengerLocation(double? latitude, double? longitude) async {}
+
   /// Session-local state. Never invent extra pilots or publish GPS to a server.
   void setPilotOnline(bool value) {
     if (_disposed || _pilotOnline == value) return;

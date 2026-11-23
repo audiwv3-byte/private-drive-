@@ -16,6 +16,8 @@ class ServerTripStore extends DemoTripStore {
   final String _role;
   late final Timer _poll;
   Future<void> _tail = Future.value();
+  Future<void> _passengerLocationWrites = Future.value();
+  String? _sharedPassengerTripId;
   bool _reading = false;
   bool _writing = false;
   bool _verified = false;
@@ -371,6 +373,36 @@ class ServerTripStore extends DemoTripStore {
   }
 
   @override
+  String? get passengerLocationTripId => _role == 'passenger' && isActive ? _id : null;
+
+  @override
+  Future<void> sharePassengerLocation(double? latitude, double? longitude) {
+    if (_disposed || _role != 'passenger') return Future.value();
+    final current = passengerLocationTripId;
+    final sharing = _validGps(latitude, longitude) && current != null;
+    final tripId = sharing ? current : _sharedPassengerTripId;
+    if (tripId == null) return Future.value();
+    if (sharing) _sharedPassengerTripId = tripId;
+    final write = _passengerLocationWrites.then((_) async {
+      try {
+        if (sharing && (_disposed || passengerLocationTripId != tripId)) return;
+        await _postPassengerLocation(tripId, sharing ? latitude : null, sharing ? longitude : null);
+        if (!sharing && _sharedPassengerTripId == tripId) _sharedPassengerTripId = null;
+      } on Exception {
+        // A missed GPS update never blocks a booking. The server expires it.
+      }
+    });
+    _passengerLocationWrites = write;
+    return write;
+  }
+
+  Future<void> _postPassengerLocation(String tripId, double? latitude, double? longitude) async {
+    await _api.post('/v1/trips/$tripId/passenger-position', {
+      'latitude': latitude, 'longitude': longitude,
+    });
+  }
+
+  @override
   void dispose() {
     _poll.cancel();
     final clearGps = _role == 'pilot' && (_verified || pilotOnline);
@@ -378,6 +410,9 @@ class ServerTripStore extends DemoTripStore {
     unawaited(
       _tail.whenComplete(() async {
         try {
+          await _passengerLocationWrites;
+          final sharedTrip = _sharedPassengerTripId;
+          if (sharedTrip != null) await _postPassengerLocation(sharedTrip, null, null);
           if (clearGps) await _api.post('/v1/gps', {'online': false});
         } on Exception {
           // Server expires the last fix if the client disconnects.

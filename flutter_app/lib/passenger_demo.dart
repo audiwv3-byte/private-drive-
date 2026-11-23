@@ -194,6 +194,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
   int _routeRequest = 0;
   Timer? _addressTimer;
   Timer? _gpsFreshnessTimer;
+  AppLifecycleListener? _passengerLocationLifecycle;
+  String? _lastLocationTripId;
+  bool _refreshingDispatcherLocation = false;
   StreamSubscription<ServiceStatus>? _passengerGpsStatus;
   int _addressGeneration = 0;
   String? _editingAddress;
@@ -406,16 +409,16 @@ class _PassengerDemoState extends State<PassengerDemo> {
     });
   }
 
-  Future<LatLng> _readDevicePosition() async {
+  Future<LatLng> _readDevicePosition({bool askPermission = true}) async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw StateError('GPS выключен');
     }
     var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
+    if (askPermission && permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    if (permission != LocationPermission.whileInUse &&
+        permission != LocationPermission.always) {
       throw StateError('Нет разрешения на геолокацию');
     }
     final pos = await Geolocator.getCurrentPosition(
@@ -436,10 +439,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
         throw const FormatException('Некорректные координаты GPS');
       }
       setState(() => _passengerLocation = point);
+      unawaited(_refreshDispatcherLocation());
       if (!kIsWeb && widget.currentPositionLoader == null) {
         _passengerGpsStatus ??= Geolocator.getServiceStatusStream().listen((status) {
           if (mounted && status == ServiceStatus.disabled) {
             setState(() => _passengerLocation = null);
+            _clearDispatcherLocation();
           }
         }, onError: (Object _) {
           if (mounted) setState(() => _passengerLocation = null);
@@ -529,6 +534,37 @@ class _PassengerDemoState extends State<PassengerDemo> {
   }
 
 
+  void _clearDispatcherLocation() {
+    unawaited(widget.tripStore?.sharePassengerLocation(null, null));
+  }
+
+  Future<void> _refreshDispatcherLocation() async {
+    final store = widget.tripStore;
+    final tripId = store?.passengerLocationTripId;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (store == null || tripId == null ||
+        (lifecycle != null && lifecycle != AppLifecycleState.resumed)) {
+      _clearDispatcherLocation();
+      return;
+    }
+    if (_refreshingDispatcherLocation) return;
+    _refreshingDispatcherLocation = true;
+    try {
+      final point = await _readDevicePosition(askPermission: false);
+      if (mounted && store.passengerLocationTripId == tripId &&
+          (WidgetsBinding.instance.lifecycleState == null ||
+           WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed)) {
+        await store.sharePassengerLocation(point.latitude, point.longitude);
+      }
+    } on Exception {
+      _clearDispatcherLocation();
+    } on StateError {
+      _clearDispatcherLocation();
+    } finally {
+      _refreshingDispatcherLocation = false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -550,7 +586,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
     }
     unawaited(_restorePreferences());
     if (widget.tripStore != null) {
+      if (widget.tripStore!.serverBacked) {
+        _passengerLocationLifecycle = AppLifecycleListener(
+          onResume: () => unawaited(_refreshDispatcherLocation()),
+          onInactive: _clearDispatcherLocation,
+        );
+        unawaited(_refreshDispatcherLocation());
+      }
       _gpsFreshnessTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+        if (mounted && widget.tripStore!.serverBacked) {
+          unawaited(_refreshDispatcherLocation());
+        }
         if (mounted && widget.tripStore?.pilotLastSeen != null) {
           setState(() {}); // Hide stale pilot fixes even without new GPS events.
           unawaited(_updatePickupEta());
@@ -563,6 +609,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
   void _onTripChanged() {
     if (!mounted) return;
+    final locationTripId = widget.tripStore?.passengerLocationTripId;
+    if (_lastLocationTripId != locationTripId) {
+      _lastLocationTripId = locationTripId;
+      unawaited(_refreshDispatcherLocation());
+    }
     _scheduleFollowPilot();
     unawaited(_updatePickupEta());
     final messages = widget.tripStore?.pilotChatMessages ?? const <String>[];
@@ -949,6 +1000,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _pickupEtaGeneration++;
     _addressTimer?.cancel();
     _gpsFreshnessTimer?.cancel();
+    _passengerLocationLifecycle?.dispose();
+    _clearDispatcherLocation();
     unawaited(_passengerGpsStatus?.cancel());
     if (widget.passengerMapController == null) _passengerMapController.dispose();
     _from.dispose();
@@ -1354,6 +1407,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 label: Text(pdTr(context, 'Забрать меня здесь',
                   'Paimti mane čia', 'Pick me up here')),
               ),
+            if (store?.passengerLocationTripId != null)
+              Text(pdTr(context,
+                'При включённой геолокации диспетчер видит твоё местоположение, пока открыт активный заказ.',
+                'Jei vietos nustatymas įjungtas, dispečeris mato tavo vietą, kol atvertas aktyvus užsakymas.',
+                'With location enabled, the dispatcher can see your location while the active order is open.')),
             Text(pdTr(context, 'Нажми на карту, чтобы выбрать точку посадки.',
               'Paliesk žemėlapį, kad pasirinktum paėmimo vietą.',
               'Tap the map to choose your pickup point.'),

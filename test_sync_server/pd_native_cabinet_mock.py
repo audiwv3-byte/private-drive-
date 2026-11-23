@@ -19,6 +19,7 @@ from pd_native_auth import issue_code, verify_code
 from pd_native_auth_sessions import authenticate_session, issue_session
 
 from pd_demo_server import ApiHandler, ApiServer, DB_LOCK, DemoStore, NEXT, TripError
+from test_sync_server.pd_passenger_location import PassengerLocations
 
 PHONES = {
     "+12025550101": "passenger",
@@ -43,6 +44,7 @@ class CabinetStore(DemoStore):
         self.pilot_id = None
         self.online = False
         self.gps = None
+        self.passenger_locations = PassengerLocations(lambda: self.clock().timestamp())
         self.photo_status = "unverified"
         self.photo_id = None
         with DB_LOCK, self.db:
@@ -193,6 +195,14 @@ class CabinetStore(DemoStore):
             self.online = True
             self.gps = {"latitude": lat, "longitude": lon, "seen_at": seen.isoformat()}
 
+    def update_passenger_position(self, trip_id, actor, body):
+        with DB_LOCK:
+            trip = self.get(trip_id, "passenger", actor)
+            try:
+                self.passenger_locations.update(trip, body)
+            except ValueError as error:
+                raise TripError(str(error), 409 if str(error) == "inactive_trip" else 400) from None
+
     def current_with_gps(self, role, actor):
         with DB_LOCK:
             if role == "dispatcher":
@@ -213,7 +223,14 @@ class CabinetStore(DemoStore):
                 and trip["pilot"] == self.pilot_id
             ):
                 gps = None
-            return {"trip": trip, "gps": gps}
+            response = {"trip": trip, "gps": gps}
+            if role == "dispatcher":
+                active = self.db.execute(
+                    "SELECT id, status FROM trips "
+                    "WHERE status IN ('requested','assigned','approaching','underway')"
+                ).fetchall()
+                response["passenger_positions"] = self.passenger_locations.snapshot(active)
+            return response
 
 
 class CabinetHandler(ApiHandler):
@@ -248,6 +265,14 @@ class CabinetHandler(ApiHandler):
                 if role != "pilot":
                     raise TripError("forbidden", 403)
                 self.server.store.update_gps(actor, self._body())
+                status, response = 200, {"ok": True}
+            elif method == "POST" and (match := re.fullmatch(
+                r"/v1/trips/([a-f0-9]{32})/passenger-position", path.path,
+            )):
+                role, actor = self._auth()
+                if role != "passenger":
+                    raise TripError("forbidden", 403)
+                self.server.store.update_passenger_position(match[1], actor, self._body())
                 status, response = 200, {"ok": True}
             elif method == "POST" and (match := re.fullmatch(
                 r"/v1/trips/([a-f0-9]{32})/(assign|action|cancel)", path.path,

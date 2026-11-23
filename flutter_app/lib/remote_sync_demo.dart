@@ -67,6 +67,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   int chatSeq = 0;
   bool _loadedChatForTrip = false;
   bool _clearLocation = false;
+  bool _refreshRequested = false;
   bool _requestingGpsPermission = false;
   int _gpsGeneration = 0;
   bool _backupTiles = false;
@@ -136,9 +137,13 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     if (role != null) await refresh();
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh({bool immediately = false}) async {
     final client = api;
-    if (client == null || refreshing) return;
+    if (client == null) return;
+    if (refreshing) {
+      _refreshRequested = _refreshRequested || immediately;
+      return;
+    }
     refreshing = true;
     try {
       final response = await client.get('/v1/current');
@@ -231,6 +236,10 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       if (mounted) setState(() => error = e.toString());
     } finally {
       refreshing = false;
+      if (mounted && _refreshRequested) {
+        _refreshRequested = false;
+        unawaited(refresh());
+      }
     }
   }
 
@@ -344,8 +353,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       setState(() {
         gpsOn = false; location = null; gpsLabel = 'GPS выключен';
       });
+      if (_clearLocation) unawaited(refresh(immediately: true));
       await stopped?.cancel();
-      if (_clearLocation) unawaited(refresh());
       return;
     }
     _requestingGpsPermission = true;
@@ -376,7 +385,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
               : 'GPS активен · только на устройстве';
         });
         if (widget.enableMapTiles) map.move(point, map.camera.zoom);
-        if (widget.stagingDispatcher) unawaited(refresh());
+        if (widget.stagingDispatcher) unawaited(refresh(immediately: true));
       }
       gps = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(

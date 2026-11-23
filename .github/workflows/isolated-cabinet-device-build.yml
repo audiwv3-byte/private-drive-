@@ -123,30 +123,6 @@ jobs:
           flutter test --reporter expanded test/pd_http_api_test.dart
           flutter test --reporter expanded --dart-define=PD_CABINET_SYNC_INTEGRATION=true test/cabinet_sync_integration_test.dart
 
-      - name: Build installable isolated Android APK
-        working-directory: qa_android
-        shell: bash
-        run: |
-          set -euo pipefail
-          flutter build apk --debug --target lib/main.dart \
-            --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
-            --dart-define=PD_ISOLATED_WEB_PREVIEW=false \
-            --dart-define=PD_ISOLATED_QA_AUTH=true
-          apk=build/app/outputs/flutter-apk/app-debug.apk
-          test -s "$apk"
-          build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
-          "$build_tools/apksigner" verify --verbose --print-certs "$apk" > ../apk-certificate.txt
-          "$build_tools/aapt" dump badging "$apk" > ../apk-badging.txt
-          grep -F "name='$QA_PACKAGE'" ../apk-badging.txt
-          grep -F "application-label:'PD CABINET SYNC QA'" ../apk-badging.txt
-          "$build_tools/aapt" dump permissions "$apk" > ../apk-permissions.txt
-          grep -F android.permission.CAMERA ../apk-permissions.txt
-          if grep -q 'android.permission.RECORD_AUDIO' ../apk-permissions.txt; then exit 1; fi
-          mkdir -p ../device_artifacts/android
-          cp "$apk" ../device_artifacts/android/PRIVATE-DRIVE-cabinet-sync-QA.apk
-          cp ../apk-certificate.txt ../apk-badging.txt ../apk-permissions.txt ../device_artifacts/android/
-          (cd ../device_artifacts/android && sha256sum PRIVATE-DRIVE-cabinet-sync-QA.apk > SHA256SUMS)
-
       - name: Compile existing main Flutter cabinets for Safari
         working-directory: qa_web
         shell: bash
@@ -178,6 +154,38 @@ jobs:
           python3 -m pip install --quiet playwright==1.58.0
           python3 -m playwright install --with-deps chromium webkit
           python3 test_sync_server/qa_browser_smoke.py
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: qa-browser-diagnostics
+          path: device_artifacts/browser/
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Build installable isolated Android APK
+        working-directory: qa_android
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --debug --target lib/main.dart \
+            --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
+            --dart-define=PD_ISOLATED_WEB_PREVIEW=false \
+            --dart-define=PD_ISOLATED_QA_AUTH=true
+          apk=build/app/outputs/flutter-apk/app-debug.apk
+          test -s "$apk"
+          build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk" > ../apk-certificate.txt
+          "$build_tools/aapt" dump badging "$apk" > ../apk-badging.txt
+          grep -F "name='$QA_PACKAGE'" ../apk-badging.txt
+          grep -F "application-label:'PD CABINET SYNC QA'" ../apk-badging.txt
+          "$build_tools/aapt" dump permissions "$apk" > ../apk-permissions.txt
+          grep -F android.permission.CAMERA ../apk-permissions.txt
+          if grep -q 'android.permission.RECORD_AUDIO' ../apk-permissions.txt; then exit 1; fi
+          mkdir -p ../device_artifacts/android
+          cp "$apk" ../device_artifacts/android/PRIVATE-DRIVE-cabinet-sync-QA.apk
+          cp ../apk-certificate.txt ../apk-badging.txt ../apk-permissions.txt ../device_artifacts/android/
+          (cd ../device_artifacts/android && sha256sum PRIVATE-DRIVE-cabinet-sync-QA.apk > SHA256SUMS)
 
       - name: Verify both artifacts are wired to the same temporary URL
         shell: bash

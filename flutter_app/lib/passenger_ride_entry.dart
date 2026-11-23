@@ -159,14 +159,17 @@ class PassengerRideEntry extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Card(child: ListTile(
-              key: const Key('passenger-entry-taxi'),
-              leading: const Icon(Icons.local_taxi, size: 36),
-              title: Text(pdLabel(context, 'Такси')),
-              subtitle: Text(pdLabel(context, 'Поездка по городу и другие направления')),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _open(context, 'Такси'),
-            )),
+            Semantics(
+              identifier: 'passenger-entry-taxi',
+              child: Card(child: ListTile(
+                key: const Key('passenger-entry-taxi'),
+                leading: const Icon(Icons.local_taxi, size: 36),
+                title: Text(pdLabel(context, 'Такси')),
+                subtitle: Text(pdLabel(context, 'Поездка по городу и другие направления')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _open(context, 'Такси'),
+              )),
+            ),
             const SizedBox(height: 12),
             Card(child: ListTile(
               key: const Key('passenger-entry-transfer'),

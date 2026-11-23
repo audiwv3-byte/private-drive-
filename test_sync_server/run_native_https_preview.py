@@ -151,7 +151,8 @@ def main():
                 verify(url, inbox)
                 options.address_file.write_text(url + "\n")
                 print("HTTPS verified for all three native roles, shared trips, GPS and chat.", flush=True)
-                deadline = time.monotonic() + 35 * 60
+                lifetime_minutes = 55 if options.web_root else 35
+                deadline = time.monotonic() + lifetime_minutes * 60
                 while time.monotonic() < deadline:
                     if tunnel.poll() is not None:
                         raise RuntimeError("Temporary HTTPS tunnel stopped")

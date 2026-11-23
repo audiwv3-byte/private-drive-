@@ -24,8 +24,8 @@ input[type=file]{padding:10px;font-size:12px}input::placeholder{color:#889099}in
 <body><header><a href="/" aria-label="PRIVATE DRIVE — главная" style="border:0;padding:0"><img src="/pd-logo-transparent.png" alt="PRIVATE DRIVE — золотой логотип PD с автомобилем" width="66" height="66" style="max-width:100%;aspect-ratio:1;object-fit:contain;border-radius:11px;vertical-align:middle"></a><a href="/dispatch/login">Диспетчерская</a></header>
 <main><h1>Регистрация пилота</h1>
 <p class="lead">Укажи имя и телефон для связи и подготовь четыре фотографии.</p>
-<div class="notice" role="status"><strong>ТЕСТОВЫЙ МАКЕТ.</strong> Файлы остаются на устройстве. Используй тестовые фотографии.</div>
-<form id="pilot-form" autocomplete="off">
+{% if enabled %}<div class="notice" role="status"><strong>ЗАКРЫТЫЙ ТЕСТ.</strong> Используй только согласованные тестовые данные. Доступ по приглашению; документы сохраняются в защищённом хранилище.</div>{% else %}<div class="notice" role="status"><strong>ТЕСТОВЫЙ МАКЕТ.</strong> Приём документов не включён: защищённое постоянное хранилище пока не готово. Не загружай настоящие документы.</div>{% endif %}
+<form id="pilot-form" autocomplete="off" method="post" action="/pilot-registration" enctype="multipart/form-data">
 <fieldset><legend>Контакты</legend><div class="grid">
 <div class="field"><label for="full-name">ФИО</label><input id="full-name" name="full_name" maxlength="160" required></div>
 <div class="field"><label for="phone">Телефон</label><input id="phone" name="phone" type="tel" inputmode="tel" maxlength="32" required></div>
@@ -36,7 +36,7 @@ input[type=file]{padding:10px;font-size:12px}input::placeholder{color:#889099}in
 <div class="doc"><label for="file-car-front">Машина спереди</label><input id="file-car-front" name="car_front" type="file" accept="image/jpeg,image/png,image/webp" required></div>
 <div class="doc"><label for="file-car-rear">Машина сзади</label><input id="file-car-rear" name="car_rear" type="file" accept="image/jpeg,image/png,image/webp" required></div>
 </div><p class="help">JPG, PNG или WebP. До 10 МБ на фотографию.</p></fieldset>
-<div class="actions"><button class="submit" type="submit" disabled>Отправить на модерацию</button><p id="demo-result" aria-live="polite">Приём анкет пока закрыт.</p></div>
+<div class="actions">{% if enabled %}<label for="qa-invitation">Код приглашения для закрытого теста</label><input id="qa-invitation" name="qa_invitation" type="password" autocomplete="off" required maxlength="128"><button class="submit" type="submit" style="opacity:1;cursor:pointer">Отправить на модерацию</button><p id="demo-result" aria-live="polite">Анкета будет отправлена на проверку диспетчеру.</p>{% else %}<button class="submit" type="submit" disabled>Отправить на модерацию</button><p id="demo-result" aria-live="polite">Приём анкет пока закрыт.</p>{% endif %}</div>
 </form></main>
 <script>
 const result=document.getElementById('demo-result');
@@ -47,6 +47,19 @@ document.querySelectorAll('input[type="file"]').forEach(input=>input.addEventLis
   result.textContent='Выбери фото JPG, PNG или WebP размером до 10 МБ.';
  }
 }));
-document.getElementById('pilot-form').addEventListener('submit',event=>event.preventDefault());
+document.getElementById('pilot-form').addEventListener('submit',async event=>{
+ event.preventDefault();
+ const form=event.currentTarget,button=form.querySelector('button[type="submit"]');
+ if(button.disabled)return;
+ button.disabled=true;result.textContent='Отправляем анкету…';
+ try{
+   const response=await fetch('/pilot-registration',{method:'POST',body:new FormData(form),credentials:'same-origin'});
+   const data=await response.json();
+   if(!response.ok||!data.qa_only||!data.application_id)throw Error(response.status===413?'Слишком большие файлы. Не больше 10 МБ на фото.':(data.error||'Не удалось подтвердить анкету.'));
+   result.textContent='Анкета №'+data.application_id.slice(0,8)+' принята. Статус: На проверке.';
+   form.reset();
+ }catch(error){result.textContent=error.message||'Ошибка отправки.'}
+ finally{button.disabled=false;}
+});
 </script>
 </body></html>

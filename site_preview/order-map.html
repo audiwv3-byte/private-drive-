@@ -33,19 +33,67 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
 .mapbox-logo img{display:block;width:72px;height:auto}
 .vehicle-marker svg{display:block;width:36px;height:36px;filter:drop-shadow(0 2px 4px #000a)}
 @media(max-width:640px){.topbar{top:8px;left:8px;right:8px}.panel{top:auto;bottom:8px;left:8px;width:calc(100% - 16px);max-height:min(65dvh,540px);padding:13px}.brand{padding:5px 9px}.brand img{width:29px;height:29px}.back{padding:9px 11px}h1{font-size:22px}.leaflet-bottom.leaflet-right{bottom:calc(min(65dvh,540px) + 16px)}}
+
+
+/* PRIVATE DRIVE map refresh 2026-11: design only, booking validation unchanged */
+#map{background:#151c22}
+#map.map-night .leaflet-tile-pane{filter:brightness(.72) invert(1) contrast(.87) hue-rotate(185deg) saturate(.92)}
+#map .leaflet-control-zoom a{background:#191614;color:#eecb84;border-color:#6d5332}
+#map .leaflet-control-attribution{background:#191614e8;color:#e4d3b5}
+#map .leaflet-control-attribution a{color:#f1c987}
+.topbar{top:16px;left:16px;right:16px;align-items:center}
+.topbar .brand,.topbar .back{border-color:#a68653;border-radius:14px;background:#0d1319ed}
+.topbar .brand{padding:10px 14px}
+.topbar .brand small{letter-spacing:.16em}
+.map-theme{position:static;min-height:44px;border-color:#b4945d;border-radius:12px;background:#0d1319eb;box-shadow:0 8px 25px #0007;padding:10px 15px;white-space:nowrap}
+.panel{top:95px;left:20px;width:min(450px,calc(100vw - 40px));max-height:calc(100dvh - 115px);padding:24px;border:1px solid #bd9656;border-radius:22px;background:linear-gradient(145deg,#0e141af5,#14130ff4);box-shadow:0 20px 70px #000b}
+.booking-kicker{margin:0 0 6px;color:#d9b36c;letter-spacing:.18em;font-weight:750;font-size:11px;text-transform:uppercase}
+.panel h1{color:#fff2d8;font:normal clamp(1.6rem,2.5vw,2rem)/1.2 Georgia,serif;margin:0 0 8px}
+.booking-intro{font-size:13px;line-height:1.55;color:#dacbad;margin:0 0 19px}
+.route-fields{padding:13px 15px 11px;border:1px solid #80663e;border-radius:16px;background:#0c1119b3}
+.route-fields .field{margin:0 0 11px}
+.route-fields .field label{font-size:12px}
+.route-fields .field input{margin:0;background:#1c252de8;border-color:#7b6848}
+.route-fields .btn{padding:8px 12px}
+.field input,.field textarea,.field select{border-radius:11px;background:#1a2228;border:1px solid #776243}
+.field input:focus,.field textarea:focus,.field select:focus{outline:2px solid #f0c477;outline-offset:1px}
+.panel .btn{border-radius:11px}
+.panel .btn.main{min-height:52px;font-size:15px;box-shadow:0 6px 25px #0007}
+.ride-extras{margin:16px 0;padding:0 13px;border:1px solid #68563e;border-radius:13px;background:#111a20}
+.ride-extras>summary{min-height:48px;display:flex;align-items:center;padding:12px 0;font-weight:700;color:#e9c78f;cursor:pointer}
+.ride-extras>summary::marker{color:#e5b875}
+.ride-extras[open]>summary{border-bottom:1px solid #5d523e}
+.ride-extras .payment-methods{gap:5px}
+.ride-extras .payment-methods span{font-size:11px}
+.map-preview-caption{position:fixed;bottom:18px;right:20px;z-index:700;max-width:270px;padding:9px 14px;border:1px solid #b28a51;border-radius:12px;background:#101820e8;color:#f1dab0;font-size:12px;pointer-events:none;box-shadow:0 8px 24px #0007}
+@media(max-width:640px){
+ .topbar{top:8px;left:8px;right:8px;gap:6px}
+ .topbar .brand{padding:6px 8px}.topbar .brand span{font-size:11px}.topbar .brand small{font-size:8px}
+ .map-theme{padding:8px;font-size:11px}
+ .topbar .back{font-size:12px;padding:8px}
+ .panel{top:auto;bottom:0;left:0;width:100%;max-height:min(70dvh,660px);padding:17px 18px max(16px,env(safe-area-inset-bottom));border-radius:22px 22px 0 0;border-left:0;border-right:0;border-bottom:0}
+ .booking-intro{margin-bottom:11px}
+ .route-fields{padding:10px 12px}
+ .leaflet-bottom.leaflet-right{bottom:calc(min(70dvh,660px) + 15px)}
+ .map-preview-caption{right:8px;bottom:calc(min(70dvh,660px) + 17px);font-size:10px;max-width:145px;padding:6px}
+}
+@media(prefers-reduced-motion:reduce){.panel *{scroll-behavior:auto}}
 </style>
 <link rel="stylesheet" href="/assets/site-analytics.css"></head>
 <body>
 <div id="map" aria-label="Интерактивная карта Вильнюса"><div id="mapFallback" class="map-fallback">Загрузка карты…</div></div>
+<div class="map-preview-caption" aria-hidden="true">Карта · OpenStreetMap</div>
 <div class="topbar">
  <a class="brand" href="index.html" aria-label="PRIVATE DRIVE — вернуться на сайт"><img src="assets/pd-logo.webp" alt=""><span>PRIVATE DRIVE<small>КАРТА ПОЕЗДКИ</small></span></a>
- <button class="map-theme" type="button" id="mapTheme" hidden>Дневная карта</button>
+ <button class="map-theme" type="button" id="mapTheme" hidden aria-label="Переключить дневной или ночной вид карты">☀ Дневная карта</button>
  <a class="back" href="index.html">← На сайт</a>
 </div>
 <main class="panel">
- <h1>Заказать поездку</h1>
- <p>Укажи адреса и отправь запрос пилоту.</p>
+ <p class="booking-kicker">PRIVATE DRIVE · ПРЕДВАРИТЕЛЬНЫЙ ЗАКАЗ</p>
+ <h1>Карта и заказ поездки</h1>
+ <p class="booking-intro">Укажи адрес подачи, пункт назначения и время. На карте можно проверить расположение точек.</p>
  <form id="orderForm">
+  <div class="route-fields">
   <div class="field"><label for="from">Откуда</label><input id="from" name="from" placeholder="Город, улица, дом" autocomplete="street-address" maxlength="200" required></div>
   <div class="field"><label for="to">Куда</label><input id="to" name="to" placeholder="Город, улица, дом" maxlength="200" required></div>
   <button class="btn" type="button" id="swapAddresses" aria-label="Поменять адреса местами">⇅ Поменять адреса местами</button>
@@ -53,8 +101,10 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
    <button class="btn" type="button" id="locate">◎ Моё местоположение</button>
    <button class="btn" type="button" id="showRoute">Показать точки на карте</button>
   </div>
+  </div>
   <div class="field"><label for="rideDate">Дата поездки (необязательно)</label><input type="date" id="rideDate" name="rideDate"></div>
   <div class="field"><label for="rideTime">Время подачи (необязательно)</label><input type="time" id="rideTime" name="rideTime" step="300"></div>
+  <details class="ride-extras"><summary>Дополнительные пожелания и способы оплаты</summary>
   <div class="field"><label for="radio">Радиостанция в поездке (необязательно)</label><select id="radio" name="radio"><option value="">Без предпочтений</option><option value="M-1">M-1</option><option value="Radiocentras">Radiocentras</option><option value="ZIP FM">ZIP FM</option><option value="LRT Opus">LRT Opus</option><option value="Другая">Другая радиостанция</option></select></div>
   <div class="field" id="radioOtherField" hidden><label for="radioOther">Название радиостанции</label><input id="radioOther" maxlength="100" placeholder="Название или частота" autocomplete="off"></div>
   <div class="field"><label for="music">Любимый трек в поездке (необязательно)</label><input id="music" name="music" maxlength="160" placeholder="Исполнитель — название песни"></div>
@@ -66,6 +116,7 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
    </div>
    <p class="note">Информационный список. Онлайн-оплата на тестовом сайте ещё не активирована; доступность способов проверим при подключении Stripe.</p>
   </section>
+  </details>
   <p id="status" class="status" role="status" aria-live="polite"></p>
   <button type="button" class="btn" id="verifyAddresses" hidden>Проверить адреса</button>
   <p class="note" id="addressCheckHint" hidden>Сначала уточни оба адреса, затем нажми «Проверить адреса». Для проверки адреса отправляются в сервис Nominatim. При недоступности сервиса заявка по быстрому маршруту не откроется.</p>
@@ -207,7 +258,17 @@ try{
    theme.hidden=false;
    theme.addEventListener('click',()=>{night=!night;showTheme();});
    showTheme();
-  }else{addOsm();}
+  }else{
+    addOsm();
+    let night=true;
+    function paintOsm(){
+      map.getContainer().classList.toggle('map-night',night);
+      theme.textContent=night?'☀ Дневная карта':'☾ Ночная карта';
+    }
+    theme.hidden=false;
+    theme.addEventListener('click',()=>{night=!night;paintOsm();});
+    paintOsm();
+  }
   L.control.zoom({position:'bottomright'}).addTo(map);
   $('mapFallback').remove();
   setTimeout(()=>map.invalidateSize(),200);

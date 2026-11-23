@@ -59,7 +59,7 @@ jobs:
             pg_dump -h 127.0.0.1 -U pd_ci -d pd_schema_ci \
             --format=custom --no-owner --no-acl --schema=public --file=- \
             | age --encrypt --recipient "$recipient" > "$dir/backup.age"
-          test "$(head -c 22 "$dir/backup.age")" = "age-encryption.org/v1"
+          test "$(head -n 1 "$dir/backup.age")" = "age-encryption.org/v1"
           test "$(stat -c '%s' "$dir/backup.age")" -gt 128
           # An unrelated empty DB proves restoration cannot overwrite source.
           docker run --rm --network host -e PGPASSWORD=synthetic-only-password postgres:18 \

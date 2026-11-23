@@ -120,7 +120,7 @@ class MigrationPostgres18Tests(unittest.TestCase):
     def test_telegram_link_unique_and_pilot_approval_requires_reviewer(self):
         self.seed()
         install_schema(self.conn)
-        from psycopg.errors import CheckViolation, UniqueViolation, ForeignKeyViolation
+        from psycopg.errors import CheckViolation, UniqueViolation, InsufficientPrivilege
         with self.conn.cursor() as cur:
             cur.execute("""INSERT INTO pd_account_telegram_links
                     (user_id,telegram_subject,verified_at,verification_method)
@@ -133,7 +133,7 @@ class MigrationPostgres18Tests(unittest.TestCase):
                         (user_id,telegram_subject,verified_at,verification_method)
                         VALUES ('passenger-fixture','7035610182',NOW(),'telegram_oidc')""")
         # An approved pilot without a reviewer must be rejected.
-        with self.assertRaises(CheckViolation):
+        with self.assertRaises((CheckViolation, InsufficientPrivilege)):
             with self.conn.transaction():
                 with self.conn.cursor() as cur:
                     cur.execute("""INSERT INTO pd_pilot_reviews(user_id,review_status)

@@ -157,7 +157,7 @@ def register(app, authorized, valid_csrf):
     def pd_test_website_booking():
         origin = request.headers.get("Origin", "")
         expected_origin = request.host_url.rstrip("/")
-        if origin != expected_origin:
+        if origin not in (expected_origin, "https://" + request.host):
             return reply({"error": "invalid_origin"}, 403)
         if request.mimetype != "application/json":
             return reply({"error": "invalid_body"}, 400)

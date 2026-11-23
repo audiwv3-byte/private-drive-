@@ -70,6 +70,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
     expect(sessions, 1);
+    // Simulate a Safari Flutter page restart without resetting browser storage.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(PrivateDriveApp(
+      mockApiUrl: 'https://qa.invalid', httpClient: client, enableMapTiles: false));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
+    expect(sessions, 1);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

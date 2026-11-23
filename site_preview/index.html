@@ -63,6 +63,11 @@
 .footer-heading-link{color:inherit;text-decoration:none}
 .footer-heading-link:hover,.footer-heading-link:focus-visible{color:var(--gold);text-decoration:underline}
 @media(max-width:740px){#contact .contact-payment-layout{grid-template-columns:1fr;gap:24px}#contact .contact-payments{padding:20px}}
+.partner-avatar{overflow:hidden;padding:0;display:block;background:#101418}
+.partner-avatar img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover}
+.partner-feature .partner-links{display:flex;flex-direction:column;align-items:stretch;gap:8px;flex:none}
+.partner-feature .partner-links .button{white-space:nowrap;text-align:center}
+@media(max-width:740px){.partner-feature .partner-links{width:100%;flex-direction:row;flex-wrap:wrap}.partner-feature .partner-links .button{flex:1 1 auto}}
 </style>
 </head>
 <body>
@@ -162,12 +167,12 @@
 <section id="partners" class="section wrap">
       <h2><a class="catalog-heading partner-section-title" href="friends.html" aria-label="Открыть страницу Наши друзья"><span>Наши друзья</span><span class="catalog-heading-motion" aria-hidden="true">🤝 ↗</span></a></h2>
       <div class="partner-feature">
-        <div class="partner-tech-icon" aria-hidden="true"><span>🤖</span></div>
-        <div class="partner-info"><h3>Work.www | IT-разработка</h3><span class="partner-role">Разработчик сайта · Друг PRIVATE DRIVE</span><p>Разработка сайтов, веб-сервисов, приложений и Telegram-ботов.</p></div>
-        <a class="button outline" href="https://t.me/ai_fast_work" target="_blank" rel="noopener noreferrer">Связаться в Telegram</a>
+        <div class="partner-tech-icon partner-avatar" aria-label="Фото профиля AI Fast Work"><img src="assets/ai-fast-work-avatar.webp" width="112" height="112" loading="lazy" alt="Синий робот — аватар AI Fast Work"></div>
+        <div class="partner-info"><h3>AI Fast Work | Telegram-боты</h3><span class="partner-role">Разработчик сайта · Друг PRIVATE DRIVE</span><p>Создаю и сопровождаю Telegram-ботов: заявки, запись, каталоги и автоматизация. Напиши «БОТ» в Instagram Direct.</p></div>
+        <div class="partner-links"><a class="button outline" href="https://t.me/ai_fast_work" target="_blank" rel="noopener noreferrer">Telegram</a><a class="button outline" href="https://www.instagram.com/ai_fast_work/" target="_blank" rel="noopener noreferrer">Instagram</a></div>
       </div>
       <div class="partner-feature partner-florist">
-        <div class="partner-tech-icon partner-florist-icon" aria-hidden="true"><span>💐</span></div>
+        <div class="partner-tech-icon partner-avatar" aria-label="Фото Liana Flowers"><img src="assets/liana-flowers-avatar.webp" width="112" height="112" loading="lazy" alt="Флорист с цветочным букетом — Liana Flowers"></div>
         <div class="partner-info"><h3>Liana Flowers | Цветы и букеты</h3><span class="partner-role">Цветочный магазин · Вильнюс</span><p>Букеты и цветы для особых случаев. Geležinkelio g. 6, Vilnius · +370 648 23574</p></div>
         <a class="button outline" href="https://www.instagram.com/liana_florist_vilnius/" target="_blank" rel="noopener noreferrer">Instagram ↗</a>
       </div>

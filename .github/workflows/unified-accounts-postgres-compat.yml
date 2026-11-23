@@ -6,6 +6,8 @@ on:
     paths:
       - 'pd_unified_accounts_schema.py'
       - 'test_unified_accounts_postgres_integration.py'
+      - 'test_pilot_admin_approval_postgres.py'
+      - 'pd_pilot_admin_approval.py'
       - '.github/workflows/unified-accounts-postgres-compat.yml'
   workflow_dispatch:
 permissions:
@@ -39,4 +41,4 @@ jobs:
       - name: Install isolated database test driver
         run: python -m pip install 'psycopg[binary]==3.2.13'
       - name: Test ONLY disposable local Postgres
-        run: python -m unittest -v test_unified_accounts_postgres_integration.py
+        run: python -m unittest -v test_unified_accounts_postgres_integration.py test_pilot_admin_approval_postgres.py

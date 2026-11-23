@@ -88,7 +88,7 @@ for role, labels in [
     ('Пилот', ('Кабина пилота', 'Не на линии')),
 ]:
     click_node(role)
-    xml = wait_for_labels('Внутренний тест', *labels)
+    xml = wait_for_labels('Локальные данные · подключить диспетчерскую', *labels)
     if role == 'Пассажир':
         xml = scroll_to_passenger_option('Трансфер', xml)
         xml = scroll_to_passenger_option('Доставка', xml)

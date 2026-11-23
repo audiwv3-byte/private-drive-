@@ -27,6 +27,15 @@
 @media(max-width:530px){#transfers .routes{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#transfers .catalog-route-link{border-radius:13px}#transfers .catalog-route-price{font-size:clamp(1.12rem,4.5vw,1.5rem)}#transfers .catalog-route-link h3{font-size:1rem}}
 @media(max-width:350px){#transfers .routes{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){#transfers .catalog-route-link,#transfers .catalog-route-image img{transition:none}}
+
+/* Route card text is an overlay on its photograph, never a separate footer. */
+#transfers .catalog-route-link{position:relative;isolation:isolate;min-height:0}
+#transfers .catalog-route-image{position:relative;z-index:0}
+#transfers .catalog-route-image::after{height:48%;background:linear-gradient(transparent,#0b0908e8)}
+#transfers .catalog-route-link .card-content{position:absolute;z-index:2;left:0;right:0;bottom:0;min-height:0;padding:18px 12px 17px;background:transparent;pointer-events:none}
+#transfers .catalog-route-link .card-content h3{color:#fff2db;text-shadow:0 2px 10px #000}
+#transfers .catalog-route-link .catalog-route-cta{color:#ffd891;text-shadow:0 2px 7px #000}
+@media(max-width:530px){#transfers .catalog-route-link .card-content{padding:12px 7px}}
 </style>
 </head>
 <body>
@@ -61,7 +70,7 @@
             <a class="button gold" href="order-map.html?mode=preorder">Забронировать поездку</a>
           </div>
           <div class="hero-night-proof" aria-label="Условия сервиса">
-            <span>Вильнюс ↔ аэропорт <strong>40 €</strong> в одну сторону</span>
+            <span>Вильнюс ↔ аэропорт <strong>40 €</strong></span>
             <span>Вильнюс → Каунас <strong>130 €</strong></span>
           </div>
         </div>
@@ -75,7 +84,7 @@
           </a>
           <a class="hero-night-choice" href="order-map.html?mode=preorder&amp;airport=to" aria-label="Заказать поездку в аэропорт Вильнюса или из аэропорта">
             <span class="hero-night-choice-symbol" aria-hidden="true">✈</span>
-            <span><strong>Трансфер в аэропорт / из аэропорта</strong><small>40 € за поездку в одну сторону</small></span>
+            <span><strong>Трансфер в аэропорт / из аэропорта</strong><small>40 €</small></span>
           </a>
           <a class="hero-night-choice" href="order-map.html?mode=preorder&amp;route=kaunas" aria-label="Заказать трансфер Вильнюс — Каунас">
             <span class="hero-night-choice-symbol" aria-hidden="true">➜</span>
@@ -100,12 +109,12 @@
     <h2><a href="directions.html" class="catalog-heading"><span>Популярные направления</span><span class="catalog-heading-motion drive" aria-hidden="true">🚙</span><span class="catalog-heading-arrow" aria-hidden="true">↗</span></a></h2>
     <div class="grid routes">
 <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;airport=to" aria-label="Аэропорт Вильнюса, 40 евро — открыть форму заказа">
-            <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Vilnius%20airport%20entrance.jpg?width=1200" width="360" height="400" alt="Вход и фасад аэропорта Вильнюса" loading="lazy"><strong class="catalog-route-price">40 €</strong></div>
+            <div class="catalog-route-image"><img src="assets/service-airport.webp" width="360" height="400" alt="Вход и фасад аэропорта Вильнюса" loading="lazy"><strong class="catalog-route-price">40 €</strong></div>
             <div class="card-content"><h3>Аэропорт Вильнюса</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
           </a>
-          <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=kaunas" aria-label="Каунас, 130 евро, дополнительный тариф 200 евро — открыть форму заказа">
-            <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Kaunas%20Castle%20in%20Kaunas%2C%20Lithuania.jpg?width=1200" width="344" height="400" alt="Каунасский замок" loading="lazy"><strong class="catalog-route-price">130 €</strong></div>
-            <div class="card-content"><h3>Каунас</h3><span class="catalog-route-extra">Дополнительный тариф: 200 €</span><span class="catalog-route-cta">Выбрать поездку →</span></div>
+          <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=kaunas" aria-label="Каунас, 130 евро — открыть форму заказа">
+            <div class="catalog-route-image"><img src="assets/kaunas.webp" width="344" height="400" alt="Каунасский замок" loading="lazy"><strong class="catalog-route-price">130 €</strong></div>
+            <div class="card-content"><h3>Каунас</h3><span class="catalog-route-cta">Выбрать поездку →</span></div>
           </a>
           <a class="card catalog-route-link" href="order-map.html?mode=preorder&amp;route=klaipeda" aria-label="Вильнюс — Клайпеда, 280 евро — открыть форму заказа">
             <div class="catalog-route-image"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Klaipeda%20old%20town.jpg?width=1200" width="346" height="400" alt="Панорама Клайпеды" loading="lazy"><strong class="catalog-route-price">280 €</strong></div>
@@ -130,7 +139,7 @@
     </section>
     <section id="about" class="section shaded"><div class="wrap contact-block"><div><h2>PRIVATE DRIVE</h2><p>Индивидуальные поездки на Toyota RAV4 Hybrid, такси в Вильнюсе, трансферы по Литве и Европе.</p></div><div><h2>Заказ поездки</h2><p>Задай маршрут, дату и пожелания — мы уточним доступность и стоимость.</p><a class="button gold" href="order-map.html?mode=preorder">Быстрый заказ поездки</a></div></div></section>
     <section id="contact" class="section wrap"><h2>Контакты</h2><div class="actions"><a class="button gold" href="https://t.me/PrivateDraive">Telegram PRIVATE DRIVE</a><a class="button outline" href="mailto:eurobaltictransfer@gmail.com">Написать на email</a><a class="button outline" href="https://www.instagram.com/privatedraive/">Instagram</a></div></section>
-  <div class="wrap"><p class="small-print" style="font-size:.72rem;opacity:.82">Фотографии первых четырёх направлений: <a href="https://commons.wikimedia.org/wiki/File:Vilnius%20airport%20entrance.jpg" target="_blank" rel="noopener noreferrer">Аэропорт Вильнюса</a> · <a href="https://commons.wikimedia.org/wiki/File:Kaunas%20Castle%20in%20Kaunas%2C%20Lithuania.jpg" target="_blank" rel="noopener noreferrer">Каунасский замок</a> · <a href="https://commons.wikimedia.org/wiki/File:Klaipeda%20old%20town.jpg" target="_blank" rel="noopener noreferrer">Панорама Клайпеды</a> · <a href="https://commons.wikimedia.org/wiki/File:Skyline%20of%20Warsaw%2C%20Poland.jpg" target="_blank" rel="noopener noreferrer">Панорама Варшавы</a>. Авторство и условия использования — на страницах файлов Wikimedia Commons.</p></div>
+  <div class="wrap"><p class="small-print" style="font-size:.72rem;opacity:.82">Фотографии Клайпеды и Варшавы: <a href="https://commons.wikimedia.org/wiki/File:Klaipeda%20old%20town.jpg" target="_blank" rel="noopener noreferrer">Панорама Клайпеды</a> · <a href="https://commons.wikimedia.org/wiki/File:Skyline%20of%20Warsaw%2C%20Poland.jpg" target="_blank" rel="noopener noreferrer">Панорама Варшавы</a>. Авторство и условия использования — на страницах файлов Wikimedia Commons.</p></div>
 </main>
   <footer id="documents" class="home-footer"><div class="wrap footer-columns">
     <div><a href="#top" class="brand"><img src="assets/pd-logo.webp" width="52" height="52" alt=""><span>PRIVATE DRIVE</span></a><p class="small-print">Трансферы · Поездки · Сопровождение</p></div>

@@ -35,13 +35,15 @@ class RemoteSyncDemo extends StatefulWidget {
   const RemoteSyncDemo({super.key, this.gateway, this.enableMapTiles = true,
     this.pollInterval = const Duration(seconds: 3),
     this.onIncomingMessageVoice, this.stagingDispatcher = false,
-    this.onReturnHome});
+    this.onReturnHome, this.initialFrom = '', this.initialTo = ''});
   final RemoteTripGateway? gateway;
   final bool enableMapTiles;
   final Duration pollInterval;
   final VoidCallback? onIncomingMessageVoice;
   final bool stagingDispatcher;
   final VoidCallback? onReturnHome;
+  /// Pre-populated route from the main passenger booking screen (QA only).
+  final String initialFrom, initialTo;
 
   @override
   State<RemoteSyncDemo> createState() => _RemoteSyncDemoState();
@@ -95,6 +97,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   void initState() {
     super.initState();
     if (widget.stagingDispatcher) url.text = stagingUrl;
+    origin.text = widget.initialFrom;
+    destination.text = widget.initialTo;
     if (widget.gateway != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) connect(widget.gateway!, isOwned: false);

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show SemanticsBinding;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:http/http.dart' as http;
 import 'remote_sync_demo.dart';
@@ -25,6 +26,10 @@ const isolatedWebPreview = bool.fromEnvironment('PD_ISOLATED_WEB_PREVIEW');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb && const bool.fromEnvironment('PD_ISOLATED_QA_AUTH')) {
+    // Keep accessibility active for the lifetime of the isolated Web build.
+    SemanticsBinding.instance.ensureSemantics();
+  }
   if (!pdLocalQaEntryEnabled) {
     await PdSystemPilotPhotoCapture.discardLostCapture();
   }

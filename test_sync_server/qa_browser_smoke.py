@@ -27,7 +27,6 @@ def smoke(browser_type, device):
         page.on("pageerror", lambda error: errors.append(str(error)[:300]))
         try:
             page.goto(ADDRESS + "/app/", wait_until="domcontentloaded", timeout=30000)
-            page.locator("flt-semantics-placeholder").click(timeout=35000)
             flutter_text(page, "Пассажир").click(timeout=20000)
             flutter_text(page, "Я ознакомился с условиями сервиса", exact=False).click(timeout=20000)
             taxi = page.locator('[flt-semantics-identifier="passenger-entry-taxi"]')
@@ -41,7 +40,6 @@ def smoke(browser_type, device):
             with page.expect_response(ADDRESS + "/v1/current", timeout=30000) as restored:
                 page.reload(wait_until="domcontentloaded", timeout=30000)
             assert restored.value.ok, statuses
-            page.locator("flt-semantics-placeholder").click(timeout=20000)
             taxi.wait_for(state="attached", timeout=15000)
             assert statuses.count(("/native-auth/qa-session", 200)) == 1, statuses
             assert statuses.count(("/v1/me", 200)) == 4, statuses

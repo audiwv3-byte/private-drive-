@@ -117,11 +117,13 @@ def create_app():
 
     @app.get("/pilot-registration")
     def pilot_registration():
-        page = Path(__file__).with_name("pd_pilot_registration.html").read_text(encoding="utf-8")
+        from pd_pilot_qa_intake import configured as pilot_intake_configured
+        template = Path(__file__).with_name("pd_pilot_registration.html").read_text(encoding="utf-8")
+        page = render_template_string(template, enabled=pilot_intake_configured())
         return Response(page, content_type="text/html; charset=utf-8",
                         headers={"Cache-Control": "no-store",
                                  "X-Content-Type-Options": "nosniff",
-                                 "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
+                                 "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; connect-src 'self'; frame-ancestors 'none'"})
 
     return app
 

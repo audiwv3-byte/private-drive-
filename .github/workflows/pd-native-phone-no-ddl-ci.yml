@@ -4,6 +4,7 @@ on:
     branches: [feature/web-dispatcher-browser-auth]
     paths:
       - 'pd_native_auth_postgres_http.py'
+      - 'pd_native_auth_schema_readiness.py'
       - 'pd_native_auth_schema_migration.py'
       - 'pd_native_phone_grants_ci.py'
       - 'test_native_phone_startup_no_ddl_postgres.py'

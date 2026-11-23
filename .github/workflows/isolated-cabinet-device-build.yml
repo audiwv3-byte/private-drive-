@@ -130,7 +130,8 @@ jobs:
           set -euo pipefail
           flutter build apk --debug --target lib/main.dart \
             --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
-            --dart-define=PD_ISOLATED_WEB_PREVIEW=false
+            --dart-define=PD_ISOLATED_WEB_PREVIEW=false \
+            --dart-define=PD_ISOLATED_QA_AUTH=true
           apk=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$apk"
           build_tools="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
@@ -154,7 +155,8 @@ jobs:
           flutter pub get
           flutter build web --release --base-href /app/ --target lib/main.dart \
             --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
-            --dart-define=PD_ISOLATED_WEB_PREVIEW=false
+            --dart-define=PD_ISOLATED_WEB_PREVIEW=false \
+            --dart-define=PD_ISOLATED_QA_AUTH=true
           test -s build/web/index.html
           test -s build/web/main.dart.js
           grep -F "trycloudflare.com" build/web/main.dart.js

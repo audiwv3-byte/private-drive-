@@ -18,6 +18,33 @@ class DispatcherStagingTests(unittest.TestCase):
             "PD_DISPATCH_ADMIN_ID": "999",
         }
 
+    def test_pilot_intake_is_fail_closed_and_dispatcher_documents_are_private(self):
+        with patch.dict(os.environ, self.env(), clear=True):
+            app = create_app()
+            client = app.test_client()
+            self.assertEqual(client.post("/pilot-registration").status_code, 503)
+            self.assertEqual(client.get("/dispatch/qa-pilot-applications").status_code, 401)
+            self.assertEqual(client.get(
+                "/dispatch/qa-pilot-applications/" + "a"*32 +
+                "/documents/license_front").status_code, 401)
+            page = client.get("/pilot-registration")
+            self.assertEqual(page.status_code, 200)
+            self.assertIn(b"disabled", page.data)
+        # Fake secrets are not sufficient; all explicit gates and storage URL
+        # must be present before the endpoint will accept any application.
+        with patch.dict(os.environ, {**self.env(),
+            "PD_PILOT_QA_INTAKE_ENABLED": "1",
+            "PD_PILOT_QA_INVITE_SECRET": "x"*40,
+            "PD_PILOT_QA_FERNET_KEY": "y"*44}, clear=True):
+            app = create_app()
+            self.assertEqual(app.test_client().post("/pilot-registration").status_code, 503)
+
+    def test_pilot_photo_validation_rejects_malformed_and_oversized_data(self):
+        from pd_pilot_qa_intake import MAX_FILE, image_as_private_webp
+        for data in (b"", b"not an image", b"0"*(MAX_FILE+1)):
+            with self.assertRaises(ValueError):
+                image_as_private_webp(data)
+
     def test_paysera_transfer_details_require_explicit_activation(self):
         cfg = {
             "PD_DISPATCH_STAGING_ONLY": "1",

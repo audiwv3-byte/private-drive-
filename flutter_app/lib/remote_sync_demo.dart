@@ -34,12 +34,14 @@ String? newestIncomingChatRole(
 class RemoteSyncDemo extends StatefulWidget {
   const RemoteSyncDemo({super.key, this.gateway, this.enableMapTiles = true,
     this.pollInterval = const Duration(seconds: 3),
-    this.onIncomingMessageVoice, this.stagingDispatcher = false});
+    this.onIncomingMessageVoice, this.stagingDispatcher = false,
+    this.onReturnHome});
   final RemoteTripGateway? gateway;
   final bool enableMapTiles;
   final Duration pollInterval;
   final VoidCallback? onIncomingMessageVoice;
   final bool stagingDispatcher;
+  final VoidCallback? onReturnHome;
 
   @override
   State<RemoteSyncDemo> createState() => _RemoteSyncDemoState();
@@ -392,7 +394,10 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   }
 
   Widget login() => Scaffold(
-    appBar: AppBar(title: const Text('PRIVATE DRIVE · Тестовый сервер')),
+    appBar: AppBar(
+      title: const Text('PRIVATE DRIVE · Тестовый сервер'),
+      leading: widget.onReturnHome == null ? null : BackButton(onPressed: widget.onReturnHome),
+    ),
     body: SafeArea(child: ListView(padding: const EdgeInsets.all(20), children: [
       const Text('Подключение только к изолированному тестовому серверу. '
           'Используй HTTPS и временный токен своей роли. '
@@ -478,7 +483,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     return Scaffold(
       appBar: AppBar(title: Text(isPassenger
           ? 'PRIVATE DRIVE · Пассажир · тест'
-          : 'PRIVATE DRIVE · Демо-диспетчер')),
+          : 'PRIVATE DRIVE · Демо-диспетчер'),
+        leading: widget.onReturnHome == null ? null : BackButton(onPressed: widget.onReturnHome)),
       body: SafeArea(child: ListView(
         key: const Key('remote-trip-list'),
         padding: const EdgeInsets.all(18),
@@ -541,6 +547,13 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         const ColoredBox(key: Key('remote-pilot-map'),
           color: Color(0xFF27332F)),
       SafeArea(child: Stack(children: [
+        if (widget.onReturnHome != null)
+          Positioned(top: 8, left: 8,
+            child: IconButton.filledTonal(
+              tooltip: 'На главный экран',
+              onPressed: widget.onReturnHome,
+              icon: const Icon(Icons.arrow_back),
+            )),
         Positioned(top: 8, right: 8,
           child: Column(children: [
             IconButton.filledTonal(

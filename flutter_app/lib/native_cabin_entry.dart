@@ -34,6 +34,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   PdNativeSession? _session;
   Timer? _expiry;
   bool _qaUnlocked = false;
+  bool _testSyncStarted = false;
+  bool _showTestSync = false;
+  bool _localPilotOpened = false;
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
 
   void _entry() {
@@ -44,11 +47,17 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     _expiry?.cancel();
     _session = null;
     _qaUnlocked = false;
+    _testSyncStarted = false;
+    _showTestSync = false;
+    _localPilotOpened = false;
     _entry();
   }
   void _select(String role) {
     if (pdLocalQaEntryEnabled) {
-      if (_qaUnlocked) setState(() => _page = role);
+      if (_qaUnlocked) setState(() {
+        _page = role;
+        if (role == 'pilot') _localPilotOpened = true;
+      });
       return;
     }
     setState(() {
@@ -128,13 +137,54 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
 
   @override
   Widget build(BuildContext context) {
+    if (!pdLocalQaEntryEnabled || !_qaUnlocked || (!_testSyncStarted && !_localPilotOpened)) {
+      return _buildCabin(context);
+    }
+    final showLocalPilot = _page == 'pilot' && !_showTestSync;
+    return Stack(fit: StackFit.expand, children: [
+      if (!_showTestSync && !showLocalPilot) _buildCabin(context),
+      if (_localPilotOpened) Offstage(
+        key: const Key('keep-local-pilot'),
+        offstage: !showLocalPilot,
+        child: TickerMode(
+          enabled: showLocalPilot,
+          child: PopScope(
+            canPop: !showLocalPilot,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && showLocalPilot) _entry();
+            },
+            child: _cabin('pilot', null, localQa: true),
+          ),
+        ),
+      ),
+      if (_testSyncStarted) Offstage(
+        key: const Key('keep-test-sync'),
+        offstage: !_showTestSync,
+        child: TickerMode(
+          enabled: _showTestSync,
+          child: PopScope(
+            canPop: !_showTestSync,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && _showTestSync) setState(() => _showTestSync = false);
+            },
+            child: RemoteSyncDemo(
+              stagingDispatcher: true,
+              onReturnHome: () => setState(() => _showTestSync = false),
+            ),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildCabin(BuildContext context) {
     if (pdLocalQaEntryEnabled) {
       if (!_qaUnlocked) {
         return _LocalQaSignIn(
           onUnlocked: () => setState(() => _qaUnlocked = true),
         );
       }
-      if (const {'passenger', 'pilot'}.contains(_page)) {
+      if (_page == 'passenger') {
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
@@ -194,9 +244,10 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 key: const Key('entry-staging-dispatch'),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                  builder: (_) => const RemoteSyncDemo(stagingDispatcher: true),
-                )),
+                onPressed: () => setState(() {
+                  _testSyncStarted = true;
+                  _showTestSync = true;
+                }),
                 icon: const Icon(Icons.sync_alt),
                 label: const Text('Тестовая связь с диспетчерской'),
               ),

@@ -20,19 +20,30 @@ TRIP_ID = re.compile(r"[a-f0-9]{32}")
 
 class StagingTripStore(DemoStore):
     last_pilot_poll = float("-inf")
+    pilot_position = None
+    last_pilot_fix = float("-inf")
 
     def ping_pilot(self):
         with DB_LOCK:
             self.last_pilot_poll = time.monotonic()
 
+    def set_pilot_position(self, position):
+        with DB_LOCK:
+            self.pilot_position = position
+            self.last_pilot_fix = time.monotonic()
+
     def snapshot(self):
         with DB_LOCK:
+            now = time.monotonic()
+            online = now - self.last_pilot_poll < ONLINE_SECONDS
+            position = self.pilot_position if online and now - self.last_pilot_fix < ONLINE_SECONDS else None
             trips = self.db.execute("""
                 SELECT id, origin, destination, pilot, status, paused, version
                 FROM trips ORDER BY created DESC LIMIT 50
             """)
             return {
-                "pilot_online": time.monotonic() - self.last_pilot_poll < ONLINE_SECONDS,
+                "pilot_online": online,
+                "pilot_position": position,
                 "trips": [dict(row) for row in trips],
             }
 
@@ -90,6 +101,21 @@ def register(app, authorized, valid_csrf):
             if role != "passenger":
                 raise TripError("forbidden", 403)
             return reply({"trip": store.create(actor, payload())}, 201)
+        if request.method == "POST" and path == "position":
+            if role != "pilot":
+                raise TripError("forbidden", 403)
+            body = payload()
+            if set(body) != {"latitude", "longitude"}:
+                raise TripError("invalid_position")
+            latitude, longitude = body["latitude"], body["longitude"]
+            if latitude is None and longitude is None:
+                store.set_pilot_position(None)
+            elif (type(latitude) in (int, float) and -90 <= latitude <= 90
+                  and type(longitude) in (int, float) and -180 <= longitude <= 180):
+                store.set_pilot_position([round(latitude, 5), round(longitude, 5)])
+            else:
+                raise TripError("invalid_position")
+            return reply({"ok": True})
         parts = path.split("/")
         if len(parts) < 2 or parts[0] != "trips" or not TRIP_ID.fullmatch(parts[1]):
             raise TripError("not_found", 404)
@@ -132,11 +158,11 @@ def register(app, authorized, valid_csrf):
 h1,a{color:#e8c581}label{display:block;margin-top:1rem}input{box-sizing:border-box;width:100%;padding:.6rem}
 </style>
 <h1>Тестовая связь между устройствами</h1>
-<p>В приложении открой «Тестовая связь между устройствами». Укажи адрес и токен своей роли.</p>
+<p>На экране выбора кабинета в Android QA 0.2.32 открой «Тестовая связь с диспетчерской». Введи токен своей роли.</p>
 <label>Адрес сервера<input readonly value="https://private-drive-dispatcher-staging.onrender.com"></label>
 <label>Токен пилота<input readonly value="{{ pilot }}"></label>
 <label>Токен пассажира<input readonly value="{{ passenger }}"></label>
-<p>Используй тестовые адреса. Статус пилота отображается, пока открыт экран тестовой связи. GPS и оплата в этом тесте выключены.</p>
+<p>Используй тестовые адреса. Статус пилота отображается, пока открыт экран тестовой связи. На карте видно последнее местоположение, если пилот включил передачу GPS. Оплата выключена.</p>
 <a href="/dispatch/map">Открыть карту диспетчерской</a></html>""",
             pilot=token("pilot", day), passenger=token("passenger", day))
         return page, {

@@ -16,6 +16,7 @@ header{height:69px;display:flex;align-items:center;justify-content:space-between
 .layout{display:grid;grid-template-columns:315px minmax(0,1fr) 305px;min-height:calc(100dvh - 69px)}
 aside{background:#17130f;padding:16px;border-right:1px solid var(--line);overflow:auto}aside.right{border-right:0;border-left:1px solid var(--line)}
 .toolbar form{margin:0}.test-order strong{overflow-wrap:anywhere}.test-order button{margin-top:5px}
+.pilot-marker{border:1px solid #ffe2a3;border-radius:50%;background:#1b1713;color:#ffd889;display:grid;place-items:center;font-size:22px;box-shadow:0 2px 8px #000a}
 @media(max-width:930px){header{height:auto;min-height:69px;flex-wrap:wrap}}
 h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 12px}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}p{color:var(--soft);margin:9px 0}
 .label{font-size:11px;letter-spacing:.11em;color:#d5b777;text-transform:uppercase}
@@ -57,7 +58,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
 </aside>
 <section id="map" aria-label="Интерактивная карта диспетчерской">
-<div id="mapNotice" role="status"><b id="mapProvider">Загрузка Mapbox…</b><span id="mapStatus">Карта доступна для просмотра. Позиции пилотов и маршруты заказов пока не подключены.</span></div>
+<div id="mapNotice" role="status"><b id="mapProvider">Загрузка Mapbox…</b><span id="mapStatus">{% if test_sync_enabled %}Местоположение появится, когда тестовый пилот поделится GPS.{% else %}Карта доступна для просмотра. Позиции пилотов и маршруты заказов пока не подключены.{% endif %}</span></div>
 </section>
 <aside class="right" aria-label="Управление пилотами и коммуникации">
 <h2 id="pilotsTitle">Пилоты</h2><div class="tabs"><button class="tab active" id="allPilots" aria-pressed="true">Все</button><button class="tab" id="onlinePilots" aria-pressed="false">На линии</button></div>
@@ -97,7 +98,8 @@ function renderTrips(){
     for(const [id,count] of Object.entries(counts))$(id).textContent=count;
     const onlyOnline=$('onlinePilots').getAttribute('aria-pressed')==='true';
     $('pilotName').hidden=onlyOnline&&!online;
-    $('pilotStatus').textContent=online?'На линии · тестовая связь':onlyOnline?'Пилотов на линии нет':'Вне сети';
+    $('pilotStatus').textContent=online?(snapshot.pilot_position?'На линии · GPS на карте':'На линии · без GPS'):onlyOnline?'Пилотов на линии нет':'Вне сети';
+    document.dispatchEvent(new CustomEvent('pd-test-gps',{detail:snapshot.pilot_position}));
     const shown=trips.filter(t=>orderFilter==='all'||
         (orderFilter==='new'&&t.status==='requested')||(orderFilter==='active'&&active(t))||
         (orderFilter==='done'&&t.status==='finished'));
@@ -161,6 +163,27 @@ refreshTrips();
 if(typeof L==='undefined'){$('mapProvider').textContent='Не удалось загрузить карту';$('mapStatus').textContent='Проверь подключение к интернету.';return}
 const map=L.map('map',{zoomControl:false}).setView([54.6872,25.2797],12);
 L.control.zoom({position:'bottomright'}).addTo(map);
+{% if test_sync_enabled %}
+let pilotMarker=null;
+document.addEventListener('pd-test-gps',event=>{
+    const point=event.detail;
+    const status=$('mapStatus');
+    if(!point){
+        if(pilotMarker){pilotMarker.remove();pilotMarker=null;}
+        status.textContent='Местоположение появится, когда тестовый пилот поделится GPS.';
+        return;
+    }
+    if(pilotMarker){pilotMarker.setLatLng(point);}
+    else{
+        pilotMarker=L.marker(point,{
+            title:'Тестовый пилот',
+            icon:L.divIcon({className:'pilot-marker',html:'➤',iconSize:[35,35],iconAnchor:[17,17]})
+        }).addTo(map).bindTooltip('Тестовый пилот');
+        if(!map.getBounds().contains(point))map.setView(point,12);
+    }
+    status.textContent='GPS тестового пилота отображается на карте.';
+});
+{% endif %}
 const osmCredit='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 const token=window.PD_MAPBOX_PUBLIC_TOKEN;
 let layer=null,night=true;
@@ -172,8 +195,8 @@ const style=night?'dark-v11':'light-v11';
 const url='https://api.mapbox.com/styles/v1/mapbox/'+style+'/tiles/256/{z}/{x}/{y}?access_token='+encodeURIComponent(token);
 let errors=0;
 const next=L.tileLayer(url,{maxZoom:19,attribution:'&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> '+osmCredit+' <a href="https://apps.mapbox.com/feedback/">Feedback</a>'});
-next.on('tileerror',()=>{if(layer!==next)return;if(++errors>=3){useOsm();$('mapStatus').textContent='Mapbox временно недоступна, работает резервная карта. Данные пилотов не подключены.';}});
-layer=next.addTo(map);$('mapProvider').textContent='Mapbox · '+(night?'ночная':'дневная')+' карта';$('providerStatus').textContent='Активна картографическая подложка Mapbox. GPS пилотов ожидает авторизованный API.';
+next.on('tileerror',()=>{if(layer!==next)return;if(++errors>=3){useOsm();$('providerStatus').textContent='Mapbox временно недоступна, работает резервная карта.';}});
+layer=next.addTo(map);$('mapProvider').textContent='Mapbox · '+(night?'ночная':'дневная')+' карта';$('providerStatus').textContent='Активна картографическая подложка Mapbox.';
 };
 $('themeBtn').addEventListener('click',()=>{night=!night;$('themeBtn').textContent=night?'Дневная карта':'Ночная карта';showTheme()});
 $('vilniusBtn').addEventListener('click',()=>map.setView([54.6872,25.2797],12));

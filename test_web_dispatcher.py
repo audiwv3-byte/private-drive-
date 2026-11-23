@@ -62,6 +62,18 @@ class DispatcherBrowserTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201)
         snapshot = dispatcher.get("/dispatch/test-sync/state").json
         self.assertTrue(snapshot["pilot_online"])
+        self.assertIsNone(snapshot["pilot_position"])
+        position = {"latitude": 54.68725, "longitude": 25.27975}
+        self.assertEqual(mobile.post("/v1/position", headers=passenger, json=position).status_code, 403)
+        self.assertEqual(mobile.post("/v1/position", headers=pilot, json={
+            **position, "latitude": 180,
+        }).status_code, 400)
+        self.assertEqual(mobile.post("/v1/position", headers=pilot, json=position).status_code, 200)
+        self.assertEqual(dispatcher.get("/dispatch/test-sync/state").json["pilot_position"], list(position.values()))
+        self.assertEqual(mobile.post("/v1/position", headers=pilot, json={
+            "latitude": None, "longitude": None,
+        }).status_code, 200)
+        self.assertIsNone(dispatcher.get("/dispatch/test-sync/state").json["pilot_position"])
         trip = snapshot["trips"][0]
         self.assertEqual(trip["origin"], route["from"])
         self.assertEqual(trip["status"], "requested")

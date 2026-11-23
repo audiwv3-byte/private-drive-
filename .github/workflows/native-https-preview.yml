@@ -1,0 +1,68 @@
+name: PRIVATE DRIVE temporary native HTTPS preview
+
+on:
+  push:
+    branches: [test/flutter-cabinet-sync]
+    paths:
+      - '.github/workflows/native-https-preview.yml'
+      - 'test_sync_server/run_native_https_preview.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-drive-native-https-preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 42
+    env:
+      PYTHONPATH: test_sync_server:.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Cloudflare client
+        run: |
+          curl --fail --silent --show-error --location --retry 2 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.11.2/cloudflared-linux-amd64 \
+            -o "$RUNNER_TEMP/cloudflared"
+          printf '%s  %s\n' \
+            '56f13335143ec0e22772963290683a84a04114a35ec64cbc794a4d39ff9bb8cf' \
+            "$RUNNER_TEMP/cloudflared" | sha256sum -c -
+          chmod 700 "$RUNNER_TEMP/cloudflared"
+      - name: Start isolated preview and verify external HTTPS
+        run: |
+          python3 test_sync_server/run_native_https_preview.py \
+            --cloudflared "$RUNNER_TEMP/cloudflared" \
+            --address-file "$RUNNER_TEMP/qa-address.txt" \
+            > "$RUNNER_TEMP/qa-preview.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/qa-preview.pid"
+          for attempt in {1..90}; do
+            if test -s "$RUNNER_TEMP/qa-address.txt"; then
+              address=$(cat "$RUNNER_TEMP/qa-address.txt")
+              echo "::notice title=Verified synthetic HTTPS endpoint::$address/healthz"
+              printf '### Verified test endpoint\n\n%s/healthz\n' "$address" >> "$GITHUB_STEP_SUMMARY"
+              cat "$RUNNER_TEMP/qa-preview.log"
+              exit 0
+            fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/qa-preview.pid")" 2>/dev/null; then
+              cat "$RUNNER_TEMP/qa-preview.log"
+              exit 1
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/qa-preview.log"
+          exit 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-test-endpoint
+          path: ${{ runner.temp }}/qa-address.txt
+          retention-days: 1
+      - name: Keep the endpoint available for the test window
+        run: |
+          pid=$(cat "$RUNNER_TEMP/qa-preview.pid")
+          while kill -0 "$pid" 2>/dev/null; do
+            sleep 10
+          done
+          cat "$RUNNER_TEMP/qa-preview.log"

@@ -329,9 +329,9 @@ class CabinetHandler(ApiHandler):
             raise TripError("forbidden", 403)
 
 
-def make_mock_server(store, deliver, *, port=0, browser_origin=None):
+def make_mock_server(store, deliver, *, port=0, browser_origin=None, handler=CabinetHandler):
     server = ApiServer(("127.0.0.1", port), store, {},
-                       browser_origin=browser_origin, handler=CabinetHandler)
+                       browser_origin=browser_origin, handler=handler)
     server.deliver = deliver
     server.otp_key = secrets.token_bytes(32)
     return server

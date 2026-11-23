@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
@@ -41,6 +43,72 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   bool _testSyncStarted = false;
   bool _showTestSync = false;
   bool _localPilotOpened = false;
+  static const _qaSessionKey = 'pd_isolated_qa_session_v1';
+  bool get _persistQaOnly => _serverSync &&
+      const bool.fromEnvironment('PD_ISOLATED_QA_AUTH');
+
+  @override
+  void initState() {
+    super.initState();
+    if (_persistQaOnly) unawaited(_restoreQaSession());
+  }
+
+  Future<void> _restoreQaSession() async {
+    try {
+      final prefs = SharedPreferencesAsync();
+      final encoded = await prefs.getString(_qaSessionKey);
+      if (encoded == null) return;
+      final data = jsonDecode(encoded);
+      if (data is! Map<String, dynamic>) return;
+      final token = data['token'];
+      final user = data['user_id'];
+      final role = data['role'];
+      final expiryMs = data['expiry_ms'];
+      if (token is! String || token.length < 40 ||
+          user is! String || user.isEmpty ||
+          !const {'passenger', 'pilot', 'dispatcher'}.contains(role) ||
+          expiryMs is! int) {
+        await prefs.remove(_qaSessionKey);
+        return;
+      }
+      final session = PdNativeSession(
+        token: token, userId: user, role: role as String,
+        expiresAt: DateTime.fromMillisecondsSinceEpoch(expiryMs),
+      );
+      if (!session.active) {
+        await prefs.remove(_qaSessionKey);
+        return;
+      }
+      // Never trust locally stored roles; only the isolated server may affirm.
+      final api = widget.syncGatewayBuilder!(session);
+      try {
+        final identity = await api.get('/v1/me');
+        if (identity['role'] != session.role ||
+            identity['user_id'] != session.userId) {
+          await prefs.remove(_qaSessionKey);
+          return;
+        }
+      } finally {
+        api.close();
+      }
+      if (!mounted || _session != null || _page != 'entry') return;
+      _requestedRole = session.role;
+      _authenticated(session);
+    } catch (_) {
+      // Offline or expired mock: show the role chooser, never fabricate auth.
+    }
+  }
+
+  Future<void> _saveQaSession(PdNativeSession session) async {
+    if (!_persistQaOnly) return;
+    try {
+      await SharedPreferencesAsync().setString(_qaSessionKey, jsonEncode({
+        'token': session.token, 'user_id': session.userId,
+        'role': session.role,
+        'expiry_ms': session.expiresAt.millisecondsSinceEpoch,
+      }));
+    } catch (_) { /* QA browser storage is optional. */ }
+  }
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
 
   bool get _serverSync => widget.syncGatewayBuilder != null;
@@ -65,6 +133,10 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     setState(() { _page = 'entry'; _message = null; });
   }
   void _signOut() {
+    if (_persistQaOnly) {
+      unawaited(SharedPreferencesAsync().remove(_qaSessionKey).then<void>(
+        (_) {}, onError: (Object _) {}));
+    }
     _expiry?.cancel();
     _session = null;
     _qaUnlocked = false;
@@ -97,6 +169,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
   void _authenticated(PdNativeSession session) {
     if (!mounted || !session.active) return;
+    unawaited(_saveQaSession(session));
     _expiry?.cancel();
     _expiry = Timer(session.expiresAt.difference(DateTime.now()), () {
       if (mounted) _signOut();

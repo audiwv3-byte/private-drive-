@@ -46,3 +46,23 @@ jobs:
         env:
           PD_DISPATCH_LOCAL_POSTGRES_CI: '1'
         run: python -m unittest -v test_dispatcher_persistent_postgres
+
+  dispatcher-shared-cabinets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: db76d700b0b4019bdd7581c8ac4a5601ce4fb940
+          path: native-qa
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated browser dispatcher dependencies
+        run: python -m pip install 'Flask==3.0.3' 'Werkzeug==3.1.9'
+      - name: Verify mobile and browser share one order with GPS and chat
+        env:
+          PYTHONPATH: native-qa/test_sync_server:native-qa:.
+        run: python -m unittest -v test_dispatcher_shared_cabinets

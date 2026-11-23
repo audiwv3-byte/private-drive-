@@ -50,7 +50,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 {% if analytics_enabled %}<a href="/dispatch/analytics">Воронка сайта</a>{% endif %}
 <a href="/pilot-registration">Регистрация пилота</a>
 <a href="/dispatch/pilot-applications">Анкеты пилотов (QA)</a>
-{% if test_sync_enabled %}<a class="btn" href="/dispatch/test-sync">Тестовая связь</a>{% endif %}
+{% if test_sync_enabled and not shared_qa_enabled %}<a class="btn" href="/dispatch/test-sync">Тестовая связь</a>{% endif %}
 <form method="post" action="/dispatch/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Выйти</button></form>
 {% else %}<span class="label">Доступ к заказам закрыт</span><a class="btn" href="/dispatch">В панель управления</a>{% endif %}
 </div>
@@ -65,6 +65,19 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <h2 id="ordersTitle">Все заказы</h2>
 {% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">Назначение пилотов включим после серверной проверки ролей.</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
 <p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
+{% if shared_qa_enabled %}
+<section id="orderChat" class="card" hidden aria-label="Чат заказа">
+<h2>Чат заказа</h2>
+<button class="btn" id="closeOrderChat" type="button">Закрыть чат</button>
+<div id="orderMessages"></div>
+<form id="orderMessageForm">
+<label for="orderMessage">Сообщение</label>
+<input id="orderMessage" maxlength="500" required>
+<button class="btn" type="submit">Отправить</button>
+</form>
+<p id="orderChatStatus" role="status"></p>
+</section>
+{% endif %}
 </aside>
 <section id="map" aria-label="Интерактивная карта диспетчерской">
 <div id="rasterMap"></div><div id="glMap" hidden></div>
@@ -140,7 +153,7 @@ document.addEventListener('pd-test-filter',renderPersistentOrders);
 pollPersistentOrders();
 {% endif %}
 {% if test_sync_enabled %}
-const statusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'Пилот едет к пассажиру',underway:'В поездке',finished:'Завершён'};
+const statusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'Пилот едет к пассажиру',underway:'В поездке',finished:'Завершён',cancelled:'Отменён'};
 const active=trip=>['assigned','approaching','underway'].includes(trip.status);
 let snapshot=null, signature='', assigning=false;
 function renderTrips(){
@@ -190,6 +203,14 @@ function renderTrips(){
             button.addEventListener('click',()=>assignPilot(trip,button));
             card.append(button);
         }
+        {% if shared_qa_enabled %}
+        const chatButton=document.createElement('button');
+        chatButton.type='button';
+        chatButton.className='btn';
+        chatButton.textContent='Чат заказа';
+        chatButton.addEventListener('click',()=>openOrderChat(trip.id));
+        card.append(chatButton);
+        {% endif %}
         return card;
     });
     $('ordersList').replaceChildren(...(cards.length?cards:['Тестовых заказов нет']));
@@ -217,6 +238,7 @@ async function refreshTrips(){
         if(!response.ok)throw new Error('sync');
         snapshot=await response.json();
         renderTrips();
+        {% if shared_qa_enabled %}if(chatTrip)await refreshOrderChat(chatTrip);{% endif %}
         $('syncStatus').textContent='Связь с сервером активна.';
     }catch{
         document.dispatchEvent(new CustomEvent('pd-passenger-gps',{detail:{}}));
@@ -225,6 +247,65 @@ async function refreshTrips(){
         setTimeout(refreshTrips,3000);
     }
 }
+{% if shared_qa_enabled %}
+let chatTrip=null, queuedMessage=null;
+const roleLabel={passenger:'Пассажир',pilot:'Пилот',dispatcher:'Диспетчер'};
+function messagesPath(id){return '/dispatch/test-sync/trips/'+id+'/messages';}
+function openOrderChat(id){
+    chatTrip=id;
+    queuedMessage=null;
+    $('orderMessage').value='';
+    $('orderChatStatus').textContent='';
+    $('orderMessages').replaceChildren();
+    $('orderChat').hidden=false;
+    refreshOrderChat(id);
+}
+async function refreshOrderChat(id){
+    try{
+        const result=await fetch(messagesPath(id),{cache:'no-store',signal:AbortSignal.timeout(7000)});
+        if(!result.ok)throw new Error('chat');
+        const {messages}=await result.json();
+        if(chatTrip!==id)return;
+        $('orderMessages').replaceChildren(...messages.map(message=>{
+            const line=document.createElement('p');
+            line.textContent=(roleLabel[message.role]||'Участник')+': '+message.body;
+            return line;
+        }));
+    }catch{
+        if(chatTrip===id)$('orderChatStatus').textContent='Чат временно недоступен.';
+    }
+}
+$('closeOrderChat').addEventListener('click',()=>{
+    chatTrip=null;
+    $('orderChat').hidden=true;
+});
+$('orderMessageForm').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const id=chatTrip, input=$('orderMessage'), text=input.value.trim();
+    if(!id||!text)return;
+    const submit=event.target.querySelector('button[type=submit]');
+    submit.disabled=true;
+    if(queuedMessage?.text!==text){
+        const client_id=crypto.randomUUID().replaceAll('-','');
+        queuedMessage={text,client_id};
+    }
+    try{
+        const body=new URLSearchParams({csrf:{{ csrf|tojson }},...queuedMessage});
+        const response=await fetch(messagesPath(id),{method:'POST',body,signal:AbortSignal.timeout(7000)});
+        if(!response.ok)throw new Error('send');
+        if(chatTrip===id){
+            queuedMessage=null;
+            if(input.value.trim()===text)input.value='';
+            $('orderChatStatus').textContent='';
+            await refreshOrderChat(id);
+        }
+    }catch{
+        if(chatTrip===id)$('orderChatStatus').textContent='Сообщение не подтверждено. Повтори отправку.';
+    }finally{
+        submit.disabled=false;
+    }
+});
+{% endif %}
 document.addEventListener('pd-test-filter',renderTrips);
 refreshTrips();
 {% endif %}

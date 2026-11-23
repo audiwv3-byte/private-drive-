@@ -321,9 +321,13 @@ def register(app, core):
     register_persistent_queue(app, authorized)
     persistent_queue_enabled = persistent_queue_ready()
 
-    test_sync_enabled = (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
-                         and os.environ.get("PD_DISPATCH_TEST_SYNC") == "1")
-    if test_sync_enabled:
+    staging_only = os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
+    shared_qa_enabled = staging_only and os.environ.get("PD_DISPATCH_SHARED_QA") == "1"
+    test_sync_enabled = staging_only and os.environ.get("PD_DISPATCH_TEST_SYNC") == "1"
+    if shared_qa_enabled:
+        from pd_dispatch_shared_qa import register as register_shared_qa
+        register_shared_qa(app, authorized, valid_csrf)
+    elif test_sync_enabled:
         from pd_dispatch_test_sync import register as register_test_sync
         register_test_sync(app, authorized, valid_csrf)
 
@@ -339,7 +343,7 @@ def register(app, core):
 
     @app.get("/dispatch")
     def pd_dispatch_home():
-        if test_sync_enabled or persistent_queue_enabled:
+        if shared_qa_enabled or test_sync_enabled or persistent_queue_enabled:
             return pd_dispatch_map()
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
@@ -359,10 +363,12 @@ def register(app, core):
             token = ""
         page = Path(__file__).with_name("pd_dispatcher_mapbox.html").read_text(encoding="utf-8")
         response = app.make_response(render_template_string(
-            page, mapbox_token=token, test_sync_enabled=test_sync_enabled and not persistent_queue_enabled,
-            persistent_queue_enabled=persistent_queue_enabled,
+            page, mapbox_token=token,
+            test_sync_enabled=shared_qa_enabled or (test_sync_enabled and not persistent_queue_enabled),
+            persistent_queue_enabled=persistent_queue_enabled and not shared_qa_enabled,
+            shared_qa_enabled=shared_qa_enabled,
             analytics_enabled="pd_site_analytics" in app.view_functions,
-            csrf=csrf() if test_sync_enabled else "",
+            csrf=csrf() if shared_qa_enabled or test_sync_enabled else "",
         ))
         response.headers.update({
             "Cache-Control": "private, no-store",

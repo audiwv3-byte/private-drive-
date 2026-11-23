@@ -70,7 +70,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
     expect(sessions, 1);
-    final storedQaSession = await SharedPreferencesAsync()
+    final storedQaSession = (await SharedPreferences.getInstance())
         .getString('pd_isolated_qa_session_v1');
     expect(storedQaSession, isNotNull);
     expect(jsonDecode(storedQaSession!)['role'], 'passenger');

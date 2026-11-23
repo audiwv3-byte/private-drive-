@@ -60,6 +60,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   String error = '', gpsLabel = 'GPS выключен';
   int seq = 0;
   int chatSeq = 0;
+  String? _pendingChatId, _pendingChatText;
+  Map<String, dynamic>? pilotFix;
   bool _loadedChatForTrip = false;
   bool _backupTiles = false;
   int _tileErrors = 0;
@@ -146,6 +148,9 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         chatSeq = 0;
         chatMessages = [];
         _loadedChatForTrip = false;
+        pilotFix = null;
+        _pendingChatId = null;
+        _pendingChatText = null;
       }
       if (id != null) {
         final responseEvents = await client.get('/v1/trips/$id/events?after=$seq');
@@ -200,7 +205,22 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         }
         _loadedChatForTrip = true;
       }
-      if (mounted) setState(() { trip = current; error = ''; });
+      // Query the same server-side verified pilot point in every role.
+      // Missing, stale and unauthorized GPS are never displayed.
+      Map<String, dynamic>? nextFix;
+      if (id != null && ['assigned','approaching','underway'].contains(current?['status'])) {
+        final fixReply = await client.get('/v1/trips/$id/gps');
+        final fix = fixReply['gps'];
+        if (fix is Map<String, dynamic> && fix['available'] == true &&
+            fix['latitude'] is num && fix['longitude'] is num) {
+          final lat = (fix['latitude'] as num).toDouble();
+          final lng = (fix['longitude'] as num).toDouble();
+          if (lat.isFinite && lng.isFinite && lat.abs() <= 90 && lng.abs() <= 180) {
+            nextFix = {'latitude':lat,'longitude':lng};
+          }
+        }
+      }
+      if (mounted) setState(() { trip = current; pilotFix = nextFix; error = ''; });
     } on Exception catch (e) {
       if (mounted) setState(() => error = e.toString());
     } finally {
@@ -236,8 +256,16 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         !['requested', 'assigned', 'approaching', 'underway'].contains(status)) return;
     setState(() { busy = true; error = ''; });
     try {
+      // Reuse one idempotency ID if the server committed but the response
+      // was lost. Only a genuinely new text gets a new client ID.
+      if (_pendingChatText != message || _pendingChatId == null) {
+        _pendingChatId = _newClientId();
+        _pendingChatText = message;
+      }
       await client.post('/v1/trips/$id/messages',
-        {'client_id': _newClientId(), 'text': message});
+        {'client_id': _pendingChatId, 'text': message});
+      _pendingChatId = null;
+      _pendingChatText = null;
       chatDraft.clear();
     } on Exception catch (e) {
       if (mounted) setState(() => error = e.toString());
@@ -277,6 +305,14 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
 
   Future<void> toggleGps() async {
     if (gpsOn) {
+      final id = trip?['id'];
+      if (role == 'pilot' && api != null && id is String) {
+        try {
+          await api!.post('/v1/trips/$id/gps', {'enabled': false});
+        } on Exception {
+          // Local GPS is still disabled; stale server fix expires within 30s.
+        }
+      }
       await gps?.cancel();
       gps = null;
       if (mounted) setState(() {
@@ -307,10 +343,25 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         ),
       ).listen((position) {
         if (!mounted) return;
+        if (!position.latitude.isFinite || !position.longitude.isFinite ||
+            position.latitude.abs() > 90 || position.longitude.abs() > 180) {
+          return;
+        }
         final point = LatLng(position.latitude, position.longitude);
+        final id = trip?['id'];
+        if (role == 'pilot' && id is String && api != null &&
+            ['assigned', 'approaching', 'underway'].contains(status)) {
+          unawaited(api!.post('/v1/trips/$id/gps', {
+            'enabled': true, 'latitude': position.latitude,
+            'longitude': position.longitude,
+          }).catchError((Object _) {
+            if (mounted) setState(() => gpsLabel = 'GPS синхронизация недоступна');
+            return <String, dynamic>{};
+          }));
+        }
         setState(() {
           location = point;
-          gpsLabel = 'GPS активен · только на устройстве';
+          gpsLabel = 'GPS активен · тестовая синхронизация';
         });
         map.move(point, map.camera.zoom);
       }, onError: (Object _) {
@@ -383,6 +434,15 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
             });
           },
         ),
+        if (role != 'pilot' && pilotFix != null)
+          MarkerLayer(markers: [
+            Marker(
+              point: LatLng(pilotFix!['latitude'] as double,
+                            pilotFix!['longitude'] as double),
+              width: 40, height: 40,
+              child: const Icon(Icons.local_taxi, key: Key('remote-confirmed-pilot-gps')),
+            ),
+          ]),
         if (location != null) MarkerLayer(markers: [
           Marker(point: location!, width: 48, height: 48,
             child: const Icon(Icons.navigation, size: 38)),
@@ -428,6 +488,10 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           Text(statusText, key: const Key('remote-trip-status')),
           if (isPassenger && widget.enableMapTiles)
             SizedBox(height: 240, child: _sharedMap()),
+          if (trip != null)
+            Text(pilotFix == null ? 'Подтверждённых GPS-точек нет'
+                : 'GPS пилота подтверждён · тест',
+                key: const Key('remote-pilot-gps-status')),
           if (trip != null)
             Text(trip!['origin'].toString() + ' → ' +
                 trip!['destination'].toString(),

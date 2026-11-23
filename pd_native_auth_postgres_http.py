@@ -65,6 +65,33 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
         if not schema_ready:
             return reply(start_response, "503 Service Unavailable",
                          {"error": schema_status})
+        if method == "GET" and route == "/native-auth/session":
+            auth = environ.get("HTTP_AUTHORIZATION", "")
+            if not isinstance(auth,str) or not auth.startswith("Bearer "):
+                return reply(start_response, "401 Unauthorized",
+                             {"error":"invalid_session"})
+            token = auth[7:]
+            digest = _digest(token)
+            if digest is None or any(char.isspace() for char in token):
+                return reply(start_response, "401 Unauthorized",
+                             {"error":"invalid_session"})
+            try:
+                with psycopg.connect(database_url) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""SELECT user_id,server_role,expires_at
+                            FROM public.pd_validate_native_session(%s,%s)""",
+                            (digest,int(clock())))
+                        row = cur.fetchone()
+                if not row:
+                    return reply(start_response, "401 Unauthorized",
+                                 {"error":"invalid_session"})
+                return reply(start_response, "200 OK",
+                             {"user_id":row[0],"role":row[1],
+                              "expires_at":row[2]})
+            except psycopg.Error:
+                readiness.mark_database_unavailable()
+                return reply(start_response, "503 Service Unavailable",
+                             {"error":"database_unavailable"})
         if method == "POST" and route == "/native-auth/logout":
             # A per-device logout is independent of whether SMS is enabled.
             # Never accept user_id, token hash or a role in the request body.

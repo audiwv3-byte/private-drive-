@@ -45,6 +45,7 @@
 #partners .partner-feature .button{border-color:#ad874c;color:#f7d997}
 @media(max-width:740px){#partners{padding-top:2.4rem;padding-bottom:2.4rem}#partners .partner-feature{gap:16px;padding:18px}#partners .partner-section-title{font-size:clamp(1.2rem,6vw,1.8rem)}}
 
+#partners a.partner-section-title{text-decoration:none;transition:border-color .2s,background .2s}#partners a.partner-section-title:hover,#partners a.partner-section-title:focus-visible{border-color:#f3d28e;background:#291f12}
 /* Contacts and payment information aligned in two responsive columns */
 #contact .contact-payment-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(270px,.8fr);gap:clamp(24px,4vw,60px);align-items:start}
 #contact .contact-main{min-width:0}
@@ -156,7 +157,7 @@
   </div>
 </section>
 <section id="partners" class="section wrap">
-      <h2><span class="catalog-heading partner-section-title"><span>Наши друзья</span><span class="catalog-heading-motion" aria-hidden="true">🤝</span></span></h2>
+      <h2><a class="catalog-heading partner-section-title" href="friends.html" aria-label="Открыть страницу Наши друзья"><span>Наши друзья</span><span class="catalog-heading-motion" aria-hidden="true">🤝 ↗</span></a></h2>
       <div class="partner-feature">
         <div class="partner-tech-icon" aria-hidden="true"><span>🤖</span></div>
         <div class="partner-info"><h3>Work.www | IT-разработка</h3><span class="partner-role">Разработчик сайта · Друг PRIVATE DRIVE</span><p>Разработка сайтов, веб-сервисов, приложений и Telegram-ботов.</p></div>

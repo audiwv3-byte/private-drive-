@@ -6,6 +6,7 @@ import 'demo_interfaces.dart';
 import 'permissions_onboarding.dart';
 import 'native_session.dart';
 import 'native_logout_api.dart';
+import 'native_session_manager.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_identity_notice_page.dart';
 
@@ -15,10 +16,11 @@ typedef PdSignInBuilder = Widget Function(BuildContext context, String role,
 /// Cabin choice is navigation intent, never a server role grant.
 class PdNativeCabinEntry extends StatefulWidget {
   const PdNativeCabinEntry({super.key, required this.signInBuilder,
-    required this.identityApiBuilder, this.logoutApi});
+    required this.identityApiBuilder, this.logoutApi, this.sessionManager});
   final PdSignInBuilder signInBuilder;
   final PdIdentityApi Function(PdNativeSession session) identityApiBuilder;
   final PdNativeLogoutApi? logoutApi;
+  final PdNativeSessionManager? sessionManager;
   @override
   State<PdNativeCabinEntry> createState() => _PdNativeCabinEntryState();
 }
@@ -30,7 +32,29 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   PdNativeSession? _session;
   Timer? _expiry;
   bool _loggingOut = false;
+  bool _restoring = false;
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
+  @override
+  void initState() {
+    super.initState();
+    if (widget.sessionManager != null) {
+      _restoreSavedSession();
+    }
+  }
+
+  Future<void> _restoreSavedSession() async {
+    setState(() => _restoring = true);
+    try {
+      final restored = await widget.sessionManager!.restore();
+      if (!mounted || restored == null || _session != null) return;
+      _authenticated(restored, persist: false);
+    } catch (_) {
+      // No session or role is granted until the server validates the token.
+    } finally {
+      if (mounted) setState(() => _restoring = false);
+    }
+  }
+
 
   void _entry() {
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -58,6 +82,11 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     setState(() => _loggingOut = true);
     try {
       await api.revokeCurrentDevice(session.token);
+      // A confirmed server logout is the only path that removes the stored
+      // credential. If secure-storage deletion fails, retain fail-closed UI.
+      if (widget.sessionManager != null) {
+        await widget.sessionManager!.forgetConfirmedSession(session.token);
+      }
       if (!mounted || !identical(_session, session)) return;
       _clearExpiredSession();
     } catch (_) {
@@ -83,8 +112,13 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       }
     });
   }
-  void _authenticated(PdNativeSession session) {
+  void _authenticated(PdNativeSession session, {bool persist = true}) {
     if (!mounted || !session.active) return;
+    if (persist && widget.sessionManager != null) {
+      // Persist only OTP-verified sessions received from the existing
+      // authenticated callback; no guest mode or role picker can write tokens.
+      unawaited(widget.sessionManager!.remember(session).catchError((_) {}));
+    }
     _expiry?.cancel();
     _expiry = Timer(session.expiresAt.difference(DateTime.now()), () {
       if (mounted) _clearExpiredSession();
@@ -140,6 +174,10 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
 
   @override
   Widget build(BuildContext context) {
+    if (_restoring) {
+      return const Scaffold(body: Center(
+        child: CircularProgressIndicator(key: Key('native-session-restoring'))));
+    }
     final session = _activeSession;
     if (_page == 'signin') {
       return PopScope(canPop: false,

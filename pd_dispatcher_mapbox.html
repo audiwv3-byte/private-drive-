@@ -6,7 +6,7 @@
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
 <title>PRIVATE DRIVE — Диспетчерская</title>
 <link rel="icon" href="assets/pd-logo.webp" type="image/webp">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyo0SS+uqOGdGQ=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>
 :root{color-scheme:dark;--gold:#e8c581;--bg:#110f0c;--panel:#1b1713;--line:#4d402c;--soft:#c8bba3}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#f6efdf}
@@ -20,7 +20,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.stat,.card{background:#242019;border:1px solid var(--line);border-radius:11px;padding:12px}.stat b{font-size:25px;display:block;color:#f7e7c3}.stat span{font-size:11px;color:var(--soft)}
 .tabs{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0}.btn,.tab{border:1px solid #725c3b;border-radius:8px;background:#292118;color:#f5d9a1;padding:9px 11px;min-height:40px}.tab.active{background:#d7ad65;color:#17100a}
 .card{margin:10px 0}.card strong{display:block;margin:7px 0;color:#f4ead9}.muted{color:var(--soft);font-size:12px}
-#map{min-height:530px;height:calc(100dvh - 69px);background:#24231f;position:relative}
+#map{min-height:530px;height:calc(100dvh - 69px);background:#24231f;position:relative;overflow:hidden;isolation:isolate}
 #mapNotice{position:absolute;z-index:500;left:16px;top:16px;right:16px;max-width:445px;border-radius:10px;background:#15120fe8;border:1px solid #8a7049;padding:12px 15px;pointer-events:none}
 #mapNotice b{display:block;color:var(--gold)}#mapNotice span{font-size:12px;color:#f2e6d2}
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.notice{padding:12px;background:#282016;border:1px solid #8b6a39;border-radius:9px}.notice strong{color:var(--gold)}.empty{margin:16px 0;padding:20px 12px;border:1px dashed #675438;border-radius:10px;text-align:center;color:var(--soft)}

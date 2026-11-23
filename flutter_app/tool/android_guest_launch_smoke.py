@@ -55,6 +55,20 @@ def wait_for_labels(*labels, timeout=45):
     raise AssertionError(f'Missing screen labels: {labels}')
 
 
+def scroll_to_passenger_option(label, xml):
+    screen_sizes = re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size').decode())
+    width, height = map(int, screen_sizes[-1])
+    for _ in range(4):
+        if label in xml:
+            return xml
+        adb('shell', 'input', 'swipe', str(width // 2), str(height * 3 // 4),
+            str(width // 2), str(height // 3), '350')
+        xml = snapshot()
+    if label in xml:
+        return xml
+    raise AssertionError(f'Missing passenger option after scrolling: {label}')
+
+
 wait_for_labels('Тестовый вход')
 click_node('pd-qa-pin')
 adb('shell', 'input', 'text', os.environ['PD_QA_LOCAL_PIN'])
@@ -64,11 +78,14 @@ entry = wait_for_labels('Выбери кабинет', 'Пассажир', 'Пи
 assert 'Диспетчер' not in entry, 'Dispatcher must stay on the website'
 
 for role, labels in [
-    ('Пассажир', ('Такси', 'Трансфер')),
+    ('Пассажир', ('Такси',)),
     ('Пилот', ('Кабина пилота', 'Не на линии')),
 ]:
     click_node(role)
     xml = wait_for_labels('Внутренний тест', *labels)
+    if role == 'Пассажир':
+        xml = scroll_to_passenger_option('Трансфер', xml)
+        xml = scroll_to_passenger_option('Доставка', xml)
     assert 'Фотоконтроль' not in xml and 'Проверка личности' not in xml
     Path(f'android-guest-{role}.xml').write_text(xml, encoding='utf-8')
     Path(f'android-guest-{role}.png').write_bytes(adb('exec-out', 'screencap', '-p'))

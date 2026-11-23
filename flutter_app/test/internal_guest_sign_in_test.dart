@@ -33,7 +33,9 @@ void main() {
     expect(calls, 0);
     expect(find.byKey(const Key('internal-guest-status')), findsOneWidget);
     expect(find.byKey(const Key('passenger-entry-taxi')), findsOneWidget);
-    expect(find.byKey(const Key('passenger-entry-transfer')), findsOneWidget);
+    final transfer = find.byKey(const Key('passenger-entry-transfer'));
+    await tester.scrollUntilVisible(transfer, 180);
+    expect(transfer, findsOneWidget);
     expect(find.byKey(const Key('authorized-role-selection')), findsNothing);
     expect(find.byType(PilotCabin), findsNothing);
     expect(find.byKey(const Key('dispatcher-open-drawer')), findsNothing);

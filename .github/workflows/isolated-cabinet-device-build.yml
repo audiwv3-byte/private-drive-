@@ -45,9 +45,11 @@ jobs:
             '56f13335143ec0e22772963290683a84a04114a35ec64cbc794a4d39ff9bb8cf' \
             "$RUNNER_TEMP/cloudflared" | sha256sum -c -
           chmod 700 "$RUNNER_TEMP/cloudflared"
+          mkdir -p "$RUNNER_TEMP/cabinet-web"
           python3 test_sync_server/run_native_https_preview.py \
             --cloudflared "$RUNNER_TEMP/cloudflared" \
             --address-file "$RUNNER_TEMP/cabinet-address.txt" \
+            --web-root "$RUNNER_TEMP/cabinet-web" \
             > "$RUNNER_TEMP/cabinet-preview.log" 2>&1 &
           echo "$!" > "$RUNNER_TEMP/cabinet-preview.pid"
           for attempt in {1..90}; do
@@ -150,7 +152,7 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
-          flutter build web --release --target lib/main.dart \
+          flutter build web --release --base-href /app/ --target lib/main.dart \
             --dart-define="PD_MOCK_CABINET_API_URL=$PD_MOCK_CABINET_API_URL" \
             --dart-define=PD_ISOLATED_WEB_PREVIEW=false
           test -s build/web/index.html
@@ -160,7 +162,11 @@ jobs:
           printf '/*\n  X-Robots-Tag: noindex, nofollow, noarchive\n  Referrer-Policy: no-referrer\n' > build/web/_headers
           mkdir -p ../device_artifacts/safari
           cp -R build/web/. ../device_artifacts/safari/
-          echo "Web artifact is NOT deployed; Safari device validation pending." >> "$GITHUB_STEP_SUMMARY"
+          cp -R build/web/. "$RUNNER_TEMP/cabinet-web/"
+          curl --fail --silent --show-error --max-time 15 "$PD_MOCK_CABINET_API_URL/app/" | grep -q 'flutter'
+          curl --fail --silent --show-error --max-time 15 "$PD_MOCK_CABINET_API_URL/app/main.dart.js" -o "$RUNNER_TEMP/qa-web-bundle.js"
+          test -s "$RUNNER_TEMP/qa-web-bundle.js"
+          echo "Safari QA frontend served at $PD_MOCK_CABINET_API_URL/app/ while runner remains alive." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify both artifacts are wired to the same temporary URL
         shell: bash
@@ -188,3 +194,17 @@ jobs:
           path: device_artifacts/
           retention-days: 3
           if-no-files-found: error
+
+      - name: Keep isolated QA HTTPS API and Safari page available for physical testing
+        shell: bash
+        timeout-minutes: 22
+        run: |
+          set -euo pipefail
+          echo "Temporary browser page: $PD_MOCK_CABINET_API_URL/app/" >> "$GITHUB_STEP_SUMMARY"
+          echo "No production services or user data are used. Endpoint expires when this job exits." >> "$GITHUB_STEP_SUMMARY"
+          for attempt in {1..120}; do
+            kill -0 "$(cat "$RUNNER_TEMP/cabinet-preview.pid")"
+            curl --fail --silent --show-error --max-time 12 "$PD_MOCK_CABINET_API_URL/healthz" >/dev/null
+            curl --fail --silent --show-error --max-time 12 "$PD_MOCK_CABINET_API_URL/app/" >/dev/null
+            sleep 10
+          done

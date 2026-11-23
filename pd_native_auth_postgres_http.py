@@ -22,37 +22,6 @@ SESSION_TTL = 30 * 86400
 MAX_BODY = 2048
 
 
-def initialize_database(database_url):
-    with psycopg.connect(database_url) as conn:
-        with conn.cursor() as cur:
-            cur.execute("""CREATE TABLE IF NOT EXISTS native_twilio_challenges (
-                id TEXT PRIMARY KEY, phone TEXT NOT NULL,
-                created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL,
-                attempts INTEGER NOT NULL DEFAULT 0, consumed_at BIGINT
-            )""")
-            cur.execute("""CREATE INDEX IF NOT EXISTS native_twilio_phone_created
-                ON native_twilio_challenges(phone, created_at DESC)""")
-            cur.execute("""CREATE TABLE IF NOT EXISTS native_auth_users (
-                id TEXT PRIMARY KEY, channel TEXT NOT NULL,
-                destination TEXT NOT NULL, created_at BIGINT NOT NULL,
-                UNIQUE(channel, destination)
-            )""")
-            cur.execute("""CREATE TABLE IF NOT EXISTS native_auth_sessions (
-                token_hash TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL REFERENCES native_auth_users(id),
-                created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL,
-                revoked_at BIGINT
-            )""")
-            cur.execute("""CREATE INDEX IF NOT EXISTS native_sessions_user
-                ON native_auth_sessions(user_id)""")
-            cur.execute("""CREATE TABLE IF NOT EXISTS native_auth_roles (
-                user_id TEXT PRIMARY KEY REFERENCES native_auth_users(id),
-                role TEXT NOT NULL CHECK(role IN ('passenger','pilot','admin'))
-            )""")
-            cur.execute("""CREATE UNIQUE INDEX IF NOT EXISTS native_auth_one_admin
-                ON native_auth_roles(role) WHERE role='admin'""")
-
-
 def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_phone=None,
              live=False,
              start_sms=None, check_sms=None, clock=None):
@@ -65,7 +34,7 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
             start_sms = start_sms or start_verification
             check_sms = check_sms or check_verification
     clock = clock or time.time
-    initialize_database(database_url)
+    # Schema installation is an explicit, separate migration step. No runtime DDL.
 
     def reply(start_response, status, payload):
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")

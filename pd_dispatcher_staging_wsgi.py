@@ -123,11 +123,6 @@ def create_app():
                                  "X-Content-Type-Options": "nosniff",
                                  "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"})
 
-    @app.post("/pilot-registration")
-    def pilot_registration_submission_disabled():
-        # Never accept IDs, uploaded photos, bank details or other PII on staging.
-        return "Загрузка анкет не подключена", 503
-
     return app
 
 

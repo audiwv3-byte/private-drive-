@@ -83,9 +83,14 @@
   <div class="crypto-wallet"><b>USDC · Ethereum ERC-20</b><code>0xfdfa98ad6f9771e537e16bfdb4d3a47c086bde45</code><button type="button" class="wallet-copy" data-copy="0xfdfa98ad6f9771e537e16bfdb4d3a47c086bde45" aria-label="Скопировать USDC адрес">Скопировать USDC</button></div>
   <small id="walletCopyStatus" role="status" aria-live="polite"></small>
  </div>
-   <div class="pay-method"><strong>Paysera</strong><small>Ранее предоставлялся Paysera-код. Он не подтверждён как постоянная платёжная ссылка, поэтому перед оплатой запроси актуальные реквизиты PRIVATE DRIVE.</small></div>
+   <div class="pay-method"><strong>Банковский перевод · EUR</strong><small>Реквизиты указаны в предоставленных изображениях Telegram. Перед переводом проверь получателя и назначение.</small>
+  <div class="crypto-wallet"><b>Swedbank</b><small>Получатель: Yauheni Ivantsou</small><code>LT397300010192096602</code><button type="button" class="wallet-copy" data-copy="LT397300010192096602" aria-label="Скопировать IBAN Swedbank">Скопировать IBAN</button></div>
+  <div class="crypto-wallet"><b>Paysera LT, UAB</b><small>Получатель: Yauheni Ivantsou</small><code>LT353500010018374792</code><button type="button" class="wallet-copy" data-copy="LT353500010018374792" aria-label="Скопировать IBAN Paysera">Скопировать IBAN</button></div>
+  <small>Оба IBAN прошли математическую проверку контрольных цифр. Принадлежность счетов и их актуальность банками не подтверждены.</small>
+  <small>На скриншоте Swedbank указано назначение TIP-PD-8163441493; оно может быть индивидуальным, поэтому уточняй назначение для конкретного платежа.</small>
+ </div>
   </div>
-  <p class="pay-note">Банковский IBAN, действующая Stripe Payment Link и публичная Paysera-ссылка пока не подтверждены. Не вводи здесь данные банковской карты и не отправляй средства без подтверждения заказа и реквизитов.</p>
+  <p class="pay-note">Два IBAN представлены на скриншотах Telegram, но их актуальность и принадлежность не проверены через банк. Действующая Stripe Payment Link отсутствует. Не вводи данные банковской карты на этой странице; оплачивай только подтверждённый заказ.</p>
   <p class="pay-note">На сайте <strong>нет автоматической криптооплаты и подключённой автоматической оплаты картой</strong> и подтверждённой общей Stripe Payment Link. Не переводи деньги по непроверенным реквизитам.</p>
   <p style="margin-top:18px"><a href="https://t.me/PrivateDraive" target="_blank" rel="noopener noreferrer">Связаться по оплате в Telegram</a></p>
   <p><a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a></p>
@@ -99,7 +104,7 @@
 
  document.querySelectorAll('.wallet-copy').forEach(btn=>btn.addEventListener('click',async()=>{
   const out=document.getElementById('walletCopyStatus');
-  try{await navigator.clipboard.writeText(btn.dataset.copy);out.textContent='Адрес скопирован. Перед переводом сверь его с PRIVATE DRIVE.'}
+  try{await navigator.clipboard.writeText(btn.dataset.copy);out.textContent='Реквизиты скопированы. Перед переводом проверь получателя, сумму и назначение.'}
   catch{out.textContent='Не удалось скопировать автоматически. Выдели адрес вручную.'}
  }));
  const form=document.getElementById('paymentRequest');

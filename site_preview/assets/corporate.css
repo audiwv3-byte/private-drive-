@@ -369,3 +369,60 @@ body{overflow-x:hidden}
  .hero-night-booking{padding:22px 18px}
 }
 @media(prefers-reduced-motion:reduce){.hero-night-choice{transition:none}}
+
+/* Primary services: let longer text grow over the photo on narrow screens. */
+.primary-service-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  min-height: 245px;
+  color: #fff5e4;
+}
+.primary-service-card > img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  height: 100%;
+  aspect-ratio: auto;
+  object-position: center 35%;
+}
+.primary-service-card::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: linear-gradient(0deg, #100c09 0%, #100c09e8 34%, #100c09a3 64%, #100c0933 100%);
+}
+.primary-service-card .card-content {
+  width: 100%;
+  padding: 1rem;
+}
+.primary-service-card h3 {
+  margin: 0;
+  font-size: clamp(1.12rem, 1.55vw, 1.35rem);
+  line-height: 1.15;
+}
+.primary-service-card p {
+  margin: .4rem 0 0;
+  color: #fff4e3;
+  font-size: .9rem;
+  line-height: 1.4;
+}
+.primary-service-card .actions {
+  gap: .45rem;
+  margin-top: .7rem;
+}
+.primary-service-card .actions .button {
+  flex: 0 1 auto;
+  min-height: 44px;
+  padding: .4rem .7rem;
+  font-size: .82rem;
+}
+.primary-service-card .actions .outline {
+  border-color: #e4ba75;
+  background: #16110ee8;
+}
+@media (max-width: 740px) {
+  .primary-service-card { min-height: 225px; }
+}

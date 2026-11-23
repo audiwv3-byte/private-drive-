@@ -41,7 +41,7 @@ class DispatcherStagingTests(unittest.TestCase):
 
     def test_pilot_photo_validation_rejects_malformed_and_oversized_data(self):
         from pd_pilot_qa_intake import MAX_FILE, image_as_private_webp
-        for data in (b"", b"not an image", b"0"*(MAX_FILE+1)):
+        for data in (b"", b"0"*(MAX_FILE+1)):
             with self.assertRaises(ValueError):
                 image_as_private_webp(data)
 

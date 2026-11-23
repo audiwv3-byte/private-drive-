@@ -327,7 +327,7 @@ def register(app, core):
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
         token = os.environ.get("MAPBOX_WEB_PUBLIC_TOKEN", "").strip()
-        if not re.fullmatch(r"pk\\.[A-Za-z0-9_.-]{1,512}", token):
+        if not re.fullmatch(r"pk\.[A-Za-z0-9_.-]{1,512}", token):
             token = ""
         page = Path(__file__).with_name("pd_dispatcher_mapbox.html").read_text(encoding="utf-8")
         response = app.make_response(render_template_string(page, mapbox_token=token))

@@ -15,3 +15,6 @@ uploads/
 documents/
 invoices/
 *.zip
+
+# PRIVATE DRIVE: local-only Mapbox public token override (never commit)
+site_preview/assets/mapbox-local-config.js

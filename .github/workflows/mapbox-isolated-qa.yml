@@ -1,13 +1,16 @@
 name: PRIVATE DRIVE Mapbox isolated QA
 
 on:
+  push:
+    branches: [test/passenger-mapbox-safe-fallback]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  mapbox-android-qa:
+  mapbox-android-web-qa:
+    if: github.ref == 'refs/heads/test/passenger-mapbox-safe-fallback'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
@@ -25,24 +28,33 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Flutter tests
         run: flutter test
-      - name: Prepare isolated Android platform
-        run: flutter create --platforms=android --project-name private_drive .
-      - name: Build Mapbox raster preview APK
+      - name: Prepare isolated platforms
+        run: flutter create --platforms=android,web --project-name private_drive .
+      - name: Build Android and Web with synthetic public-token placeholder
+        run: |
+          flutter build apk --debug --dart-define=PD_NATIVE_AUTH_API_URL= --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN=pk.synthetic_qa
+          flutter build web --release --dart-define=PD_NATIVE_AUTH_API_URL= --dart-define=PD_ISOLATED_WEB_PREVIEW=true --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN=pk.synthetic_qa
+          test -s build/web/index.html
+          test -s build/web/main.dart.js
+      - name: Verify configured public token reaches Mapbox without printing it
         env:
           MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
         run: |
-          if [[ "$MAPBOX_PUBLIC_TOKEN" != pk.* ]]; then
-            echo "MAPBOX_PUBLIC_TOKEN is missing or is not a public token" >&2
-            exit 1
-          fi
-          flutter build apk --debug \
-            --dart-define=PD_NATIVE_AUTH_API_URL= \
-            --dart-define=PD_MAPBOX_QA=true \
-            --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN"
-      - name: Upload isolated APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: private-drive-mapbox-raster-preview-debug-apk
-          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: error
-          retention-days: 7
+          python3 - <<'PY'
+          import os, re, urllib.request, urllib.parse, urllib.error
+          token = os.environ.get('MAPBOX_PUBLIC_TOKEN', '')
+          if not re.fullmatch(r'pk\.[A-Za-z0-9_.-]+', token):
+              raise SystemExit('Public Mapbox token missing or invalid')
+          for style in ('streets-v12', 'dark-v11'):
+              url = 'https://api.mapbox.com/styles/v1/mapbox/' + style + '/tiles/256/10/583/325?' + urllib.parse.urlencode({'access_token': token})
+              try:
+                  with urllib.request.urlopen(url, timeout=15) as response:
+                      if response.status != 200 or not response.headers.get('Content-Type', '').startswith('image/'):
+                          raise SystemExit('Mapbox tile response not an image')
+              except urllib.error.HTTPError as e:
+                  raise SystemExit('Mapbox HTTP ' + str(e.code) + ' (URL restrictions may require browser-origin testing)')
+              except Exception:
+                  raise SystemExit('Mapbox network check failed')
+              print(style + ': image response OK')
+          PY
+      # No token-bearing APK or web artifact is uploaded to this public repository.

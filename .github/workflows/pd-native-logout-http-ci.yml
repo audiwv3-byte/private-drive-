@@ -1,0 +1,43 @@
+name: PRIVATE DRIVE synthetic Bearer logout HTTP
+on:
+  push:
+    branches: [feature/web-dispatcher-browser-auth]
+    paths:
+      - 'pd_native_auth_postgres_http.py'
+      - 'pd_native_auth_logout_schema_ci.py'
+      - 'test_native_auth_logout_http_postgres.py'
+      - '.github/workflows/pd-native-logout-http-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  logout-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pd_schema_ci
+          POSTGRES_USER: pd_ci
+          POSTGRES_PASSWORD: synthetic-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pd_ci -d pd_schema_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PD_CI_FAKE_DB_ONLY: 'YES'
+      PD_CI_POSTGRES_URL: 'postgresql://pd_ci:synthetic-only-password@127.0.0.1:5432/pd_schema_ci'
+      PD_NATIVE_SMS_LIVE: 'NO'
+      TWILIO_VERIFY_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install synthetic local driver
+        run: python -m pip install 'psycopg[binary]==3.2.13'
+      - name: Verify Bearer-only logout HTTP with isolated PostgreSQL 18
+        run: python -m unittest -v test_native_auth_logout_http_postgres.py

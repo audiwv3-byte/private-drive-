@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'native_orders_api.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -28,7 +29,8 @@ class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
       this.preferencesStorage, this.initialRideType = 'Трансфер',
       this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController,
-      this.onIncomingMessageVoice});
+      this.onIncomingMessageVoice, this.ordersApi});
+  final NativeOrdersApi? ordersApi;
 
   final bool enableMapTiles;
   final String initialRideType;
@@ -571,12 +573,43 @@ class _PassengerDemoState extends State<PassengerDemo> {
     });
   }
 
+  bool _sendingOrder = false;
+  Map<String,String>? _pendingOrder;
   void _openOrders() {
+    final api = widget.ordersApi;
+    if (api != null) {
+      Navigator.push(context, MaterialPageRoute<void>(builder: (_) => NativeOrdersHistory(api: api)));
+      return;
+    }
     final store = widget.tripStore;
     if (store == null) return;
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => PdPassengerLanguageScope(
         child: PassengerOrdersDemo(tripStore: store))));
+  }
+
+  Future<void> _sendServerOrder() async {
+    if (_sendingOrder) return;
+    final date = _date ?? DateTime.now();
+    final time = _time ?? TimeOfDay.now();
+    String two(int n) => n.toString().padLeft(2, '0');
+    final payload = _pendingOrder ??= {
+      'request_id': NativeOrdersApi.requestId(),
+      'from': _from.text.trim(), 'to': _to.text.trim(),
+      'trip_date': '${date.year}-${two(date.month)}-${two(date.day)}',
+      'trip_time': '${two(time.hour)}:${two(time.minute)}',
+    };
+    setState(() => _sendingOrder = true);
+    try {
+      final result = await widget.ordersApi!.call(payload);
+      if (result['order_id'] is! String) throw const FormatException('Missing order ID');
+      _pendingOrder = null;
+      if (mounted) _openOrders();
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Заказ не подтверждён. Повтор отправит ту же заявку.')));
+    } finally {
+      if (mounted) setState(() => _sendingOrder = false);
+    }
   }
 
   void _createLocalTrip() {
@@ -1694,8 +1727,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ],
             FilledButton(
               key: const Key('passenger-book-disabled'),
-              onPressed: _canCreateLocalTrip ? _createLocalTrip : null,
-              child: Text(widget.tripStore == null
+              onPressed: widget.ordersApi != null
+                  ? (!_sendingOrder && (_pendingOrder != null || _canCreateLocalTrip) ? _sendServerOrder : null)
+                  : (_canCreateLocalTrip ? _createLocalTrip : null),
+              child: Text(widget.ordersApi != null ? (_sendingOrder ? 'Отправка…' : _pendingOrder != null ? 'Повторить отправку прежней заявки' : 'Отправить заявку · без оплаты') : widget.tripStore == null
                   ? pdTr(context, 'Заказать поездку — недоступно в демоверсии',
                       'Užsakyti kelionę — demo versijoje nepasiekiama',
                       'Book ride — unavailable in demo')

@@ -8,7 +8,7 @@ import unittest
 import psycopg
 from PIL import Image
 
-from pd_native_auth_postgres_http import initialize_database
+from pd_native_auth_schema_migration import initialize_database
 from pd_native_identity_http import make_identity_app, sanitize_photo, APPROVAL_TTL, PENDING_TTL
 
 

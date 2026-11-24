@@ -28,6 +28,7 @@ class PdNativeSessionManager {
     final transport = client ?? http.Client();
     try {
       final request = http.Request('GET', uri)
+        ..followRedirects = false
         ..headers['Authorization'] = 'Bearer ${stored.token}'
         ..headers['Accept'] = 'application/json';
       final streamed = await transport.send(request)

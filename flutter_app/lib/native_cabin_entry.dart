@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'native_orders_api.dart';
+import 'native_pilot_orders.dart';
+import 'pilot_cabin.dart';
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
 import 'private_drive_bright_backdrop.dart';
@@ -43,6 +45,19 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   bool _restoring = false;
   Future<void>? _pendingSessionSave;
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
+  static const _allowInternalGuest =
+      bool.fromEnvironment('PD_INTERNAL_QA') &&
+      !bool.fromEnvironment('PD_CLOSED_PILOT_INVITE_ENTRY');
+
+  static const _stagePilotAssignments = bool.fromEnvironment(
+    'PD_NATIVE_PILOT_ASSIGNMENT',
+  );
+
+  bool _canOpenPilot(PdNativeSession? session) {
+    if (!_stagePilotAssignments) return session?.canPilot == true;
+    return session != null &&
+        const {'pilot', 'pilot_dispatcher'}.contains(session.role);
+  }
   @override
   void initState() {
     super.initState();
@@ -119,7 +134,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       } else if (role == 'dispatcher') {
         _page = session?.canDispatch == true ? 'dispatcher' : 'signin';
       } else {
-        _page = session != null || const bool.fromEnvironment('PD_INTERNAL_QA')
+        _page = session != null || _allowInternalGuest
             ? 'passenger' : 'signin';
       }
     });
@@ -129,8 +144,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }) {
     if (!mounted || !session.active) return;
     if (persist && widget.sessionManager != null) {
-      // Persist only OTP-verified sessions received from the existing
-      // authenticated callback; no guest mode or role picker can write tokens.
+      // Persist only server-authenticated sessions received from this
+      // callback; no guest mode or role picker can write tokens.
       _pendingSessionSave =
           widget.sessionManager!.remember(session).catchError((_) {});
     }
@@ -144,7 +159,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       // Require explicit cabin selection from freshly verified server rights.
       if (restored) {
         _page = 'entry';
-      } else if (_requestedRole == 'pilot' && session.canPilot) {
+      } else if (_requestedRole == 'pilot' && _canOpenPilot(session)) {
         _page = 'photo';
       } else if (_requestedRole == 'dispatcher' && session.canDispatch) {
         _page = 'dispatcher';
@@ -157,7 +172,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     });
   }
   void _photoApproved() {
-    if (_activeSession?.canPilot != true) return;
+    if (!_canOpenPilot(_activeSession)) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
     setState(() => _page = 'pilot');
   }
@@ -169,6 +184,19 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   void dispose() { _expiry?.cancel(); super.dispose(); }
 
   Widget _cabin(String role, PdNativeSession? session) {
+    if (role == 'pilot' && _stagePilotAssignments && session != null) {
+      // _page reaches 'pilot' only after the current photo check, and the
+      // server rechecks the Bearer role/photo on each assignment read.
+      return PilotCabin(
+        key: ValueKey('pilot-assignments-${session.userId}'),
+        assignmentApi: NativePilotOrdersApi(
+          baseUrl: const String.fromEnvironment('PD_NATIVE_AUTH_API_URL'),
+          token: session.token,
+        ),
+        onSignOut: _signOut,
+        onBackToCabinets: _entry,
+      );
+    }
     final cabin = PrivateDriveDemo(
       key: ValueKey('entry-$role-${session?.userId ?? 'guest'}'),
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',
@@ -233,17 +261,17 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       return PopScope(canPop: false,
         onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
         child: PdPilotIdentityNoticePage(
-        api: session != null && session.canPilot ? widget.identityApiBuilder(session) : null,
+        api: session != null && _canOpenPilot(session) ? widget.identityApiBuilder(session) : null,
         onBack: _entry,
         onRequestSignIn: _photoSignIn,
         onVerificationApproved: _photoApproved,
         onContinueWithoutVerification: _entry,
       ));
     }
-    if (_page == 'passenger' && (session != null || const bool.fromEnvironment('PD_INTERNAL_QA'))) {
+    if (_page == 'passenger' && (session != null || _allowInternalGuest)) {
       return _cabin('passenger', session);
     }
-    if (_page == 'pilot' && session?.canPilot == true) return _cabin('pilot', session);
+    if (_page == 'pilot' && _canOpenPilot(session)) return _cabin('pilot', session);
     if (_page == 'dispatcher' && session?.canDispatch == true) return _cabin('dispatcher', session);
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [

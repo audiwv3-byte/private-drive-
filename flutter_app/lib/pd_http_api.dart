@@ -26,6 +26,7 @@ class PdHttpApi {
     Uri uri,
     Map<String, String> payload, {
     http.Client? client,
+    bool followRedirects = true,
     Duration timeout = const Duration(seconds: 10),
   }) async {
     if (uri.scheme != 'https' || uri.userInfo.isNotEmpty) {
@@ -35,6 +36,7 @@ class PdHttpApi {
     final transport = client ?? http.Client();
     try {
       final request = http.Request('POST', uri)
+        ..followRedirects = followRedirects
         ..headers['Content-Type'] = 'application/json; charset=utf-8'
         ..body = jsonEncode(payload);
       final response = await transport.send(request).timeout(timeout);

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'pilot_offer_tone.dart';
+import 'native_pilot_orders.dart';
 import 'pilot_sound_settings.dart';
 import 'pilot_payment_settings.dart';
 import 'pilot_identity_notice_page.dart';
@@ -20,6 +21,7 @@ class PilotCabin extends StatefulWidget {
     super.key,
     this.enableMapTiles = true,
     this.tripStore,
+    this.assignmentApi,
     this.onOfferAlert,
     this.onSignOut,
     this.onBackToCabinets,
@@ -27,6 +29,7 @@ class PilotCabin extends StatefulWidget {
 
   final bool enableMapTiles;
   final DemoTripStore? tripStore;
+  final NativePilotOrdersApi? assignmentApi;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
   /// Test-only hook to verify alert repetition without device audio.
@@ -62,6 +65,7 @@ class _PilotCabinState extends State<PilotCabin> {
   @override
   void initState() {
     super.initState();
+    if (widget.assignmentApi != null) return;
     _onLine = widget.tripStore?.pilotOnline ?? false;
     widget.tripStore?.addListener(_syncOfferSound);
     PilotSoundSettings.instance.addListener(_onSettingsChanged);
@@ -141,10 +145,12 @@ class _PilotCabinState extends State<PilotCabin> {
 
   @override
   void dispose() {
-    widget.tripStore?.removeListener(_syncOfferSound);
-    PilotSoundSettings.instance.removeListener(_onSettingsChanged);
-    PilotPaymentSettings.instance.removeListener(_onPaymentSettingsChanged);
-    _hideCockpitOverlay();
+    if (widget.assignmentApi == null) {
+      widget.tripStore?.removeListener(_syncOfferSound);
+      PilotSoundSettings.instance.removeListener(_onSettingsChanged);
+      PilotPaymentSettings.instance.removeListener(_onPaymentSettingsChanged);
+      _hideCockpitOverlay();
+    }
     // Leaving this screen is not the same as ending a shift.
     _offerTone.dispose();
     super.dispose();
@@ -195,7 +201,9 @@ class _PilotCabinState extends State<PilotCabin> {
             ),
         ],
       ),
-      body: Stack(
+      body: widget.assignmentApi != null
+          ? SafeArea(child: PilotAssignedOrdersPanel(api: widget.assignmentApi!))
+          : Stack(
         fit: StackFit.expand,
         children: [
           const VilniusEveningBackdrop(),

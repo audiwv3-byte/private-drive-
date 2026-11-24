@@ -1,5 +1,7 @@
 """Disposable localhost PostgreSQL: native API and browser queue share one order."""
+import base64
 import hashlib
+import io
 import os
 from pathlib import Path
 import re
@@ -9,6 +11,7 @@ import uuid
 
 import psycopg
 import pytest
+from PIL import Image
 from werkzeug.security import generate_password_hash
 from werkzeug.test import Client
 from werkzeug.wrappers import Response
@@ -17,6 +20,7 @@ from pd_dispatcher_staging_wsgi import create_app
 from pd_native_auth_postgres_http import make_app
 from pd_native_auth_schema_migration import initialize_database
 from pd_native_orders_http import make_orders_app
+from pd_native_identity_http import make_identity_app, use_restricted_identity_runtime
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +41,7 @@ def pilot_db():
     dispatch_dsn = dsn.replace("pd_ci:synthetic-only-password@", f"{dispatch_user}:synthetic-dispatch@")
     now = int(time.time())
     tokens = {role: uuid.uuid4().hex + uuid.uuid4().hex
-              for role in ("passenger", "other", "pilot", "expired")}
+              for role in ("passenger", "other", "pilot", "expired", "reviewer")}
     initialize_database(dsn)
     sql_dir = Path(__file__).resolve().parents[1] / "migrations"
     # Migration controls its own BEGIN/COMMIT. Role grants have no default
@@ -45,6 +49,7 @@ def pilot_db():
     with psycopg.connect(dsn, autocommit=True) as db:
         db.execute((sql_dir / "native_auth_session_functions.sql").read_text())
         db.execute((sql_dir / "native_dispatch_orders.sql").read_text())
+        db.execute((sql_dir / "native_pilot_identity.sql").read_text())
     with psycopg.connect(dsn) as db:
         db.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
         db.execute("CREATE ROLE pd_ci_order_api LOGIN PASSWORD 'synthetic-api'")
@@ -56,13 +61,18 @@ def pilot_db():
             GRANT SELECT, INSERT ON public.pd_dispatch_orders,
                 public.pd_native_order_owners TO pd_ci_order_api;
             GRANT SELECT ON public.pd_dispatch_orders TO pd_ci_order_dispatcher;
+            GRANT SELECT (id,user_id,status,photo,created_at,expires_at,decided_at),
+                  INSERT (id,user_id,status,photo,created_at,expires_at),
+                  UPDATE (status,photo,reviewer_id,decided_at)
+                ON public.native_identity_checks TO pd_ci_order_api;
         """)
         for i, (name, token) in enumerate(tokens.items()):
             uid = "synthetic_" + name
             db.execute("""INSERT INTO public.native_auth_users (id,channel,destination,created_at)
                 VALUES (%s,'phone',%s,%s)""", (uid, f"+3706990000{i}", now - 100))
-            if name == "pilot":
-                db.execute("INSERT INTO public.native_auth_roles VALUES (%s,'pilot')", (uid,))
+            staff_role = {"pilot": "pilot", "reviewer": "admin"}.get(name)
+            if staff_role:
+                db.execute("INSERT INTO public.native_auth_roles VALUES (%s,%s)", (uid, staff_role))
             expiry = now - 1 if name == "expired" else now + 1000
             db.execute("""INSERT INTO public.native_auth_sessions
                 (token_hash,user_id,created_at,expires_at) VALUES (%s,%s,%s,%s)""",
@@ -136,3 +146,57 @@ def test_native_order_appears_in_authenticated_web_dispatch_and_passenger_histor
     monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", api_dsn)
     assert api.post("/native-auth/logout", headers=passenger).status_code == 200
     assert api.get("/native-orders", headers=passenger).status_code == 401
+
+
+def test_pilot_photo_no_ddl_preserves_auth_readiness_and_review(pilot_db):
+    api_dsn, dispatch_dsn, tokens, now = pilot_db
+    assert use_restricted_identity_runtime({
+        "PD_NATIVE_SMS_ISOLATED": "YES",
+        "PD_DISPATCH_STAGING_ONLY": "1",
+        "PD_DISPATCH_PERSISTENT_QUEUE": "1",
+    })
+    assert not use_restricted_identity_runtime({"PD_NATIVE_SMS_ISOLATED": "YES"})
+    assert not use_restricted_identity_runtime({"PD_NATIVE_IDENTITY_NO_RUNTIME_DDL": "1"})
+
+    with psycopg.connect(api_dsn) as db:
+        assert db.execute("SELECT has_schema_privilege('public', 'CREATE')").fetchone() == (False,)
+        assert db.execute("""SELECT has_table_privilege(
+            'public.native_auth_sessions', 'SELECT')""").fetchone() == (False,)
+        assert db.execute("""SELECT has_column_privilege(
+            'public.native_auth_sessions', 'token_hash', 'SELECT')""").fetchone() == (False,)
+    with psycopg.connect(dispatch_dsn) as db:
+        assert db.execute("""SELECT has_column_privilege(
+            'public.native_identity_checks', 'photo', 'SELECT')""").fetchone() == (False,)
+
+    underlying = make_app(api_dsn, live=False, clock=lambda: now)
+    identity = Client(make_identity_app(underlying, api_dsn, clock=lambda: now,
+                                        start_cleanup=False, restricted_runtime=True), Response)
+    assert identity.get("/health").json == {"status": "ok", "sms_enabled": False}
+
+    def not_ready(_environ, start_response):
+        start_response("503 Service Unavailable", [])
+        return [b"native standby"]
+
+    unavailable = Client(make_identity_app(not_ready, api_dsn, start_cleanup=False,
+                                           restricted_runtime=True), Response)
+    assert unavailable.get("/health").status_code == 503
+
+    pilot = auth(tokens["pilot"])
+    reviewer = auth(tokens["reviewer"])
+    image = io.BytesIO()
+    Image.new("RGB", (64, 64), "blue").save(image, format="PNG")
+    photo = {"photo": base64.b64encode(image.getvalue()).decode()}
+    assert identity.get("/native-identity/status", headers=pilot).json["status"] == "unverified"
+    assert identity.get("/native-identity/status", headers=auth(tokens["other"])).status_code == 403
+    assert identity.get("/native-identity/status", headers=auth(tokens["expired"])).status_code == 401
+    submitted = identity.post("/native-identity/submit", headers=pilot, json=photo)
+    assert submitted.status_code == 202, submitted.json
+    photo_id = submitted.json["id"]
+    assert identity.get("/native-identity/queue", headers=pilot).status_code == 403
+    assert identity.get("/native-identity/queue", headers=reviewer).json["items"][0]["id"] == photo_id
+    assert identity.get(f"/native-identity/photo/{photo_id}", headers=reviewer).status_code == 200
+    assert identity.post(f"/native-identity/decision/{photo_id}", headers=reviewer,
+                         json={"decision": "approved"}).status_code == 200
+    assert identity.get("/native-identity/status", headers=pilot).json["status"] == "approved"
+    assert identity.get(f"/native-identity/photo/{photo_id}", headers=reviewer).status_code == 404
+    assert identity.get("/native-auth/session", headers=pilot).json["role"] == "pilot"

@@ -47,7 +47,7 @@ def sanitize_photo(encoded):
 
 def initialize_identity(database_url):
     with psycopg.connect(database_url) as conn:
-        conn.execute("""CREATE TABLE IF NOT EXISTS native_identity_checks (
+        conn.execute("""CREATE TABLE IF NOT EXISTS public.native_identity_checks (
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL REFERENCES native_auth_users(id),
             status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected','expired')),
@@ -55,18 +55,33 @@ def initialize_identity(database_url):
             reviewer_id TEXT REFERENCES native_auth_users(id), decided_at BIGINT
         )""")
         conn.execute("""CREATE INDEX IF NOT EXISTS native_identity_user_created
-            ON native_identity_checks(user_id, created_at DESC)""")
+            ON public.native_identity_checks(user_id, created_at DESC)""")
 
 
 def purge_expired(database_url, now):
     with psycopg.connect(database_url) as conn:
-        conn.execute("""UPDATE native_identity_checks SET photo=NULL,
+        conn.execute("""UPDATE public.native_identity_checks SET photo=NULL,
             status=CASE WHEN status='pending' THEN 'expired' ELSE status END
             WHERE photo IS NOT NULL AND expires_at<=%s""", (now,))
 
 
-def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=True, sms_enabled=False):
-    initialize_identity(database_url)
+def use_restricted_identity_runtime(environ):
+    """Never run identity DDL in an explicitly enabled isolated pilot."""
+    if environ.get("PD_NATIVE_SMS_ISOLATED") != "YES":
+        return False
+    return (
+        environ.get("PD_NATIVE_IDENTITY_NO_RUNTIME_DDL") == "1"
+        or (environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
+            and environ.get("PD_DISPATCH_PERSISTENT_QUEUE") == "1")
+        or environ.get("PD_NATIVE_CLOSED_PILOT_INVITES") == "1"
+        or environ.get("PD_NATIVE_PILOT_ASSIGNMENT") == "1"
+    )
+
+
+def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=True,
+                      sms_enabled=False, restricted_runtime=False):
+    if not restricted_runtime:
+        initialize_identity(database_url)
 
     if start_cleanup:
         def cleanup():
@@ -88,6 +103,9 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
     def app(environ, start_response):
         route = environ.get("PATH_INFO", "")
         if route == "/health" and environ.get("REQUEST_METHOD") == "GET":
+            if restricted_runtime:
+                # Pilot readiness is owned by native auth. Don't hide its 503.
+                return next_app(environ, start_response)
             return reply(start_response, "200 OK", {"status": "ok", "sms_enabled": sms_enabled,
                 "identity_enabled": True, "identity_revision": "photo-review-v1"})
         if not route.startswith("/native-identity/"):
@@ -98,35 +116,46 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
         auth = environ.get("HTTP_AUTHORIZATION", "")
         if not auth.startswith("Bearer ") or not 40 <= len(auth[7:]) <= 256:
             return reply(start_response, "401 Unauthorized", {"error": "invalid_session"})
-        digest = hashlib.sha256(auth[7:].encode()).hexdigest()
+        token = auth[7:]
+        if restricted_runtime and any(char.isspace() for char in token):
+            return reply(start_response, "401 Unauthorized", {"error": "invalid_session"})
+        digest = hashlib.sha256(token.encode()).hexdigest()
         try:
-            purge_expired(database_url, now)
+            if not restricted_runtime:
+                purge_expired(database_url, now)
             with psycopg.connect(database_url) as conn:
-                row = conn.execute("""SELECT s.user_id,COALESCE(r.role,'passenger')
-                    FROM native_auth_sessions s LEFT JOIN native_auth_roles r ON r.user_id=s.user_id
-                    WHERE s.token_hash=%s AND s.expires_at>%s AND s.revoked_at IS NULL""",
-                    (digest, now)).fetchone()
+                if restricted_runtime:
+                    row = conn.execute("""SELECT user_id,server_role
+                        FROM public.pd_validate_native_session(%s,%s)""",
+                        (digest, now)).fetchone()
+                else:
+                    row = conn.execute("""SELECT s.user_id,COALESCE(r.role,'passenger')
+                        FROM native_auth_sessions s LEFT JOIN native_auth_roles r ON r.user_id=s.user_id
+                        WHERE s.token_hash=%s AND s.expires_at>%s AND s.revoked_at IS NULL""",
+                        (digest, now)).fetchone()
                 if not row:
                     return reply(start_response, "401 Unauthorized", {"error": "invalid_session"})
                 uid, role = row
                 if (endpoint in {"status", "submit"} and role not in PILOTS) or (
                         endpoint not in {"status", "submit"} and role not in REVIEWERS):
                     return reply(start_response, "403 Forbidden", {"error": "role_required"})
+                if restricted_runtime:
+                    purge_expired(database_url, now)
                 if endpoint == "status" and method == "GET":
-                    row = conn.execute("""SELECT id,status,decided_at FROM native_identity_checks
+                    row = conn.execute("""SELECT id,status,decided_at FROM public.native_identity_checks
                         WHERE user_id=%s ORDER BY created_at DESC,id DESC LIMIT 1""", (uid,)).fetchone()
                     status = row[1] if row else "unverified"
                     if row and status == "approved" and now >= row[2] + APPROVAL_TTL:
                         status = "expired"
                     return reply(start_response, "200 OK", {"status": status})
                 if endpoint == "queue" and method == "GET":
-                    rows = conn.execute("""SELECT id,user_id FROM native_identity_checks
+                    rows = conn.execute("""SELECT id,user_id FROM public.native_identity_checks
                         WHERE status='pending' AND expires_at>%s AND user_id<>%s
                         ORDER BY created_at LIMIT 50""", (now, uid)).fetchall()
                     return reply(start_response, "200 OK", {"items": [
                         {"id": r[0], "user_id": r[1]} for r in rows]})
                 if endpoint.startswith("photo/") and method == "GET":
-                    row = conn.execute("""SELECT photo FROM native_identity_checks
+                    row = conn.execute("""SELECT photo FROM public.native_identity_checks
                         WHERE id=%s AND user_id<>%s AND status='pending' AND expires_at>%s""",
                         (endpoint[6:], uid, now)).fetchone()
                     if not row or row[0] is None:
@@ -147,12 +176,12 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
                 if endpoint == "submit":
                     # Lock per account: retries and concurrent requests cannot create a queue flood.
                     conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (uid,))
-                    existing = conn.execute("""SELECT id,created_at FROM native_identity_checks
+                    existing = conn.execute("""SELECT id,created_at FROM public.native_identity_checks
                         WHERE user_id=%s AND status='pending' AND expires_at>%s
                         ORDER BY created_at DESC LIMIT 1""", (uid, now)).fetchone()
                     if existing:
                         return reply(start_response, "200 OK", {"id": existing[0], "status": "pending"})
-                    recent = conn.execute("SELECT MAX(created_at) FROM native_identity_checks WHERE user_id=%s", (uid,)).fetchone()[0]
+                    recent = conn.execute("SELECT MAX(created_at) FROM public.native_identity_checks WHERE user_id=%s", (uid,)).fetchone()[0]
                     if recent is not None and now - recent < 60:
                         return reply(start_response, "429 Too Many Requests", {"error": "try_later"})
                     try:
@@ -161,14 +190,14 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
                             OSError, Image.DecompressionBombError, Image.DecompressionBombWarning):
                         return reply(start_response, "400 Bad Request", {"error": "invalid_photo"})
                     check_id = secrets.token_urlsafe(24)
-                    conn.execute("""INSERT INTO native_identity_checks
+                    conn.execute("""INSERT INTO public.native_identity_checks
                         (id,user_id,status,photo,created_at,expires_at) VALUES (%s,%s,'pending',%s,%s,%s)""",
                         (check_id, uid, photo, now, now + PENDING_TTL))
                     return reply(start_response, "202 Accepted", {"id": check_id, "status": "pending"})
                 decision = payload.get("decision")
                 if not isinstance(decision, str) or decision not in {"approved", "rejected"}:
                     return reply(start_response, "400 Bad Request", {"error": "invalid_decision"})
-                updated = conn.execute("""UPDATE native_identity_checks SET status=%s,
+                updated = conn.execute("""UPDATE public.native_identity_checks SET status=%s,
                     photo=NULL,reviewer_id=%s,decided_at=%s
                     WHERE id=%s AND user_id<>%s AND status='pending' AND expires_at>%s
                     RETURNING id""", (decision, uid, now, endpoint[9:], uid, now)).fetchone()

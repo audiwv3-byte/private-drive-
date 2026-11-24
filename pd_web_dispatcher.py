@@ -320,6 +320,11 @@ def register(app, core):
     from pd_dispatch_persistent import register as register_persistent_queue
     register_persistent_queue(app, authorized)
     persistent_queue_enabled = persistent_queue_ready()
+    from pd_native_pilot_assignment import (
+        dispatcher_assignment_enabled, register_dispatch_assignment,
+    )
+    register_dispatch_assignment(app, authorized, valid_csrf, admin_id)
+    pilot_assignment_enabled = persistent_queue_enabled and dispatcher_assignment_enabled()
 
     test_sync_enabled = (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
                          and os.environ.get("PD_DISPATCH_TEST_SYNC") == "1")
@@ -362,7 +367,8 @@ def register(app, core):
             page, mapbox_token=token, test_sync_enabled=test_sync_enabled and not persistent_queue_enabled,
             persistent_queue_enabled=persistent_queue_enabled,
             analytics_enabled="pd_site_analytics" in app.view_functions,
-            csrf=csrf() if test_sync_enabled else "",
+            pilot_assignment_enabled=pilot_assignment_enabled,
+            csrf=csrf() if test_sync_enabled or persistent_queue_enabled else "",
         ))
         response.headers.update({
             "Cache-Control": "private, no-store",

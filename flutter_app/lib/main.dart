@@ -15,12 +15,14 @@ import 'pd_http_api.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_photo_capture.dart';
 import 'native_cabin_entry.dart';
+import 'native_closed_invite_api.dart';
 import 'native_session.dart';
 import 'native_logout_api.dart';
 import 'native_session_vault.dart';
 import 'native_session_manager.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
+const closedPilotInviteBuild = bool.fromEnvironment('PD_CLOSED_PILOT_INVITE_ENTRY');
 // Opt-in only for the isolated static Safari/Android browser test artifact.
 // No production auth URL, payment gateway or automatic backend connection.
 const isolatedWebPreview = bool.fromEnvironment('PD_ISOLATED_WEB_PREVIEW');
@@ -52,7 +54,13 @@ class PrivateDriveApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFF111111),
       ),
-      home: kIsWeb && isolatedWebPreview
+      home: closedPilotInviteBuild && (kIsWeb || enableOfflinePreview ||
+              isolatedWebPreview || const bool.fromEnvironment('PD_INTERNAL_QA') ||
+              const bool.fromEnvironment('PD_ISOLATED_NATIVE_SYNC') ||
+              apiBaseUrl != PdClosedInviteApi.stagingBaseUrl)
+          ? const Scaffold(body: Center(
+              child: Text('В этой сборке не настроен безопасный тестовый вход.')))
+          : kIsWeb && isolatedWebPreview
           ? const RemoteSyncDemo()
           : enableOfflinePreview
           // Explicit developer harness only. Normal launch starts with cabins.
@@ -60,11 +68,17 @@ class PrivateDriveApp extends StatelessWidget {
               child: NativeSignInScreen(enableOfflinePreview: true),
             )
           : PdNativeCabinEntry(
-              signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
-                enableOfflinePreview: enableOfflinePreview,
-                allowGuestEntry: role == 'passenger',
-                onAuthenticated: onAuthenticated,
-              ),
+              signInBuilder: (_, role, onAuthenticated) =>
+                  closedPilotInviteBuild && role != 'passenger'
+                  ? const Center(child: Text(
+                      'В этой сборке приглашения доступны только пассажирам.',
+                      textAlign: TextAlign.center))
+                  : NativeSignInScreen(
+                      enableOfflinePreview: enableOfflinePreview,
+                      allowGuestEntry: role == 'passenger',
+                      enableClosedInvite: closedPilotInviteBuild,
+                      onAuthenticated: onAuthenticated,
+                    ),
               identityApiBuilder: (session) => PdIdentityApi(
                 baseUrl: apiBaseUrl, token: session.token),
               logoutApi: const PdNativeLogoutApi(baseUrl: apiBaseUrl),
@@ -94,6 +108,7 @@ class NativeSignInScreen extends StatefulWidget {
     this.enableOfflinePreview = false,
     this.httpClient,
     this.allowGuestEntry = true,
+    this.enableClosedInvite = false,
     this.onAuthenticated,
   });
 
@@ -101,6 +116,7 @@ class NativeSignInScreen extends StatefulWidget {
   final bool enableOfflinePreview;
   final http.Client? httpClient;
   final bool allowGuestEntry;
+  final bool enableClosedInvite;
   final ValueChanged<PdNativeSession>? onAuthenticated;
 
   @override
@@ -110,6 +126,7 @@ class NativeSignInScreen extends StatefulWidget {
 class _NativeSignInScreenState extends State<NativeSignInScreen> {
   final destination = TextEditingController();
   final code = TextEditingController();
+  final inviteCode = TextEditingController();
   bool busy = false;
   bool loggingOut = false;
   bool _guest = false;
@@ -130,6 +147,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   void dispose() {
     destination.dispose();
     code.dispose();
+    inviteCode.dispose();
     super.dispose();
   }
 
@@ -138,8 +156,43 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     return const PdHttpApi().postJson(uri, payload, client: widget.httpClient);
   }
 
+  PdClosedInviteApi get _inviteApi => PdClosedInviteApi(
+      baseUrl: widget.authApiUrl, client: widget.httpClient);
+
+  bool get _closedInviteEntry => widget.enableClosedInvite &&
+      widget.onAuthenticated != null && _inviteApi.enabled;
+
+  Future<void> _redeemInvite() async {
+    if (!_closedInviteEntry || busy || !_acknowledgedLegal) return;
+    final value = inviteCode.text.trim();
+    if (!PdClosedInviteApi.validCode(value)) return;
+    setState(() {
+      busy = true;
+      message = '';
+    });
+    try {
+      final session = await _inviteApi.redeem(value);
+      if (!mounted || !_closedInviteEntry) return;
+      inviteCode.clear();
+      widget.onAuthenticated!(session);
+    } on PdHttpStatusException catch (error) {
+      if (mounted && _closedInviteEntry) setState(() {
+        if (error.statusCode == 401) inviteCode.clear();
+        message = switch (error.statusCode) {
+          401 => 'Приглашение недействительно, просрочено или уже использовано.',
+          429 => 'Слишком много попыток. Подожди немного и повтори.',
+          _ => 'Вход по приглашению временно недоступен.',
+        };
+      });
+    } catch (_) {
+      if (mounted) setState(() => message = 'Не удалось подтвердить приглашение.');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> requestCode() async {
-    if (busy || !_acknowledgedLegal) return;
+    if (widget.enableClosedInvite || busy || !_acknowledgedLegal) return;
     setState(() {
       busy = true;
       message = '';
@@ -177,7 +230,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
 
   Future<void> verifyCode() async {
     final id = challengeId;
-    if (busy || id == null) return;
+    if (widget.enableClosedInvite || busy || id == null) return;
     setState(() {
       busy = true;
       message = '';
@@ -490,7 +543,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       child: const Text('Открыть тестовые кабинеты'),
                     ),
                   ),
-                if (const bool.fromEnvironment('PD_INTERNAL_QA') && widget.allowGuestEntry) ...[
+                if (!widget.enableClosedInvite && const bool.fromEnvironment('PD_INTERNAL_QA') && widget.allowGuestEntry) ...[
                   const SizedBox(height: 12),
                   FilledButton.icon(
                     key: const Key('internal-guest-entry'),
@@ -505,7 +558,23 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 ],
                 const SizedBox(height: 20),
-                TextField(
+                if (widget.enableClosedInvite)
+                  TextField(
+                    key: const Key('closed-pilot-invite-field'),
+                    controller: inviteCode,
+                    enabled: _closedInviteEntry && !busy,
+                    obscureText: true,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    enableIMEPersonalizedLearning: false,
+                    textCapitalization: TextCapitalization.none,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Код приглашения',
+                      border: OutlineInputBorder(),
+                    ),
+                  )
+                else TextField(
                   controller: destination,
                   enabled: !busy && challengeId == null,
                   keyboardType: TextInputType.phone,
@@ -539,7 +608,15 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                if (challengeId == null)
+                if (widget.enableClosedInvite)
+                  FilledButton(
+                    key: const Key('closed-pilot-invite-submit'),
+                    onPressed: !_closedInviteEntry || busy || !_acknowledgedLegal ||
+                        !PdClosedInviteApi.validCode(inviteCode.text.trim())
+                        ? null : _redeemInvite,
+                    child: const Text('Войти по приглашению'),
+                  )
+                else if (challengeId == null)
                   FilledButton(
                     onPressed: busy || widget.authApiUrl.isEmpty || !_acknowledgedLegal
                         ? null : requestCode,
@@ -572,6 +649,9 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     child: Text(tr('Изменить контакт', 'Keisti kontaktą', 'Change contact')),
                   ),
                 ],
+                if (widget.enableClosedInvite && !_closedInviteEntry)
+                  const Text('В этой сборке не настроен безопасный тестовый вход.',
+                      textAlign: TextAlign.center),
                 if (busy) const Center(child: CircularProgressIndicator()),
                 if (message.isNotEmpty)
                   Padding(

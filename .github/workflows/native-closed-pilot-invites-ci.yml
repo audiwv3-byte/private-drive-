@@ -1,0 +1,76 @@
+name: PRIVATE DRIVE isolated invite and pilot UI tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/native-dispatch-integration-no-payments]
+    paths:
+      - .github/workflows/native-closed-pilot-invites-ci.yml
+      - isolated_sms_wsgi.py
+      - pd_native_closed_invites.py
+      - pd_issue_closed_pilot_invite.py
+      - migrations/native_closed_pilot_invites.sql
+      - tests/test_native_closed_invites*.py
+      - flutter_app/lib/main.dart
+      - flutter_app/lib/native_cabin_entry.dart
+      - flutter_app/lib/native_closed_invite_api.dart
+      - flutter_app/lib/native_logout_api.dart
+      - flutter_app/lib/native_session_manager.dart
+      - flutter_app/lib/pd_http_api.dart
+      - flutter_app/test/native_closed_invite_test.dart
+      - flutter_app/lib/native_pilot_orders.dart
+      - flutter_app/lib/pilot_cabin.dart
+      - flutter_app/test/native_pilot_orders_test.dart
+
+permissions:
+  contents: read
+
+jobs:
+  invite-tests:
+    if: github.ref == 'refs/heads/feature/native-dispatch-integration-no-payments'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pd_invite_ci
+          POSTGRES_PASSWORD: synthetic-test-only
+          POSTGRES_DB: private_drive_test
+        ports: ['55438:5432']
+        options: >-
+          --health-cmd 'pg_isready -U pd_invite_ci -d private_drive_test'
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PD_CI_CLOSED_INVITES_TEST_PG: postgresql://pd_invite_ci:synthetic-test-only@127.0.0.1:55438/private_drive_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'psycopg[binary]'
+      - run: python -m unittest discover -v -s tests -p 'test_native_closed_invites*.py'
+
+  invite-and-pilot-flutter-tests:
+    if: github.ref == 'refs/heads/feature/native-dispatch-integration-no-payments'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - run: flutter pub get
+      - name: Verify invite and pilot order widgets with mocked HTTP
+        run: >-
+          flutter test test/native_closed_invite_test.dart
+          test/native_auth_relaunch_widget_test.dart
+          test/native_cabin_entry_test.dart
+          test/native_pilot_orders_test.dart

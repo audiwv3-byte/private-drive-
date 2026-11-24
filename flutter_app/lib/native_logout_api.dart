@@ -22,6 +22,7 @@ class PdNativeLogoutApi {
     final transport = client ?? http.Client();
     try {
       final request = http.Request('POST', uri)
+        ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $accessToken'
         ..headers['Accept'] = 'application/json';
       // An explicitly empty body: token must NEVER appear here.

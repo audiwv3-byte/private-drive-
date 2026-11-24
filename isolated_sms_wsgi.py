@@ -8,8 +8,10 @@ import json
 import threading
 
 from pd_native_auth_postgres_http import make_app
-from pd_native_identity_http import make_identity_app
+from pd_native_identity_http import make_identity_app, use_restricted_identity_runtime
 from pd_native_orders_http import make_orders_app
+from pd_native_closed_invites import make_closed_invites_app
+from pd_native_pilot_assignment import make_native_pilot_orders_app
 
 if os.environ.get("PD_NATIVE_SMS_ISOLATED") != "YES":
     raise RuntimeError("Isolated SMS deployment requires explicit opt-in")
@@ -32,8 +34,13 @@ application = make_app(
     pilot_phone=os.environ.get("PD_NATIVE_PILOT_PHONE") or None,
     live=live,
 )
-application = make_identity_app(application, database_url, sms_enabled=live)
+application = make_identity_app(
+    application, database_url, sms_enabled=live,
+    restricted_runtime=use_restricted_identity_runtime(os.environ),
+)
 application = make_orders_app(application, database_url)
+application = make_closed_invites_app(application, database_url)
+application = make_native_pilot_orders_app(application, database_url)
 
 def _report_sms_setup():
     from pd_twilio_setup_diagnostics import inspect_setup

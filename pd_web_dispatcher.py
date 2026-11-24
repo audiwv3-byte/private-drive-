@@ -2,7 +2,11 @@
 
 Existing Telegram Mini App endpoints and authentication are unchanged.
 """
+import base64
+import binascii
 import hashlib
+import hmac
+import struct
 import os
 import re
 import secrets
@@ -40,11 +44,36 @@ small{color:var(--pd-muted,#c7b79e)}
 <input id="password" type="password" name="password" autocomplete="{{ 'new-password' if registration else 'current-password' }}" required maxlength="{{ 128 if registration else 512 }}" {% if registration %}minlength="12"{% endif %}>
 {% if registration %}<label for="confirmation">Повтори пароль</label>
 <input id="confirmation" type="password" name="confirmation" autocomplete="new-password" required minlength="12" maxlength="128">
+{% endif %}{% if require_mfa and not registration %}
+<label for="totp">Код из приложения-аутентификатора</label>
+<input id="totp" name="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>
 {% endif %}<button>{{ 'Сохранить новый пароль' if recovery else ('Создать пароль' if registration else 'Войти') }}</button></form>
 {% endif %}
 {% if registration %}<a href="/dispatch/login">Войти в диспетчерскую</a>
-{% else %}<a href="/dispatch/register">Регистрация по приглашению</a> · <a href="/dispatch/recover">Восстановить пароль</a>{% endif %}
+{% elif not require_mfa %}<a href="/dispatch/register">Регистрация по приглашению</a> · <a href="/dispatch/recover">Восстановить пароль</a>{% endif %}
 </main></html>"""
+
+
+def decode_totp_key(value):
+    if not re.fullmatch(r"[A-Z2-7]{32,104}", value):
+        return b""
+    try:
+        return base64.b32decode(value + "=" * (-len(value) % 8))
+    except (ValueError, binascii.Error):
+        return b""
+
+
+def totp_counter(key, code, now):
+    if not re.fullmatch(r"[0-9]{6}", code):
+        return None
+    step = int(now) // 30
+    for counter in (step + 1, step, step - 1):
+        digest = hmac.digest(key, struct.pack(">Q", counter), "sha1")
+        offset = digest[-1] & 15
+        value = int.from_bytes(digest[offset:offset + 4], "big") & 0x7fffffff
+        if secrets.compare_digest(code, f"{value % 1000000:06d}"):
+            return counter
+    return None
 
 
 class DispatcherPasswords:
@@ -71,6 +100,30 @@ class DispatcherPasswords:
         except UndefinedTable:
             return ""
         return row[0] if row else ""
+
+    def reserve_owner_attempt(self, admin_id, window):
+        with self.connect() as db:
+            row = db.execute("""
+                INSERT INTO private_drive_dispatcher_mfa AS m (admin_id, attempt_window, attempts)
+                VALUES (%s, %s, 1)
+                ON CONFLICT (admin_id) DO UPDATE SET
+                    attempts = CASE WHEN m.attempt_window = EXCLUDED.attempt_window
+                                    THEN m.attempts + 1 ELSE 1 END,
+                    attempt_window = EXCLUDED.attempt_window
+                WHERE m.attempt_window < EXCLUDED.attempt_window
+                    OR (m.attempt_window = EXCLUDED.attempt_window AND m.attempts < 5)
+                RETURNING admin_id
+            """, (admin_id, window)).fetchone()
+        return row is not None
+
+    def consume_totp(self, admin_id, counter):
+        with self.connect() as db:
+            row = db.execute("""
+                UPDATE private_drive_dispatcher_mfa SET last_counter = %(counter)s
+                WHERE admin_id = %(admin_id)s AND last_counter < %(counter)s
+                RETURNING admin_id
+            """, {"admin_id": admin_id, "counter": counter}).fetchone()
+        return row is not None
 
     def create(self, admin_id, password_hash):
         with self.connect() as db:
@@ -146,11 +199,15 @@ def register(app, core):
     recovery_expiry = os.environ.get("PD_DISPATCH_RECOVERY_EXPIRES", "")
     recovery_deadline = int(recovery_expiry) if re.fullmatch(r"[0-9]{1,12}", recovery_expiry) else 0
     passwords = DispatcherPasswords(dsn) if dsn else None
+    require_mfa = os.environ.get("PD_DISPATCH_REQUIRE_MFA", "") == "1"
+    totp_key = decode_totp_key(os.environ.get("PD_DISPATCH_TOTP_BASE32", "")) if require_mfa else b""
+    mfa_version = hmac.digest(secret.encode(), totp_key, "sha256").hex() if totp_key else ""
     valid_admin = re.fullmatch(r"[0-9]{1,18}", raw_admin) and int(raw_admin) in core.ADMIN_IDS
     configured = password_hash.startswith(("scrypt:", "pbkdf2:")) or passwords is not None
     existing_secret = app.secret_key
     if (len(secret) < 32 or not valid_admin or not configured
-            or existing_secret not in (None, secret)):
+            or existing_secret not in (None, secret)
+            or (require_mfa and (not passwords or not totp_key))):
         @app.get("/dispatch")
         @app.get("/dispatch/login")
         def pd_dispatch_disabled():
@@ -182,7 +239,8 @@ def register(app, core):
     def authorized():
         if not (session.get("pd_dispatch_authenticated") is True
                 and session.get("pd_dispatch_admin_id") == admin_id
-                and core.is_admin(admin_id)):
+                and core.is_admin(admin_id)
+                and session.get("pd_dispatch_mfa_version", "") == mfa_version):
             return False
         try:
             credential = passwords.read(admin_id) if passwords else password_hash
@@ -220,7 +278,7 @@ def register(app, core):
             return auth_page(app, registration=True, status=status, ready=ready,
                              csrf=csrf() if ready else "", error=error)
 
-        if not passwords or not core.is_admin(admin_id):
+        if require_mfa or not passwords or not core.is_admin(admin_id):
             return page("Регистрация по приглашению сейчас закрыта.", 403)
         if request.method == "POST":
             failure = verify_form("register")
@@ -256,7 +314,7 @@ def register(app, core):
             return auth_page(app, registration=True, recovery=True, status=status,
                              error=error, ready=ready, csrf=csrf() if ready else "")
 
-        if (not passwords or not core.is_admin(admin_id)
+        if (require_mfa or not passwords or not core.is_admin(admin_id)
                 or not re.fullmatch(r"[0-9a-f]{64}", recovery_hash)
                 or time.time() >= recovery_deadline):
             return page("Нет действующего кода восстановления.", 403)
@@ -300,16 +358,31 @@ def register(app, core):
                 app.logger.error("Dispatcher credential unavailable (%s)", type(exc).__name__)
                 return auth_page(app, status=503, error="Вход временно недоступен.")
             if credential and check_password_hash(credential, request.form.get("password", "")) and core.is_admin(admin_id):
+                if require_mfa:
+                    try:
+                        now = time.time()
+                        if not passwords.reserve_owner_attempt(admin_id, int(now) // 300):
+                            return auth_page(app, status=429, require_mfa=True, ready=True,
+                                             csrf=csrf(), error="Слишком много попыток.")
+                        counter = totp_counter(totp_key, request.form.get("totp", ""), now)
+                        if counter is None or not passwords.consume_totp(admin_id, counter):
+                            return auth_page(app, status=401, require_mfa=True, ready=True,
+                                             csrf=csrf(), error="Неверный или использованный код.")
+                    except Exception as exc:
+                        app.logger.error("Dispatcher MFA unavailable (%s)", type(exc).__name__)
+                        return auth_page(app, status=503, require_mfa=True,
+                                         error="Вход временно недоступен.")
                 session.clear()
                 session.permanent = True
                 session["pd_dispatch_authenticated"] = True
                 session["pd_dispatch_admin_id"] = admin_id
+                session["pd_dispatch_mfa_version"] = mfa_version
                 session["pd_dispatch_credential_version"] = hashlib.sha256(credential.encode()).hexdigest()
                 csrf()
                 attempts.pop(("login", request.remote_addr or "unknown"), None)
                 return redirect(url_for("pd_dispatch_home"))
             error = "Неверный пароль"
-        return auth_page(app, csrf=csrf(), error=error, ready=True,
+        return auth_page(app, csrf=csrf(), error=error, ready=True, require_mfa=require_mfa,
                          registered=bool(passwords) and request.args.get("registered") == "1")
 
     if passwords and os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":

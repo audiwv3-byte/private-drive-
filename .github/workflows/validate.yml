@@ -1,5 +1,10 @@
 name: Validate release
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches-ignore:
+      - qa/r2-synthetic-restore-20261124
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

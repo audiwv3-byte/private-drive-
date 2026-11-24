@@ -43,8 +43,9 @@ jobs:
 
       - name: Generate the same original transparent PD logo used by Android
         run: |
-          python3 -m pip install --quiet Pillow
-          python3 - <<'PY'
+          python3 -m venv "$RUNNER_TEMP/pd-logo-venv"
+          "$RUNNER_TEMP/pd-logo-venv/bin/python" -m pip install --quiet Pillow
+          "$RUNNER_TEMP/pd-logo-venv/bin/python" - <<'PY'
           from pathlib import Path
           from PIL import Image
           import hashlib

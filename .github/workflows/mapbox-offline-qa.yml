@@ -1,0 +1,33 @@
+name: PRIVATE DRIVE Mapbox offline QA
+
+on:
+  push:
+    branches:
+      - feature/website-private-drive-preview
+    paths:
+      - '.github/workflows/mapbox-offline-qa.yml'
+      - 'test_mapbox_qa.py'
+      - 'site_preview/order-map.html'
+      - 'site_preview/assets/mapbox-config.js'
+      - 'ops/setup-local-mapbox.ps1'
+      - 'build_website_map_config.py'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mapbox-offline-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify Mapbox safely without network, credentials or deployment
+        env:
+          MAPBOX_WEB_PUBLIC_TOKEN: ''
+          MAPBOX_PUBLIC_TOKEN: ''
+        run: python -m unittest -v test_mapbox_qa

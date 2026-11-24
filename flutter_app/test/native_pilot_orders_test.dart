@@ -104,8 +104,10 @@ void main() {
             : http.Response('{"error":"identity_approval_required"}', 403);
       }),
     );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpWidget(MaterialApp(home: PilotCabin(assignmentApi: api)));
     await tester.pumpAndSettle();
+    expect(requestCount, 1);
     expect(find.byKey(const ValueKey('pilot-server-order-$orderId')), findsOneWidget);
     expect(find.text('ID заказа: $orderId'), findsOneWidget);
     expect(find.text('2026-12-01 11:30 · Назначен'), findsOneWidget);
@@ -114,6 +116,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('pilot-server-orders-refresh')));
     await tester.pumpAndSettle();
+    expect(requestCount, 2);
     expect(find.byKey(const ValueKey('pilot-server-order-$orderId')), findsNothing);
     expect(find.text('Доступ закрыт. Проверь роль и фотоконтроль.'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -130,8 +133,10 @@ void main() {
         return requestCount == 1 ? delayed.future : Future.value(http.Response(result([]), 200));
       }),
     );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpWidget(MaterialApp(home: PilotCabin(assignmentApi: api)));
     await tester.pump();
+    expect(requestCount, 1);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     delayed.complete(http.Response(result([order]), 200));
     await tester.pump();

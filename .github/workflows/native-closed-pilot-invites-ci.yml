@@ -39,7 +39,7 @@ jobs:
           POSTGRES_DB: private_drive_test
         ports: ['55438:5432']
         options: >-
-          --health-cmd 'pg_isready -U pd_invite_ci -d private_drive_test'
+          --health-cmd "pg_isready -U pd_invite_ci -d private_drive_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10

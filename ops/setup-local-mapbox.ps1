@@ -53,5 +53,5 @@ $js = 'window.PD_MAPBOX_PUBLIC_TOKEN = ' + (ConvertTo-Json -InputObject $token -
 [System.IO.File]::WriteAllText($target, $js, (New-Object System.Text.UTF8Encoding($false)))
 $token = $null
 Write-Host 'Local Mapbox config created. Token was not printed and the file is Git-ignored.'
-Write-Host 'Open http://127.0.0.1:5500/site_preview/order-map.html in Live Server.'
-Write-Host 'If tiles do not load, check URL restrictions for http://127.0.0.1:5500 on the existing token.'
+Write-Host 'Open http://localhost:5500/site_preview/order-map.html in Live Server.'
+Write-Host 'If tiles do not load, check URL restrictions for http://localhost:5500 on the existing token.'

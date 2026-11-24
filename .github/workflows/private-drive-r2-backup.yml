@@ -1,0 +1,89 @@
+# PRIVATE DRIVE: manual, test-only encrypted backup proposal.
+# No automatic triggers. Not operational until explicitly reviewed and merged.
+name: PRIVATE DRIVE test PostgreSQL encrypted backup
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_test_only:
+        description: 'I explicitly authorize a one-time backup of private_drive_test'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-drive-test-db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup-test-db:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/backup/private-drive-r2' && inputs.confirm_test_only == true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: private-drive-backup
+    env:
+      PG_TEST_DATABASE_URL: ${{ secrets.PG_TEST_DATABASE_URL }}
+      PGSSLMODE: require
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+      AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
+      R2_BUCKET: private-drive-backups
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: 'true'
+    steps:
+      - name: Validate required settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in PG_TEST_DATABASE_URL R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ACCOUNT_ID AGE_RECIPIENT; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "::error::Missing required environment setting: $key"
+              exit 1
+            fi
+          done
+          [[ "$R2_ACCOUNT_ID" =~ ^[0-9a-fA-F]{32}$ ]] || { echo "::error::Invalid Cloudflare account ID"; exit 1; }
+          [[ "$AGE_RECIPIENT" =~ ^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$ ]] || { echo "::error::Invalid age recipient"; exit 1; }
+
+      - name: Install age encryption CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+
+      - name: Back up only test database as encrypted R2 object
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          TEMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEMP_DIR"' EXIT
+          ENCRYPTED="$TEMP_DIR/test-backup.dump.age"
+          ENDPOINT="https://${R2_ACCOUNT_ID}.eu.r2.cloudflarestorage.com"
+          KEY="private_drive_test/$(date -u +%Y/%m/%d)/backup-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.dump.age"
+          # The URL must point to the isolated TEST PostgreSQL only.
+          # Hard stop if the server reports any other database name or no TLS.
+          # PostgreSQL 18 client outputs custom-format dump into encryption pipe.
+          docker run --rm --network host \
+            --env PG_TEST_DATABASE_URL --env PGSSLMODE \
+            postgres:18 bash -euo pipefail -c '
+              db="$(psql "$PG_TEST_DATABASE_URL" -XAt -v ON_ERROR_STOP=1 -c "SELECT current_database()")"
+              [[ "$db" == "private_drive_test" ]] || { echo "Refusing non-test database" >&2; exit 42; }
+              tls="$(psql "$PG_TEST_DATABASE_URL" -XAt -v ON_ERROR_STOP=1 -c "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()")"
+              [[ "$tls" == "t" ]] || { echo "Refusing non-TLS database connection" >&2; exit 43; }
+              pg_dump --dbname="$PG_TEST_DATABASE_URL" --format=custom --no-owner --no-acl
+            ' | age --encrypt --recipient "$AGE_RECIPIENT" --output "$ENCRYPTED"
+          test -s "$ENCRYPTED"
+          aws --endpoint-url "$ENDPOINT" s3api put-object \
+            --bucket "$R2_BUCKET" --key "$KEY" --body "$ENCRYPTED" \
+            --content-type application/octet-stream >/dev/null
+          aws --endpoint-url "$ENDPOINT" s3api head-object \
+            --bucket "$R2_BUCKET" --key "$KEY" >/dev/null
+          echo 'Encrypted object uploaded and confirmed via object metadata.'

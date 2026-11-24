@@ -28,6 +28,12 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Flutter tests
         run: flutter test
+      - name: Verify Mapbox activation and fallback configuration
+        run: |
+          flutter test --no-pub test/pd_mapbox_qa_config_test.dart --dart-define=PD_MAPBOX_QA=true
+          flutter test --no-pub test/pd_mapbox_qa_config_test.dart --dart-define=MAPBOX_PUBLIC_TOKEN=pk.qa_fixture
+          flutter test --no-pub test/pd_mapbox_qa_config_test.dart --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN=sk.qa_fixture
+          flutter test --no-pub test/pd_mapbox_qa_config_test.dart --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN=pk.qa_fixture --dart-define=PD_EXPECT_MAPBOX=true
       - name: Prepare isolated platforms
         run: flutter create --platforms=android,web --project-name private_drive .
       - name: Build Android and Web with synthetic public-token placeholder

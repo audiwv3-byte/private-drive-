@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/flutter-independent-auth
+      - test/passenger-mapbox-safe-fallback
     paths:
       - 'flutter_app/**'
       - '.github/workflows/flutter-ios-prototype.yml'
@@ -17,7 +18,7 @@ jobs:
     runs-on: macos-15-intel
     timeout-minutes: 60
     env:
-      PD_STAGING_NATIVE_AUTH_API_URL: https://private-drive-drbd.onrender.com
+      PD_STAGING_NATIVE_AUTH_API_URL: ${{ github.ref == 'refs/heads/feature/flutter-independent-auth' && 'https://private-drive-drbd.onrender.com' || '' }}
     defaults:
       run:
         working-directory: flutter_app
@@ -26,7 +27,6 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: '3.50.0'
           cache: true
 
       - name: Verify committed iOS project and safe metadata

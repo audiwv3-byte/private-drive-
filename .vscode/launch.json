@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "PRIVATE DRIVE • Mapbox QA",
+      "type": "dart",
+      "request": "launch",
+      "program": "${workspaceFolder}/flutter_app/lib/main.dart",
+      "cwd": "${workspaceFolder}/flutter_app",
+      "toolArgs": [
+        "--dart-define-from-file=${workspaceFolder}/.env.mapbox.local.json",
+        "--dart-define=PD_MAPBOX_QA=true",
+        "--dart-define=PD_INTERNAL_QA=true",
+        "--dart-define=PD_NATIVE_AUTH_API_URL="
+      ]
+    }
+  ]
+}

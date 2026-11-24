@@ -1,5 +1,5 @@
 # LOCAL QA ONLY. Never commit a Mapbox token to Git.
-# Run from the repository root: powershell -NoProfile -File .\\ops\\setup-local-mapbox.ps1
+# Run from the repository root: powershell -NoProfile -File .\ops\setup-local-mapbox.ps1
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repoRoot
@@ -19,11 +19,11 @@ if ($tracked) {
 }
 if (Test-Path $target) {
     $existing = [System.IO.File]::ReadAllText($target)
-    if ($existing -match 'window\\.PD_MAPBOX_PUBLIC_TOKEN\\s*=\\s*["''][ ]*pk\\.') {
+    if ($existing -match 'window\.PD_MAPBOX_PUBLIC_TOKEN\s*=\s*["''][ ]*pk\.') {
         Write-Host 'Local Mapbox config already contains a public token. No changes made.'
         exit 0
     }
-    if ($existing.Trim() -and $existing -notmatch 'window\\.PD_MAPBOX_PUBLIC_TOKEN\\s*=\\s*["'']{2}') {
+    if ($existing.Trim() -and $existing -notmatch 'window\.PD_MAPBOX_PUBLIC_TOKEN\s*=\s*["'']{2}') {
         throw 'Safety stop: existing local Mapbox config has unexpected content. No changes made.'
     }
 }
@@ -45,7 +45,7 @@ if (-not $token) {
     }
 }
 $token = $token.Trim()
-if ($token -notmatch '^pk\\.[A-Za-z0-9_.-]{8,}$') {
+if ($token -notmatch '^pk\.[A-Za-z0-9_.-]{8,}$') {
     throw 'Only an existing public Mapbox token beginning with pk. is accepted. No file written.'
 }
 # Since Mapbox public tokens can be exposed to browsers, this only prevents Git exposure.

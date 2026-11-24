@@ -21,6 +21,7 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
             return [body]
 
         if (os.getenv("PD_NATIVE_SMS_ISOLATED") != "YES"
+                or os.getenv("PD_DISPATCH_STAGING_ONLY") != "1"
                 or os.getenv("PD_PAYMENT_MODE") != "disabled"
                 or os.getenv("PD_DISPATCH_PERSISTENT_QUEUE") != "1"
                 or os.getenv("PD_DISPATCH_ORDERS_DATABASE_URL") != database_url):
@@ -47,8 +48,8 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                 # Explicit migration is required; no runtime schema changes.
                 if method == "GET":
                     rows = db.execute("""SELECT o.id,o.origin,o.destination,o.trip_date,
-                        o.trip_time,o.status FROM pd_dispatch_orders o
-                        JOIN pd_native_order_owners n ON n.order_id=o.id
+                        o.trip_time,o.status FROM public.pd_dispatch_orders o
+                        JOIN public.pd_native_order_owners n ON n.order_id=o.id
                         WHERE n.user_id=%s ORDER BY o.created_at DESC LIMIT 100""",
                         (uid,)).fetchall()
                     return reply("200 OK", {"payment_mode":"disabled","orders":[
@@ -69,18 +70,18 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                 source, original, origin, destination, date, clock_time = values
                 fp = fingerprint(values)
                 order_id = str(uuid.uuid4())
-                inserted = db.execute("""INSERT INTO pd_dispatch_orders
+                inserted = db.execute("""INSERT INTO public.pd_dispatch_orders
                     (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                     ON CONFLICT(source,source_order_id) DO NOTHING RETURNING id""",
                     (order_id,source,original,fp,origin,destination,date,clock_time)).fetchone()
                 if inserted:
-                    db.execute("INSERT INTO pd_native_order_owners(order_id,user_id) VALUES (%s,%s)",
+                    db.execute("INSERT INTO public.pd_native_order_owners(order_id,user_id) VALUES (%s,%s)",
                                (order_id,uid))
                     status = "requested"
                 else:
                     existing = db.execute("""SELECT o.id,o.fingerprint,o.status
-                        FROM pd_dispatch_orders o JOIN pd_native_order_owners n ON n.order_id=o.id
+                        FROM public.pd_dispatch_orders o JOIN public.pd_native_order_owners n ON n.order_id=o.id
                         WHERE o.source=%s AND o.source_order_id=%s AND n.user_id=%s""",
                         (source,original,uid)).fetchone()
                     if not existing or existing[1] != fp:

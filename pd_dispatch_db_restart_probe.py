@@ -14,7 +14,6 @@ import sys
 import uuid
 from urllib.parse import urlparse
 from datetime import datetime, timezone
-from pd_dispatch_persistent import SCHEMA
 
 PREFIX = "qa-restart-"
 
@@ -48,12 +47,11 @@ def run(stage, marker=None):
     with psycopg.connect(dsn, connect_timeout=5,
                          options="-c statement_timeout=5000") as db:
         if stage == "prepare":
-            db.execute(SCHEMA)
             order_id = str(uuid.uuid4())
             original_id = PREFIX + order_id
             today = datetime.now(timezone.utc).date().isoformat()
             with db.cursor() as cur:
-                cur.execute("""INSERT INTO pd_dispatch_orders
+                cur.execute("""INSERT INTO public.pd_dispatch_orders
                     (id,source,source_order_id,fingerprint,origin,destination,
                      trip_date,trip_time,status)
                     VALUES (%s,'website',%s,'qa-restart-sentinel',
@@ -64,7 +62,7 @@ def run(stage, marker=None):
         marker = check_id(marker)
         original_id = PREFIX + marker
         if stage == "verify":
-            row = db.execute("""SELECT source_order_id,status FROM pd_dispatch_orders
+            row = db.execute("""SELECT source_order_id,status FROM public.pd_dispatch_orders
                 WHERE id=%s AND source='website' AND source_order_id=%s
                 AND fingerprint='qa-restart-sentinel'""",
                 (marker, original_id)).fetchone()
@@ -72,7 +70,7 @@ def run(stage, marker=None):
                 raise RuntimeError("Synthetic order not found after restart")
             return "PERSISTED " + marker
         if stage == "cleanup":
-            count = db.execute("""DELETE FROM pd_dispatch_orders
+            count = db.execute("""DELETE FROM public.pd_dispatch_orders
                 WHERE id=%s AND source='website' AND source_order_id=%s
                 AND fingerprint='qa-restart-sentinel'""", (marker, original_id)).rowcount
             if count != 1:

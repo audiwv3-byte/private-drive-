@@ -11,12 +11,38 @@ permissions:
 
 jobs:
   build-android-release:
+    if: github.ref == 'refs/heads/feature/native-dispatch-integration-no-payments'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: pd_schema_ci
+          POSTGRES_USER: pd_ci
+          POSTGRES_PASSWORD: synthetic-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pd_ci -d pd_schema_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     env:
-      PD_STAGING_NATIVE_AUTH_API_URL: https://example.invalid
+      PD_CI_FAKE_DB_ONLY: 'YES'
+      PD_CI_POSTGRES_URL: 'postgresql://pd_ci:synthetic-only-password@127.0.0.1:5432/pd_schema_ci'
     steps:
       - uses: actions/checkout@v4
+      - name: Read explicit isolated pilot build manifest
+        id: pilot
+        shell: bash
+        run: |
+          connected=false
+          if [[ -f flutter_app/tool/connected-pilot-apk.txt ]]; then
+            [[ "$(cat flutter_app/tool/connected-pilot-apk.txt)" == 'staging-only-no-payments' ]]
+            connected=true
+          fi
+          echo "PD_CONNECTED_PILOT_APK=$connected" >> "$GITHUB_ENV"
+          echo "connected=$connected" >> "$GITHUB_OUTPUT"
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -36,6 +62,8 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import hashlib
+          import os
+          import re
           source = Path("flutter_app/assets/brand/private_drive_logo.webp")
           data = source.read_bytes()
           expected = "550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f"
@@ -77,9 +105,21 @@ jobs:
           assert 'android:icon="@mipmap/ic_launcher"' in text
           text = text.replace('android:icon="@mipmap/ic_launcher"',
                               'android:icon="@drawable/private_drive_logo"')
-          text = text.replace('android:label="private_drive"',
-                              'android:label="PRIVATE DRIVE DEMO"')
+          label = ("PRIVATE DRIVE PILOT" if os.environ.get("PD_CONNECTED_PILOT_APK") == "true"
+                   else "PRIVATE DRIVE OFFLINE QA")
+          text = text.replace('android:label="private_drive"', f'android:label="{label}"')
           manifest.write_text(text)
+          if os.environ.get("PD_CONNECTED_PILOT_APK") == "true":
+              # Stay installable beside the existing app, without touching
+              # its package or device storage.
+              gradle = android.parent.parent / "build.gradle.kts"
+              data, replacements = re.subn(
+                  r'(?m)^([ ]*)applicationId\s*=\s*"lt\.privatedrive\.private_drive"',
+                  r'\1applicationId = "lt.privatedrive.private_drive.pilot"',
+                  gradle.read_text(),
+              )
+              assert replacements == 1, "could not safely set separate pilot app ID"
+              gradle.write_text(data)
           assert '@drawable/private_drive_logo' in manifest.read_text()
           print(f"Brand asset verified ({len(data)} bytes), Android icon and splash replaced")
           PY
@@ -144,23 +184,31 @@ jobs:
           python3 -m unittest discover -s test_sync_server -p 'test_*.py' -v
       - name: Python syntax and isolated tests
         run: |
-          python3 -m pip install pytest flask 'psycopg[binary]' -r requirements.txt
+          python3 -m pip install pytest -r requirements-dispatcher-staging.txt -r requirements.txt
           python3 -m py_compile pd_native_orders_http.py pd_dispatch_persistent.py isolated_sms_wsgi.py pd_dispatcher_staging_wsgi.py
-          python3 -m pytest -q tests/test_native_dispatch_payment_guard.py
+          python3 -m pytest -q tests/test_native_dispatch_payment_guard.py tests/test_native_dispatch_postgres.py
+          python3 -m unittest -v test_web_dispatcher.py test_dispatcher_staging_wsgi.py
       - name: Flutter tests and debug APK
         working-directory: private_drive_build
         run: |
           flutter pub get
           flutter analyze --no-fatal-infos
           flutter test
-          flutter build apk --debug --dart-define="PD_NATIVE_AUTH_API_URL=$PD_STAGING_NATIVE_AUTH_API_URL"
+          # No URL can be supplied by a workflow caller. Only the exact QA
+          # branch and explicit tracked manifest can build a connected APK.
+          # This job never contacts Render or deploys services.
+          base_url=https://example.invalid
+          if [[ "$PD_CONNECTED_PILOT_APK" == true ]]; then
+            base_url=https://private-drive-drbd.onrender.com
+          fi
+          flutter build apk --debug --dart-define="PD_NATIVE_AUTH_API_URL=$base_url"
           mkdir -p ../private_drive_qa
           cp build/app/outputs/flutter-apk/app-debug.apk ../private_drive_qa/private-drive-qa.apk
           cd ../private_drive_qa
           sha256sum private-drive-qa.apk > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
-          name: private-drive-no-payment-qa-apk
+          name: ${{ steps.pilot.outputs.connected == 'true' && 'private-drive-connected-pilot-internal-debug-apk' || 'private-drive-offline-qa-apk' }}
           path: private_drive_qa/
           if-no-files-found: error
           retention-days: 7

@@ -17,30 +17,20 @@ from flask import jsonify, request
 
 MAX_BYTES = 8192
 SOURCES = frozenset({"website", "android", "ios", "telegram_miniapp", "telegram_bot"})
-SCHEMA = """CREATE TABLE IF NOT EXISTS pd_dispatch_orders (
- id UUID PRIMARY KEY,
- source TEXT NOT NULL,
- source_order_id TEXT NOT NULL,
- fingerprint TEXT NOT NULL,
- origin TEXT NOT NULL,
- destination TEXT NOT NULL,
- trip_date TEXT NOT NULL,
- trip_time TEXT NOT NULL,
- status TEXT NOT NULL DEFAULT 'requested'
-   CHECK (status IN ('requested','assigned','approaching','underway','finished','cancelled')),
- created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
- UNIQUE(source,source_order_id)
-)"""
 
 
 def enabled():
     dsn = os.environ.get("PD_DISPATCH_ORDERS_DATABASE_URL", "")
-    key = os.environ.get("PD_DISPATCH_ORDERS_INGEST_SECRET", "")
     return (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
             and os.environ.get("PD_DISPATCH_PERSISTENT_QUEUE") == "1"
             and os.environ.get("PD_PAYMENT_MODE") == "disabled"
-            and dsn.startswith(("postgresql://", "postgres://"))
-            and len(key) >= 32)
+            and dsn.startswith(("postgresql://", "postgres://")))
+
+
+def ingest_enabled():
+    # Native orders write through their authenticated API directly.
+    # Reading the dispatcher queue must not enable the separate import route.
+    return enabled() and len(os.environ.get("PD_DISPATCH_ORDERS_INGEST_SECRET", "")) >= 32
 
 
 def verified_request(raw, headers, key, now=None):
@@ -96,7 +86,7 @@ def register(app, authorized):
 
     @app.post("/v1/dispatch/orders/import")
     def import_order():
-        if not enabled():
+        if not ingest_enabled():
             return reply({"error":"persistent_queue_disabled"}, 503)
         if request.mimetype != "application/json" or request.content_length is None or not 0 < request.content_length <= MAX_BYTES:
             return reply({"error":"invalid_body"}, 400)
@@ -113,17 +103,16 @@ def register(app, authorized):
         status = "requested"
         try:
             with connect() as db:
-                db.execute(SCHEMA)
                 # The insert either wins once or retrieves an existing record.
                 with db.cursor() as cur:
-                    cur.execute("""INSERT INTO pd_dispatch_orders
+                    cur.execute("""INSERT INTO public.pd_dispatch_orders
                         (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                         ON CONFLICT(source,source_order_id) DO NOTHING
                         RETURNING id""", (order_id,source,original,digest,origin,destination,date,clock))
                     inserted = cur.fetchone()
                     if not inserted:
-                        cur.execute("""SELECT id,fingerprint,status FROM pd_dispatch_orders
+                        cur.execute("""SELECT id,fingerprint,status FROM public.pd_dispatch_orders
                             WHERE source=%s AND source_order_id=%s""", (source,original))
                         existing = cur.fetchone()
                         if not existing or existing[1] != digest:
@@ -144,10 +133,9 @@ def register(app, authorized):
             return reply({"error":"persistent_queue_disabled"},503)
         try:
             with connect() as db:
-                db.execute(SCHEMA)
                 rows = db.execute("""SELECT id,source,source_order_id,origin,destination,
                      trip_date,trip_time,status,created_at
-                     FROM pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()
+                     FROM public.pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()
             orders = [{"id":str(row[0]),"source":row[1],"source_order_id":row[2],
                        "origin":row[3],"destination":row[4],
                        "trip_date":row[5],"trip_time":row[6],

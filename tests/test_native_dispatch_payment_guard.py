@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 from flask import Flask
-from pd_dispatch_persistent import enabled, validated_order, register
+from pd_dispatch_persistent import enabled, ingest_enabled, validated_order, register
 
 class PaymentGuardTests(unittest.TestCase):
     def test_explicit_disabled_required(self):
@@ -16,6 +16,11 @@ class PaymentGuardTests(unittest.TestCase):
             self.assertFalse(enabled())
             os.environ["PD_PAYMENT_MODE"]="disabled"
             self.assertTrue(enabled())
+            self.assertTrue(ingest_enabled())
+            del os.environ["PD_DISPATCH_ORDERS_INGEST_SECRET"]
+            self.assertTrue(enabled())
+            self.assertFalse(ingest_enabled())
+
 
     def test_disabled_route_fails_closed(self):
         app = Flask(__name__)

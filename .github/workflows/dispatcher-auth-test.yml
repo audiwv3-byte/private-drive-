@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/web-dispatcher-browser-auth
+      - feature/dispatcher-owner-mfa
   workflow_dispatch:
 permissions:
   contents: read

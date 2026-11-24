@@ -189,6 +189,53 @@ class DispatcherBrowserTests(unittest.TestCase):
         self.assertTrue(app.config["SESSION_COOKIE_SECURE"])
         self.assertEqual(app.config["SESSION_COOKIE_SAMESITE"], "Strict")
 
+    def test_owner_mfa_requires_code_and_closes_registration(self):
+        app = Flask(__name__)
+        core = SimpleNamespace(ADMIN_IDS=frozenset({999}), is_admin=lambda uid: uid == 999)
+        credential = generate_password_hash("test-only-password")
+        consumed = set()
+
+        def consume(admin_id, counter):
+            if counter in consumed:
+                return False
+            consumed.add(counter)
+            return True
+
+        passwords = SimpleNamespace(read=lambda admin_id: credential,
+                                    reserve_owner_attempt=lambda *args: True,
+                                    consume_totp=consume)
+        cfg = {"PD_DISPATCH_SESSION_SECRET": "synthetic-secret-32-characters-minimum-12345",
+               "PD_DISPATCH_ADMIN_ID": "999",
+               "PD_DISPATCH_DATABASE_URL": "postgresql://unused/test",
+               "PD_DISPATCH_REQUIRE_MFA": "1",
+               "PD_DISPATCH_TOTP_BASE32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"}
+        with patch.dict(os.environ, cfg, clear=True):
+            with patch.object(pd_web_dispatcher, "DispatcherPasswords", return_value=passwords):
+                self.assertTrue(pd_web_dispatcher.register(app, core))
+        app.config["TESTING"] = True
+        browser = app.test_client()
+        self.assertEqual(browser.get("/dispatch/register").status_code, 403)
+        self.assertEqual(browser.get("/dispatch/recover").status_code, 403)
+        self.assertIn(b'name="totp"', browser.get("/dispatch/login").data)
+
+        def login(client, code=""):
+            client.get("/dispatch/login")
+            with client.session_transaction() as state:
+                csrf = state["pd_dispatch_csrf"]
+            return client.post("/dispatch/login", data={
+                "password": "test-only-password", "csrf": csrf, "totp": code,
+            })
+
+        with patch.object(pd_web_dispatcher, "totp_counter",
+                          side_effect=lambda key, code, now: 123 if code == "123456" else None):
+            self.assertEqual(login(browser).status_code, 401)
+            self.assertEqual(browser.get("/dispatch/orders/state").status_code, 401)
+            self.assertEqual(login(browser, "123456").status_code, 302)
+            self.assertEqual(browser.get("/dispatch").status_code, 200)
+            other_browser = app.test_client()
+            self.assertEqual(login(other_browser, "123456").status_code, 401)
+            self.assertEqual(other_browser.get("/dispatch/map").status_code, 302)
+
     def test_mapbox_public_token_configuration_diagnostic(self):
         """Report only token presence and validity, never the token itself."""
         import re

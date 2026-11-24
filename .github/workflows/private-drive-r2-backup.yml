@@ -47,6 +47,7 @@ jobs:
           done
           [[ "$R2_ACCOUNT_ID" =~ ^[0-9a-fA-F]{32}$ ]] || { echo "::error::Invalid Cloudflare account ID"; exit 1; }
           [[ "$AGE_RECIPIENT" =~ ^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$ ]] || { echo "::error::Invalid age recipient"; exit 1; }
+          command -v docker >/dev/null || { echo "::error::Docker unavailable"; exit 1; }
 
       - name: Install age encryption CLI
         shell: bash
@@ -81,9 +82,18 @@ jobs:
               pg_dump --dbname="$PG_TEST_DATABASE_URL" --format=custom --no-owner --no-acl
             ' | age --encrypt --recipient "$AGE_RECIPIENT" --output "$ENCRYPTED"
           test -s "$ENCRYPTED"
-          aws --endpoint-url "$ENDPOINT" s3api put-object \
-            --bucket "$R2_BUCKET" --key "$KEY" --body "$ENCRYPTED" \
+          # Use the AWS CLI container: do not assume awscli exists on the runner.
+          # Only the encrypted file is mounted into the upload container.
+          docker run --rm --network host \
+            --env AWS_ACCESS_KEY_ID --env AWS_SECRET_ACCESS_KEY \
+            --env AWS_DEFAULT_REGION --env AWS_EC2_METADATA_DISABLED \
+            --volume "$ENCRYPTED:/backup.age:ro" \
+            amazon/aws-cli:2 --endpoint-url "$ENDPOINT" s3api put-object \
+            --bucket "$R2_BUCKET" --key "$KEY" --body /backup.age \
             --content-type application/octet-stream >/dev/null
-          aws --endpoint-url "$ENDPOINT" s3api head-object \
+          docker run --rm --network host \
+            --env AWS_ACCESS_KEY_ID --env AWS_SECRET_ACCESS_KEY \
+            --env AWS_DEFAULT_REGION --env AWS_EC2_METADATA_DISABLED \
+            amazon/aws-cli:2 --endpoint-url "$ENDPOINT" s3api head-object \
             --bucket "$R2_BUCKET" --key "$KEY" >/dev/null
           echo 'Encrypted object uploaded and confirmed via object metadata.'

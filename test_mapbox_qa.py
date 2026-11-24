@@ -2,7 +2,6 @@
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import sys
 import tempfile
@@ -69,8 +68,8 @@ class MapboxQaTests(unittest.TestCase):
 
             forbidden = run("sk.must_not_be_used")
             self.assertNotEqual(forbidden.returncode, 0)
-            self.assertNotIn(forbidden.args[-1] if isinstance(forbidden.args[-1], str)
-                             else "UNLIKELY", forbidden.stdout)
+            self.assertIn("must be a public Mapbox token", forbidden.stderr)
+            self.assertNotIn("sk.must_not_be_used", forbidden.stdout + forbidden.stderr)
             self.assertEqual(target.read_text(encoding="utf-8").strip(),
                              "window.PD_MAPBOX_PUBLIC_TOKEN = " + json.dumps(sample) + ";")
 

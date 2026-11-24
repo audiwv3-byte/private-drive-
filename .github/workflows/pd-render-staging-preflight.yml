@@ -1,0 +1,149 @@
+name: PRIVATE DRIVE Render staging preflight (GET only)
+
+# The operator must review before placing at this exact path on the QA branch.
+on:
+  push:
+    branches: [feature/native-dispatch-integration-no-payments]
+    paths: [.github/workflows/pd-render-staging-preflight.yml]
+
+permissions: {}
+concurrency:
+  group: private-drive-render-staging-preflight
+  cancel-in-progress: false
+
+jobs:
+  staging-preflight:
+    if: ${{ github.repository == 'audiwv3-byte/private-drive-' && github.ref == 'refs/heads/feature/native-dispatch-integration-no-payments' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      # No checkout, third-party action, Docker image or downloaded script in the
+      # credential-bearing step. Provider bodies are never printed.
+      - name: Inspect only existing staging resources
+        env:
+          RENDER_TOKEN: ${{ secrets.RENDER_API_KEY }}
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          set +x
+          python3 -I - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          HOST = "https://api.render.com"
+          WORKSPACE_ID = "tea-dbvtteui0phs73b55i80"
+          AUTH = "srv-dbvumcks728c73c1atvg"
+          DISPATCH = "srv-dc0qfsp42hec73c7ff3g"
+          POSTGRES = "dpg-dc00pubm8hqs7397rblg-a"
+          REGION = "frankfurt"
+          REPO = "https://github.com/audiwv3-byte/private-drive-"
+          TOKEN = os.environ.get("RENDER_TOKEN", "").strip()
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+          opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+
+          def check(path, metadata=False):
+              # Paths below are assembled only from literal ID/key allowlists.
+              try:
+                  req = urllib.request.Request(
+                      HOST + "/v1" + path,
+                      headers={
+                          "Authorization": "Bearer " + TOKEN,
+                          "Accept": "application/json",
+                      },
+                      method="GET",
+                  )
+                  with opener.open(req, timeout=8) as response:
+                      if response.status != 200:
+                          return False, {}
+                      if not metadata:
+                          return True, {}
+                      result = json.loads(response.read(131073))
+                      return True, result if isinstance(result, dict) else {}
+              except urllib.error.HTTPError as exc:
+                  exc.close()  # Do not read or print provider error bodies.
+              except (OSError, ValueError):
+                  pass
+              return False, {}
+
+          def safe_service(data, expected_id, expected_name, expected_slug, branch):
+              details = data.get("serviceDetails")
+              return (
+                  data.get("id") == expected_id
+                  and data.get("ownerId") == WORKSPACE_ID
+                  and data.get("name") == expected_name
+                  and data.get("slug") == expected_slug
+                  and data.get("repo") == REPO
+                  and data.get("branch") == branch
+                  and data.get("type") == "web_service"
+                  and data.get("autoDeployTrigger") == "off"
+                  and isinstance(details, dict)
+                  and details.get("region") == REGION
+                  and details.get("url") == "https://" + expected_slug + ".onrender.com"
+              )
+
+          report = {"render_key_present": bool(TOKEN)}
+          if not TOKEN:
+              print(json.dumps(report, sort_keys=True))
+              raise SystemExit(1)
+
+          ok, auth = check("/services/" + AUTH, metadata=True)
+          report["auth_service_verified"] = ok and safe_service(
+              auth, AUTH, "private-drive-", "private-drive-drbd",
+              "feature/flutter-independent-auth",
+          )
+
+          ok, dispatch = check("/services/" + DISPATCH, metadata=True)
+          report["dispatcher_service_verified"] = ok and safe_service(
+              dispatch, DISPATCH, "private-drive-dispatcher-staging", "private-drive-dispatcher-staging",
+              "feature/web-dispatcher-browser-auth",
+          )
+
+          ok, pg = check("/postgres/" + POSTGRES, metadata=True)
+          owner = pg.get("owner")
+          owner_id = owner.get("id") if isinstance(owner, dict) else owner
+          report["postgres_metadata_verified"] = (
+              ok and pg.get("id") == POSTGRES and owner_id == WORKSPACE_ID
+              and pg.get("name") == "private-drive-test-db"
+              and pg.get("databaseName") == "private_drive_test"
+              and pg.get("region") == REGION and pg.get("status") == "available"
+              and pg.get("plan") == "free"
+          )
+
+          # Use status only; never parse or display this sensitive response.
+          report["postgres_connection_info_accessible"] = False
+          if report["postgres_metadata_verified"]:
+              report["postgres_connection_info_accessible"], _ = check(
+                  "/postgres/" + POSTGRES + "/connection-info"
+              )
+
+          # Test presence on individual non-secret gate keys, never list env vars.
+          # An inaccessible/missing/linked variable all gives false (not proof absent).
+          targets = (
+              ("auth", AUTH, report["auth_service_verified"], (
+                  "PD_NATIVE_SMS_ISOLATED", "PD_PAYMENT_MODE", "PD_DISPATCH_PERSISTENT_QUEUE",
+                  "PD_NATIVE_SMS_LIVE", "TWILIO_VERIFY_ENABLED",
+              )),
+              ("dispatcher", DISPATCH, report["dispatcher_service_verified"], (
+                  "PD_DISPATCH_STAGING_ONLY", "PD_PAYMENT_MODE", "PD_DISPATCH_PERSISTENT_QUEUE",
+              )),
+          )
+          for label, service_id, verified, names in targets:
+              if verified:
+                  for name in names:
+                      report[label + "_env_" + name.lower() + "_accessible"], _ = check(
+                          "/services/" + service_id + "/env-vars/" + name
+                      )
+
+          # No DSN is read, used, persisted, or displayed: this job is status-only.
+          print(json.dumps(report, sort_keys=True))
+          if not all(report[k] for k in (
+              "auth_service_verified", "dispatcher_service_verified",
+              "postgres_metadata_verified", "postgres_connection_info_accessible",
+          )):
+              raise SystemExit(1)
+          PY

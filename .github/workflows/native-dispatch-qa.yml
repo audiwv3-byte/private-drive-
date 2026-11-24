@@ -1,0 +1,166 @@
+name: PRIVATE DRIVE isolated no-payment QA
+
+on:
+  push:
+    branches:
+      - feature/native-dispatch-integration-no-payments
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PD_STAGING_NATIVE_AUTH_API_URL: https://example.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Create isolated Android Flutter scaffold
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive private_drive_build
+          cp -R flutter_app/lib/. private_drive_build/lib/
+          cp -R flutter_app/assets private_drive_build/assets
+          # Install Pillow BEFORE starting the Python interpreter.
+          # Installing it from inside a running Python process leaves its
+          # newly created user-site path unavailable to that same process.
+          python3 -m pip install --quiet Pillow
+          # The exact, approved 1254px lossless asset is used by Flutter,
+          # the Android launcher, and the native launch background.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          source = Path("flutter_app/assets/brand/private_drive_logo.webp")
+          data = source.read_bytes()
+          expected = "550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f"
+          assert hashlib.sha256(data).hexdigest() == expected, "approved logo hash mismatch"
+          assert data[:4] == b"RIFF" and data[8:16] == b"WEBPVP8L"
+          assert len(data) > 1000000, "approved full resolution asset missing"
+          android = Path("private_drive_build/android/app/src/main")
+          drawable = android / "res/drawable-nodpi"
+          drawable.mkdir(parents=True, exist_ok=True)
+          (drawable / "private_drive_logo.webp").write_bytes(data)
+          # Keep the original brand image for the launcher and Flutter.
+          # Android's native bitmap drawable is not fit-center scaled on
+          # narrow phones; the old 1254px artwork could be clipped.
+          # Generate a smaller lossless native splash image with margins.
+          import io
+          from PIL import Image
+          with Image.open(io.BytesIO(data)) as source_image:
+              source_image.thumbnail((720, 720), Image.Resampling.LANCZOS)
+              splash = io.BytesIO()
+              source_image.save(splash, format="WEBP", lossless=True)
+          (drawable / "private_drive_splash_logo.webp").write_bytes(splash.getvalue())
+          assert source_image.width <= 720 and source_image.height <= 720
+          # The Flutter entry screen uses exactly the same approved image.
+          assert len(data) >= 3000
+          launch = """<?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/black" />
+              <item>
+                  <bitmap android:gravity="center" android:src="@drawable/private_drive_splash_logo" />
+              </item>
+          </layer-list>
+          """
+          for dirname in ("drawable", "drawable-v21"):
+              folder = android / f"res/{dirname}"
+              folder.mkdir(parents=True, exist_ok=True)
+              (folder / "launch_background.xml").write_text(launch)
+          manifest = android / "AndroidManifest.xml"
+          text = manifest.read_text()
+          assert 'android:icon="@mipmap/ic_launcher"' in text
+          text = text.replace('android:icon="@mipmap/ic_launcher"',
+                              'android:icon="@drawable/private_drive_logo"')
+          text = text.replace('android:label="private_drive"',
+                              'android:label="PRIVATE DRIVE DEMO"')
+          manifest.write_text(text)
+          assert '@drawable/private_drive_logo' in manifest.read_text()
+          print(f"Brand asset verified ({len(data)} bytes), Android icon and splash replaced")
+          PY
+          python3 flutter_app/tool/apply_native_brand_splash.py
+          cp -R flutter_app/test/. private_drive_build/test/
+          cp -R flutter_app/integration_test private_drive_build/integration_test
+          cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
+          # The generated transparent artwork is shared by native sign-in and
+          # the pilot's offline go-online screen, never by the launcher icon.
+          # Ensure Pillow exists in this Python context before generating it.
+          python3 -m pip install --quiet Pillow
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib
+          source = Path("flutter_app/assets/brand/private_drive_logo.webp")
+          assert hashlib.sha256(source.read_bytes()).hexdigest() == "550d3b75e1a50fc4feb4d34bec1727c7dd0f6a947f94e16295b834abbfbde35f"
+          image = Image.open(source).convert("RGB")
+          rgba = image.convert("RGBA")
+          rgb = image.load()
+          px = rgba.load()
+          for y in range(image.height):
+              for x in range(image.width):
+                  red, green, blue = rgb[x, y]
+                  strength = max(red, green, blue)
+                  t = min(1.0, max(0.0, (strength - 25.0) / 70.0))
+                  opacity = round(255 * t * t * (3 - 2 * t))
+                  px[x, y] = (red, green, blue, opacity)
+          dest = Path("private_drive_build/assets/brand/private_drive_logo_transparent.png")
+          rgba.save(dest, format="PNG", optimize=True)
+          assert rgba.getpixel((0, 0))[3] == 0, "black backdrop must be transparent"
+          assert rgba.getpixel((image.width // 2, image.height // 2))[3] > 0, "gold artwork must remain visible"
+          pubspec = Path("private_drive_build/pubspec.yaml")
+          contents = pubspec.read_text()
+          marker = "    - assets/brand/private_drive_logo.webp"
+          assert contents.count(marker) == 1
+          pubspec.write_text(contents.replace(marker,
+              marker + chr(10) + "    - assets/brand/private_drive_logo_transparent.png"))
+          assert dest.stat().st_size > 10000
+          print(f"Original logo unchanged; sign-in transparency ready: {dest.stat().st_size} bytes")
+          PY
+          cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
+          rm -f private_drive_build/test/widget_test.dart
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest = Path("private_drive_build/android/app/src/main/AndroidManifest.xml")
+          data = manifest.read_text()
+          assert "<manifest" in data and "<application" in data
+          insert = ('    <uses-permission android:name="android.permission.INTERNET"/>\\n'
+                    '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\\n'
+                    '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\\n'
+                    '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\\n'
+                    '    <uses-permission android:name="android.permission.CAMERA"/>\\n'
+                    '    <uses-feature android:name="android.hardware.camera" android:required="false"/>\\n'
+                    '    <queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>\\n')
+          insert = insert.replace('\\n', '\n')
+          data = data.replace("<application", insert + "    <application", 1)
+          manifest.write_text(data)
+          PY
+      - name: Verify two isolated HTTP chat sessions and message delivery
+        run: |
+          python3 -m unittest discover -s test_sync_server -p 'test_*.py' -v
+      - name: Python syntax and isolated tests
+        run: |
+          python3 -m pip install pytest flask 'psycopg[binary]' -r requirements.txt
+          python3 -m py_compile pd_native_orders_http.py pd_dispatch_persistent.py isolated_sms_wsgi.py pd_dispatcher_staging_wsgi.py
+          python3 -m pytest -q tests -k 'dispatch_persistent or native_orders'
+      - name: Flutter tests and debug APK
+        working-directory: private_drive_build
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+          flutter build apk --debug --dart-define="PD_NATIVE_AUTH_API_URL=$PD_STAGING_NATIVE_AUTH_API_URL"
+          mkdir -p ../private_drive_qa
+          cp build/app/outputs/flutter-apk/app-debug.apk ../private_drive_qa/private-drive-qa.apk
+          cd ../private_drive_qa
+          sha256sum private-drive-qa.apk > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-no-payment-qa-apk
+          path: private_drive_qa/
+          if-no-files-found: error
+          retention-days: 7

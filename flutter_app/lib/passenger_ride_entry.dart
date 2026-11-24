@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'native_orders_api.dart';
 import 'demo_trip_store.dart';
 import 'passenger_demo.dart';
 import 'passenger_extra_services.dart';
@@ -15,14 +16,20 @@ class PassengerRideEntry extends StatelessWidget {
     required this.tripStore,
     this.onSignOut,
     this.onBackToCabinets,
+    this.ordersApi,
   });
 
+  final NativeOrdersApi? ordersApi;
   final bool enableMapTiles;
   final DemoTripStore tripStore;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
 
   void _openExtra(BuildContext context, ExtraServiceType service) {
+    if (ordersApi != null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Дополнительные услуги пока не подключены к серверу.')));
+      return;
+    }
     Navigator.push(context, MaterialPageRoute<void>(
       builder: (_) => PdPassengerLanguageScope(
         child: PassengerExtraServices(
@@ -38,6 +45,7 @@ class PassengerRideEntry extends StatelessWidget {
           enableMapTiles: enableMapTiles,
           tripStore: tripStore,
           initialRideType: type,
+          ordersApi: ordersApi,
         ),
       ),
     ));
@@ -51,6 +59,7 @@ class PassengerRideEntry extends StatelessWidget {
           : BackButton(onPressed: onBackToCabinets),
       actions: [
         const PdLanguageMenu(),
+        if (ordersApi != null) IconButton(icon: const Icon(Icons.history), tooltip: 'Мои заказы', onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => NativeOrdersHistory(api: ordersApi!)))),
         if (onSignOut != null)
           IconButton(
             key: const Key('passenger-sign-out'),

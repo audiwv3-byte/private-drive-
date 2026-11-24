@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'native_orders_api.dart';
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
 import 'private_drive_bright_backdrop.dart';
@@ -173,6 +174,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',
       adminOnly: role == 'dispatcher',
       storageScope: session?.userId ?? 'internal-guest',
+      ordersApi: role == 'passenger' && session != null
+          ? NativeOrdersApi(const String.fromEnvironment('PD_NATIVE_AUTH_API_URL'), session.token)
+          : null,
       onSignOut: _signOut, onBackToCabinets: _entry,
     );
     Widget child = PdPermissionsFirstLaunch(child: cabin);

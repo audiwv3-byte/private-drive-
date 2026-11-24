@@ -4,6 +4,7 @@ Designed for isolated stage-to-real migration. No QA tokens, no client-chosen
 roles and no real payments. Requires separate, durable PostgreSQL and a private
 server-to-server HMAC key; remains disabled until deliberately configured.
 """
+from datetime import date as calendar_date
 import hashlib
 import hmac
 import json
@@ -37,6 +38,7 @@ def enabled():
     key = os.environ.get("PD_DISPATCH_ORDERS_INGEST_SECRET", "")
     return (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
             and os.environ.get("PD_DISPATCH_PERSISTENT_QUEUE") == "1"
+            and os.environ.get("PD_PAYMENT_MODE") == "disabled"
             and dsn.startswith(("postgresql://", "postgres://"))
             and len(key) >= 32)
 
@@ -58,7 +60,7 @@ def validated_order(data):
         raise ValueError("invalid_order")
     source = data["source"]
     original = data["source_order_id"]
-    if source not in SOURCES or not isinstance(original, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", original):
+    if not isinstance(source, str) or source not in SOURCES or not isinstance(original, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", original):
         raise ValueError("invalid_source")
     origin, destination = data["from"], data["to"]
     if not isinstance(origin, str) or not isinstance(destination, str):
@@ -71,6 +73,7 @@ def validated_order(data):
         raise ValueError("invalid_departure")
     if not isinstance(clock, str) or not re.fullmatch(r"[0-2][0-9]:[0-5][0-9]", clock) or int(clock[:2]) > 23:
         raise ValueError("invalid_departure")
+    calendar_date.fromisoformat(date)
     return source, original, origin, destination, date, clock
 
 
@@ -107,6 +110,7 @@ def register(app, authorized):
         source, original, origin, destination, date, clock = values
         digest = fingerprint(values)
         order_id = str(uuid.uuid4())
+        status = "requested"
         try:
             with connect() as db:
                 db.execute(SCHEMA)
@@ -119,14 +123,15 @@ def register(app, authorized):
                         RETURNING id""", (order_id,source,original,digest,origin,destination,date,clock))
                     inserted = cur.fetchone()
                     if not inserted:
-                        cur.execute("""SELECT id,fingerprint FROM pd_dispatch_orders
+                        cur.execute("""SELECT id,fingerprint,status FROM pd_dispatch_orders
                             WHERE source=%s AND source_order_id=%s""", (source,original))
                         existing = cur.fetchone()
                         if not existing or existing[1] != digest:
                             return reply({"error":"source_order_conflict"}, 409)
                         order_id = str(existing[0])
+                        status = existing[2]
             return reply({"order_id":order_id,"source":source,"source_order_id":original,
-                          "status":"requested","created":bool(inserted)}, 201 if inserted else 200)
+                          "status":status,"created":bool(inserted),"payment_mode":"disabled"}, 201 if inserted else 200)
         except Exception:
             app.logger.exception("Persistent dispatcher order store unavailable")
             return reply({"error":"storage_unavailable"},503)

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/flutter-independent-auth
+      - feature/website-private-drive-preview
     paths:
       - 'flutter_app/**'
       - '.github/workflows/flutter-ios-prototype.yml'

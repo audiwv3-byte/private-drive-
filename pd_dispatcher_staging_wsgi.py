@@ -59,6 +59,8 @@ def create_app():
 
     @app.get("/payment/paysera")
     def paysera_payment():
+        if os.environ.get("PD_PAYMENT_MODE") == "disabled":
+            return "Payments disabled for pilot", 403
         recipient = os.environ.get("PD_PAYSERA_RECIPIENT_CODE", "")
         qr = os.environ.get("PD_PAYSERA_QR_PNG_BASE64", "")
         enabled = (os.environ.get("PD_PAYSERA_MANUAL_ENABLED") == "1"

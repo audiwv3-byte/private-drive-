@@ -22,11 +22,14 @@ typedef PdSignInBuilder = Widget Function(BuildContext context, String role,
 class PdNativeCabinEntry extends StatefulWidget {
   const PdNativeCabinEntry({super.key, required this.signInBuilder,
     required this.identityApiBuilder, this.logoutApi, this.sessionManager,
-    this.isolatedSyncGatewayBuilder});
+    this.isolatedSyncGatewayBuilder, this.closedInviteOnly = false,
+    this.allowInvitedPilot = false});
   final PdSignInBuilder signInBuilder;
   final PdIdentityApi Function(PdNativeSession session) identityApiBuilder;
   final PdNativeLogoutApi? logoutApi;
   final PdNativeSessionManager? sessionManager;
+  final bool closedInviteOnly;
+  final bool allowInvitedPilot;
   /// Explicit internal QA only. Uses the existing verified phone token,
   /// never a separate manual demo token or an unverified guest session.
   final RemoteTripGateway Function(PdNativeSession session, String cabin)?
@@ -54,6 +57,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   );
 
   bool _canOpenPilot(PdNativeSession? session) {
+    if (widget.closedInviteOnly) {
+      return widget.allowInvitedPilot && session?.role == 'pilot';
+    }
     if (!_stagePilotAssignments) return session?.canPilot == true;
     return session != null &&
         const {'pilot', 'pilot_dispatcher'}.contains(session.role);
@@ -133,6 +139,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
         _page = 'photo';
       } else if (role == 'dispatcher') {
         _page = session?.canDispatch == true ? 'dispatcher' : 'signin';
+      } else if (widget.closedInviteOnly && session?.role == 'pilot') {
+        _requestedRole = 'pilot';
+        _page = 'photo';
       } else {
         _page = session != null || _allowInternalGuest
             ? 'passenger' : 'signin';
@@ -143,6 +152,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     bool persist = true, bool restored = false,
   }) {
     if (!mounted || !session.active) return;
+    if (widget.closedInviteOnly && session.role != 'passenger' &&
+        !_canOpenPilot(session)) return;
     if (persist && widget.sessionManager != null) {
       // Persist only server-authenticated sessions received from this
       // callback; no guest mode or role picker can write tokens.
@@ -159,6 +170,11 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       // Require explicit cabin selection from freshly verified server rights.
       if (restored) {
         _page = 'entry';
+      } else if (widget.closedInviteOnly) {
+        // The server's invitation principal, not the chosen screen, decides
+        // the first cabin. A pilot session always starts at the photo gate.
+        _requestedRole = session.role;
+        _page = session.role == 'pilot' ? 'photo' : 'passenger';
       } else if (_requestedRole == 'pilot' && _canOpenPilot(session)) {
         _page = 'photo';
       } else if (_requestedRole == 'dispatcher' && session.canDispatch) {

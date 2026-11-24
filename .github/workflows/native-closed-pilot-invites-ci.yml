@@ -1,4 +1,4 @@
-name: PRIVATE DRIVE isolated invite and pilot UI tests
+name: PRIVATE DRIVE isolated pilot invite, photo and map tests
 
 on:
   workflow_dispatch:
@@ -9,8 +9,24 @@ on:
       - isolated_sms_wsgi.py
       - pd_native_closed_invites.py
       - pd_issue_closed_pilot_invite.py
+      - pd_native_identity_http.py
+      - pd_native_pilot_assignment.py
+      - pd_web_dispatcher.py
+      - pd_web_native_photo_review.py
+      - pd_dispatcher_staging_wsgi.py
+      - pd_dispatcher_dashboard.html
+      - pd_dispatcher_mapbox.html
+      - requirements-sms-render.txt
+      - requirements-dispatcher-staging.txt
       - migrations/native_closed_pilot_invites.sql
+      - migrations/native_pilot_invite_onboarding.sql
+      - migrations/native_auth_session_functions.sql
+      - migrations/native_dispatch_orders.sql
+      - migrations/native_pilot_assignment.sql
+      - migrations/native_pilot_identity.sql
+      - migrations/native_web_photo_review.sql
       - tests/test_native_closed_invites*.py
+      - tests/test_native_web_photo_review_postgres.py
       - flutter_app/lib/main.dart
       - flutter_app/lib/native_cabin_entry.dart
       - flutter_app/lib/native_closed_invite_api.dart
@@ -20,7 +36,11 @@ on:
       - flutter_app/test/native_closed_invite_test.dart
       - flutter_app/lib/native_pilot_orders.dart
       - flutter_app/lib/pilot_cabin.dart
+      - flutter_app/lib/demo_interfaces.dart
+      - flutter_app/lib/demo_map_tile_provider.dart
       - flutter_app/test/native_pilot_orders_test.dart
+      - flutter_app/test/pilot_assigned_map_test.dart
+      - flutter_app/test/pilot_cabin_test.dart
 
 permissions:
   contents: read
@@ -43,15 +63,40 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      photo-postgres:
+        # Separate fresh cluster: each synthetic suite has its own exact
+        # empty test database name and credentials.
+        image: postgres:16
+        env:
+          POSTGRES_USER: pd_web_photo_review_owner
+          POSTGRES_PASSWORD: synthetic-only
+          POSTGRES_DB: private_drive_test
+        ports: ['127.0.0.1:55444:5432']
+        options: >-
+          --health-cmd "pg_isready -U pd_web_photo_review_owner -d private_drive_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       PD_CI_CLOSED_INVITES_TEST_PG: postgresql://pd_invite_ci:synthetic-test-only@127.0.0.1:55438/private_drive_test
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install 'psycopg[binary]'
-      - run: python -m unittest discover -v -s tests -p 'test_native_closed_invites*.py'
+      - run: python -m pip install -r requirements-sms-render.txt pytest Flask==3.0.3 Werkzeug==3.1.9
+      - name: Verify exact role, invitation and no-SMS startup on disposable PostgreSQL
+        run: python -m unittest discover -v -s tests -p 'test_native_closed_invites*.py'
+      - name: Verify web photo review with synthetic images and restricted roles
+        env:
+          PD_CI_FAKE_DB_ONLY: 'YES'
+          PD_SYNTHETIC_WEB_PHOTO_REVIEW_DATABASE_URL: postgresql://pd_web_photo_review_owner:synthetic-only@127.0.0.1:55444/private_drive_test
+        run: |
+          test "$PD_CI_FAKE_DB_ONLY" = YES
+          test -n "$PD_SYNTHETIC_WEB_PHOTO_REVIEW_DATABASE_URL"
+          python -m pytest -q tests/test_native_web_photo_review_postgres.py
 
   invite-and-pilot-flutter-tests:
     if: github.ref == 'refs/heads/feature/native-dispatch-integration-no-payments'
@@ -62,15 +107,19 @@ jobs:
         working-directory: flutter_app
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: '3.50.0'
           cache: true
       - run: flutter pub get
-      - name: Verify invite and pilot order widgets with mocked HTTP
+      - name: Verify invite, pilot order and offline GPS privacy widgets
         run: >-
           flutter test test/native_closed_invite_test.dart
           test/native_auth_relaunch_widget_test.dart
           test/native_cabin_entry_test.dart
           test/native_pilot_orders_test.dart
+          test/pilot_assigned_map_test.dart
+          test/pilot_cabin_test.dart

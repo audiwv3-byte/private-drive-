@@ -26,6 +26,7 @@
 <aside class="sidebar" id="sidebar" aria-label="Навигация">
 <div class="brand"><img src="/pd-logo-transparent.png" alt="PRIVATE DRIVE — золотой логотип PD с автомобилем" width="102" height="102" style="width:102px;height:102px;max-width:100%;aspect-ratio:1;object-fit:contain;border-radius:16px"></div>
 <nav class="menu" aria-label="Разделы диспетчерской">
+{% if native_photo_review_enabled %}<a class="nav" href="/dispatch/native-photo-review">Фотопроверка пилотов</a>{% endif %}
 <a class="nav" href="/dispatch/map" style="text-decoration:none"><span class="symbol">◉</span>Карта Mapbox ↗</a>
 {% if analytics_enabled %}<a class="nav" href="/dispatch/analytics" style="text-decoration:none">Воронка сайта</a>{% endif %}
 <button class="nav active" type="button" data-section="Панель управления"><span class="symbol">⌂</span>Панель управления</button>

@@ -194,6 +194,25 @@ def register(app, core):
             hashlib.sha256(credential.encode()).hexdigest(),
         )
 
+    def photo_reviewer_context():
+        if not authorized():
+            return None
+        version = session["pd_dispatch_credential_version"]
+        return admin_id, web_review_credential_proof(secret, admin_id, version)
+
+    def verify_photo_reviewer_password(supplied):
+        try:
+            credential = passwords.read(admin_id) if passwords else password_hash
+            matches = (bool(credential)
+                       and secrets.compare_digest(session.get("pd_dispatch_credential_version", ""),
+                                                  hashlib.sha256(credential.encode()).hexdigest())
+                       and check_password_hash(credential, supplied))
+            if matches:
+                attempts.pop(("native-photo-review", request.remote_addr or "unknown"), None)
+            return matches
+        except Exception:
+            return False
+
     def within_attempt_limit(kind):
         ip = request.remote_addr or "unknown"
         history = attempts[kind, ip]
@@ -342,6 +361,16 @@ def register(app, core):
         from pd_pilot_qa_intake import register as register_qa_pilots
         register_qa_pilots(app, authorized)
 
+    # A distinct, default-off native photo-review page; no linkage to legacy
+    # pilot applications and no review/enrollment authority from the browser ID.
+    from pd_web_native_photo_review import (
+        photo_review_database, register_web_native_photo_review, web_review_credential_proof,
+    )
+    if os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
+        register_web_native_photo_review(
+            app, photo_reviewer_context, verify_photo_reviewer_password,
+            lambda: within_attempt_limit("native-photo-review"), csrf, valid_csrf)
+
     @app.get("/dispatch")
     def pd_dispatch_home():
         if test_sync_enabled or persistent_queue_enabled:
@@ -350,7 +379,8 @@ def register(app, core):
             return redirect(url_for("pd_dispatch_login"))
         dashboard = Path(__file__).with_name("pd_dispatcher_dashboard.html").read_text(encoding="utf-8")
         response = app.make_response(render_template_string(dashboard, csrf=csrf(),
-                                     analytics_enabled="pd_site_analytics" in app.view_functions))
+                                     analytics_enabled="pd_site_analytics" in app.view_functions,
+                                     native_photo_review_enabled=bool(photo_review_database())))
         response.headers["Cache-Control"] = "private, no-store"
         return response
 
@@ -368,6 +398,7 @@ def register(app, core):
             persistent_queue_enabled=persistent_queue_enabled,
             analytics_enabled="pd_site_analytics" in app.view_functions,
             pilot_assignment_enabled=pilot_assignment_enabled,
+            native_photo_review_enabled=bool(photo_review_database()),
             csrf=csrf() if test_sync_enabled or persistent_queue_enabled else "",
         ))
         response.headers.update({

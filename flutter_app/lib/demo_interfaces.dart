@@ -415,7 +415,29 @@ class PilotDemo extends StatefulWidget {
     this.onIncomingMessageVoice,
     this.showAssignedOffer = true,
     this.testRoadPoints,
-  });
+  }) : deviceLocationOnly = false,
+       deviceTileProviderForTest = null;
+
+  /// Existing map surface, but explicitly without trip, chat, payment, or
+  /// server-sharing controls. Only local device positioning may be enabled.
+  const PilotDemo.ownDevice({
+    super.key,
+    this.enableMapTiles = true,
+    this.mapController,
+    this.loadMapTiles = true,
+    this.deviceTileProviderForTest,
+  }) : deviceLocationOnly = true,
+       positions = null,
+       tripStore = null,
+       onIncomingSound = null,
+       onIncomingMessageVoice = null,
+       showAssignedOffer = false,
+       testRoadPoints = null;
+
+  final bool deviceLocationOnly;
+  /// Optional recording boundary for widget tests of the ordinary online map.
+  /// It is never used for the private GPS surface.
+  final TileProvider Function()? deviceTileProviderForTest;
 
   final bool enableMapTiles;
   /// Synthetic stream for deterministic tests; never enabled by production.
@@ -438,10 +460,15 @@ class PilotDemo extends StatefulWidget {
   State<PilotDemo> createState() => _PilotDemoState();
 }
 
-class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMixin {
+class _PilotDemoState extends State<PilotDemo>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final MapController _map = widget.mapController ?? MapController();
   StreamSubscription<Position>? _gps;
   StreamSubscription<LatLng>? _synthetic;
+  bool _deviceLocationForeground = true;
+  bool _deviceLocationStarting = false;
+  bool _devicePrivateSurface = false;
+  int _deviceLocationGeneration = 0;
   LatLng? _position;
   LatLng? _displayPosition;
   double _headingDegrees = 0;
@@ -695,6 +722,13 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
+    if (widget.deviceLocationOnly) {
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      _deviceLocationForeground =
+          lifecycle == null || lifecycle == AppLifecycleState.resumed;
+      WidgetsBinding.instance.addObserver(this);
+      return;
+    }
     _seenPassengerMessageCount =
         widget.tripStore?.passengerChatMessages.length ?? 0;
     widget.tripStore?.addListener(_onTripChanged);
@@ -822,6 +856,9 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
       bool publishToStore = true}) {
     if (!mounted || !value.latitude.isFinite || !value.longitude.isFinite ||
         value.latitude.abs() > 90 || value.longitude.abs() > 180) return;
+    // GPS from the attached assignment cabinet must not reach a network map
+    // camera, its center button, or the legacy address routing methods.
+    if (widget.deviceLocationOnly && !_devicePrivateSurface) return;
     final previous = _displayPosition;
     final previousFix = _position;
     // The location icon points north by default. Rotate it clockwise to the
@@ -845,8 +882,11 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     setState(() {
       _position = value;
       if (course != null) _headingDegrees = (course + 360) % 360;
-      _gpsMessage = 'GPS активен · только на устройстве';
+      _gpsMessage = widget.deviceLocationOnly
+          ? 'Моя позиция · не передаётся диспетчеру'
+          : 'GPS активен · только на устройстве';
     });
+    if (widget.deviceLocationOnly) return;
     if (publishToStore) {
       widget.tripStore?.updatePilotLocation(value.latitude, value.longitude);
     }
@@ -867,7 +907,98 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     _cameraAnimation.forward(from: 0);
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.deviceLocationOnly) return;
+    _deviceLocationForeground = state == AppLifecycleState.resumed;
+    if (!_deviceLocationForeground && (_gpsEnabled || _deviceLocationStarting)) {
+      final permissionRequestInterrupted = _deviceLocationStarting;
+      _stopGps();
+      if (permissionRequestInterrupted) {
+        setState(() => _gpsMessage = 'Нажми «Показать мою позицию» снова');
+      }
+    }
+  }
+
+  bool _activeDeviceLocation(int generation) =>
+      mounted && _deviceLocationForeground &&
+      generation == _deviceLocationGeneration;
+
+  Future<void> _enableDeviceLocation() async {
+    if (!_deviceLocationForeground || _deviceLocationStarting || _gpsEnabled ||
+        !widget.enableMapTiles) {
+      return;
+    }
+    final generation = ++_deviceLocationGeneration;
+    setState(() {
+      _deviceLocationStarting = true;
+      _devicePrivateSurface = true;
+      _gpsMessage = 'Проверяем доступ к GPS устройства…';
+    });
+
+    void streamEnded([Object? error]) {
+      if (!_activeDeviceLocation(generation)) return;
+      _stopGps();
+      setState(() => _gpsMessage = 'GPS устройства недоступен');
+    }
+
+    try {
+      // Unmount the TileLayer before requesting permission or any position.
+      // The GPS callback is independently forbidden from moving its camera.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!_activeDeviceLocation(generation)) return;
+      final servicesOn = await Geolocator.isLocationServiceEnabled();
+      if (!_activeDeviceLocation(generation)) return;
+      if (!servicesOn) {
+        setState(() => _gpsMessage = 'Включи геолокацию устройства');
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (!_activeDeviceLocation(generation)) return;
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (!_activeDeviceLocation(generation)) return;
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
+        setState(() => _gpsMessage = 'Доступ к GPS не предоставлен');
+        return;
+      }
+      setState(() {
+        _gpsEnabled = true;
+        _gpsMessage = 'Ожидание координат GPS…';
+      });
+      _gps = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 5,
+        ),
+      ).listen((position) {
+        if (!_activeDeviceLocation(generation) || position.isMocked) return;
+        _onPosition(
+          LatLng(position.latitude, position.longitude),
+          sensorHeading: position.heading,
+          speed: position.speed,
+          publishToStore: false,
+        );
+      }, onError: streamEnded, onDone: streamEnded);
+    } catch (_) {
+      streamEnded();
+    } finally {
+      if (_activeDeviceLocation(generation)) {
+        setState(() {
+          _deviceLocationStarting = false;
+          if (!_gpsEnabled) _devicePrivateSurface = false;
+        });
+      }
+    }
+  }
+
   Future<void> _enableGps() async {
+    if (widget.deviceLocationOnly) {
+      await _enableDeviceLocation();
+      return;
+    }
     if (_gpsEnabled) return;
     // Synthetic positions never request platform permissions or network calls.
     if (widget.positions != null) {
@@ -919,6 +1050,10 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   }
 
   void _stopGps() {
+    if (widget.deviceLocationOnly) {
+      _deviceLocationGeneration++;
+      _deviceLocationStarting = false;
+    }
     _gps?.cancel();
     _gps = null;
     _synthetic?.cancel();
@@ -930,12 +1065,14 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
       _displayPosition = null;
       _headingDegrees = 0;
       _gpsEnabled = false;
+      _devicePrivateSurface = false;
       _gpsMessage = 'GPS выключен';
       _position = null;
     });
   }
 
   void advance() {
+    if (widget.deviceLocationOnly) return;
     if (widget.tripStore != null) {
       final changed = widget.tripStore!.advancePilot();
       if (changed && _approachingPassenger) {
@@ -970,6 +1107,10 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
+    if (widget.deviceLocationOnly) {
+      _deviceLocationGeneration++;
+      WidgetsBinding.instance.removeObserver(this);
+    }
     _waitingTicker?.cancel();
     _pickupWaitingTicker?.cancel();
     widget.tripStore?.removeListener(_onTripChanged);
@@ -983,8 +1124,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: Drawer(
+    final scaffold = Scaffold(
+      drawer: widget.deviceLocationOnly ? null : Drawer(
         key: const Key('pilot-navigation-drawer'),
         child: SafeArea(child: ListView(children: [
           const DrawerHeader(child: Center(child: Text('PRIVATE DRIVE · Пилот',
@@ -1077,7 +1218,13 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
       body: Stack(
         fit: StackFit.expand,
         children: [
-          if (widget.enableMapTiles)
+          if (_devicePrivateSurface)
+            _PilotDevicePositionGrid(
+              position: _position,
+              headingDegrees: _headingDegrees,
+              night: _nightMap,
+            )
+          else if (widget.enableMapTiles)
             KeyedSubtree(
               key: ValueKey('pilot-map-retry-$_pilotTileRetry'),
               child: FlutterMap(
@@ -1109,13 +1256,16 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           ]),
                     child: TileLayer(
                     key: const Key('pilot-map-tiles'),
-                    tileProvider: demoTileProvider(),
+                    tileProvider: widget.deviceTileProviderForTest?.call() ??
+                        demoTileProvider(),
                     // Raster OSM tiles need no CARTO API key.
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'lt.privatedrive.private_drive.demo',
                     maxNativeZoom: 19,
                     errorTileCallback: (tile, error, stackTrace) {
-                    debugPrint('PD_PILOT_TILE_ERROR: $error');
+                    if (!widget.deviceLocationOnly) {
+                      debugPrint('PD_PILOT_TILE_ERROR: $error');
+                    }
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (!mounted || _pilotTilesFailed) return;
                         setState(() {
@@ -1190,8 +1340,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                 painter: DemoMapPainter(),
               ),
             ),
-          if (widget.enableMapTiles && widget.loadMapTiles &&
-              _pilotTilesFailed)
+          if (!_devicePrivateSurface && widget.enableMapTiles &&
+              widget.loadMapTiles && _pilotTilesFailed)
             Positioned.fill(
               child: ColoredBox(
                 color: const Color(0xD9172535),
@@ -1232,6 +1382,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     icon: const Icon(Icons.arrow_back),
                   ),
                 ),
+                if (!widget.deviceLocationOnly)
                 Positioned(
                   top: 64,
                   left: 12,
@@ -1242,6 +1393,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     icon: const Icon(Icons.menu),
                   )),
                 ),
+                if (!widget.deviceLocationOnly)
                 Positioned(
                   top: 120,
                   left: 12,
@@ -1261,7 +1413,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                   ),
                 ),
                 Positioned(
-                  top: 176,
+                  top: widget.deviceLocationOnly ? 64 : 176,
                   left: 12,
                   child: Material(
                     color: const Color(0xF0172535),
@@ -1310,8 +1462,10 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                         FloatingActionButton.small(
                           key: const Key('pilot-enable-gps'),
                           heroTag: 'pilot-gps',
-                          tooltip: pdLabel(context, 'Включить GPS'),
-                          onPressed: _enableGps,
+                          tooltip: widget.deviceLocationOnly
+                              ? 'Показать мою позицию'
+                              : pdLabel(context, 'Включить GPS'),
+                          onPressed: _deviceLocationStarting ? null : _enableGps,
                           child: const Icon(Icons.my_location),
                         )
                       else
@@ -1322,7 +1476,8 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                           onPressed: _stopGps,
                           child: const Icon(Icons.location_off),
                         ),
-                      if (_gpsEnabled && _position != null)
+                      if (!widget.deviceLocationOnly && _gpsEnabled &&
+                          _position != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: FloatingActionButton.small(
@@ -1340,7 +1495,16 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     ],
                   ),
                 ),
-                Align(
+                if (widget.deviceLocationOnly)
+                  const Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Chip(label: Text('Позиция диспетчеру не передаётся')),
+                    ),
+                  )
+                else
+                  Align(
                   alignment: Alignment.bottomCenter,
                   child: GestureDetector(
                     onVerticalDragEnd: (details) {
@@ -1653,7 +1817,92 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         ],
       ),
     );
+    if (!widget.deviceLocationOnly) return scaffold;
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop && mounted && (_gpsEnabled || _deviceLocationStarting)) {
+          _stopGps();
+        }
+      },
+      child: scaffold,
+    );
   }
+}
+
+/// An explicitly offline position display. This intentionally has no maps SDK,
+/// tile layer, map controller, address routing, or synthetic place markers.
+class _PilotDevicePositionGrid extends StatelessWidget {
+  const _PilotDevicePositionGrid({
+    required this.position,
+    required this.headingDegrees,
+    required this.night,
+  });
+
+  final LatLng? position;
+  final double headingDegrees;
+  final bool night;
+
+  @override
+  Widget build(BuildContext context) {
+    final fix = position;
+    return ColoredBox(
+      key: const Key('pilot-device-position-grid'),
+      color: night ? const Color(0xFF101B2B) : const Color(0xFFE0EAF0),
+      child: CustomPaint(
+        painter: _PilotDeviceGridPainter(night: night),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (fix != null) ...[
+                Transform.rotate(
+                  angle: headingDegrees * math.pi / 180,
+                  child: const Icon(
+                    Icons.local_taxi_rounded,
+                    key: Key('pilot-location-marker'),
+                    color: Color(0xFFB68114),
+                    size: 44,
+                  ),
+                ),
+                Text(
+                  '${fix.latitude.toStringAsFixed(5)}, '
+                  '${fix.longitude.toStringAsFixed(5)}',
+                  style: TextStyle(color: night ? Colors.white : Colors.black),
+                ),
+              ],
+              Text(
+                'Локальная сетка без интернет-карты',
+                style: TextStyle(color: night ? Colors.white : Colors.black),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PilotDeviceGridPainter extends CustomPainter {
+  const _PilotDeviceGridPainter({required this.night});
+
+  final bool night;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final grid = Paint()
+      ..color = night ? const Color(0xFF263A50) : const Color(0xFFB6C9D3);
+    const spacing = 32.0;
+    for (double x = size.width / 2 % spacing; x < size.width; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    }
+    for (double y = size.height / 2 % spacing; y < size.height; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PilotDeviceGridPainter oldDelegate) =>
+      night != oldDelegate.night;
 }
 
 class DemoMapPainter extends CustomPainter {

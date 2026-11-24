@@ -41,6 +41,7 @@ class PilotCabin extends StatefulWidget {
 
 class _PilotCabinState extends State<PilotCabin> {
   bool _onLine = false;
+  bool _assignmentMapOpen = false;
   OverlayEntry? _cockpitEntry;
   Timer? _offerAlert;
   bool _hasAnnouncedOffer = false;
@@ -167,6 +168,18 @@ class _PilotCabinState extends State<PilotCabin> {
     ));
   }
 
+  Future<void> _openAssignmentMap() async {
+    if (_assignmentMapOpen || widget.assignmentApi == null) return;
+    setState(() => _assignmentMapOpen = true);
+    try {
+      await Navigator.of(context).push<void>(MaterialPageRoute<void>(
+        builder: (_) => PilotDemo.ownDevice(enableMapTiles: widget.enableMapTiles),
+      ));
+    } finally {
+      if (mounted) setState(() => _assignmentMapOpen = false);
+    }
+  }
+
   void _toggleLine() {
     if (_onLine) {
       setState(() => _onLine = false);
@@ -193,6 +206,13 @@ class _PilotCabinState extends State<PilotCabin> {
             ? null
             : BackButton(onPressed: widget.onBackToCabinets),
         actions: [
+          if (widget.assignmentApi != null)
+            IconButton(
+              key: const Key('pilot-server-open-map'),
+              tooltip: 'Открыть карту',
+              icon: const Icon(Icons.map_outlined),
+              onPressed: _assignmentMapOpen ? null : _openAssignmentMap,
+            ),
           if (widget.onSignOut != null)
             IconButton(
               tooltip: 'Выйти',
@@ -202,7 +222,9 @@ class _PilotCabinState extends State<PilotCabin> {
         ],
       ),
       body: widget.assignmentApi != null
-          ? SafeArea(child: PilotAssignedOrdersPanel(api: widget.assignmentApi!))
+          ? SafeArea(child: PilotAssignedOrdersPanel(
+              api: widget.assignmentApi!, visible: !_assignmentMapOpen,
+            ))
           : Stack(
         fit: StackFit.expand,
         children: [

@@ -5,8 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:private_drive/main.dart';
+import 'package:private_drive/native_cabin_entry.dart';
 import 'package:private_drive/native_closed_invite_api.dart';
 import 'package:private_drive/native_session.dart';
+import 'package:private_drive/pilot_cabin.dart';
+import 'package:private_drive/pilot_identity_api.dart';
+import 'package:private_drive/pilot_identity_notice_page.dart';
 
 class _NoRedirectClient extends http.BaseClient {
   bool called = false;
@@ -58,6 +62,82 @@ void main() {
         baseUrl: PdClosedInviteApi.stagingBaseUrl, client: client);
       await expectLater(api.redeem(invite), throwsFormatException);
     }
+  });
+
+  test('opt-in accepts an exact pilot, not other elevated roles', () async {
+    for (final role in ['pilot', 'passenger', 'admin', 'pilot_dispatcher', 'dispatcher']) {
+      final client = MockClient((request) async {
+        expect(request.url.path, '/native-auth/redeem-pilot-invite');
+        expect(jsonDecode(request.body), {'invite_code': invite});
+        return http.Response(jsonEncode({...result, 'role': role}), 200);
+      });
+      addTearDown(client.close);
+      final api = PdClosedInviteApi(
+        baseUrl: PdClosedInviteApi.stagingBaseUrl, client: client, pilotInvite: true);
+      if (role == 'pilot') {
+        final session = await api.redeem(invite);
+        expect(session.role, 'pilot');
+        expect(session.canDispatch, isFalse);
+      } else {
+        await expectLater(api.redeem(invite), throwsFormatException);
+      }
+    }
+  });
+
+  testWidgets('fresh pilot invite goes through the photo gate, with no SMS',
+      (tester) async {
+    final requests = <String>[];
+    final client = MockClient((request) async {
+      requests.add(request.url.path);
+      expect(request.method, 'POST');
+      expect(request.url.path, '/native-auth/redeem-pilot-invite');
+      expect(jsonDecode(request.body), {'invite_code': invite});
+      return http.Response(jsonEncode({
+        ...result, 'user_id': 'preapproved-pilot', 'role': 'pilot',
+      }), 200);
+    });
+    addTearDown(client.close);
+    await tester.pumpWidget(MaterialApp(home: PdNativeCabinEntry(
+      closedInviteOnly: true,
+      allowInvitedPilot: true,
+      signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
+        authApiUrl: PdClosedInviteApi.stagingBaseUrl,
+        httpClient: client,
+        enableClosedInvite: true,
+        pilotInvite: role == 'pilot',
+        onAuthenticated: onAuthenticated,
+      ),
+      identityApiBuilder: (session) => PdIdentityApi(
+        baseUrl: PdClosedInviteApi.stagingBaseUrl, token: session.token, client: client,
+      ),
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('entry-pilot')));
+    await tester.pumpAndSettle();
+    final notice = find.byType(PdPilotIdentityNoticePage);
+    expect(tester.widget<PdPilotIdentityNoticePage>(notice).api, isNull);
+    await tester.tap(find.byKey(const Key('pilot-identity-notice-sign-in')));
+    await tester.pumpAndSettle();
+
+    const fieldKey = Key('closed-pilot-invite-field');
+    const legalKey = Key('native-legal-acknowledgement');
+    const submitKey = Key('closed-pilot-invite-submit');
+    final scroll = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(find.byKey(fieldKey), 120, scrollable: scroll);
+    await tester.enterText(find.byKey(fieldKey), invite);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(legalKey), 120, scrollable: scroll);
+    await tester.tap(find.byKey(legalKey));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(submitKey), 120, scrollable: scroll);
+    await tester.tap(find.byKey(submitKey));
+    await tester.pumpAndSettle();
+
+    expect(requests, ['/native-auth/redeem-pilot-invite']);
+    expect(tester.widget<PdPilotIdentityNoticePage>(notice).api?.token, token);
+    expect(find.byType(PilotCabin), findsNothing);
+    expect(find.byKey(const Key('pilot-identity-notice-qa-skip')), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink()); // cancel session expiry timer
   });
 
   testWidgets('closed app invite entry is absent by default', (tester) async {

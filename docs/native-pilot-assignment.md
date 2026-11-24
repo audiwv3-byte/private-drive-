@@ -6,6 +6,16 @@ authenticated read endpoint see the same persisted order ID and new status.
 There is no acceptance/decline transition, live GPS, SMS, payment or live release
 in this change. An explicitly opted-in Flutter build projects the server
 assignments into the existing pilot cabin without local demo controls.
+Its map button opens the existing map with an independent, foreground-only
+**Показать мою позицию** switch. Tapping that switch never sends the device
+position to the dispatch server, changes the order, or starts sharing with a
+passenger. Before GPS starts, the online map is removed and replaced with
+an offline reference grid that shows the local fix. GPS cannot animate, center
+or generate tile URLs on the online map. The original online map remains a
+separate, manually explored view; normal map imagery requests still go to its
+existing provider. Stopping GPS, leaving the map, or leaving the foreground
+removes the position; after interruption another explicit tap is required.
+Returning to the order list refreshes assignments with the same native session.
 
 ## Sequence
 

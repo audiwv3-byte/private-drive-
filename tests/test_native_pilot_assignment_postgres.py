@@ -1,6 +1,9 @@
 """Disposable PostgreSQL contract through the real browser and native HTTP entry points."""
 from concurrent.futures import ThreadPoolExecutor
+import base64
 from hashlib import sha256
+import io
+import json
 import os
 from pathlib import Path
 import re
@@ -11,13 +14,17 @@ import uuid
 
 import psycopg
 import pytest
+from PIL import Image
 from werkzeug.security import generate_password_hash
 from werkzeug.test import Client
 from werkzeug.wrappers import Response
 
 from pd_dispatcher_staging_wsgi import create_app
+from pd_issue_closed_pilot_invite import issue
+from pd_native_auth_postgres_http import make_app
 from pd_native_auth_schema_migration import initialize_database
-from pd_native_identity_http import initialize_identity
+from pd_native_closed_invites import make_closed_invites_app
+from pd_native_identity_http import initialize_identity, make_identity_app
 from pd_native_orders_http import make_orders_app
 from pd_native_pilot_assignment import make_native_pilot_orders_app
 
@@ -49,7 +56,8 @@ def stage(monkeypatch):
         owner.close()
         raise RuntimeError("Synthetic database must be empty")
     for name in ("native_auth_session_functions.sql", "native_dispatch_orders.sql",
-                 "native_pilot_assignment.sql"):
+                 "native_pilot_assignment.sql", "native_closed_pilot_invites.sql",
+                 "native_pilot_invite_onboarding.sql"):
         owner.execute((migration / name).read_text())
 
     native, queue, assign = ("pd_assignment_api", "pd_assignment_reader", "pd_assignment_writer")
@@ -59,7 +67,13 @@ def stage(monkeypatch):
     owner.execute(f"""
         REVOKE CREATE ON SCHEMA public FROM PUBLIC;
         GRANT EXECUTE ON FUNCTION public.pd_validate_native_session(text,bigint),
-                                   public.pd_native_pilot_order_state(text,bigint) TO {native};
+                                   public.pd_native_pilot_order_state(text,bigint),
+                                   public.pd_redeem_closed_pilot_invite(text,text),
+                                   public.pd_redeem_closed_pilot_account_invite(text,text) TO {native};
+        GRANT SELECT (id,user_id,status,photo,created_at,expires_at,decided_at),
+              INSERT (id,user_id,status,photo,created_at,expires_at),
+              UPDATE (status,photo,reviewer_id,decided_at)
+          ON public.native_identity_checks TO {native};
         GRANT SELECT, INSERT ON public.pd_dispatch_orders,
             public.pd_native_order_owners TO {native};
         GRANT SELECT ON public.pd_dispatch_orders TO {queue};
@@ -76,6 +90,10 @@ def stage(monkeypatch):
         "PD_DISPATCH_STAGING_ONLY": "1",
         "PD_DISPATCH_PERSISTENT_QUEUE": "1",
         "PD_NATIVE_PILOT_ASSIGNMENT": "1",
+        "PD_NATIVE_CLOSED_PILOT_INVITES": "1",
+        "PD_NATIVE_PILOT_INVITE_ONBOARDING": "1",
+        "PD_NATIVE_SMS_LIVE": "NO",
+        "TWILIO_VERIFY_ENABLED": "false",
         "PD_PAYMENT_MODE": "disabled",
         "PD_DISPATCH_ORDERS_DATABASE_URL": queue_url,
         "PD_PILOT_ASSIGNMENT_DATABASE_URL": assign_url,
@@ -113,8 +131,11 @@ def stage(monkeypatch):
             owner.execute("""INSERT INTO public.native_identity_checks
                 (id,user_id,status,created_at,expires_at,decided_at) VALUES (%s,%s,%s,%s,%s,%s)""",
                 (uuid.uuid4().hex, user_id, status, now - 800000, now + 1000, decided))
+    owner.execute("INSERT INTO public.native_auth_users VALUES ('pilotInvite','invite','opaque-pilot',%s)",
+                  (now - 100,))
+    owner.execute("INSERT INTO public.native_auth_roles VALUES ('pilotInvite','pilot')")
     try:
-        yield owner, native_url, queue_url, assign_url, tokens
+        yield owner, dsn, native_url, queue_url, assign_url, tokens
     finally:
         owner.close()
 
@@ -134,10 +155,13 @@ def login(client):
     return token.group(1).decode()
 
 
-def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch):
-    owner, native_url, queue_url, assign_url, tokens = stage
-    native = Client(make_native_pilot_orders_app(
-        make_orders_app(Response("not found", status=404), native_url), native_url), Response)
+def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch, tmp_path):
+    owner, owner_url, native_url, queue_url, assign_url, tokens = stage
+    mounted_identity = make_identity_app(make_app(native_url, live=False), native_url,
+                                         restricted_runtime=True, start_cleanup=False)
+    mounted_orders = make_orders_app(mounted_identity, native_url)
+    mounted_invites = make_closed_invites_app(mounted_orders, native_url)
+    native = Client(make_native_pilot_orders_app(mounted_invites, native_url), Response)
 
     def orders(user="passenger"):
         return native.get("/native-orders", headers=auth(tokens, user)).json["orders"]
@@ -154,7 +178,24 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
         return result.json["order_id"]
 
     monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", native_url)
-    order_id, race_id = create_order(), create_order()
+    order_id, race_id, invited_order_id = create_order(), create_order(), create_order()
+    assert native.get("/health").json["sms_enabled"] is False
+    invite_file = tmp_path / "operator-one-time-invite"
+    issue(owner_url, invite_file, 1, env=os.environ, approved_pilot_id="pilotInvite")
+    invite = json.loads(invite_file.read_text())
+    invite_file.unlink()
+    redeemed = native.post("/native-auth/redeem-pilot-invite", json={"invite_code": invite["invite_code"]})
+    assert redeemed.status_code == 200
+    assert redeemed.json["role"] == "pilot"
+    assert redeemed.json["user_id"] == "pilotInvite"
+    tokens["pilotInvite"] = redeemed.json["access_token"]
+    assert native.get("/native-auth/session", headers=auth(tokens, "pilotInvite")).json == {
+        "user_id": "pilotInvite", "role": "pilot", "expires_at": redeemed.json["expires_at"],
+    }
+    assert native.get("/native-identity/status", headers=auth(tokens, "pilotInvite")).json == {
+        "status": "unverified",
+    }
+    assert assignments("pilotInvite").status_code == 403
     assert assignments("pilotA").json["orders"] == []
     monkeypatch.delenv("PD_DISPATCH_STAGING_ONLY")
     assert assignments("pilotA").status_code == 503
@@ -179,6 +220,8 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     assert client.post(endpoint, data={"pilot_id": "pilotA", "csrf": "invalid"}).status_code == 403
     assert client.post(endpoint, data={"pilot_id": "pilotOld", "csrf": token}).status_code == 409
     assert client.post(endpoint, data={"pilot_id": "pilotReview", "csrf": token}).status_code == 409
+    invited_endpoint = f"/dispatch/orders/{invited_order_id}/assign"
+    assert client.post(invited_endpoint, data={"pilot_id": "pilotInvite", "csrf": token}).status_code == 409
     assert client.post(endpoint, data={"pilot_id": "pilotA", "csrf": token, "role": "admin"}).status_code == 400
     assert client.post(f"/dispatch/orders/{uuid.uuid4()}/assign",
                        data={"pilot_id": "pilotA", "csrf": token}).status_code == 404
@@ -226,6 +269,28 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", native_url)
     assert next(o for o in orders() if o["order_id"] == order_id)["status"] == "assigned"
     assert orders("other") == []
+    # This is a synthetic image and an existing authorized synthetic reviewer;
+    # it proves the assignment gate, not provisioning a live web reviewer.
+    synthetic_photo = io.BytesIO()
+    Image.new("RGB", (40, 40), "gold").save(synthetic_photo, format="PNG")
+    photo = native.post("/native-identity/submit", headers=auth(tokens, "pilotInvite"),
+                        json={"photo": base64.b64encode(synthetic_photo.getvalue()).decode()})
+    assert photo.status_code == 202, photo.json
+    assert assignments("pilotInvite").status_code == 403
+    assert native.get("/native-identity/queue", headers=auth(tokens, "pilotInvite")).status_code == 403
+    decision = native.post(f"/native-identity/decision/{photo.json['id']}",
+                           headers=auth(tokens, "admin"), json={"decision": "approved"})
+    assert decision.json == {"status": "approved"}
+    assert owner.execute("SELECT photo FROM public.native_identity_checks WHERE id=%s",
+                         (photo.json['id'],)).fetchone() == (None,)
+    monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", queue_url)
+    ids = {item["id"] for item in client.get("/dispatch/orders/eligible-pilots").json["pilots"]}
+    assert "pilotInvite" in ids
+    assert client.post(invited_endpoint, data={"pilot_id": "pilotInvite", "csrf": token}).json == {
+        "order_id": invited_order_id, "status": "assigned", "changed": True,
+    }
+    monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", native_url)
+    assert [o["order_id"] for o in assignments("pilotInvite").json["orders"]] == [invited_order_id]
     assert order_id in {o["order_id"] for o in assignments("pilotA").json["orders"]}
     assert order_id not in {o["order_id"] for o in assignments("pilotB").json["orders"]}
     owner.execute("""INSERT INTO public.native_identity_checks

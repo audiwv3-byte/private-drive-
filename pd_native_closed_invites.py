@@ -9,6 +9,7 @@ import time
 from urllib.parse import urlsplit
 
 INVITE_PATH = "/native-auth/redeem-invite"
+PILOT_INVITE_PATH = "/native-auth/redeem-pilot-invite"
 TEST_DB = "private_drive_test"
 INVITE_RE = re.compile(r"[A-Za-z0-9_-]{43}\Z")
 _OFF = {"", "0", "false", "no", "off"}
@@ -37,18 +38,32 @@ def _hash(value):
     return hashlib.sha256(value.encode("ascii")).hexdigest()
 
 
-def exchange_in_db(database_url, invite_digest, session_digest):
+def pilot_account_invites_enabled(database_url, env):
+    return (pilot_enabled(database_url, env)
+            and env.get("PD_NATIVE_PILOT_INVITE_ONBOARDING") == "1")
+
+
+def _exchange_in_db(database_url, invite_digest, session_digest, *, allow_pilot):
     import psycopg
     try:
         with psycopg.connect(database_url, connect_timeout=4,
                              options="-c statement_timeout=4000") as db:
-            return db.execute(
-                "SELECT user_id,server_role,expires_at "
-                "FROM public.pd_redeem_closed_pilot_invite(%s,%s)",
-                (invite_digest, session_digest),
-            ).fetchone()
+            query = (
+                "SELECT user_id,server_role,expires_at FROM public.pd_redeem_closed_pilot_account_invite(%s,%s)"
+                if allow_pilot else
+                "SELECT user_id,server_role,expires_at FROM public.pd_redeem_closed_pilot_invite(%s,%s)"
+            )
+            return db.execute(query, (invite_digest, session_digest)).fetchone()
     except psycopg.Error:
         raise InviteStorageUnavailable() from None
+
+
+def exchange_in_db(database_url, invite_digest, session_digest):
+    return _exchange_in_db(database_url, invite_digest, session_digest, allow_pilot=False)
+
+
+def exchange_pilot_account_in_db(database_url, invite_digest, session_digest):
+    return _exchange_in_db(database_url, invite_digest, session_digest, allow_pilot=True)
 
 
 class _Limiter:
@@ -73,12 +88,18 @@ class _Limiter:
 
 def make_closed_invites_app(next_app, database_url, *, environ=None,
                             exchange=exchange_in_db, token=secrets.token_urlsafe,
+                            pilot_exchange=exchange_pilot_account_in_db,
                             monotonic=time.monotonic):
     env = os.environ if environ is None else environ
     limiter = _Limiter(monotonic)
 
     def app(wsgi, start_response):
-        if wsgi.get("PATH_INFO") != INVITE_PATH or not pilot_enabled(database_url, env):
+        path = wsgi.get("PATH_INFO")
+        if path == INVITE_PATH and pilot_enabled(database_url, env):
+            redeem, expected_role = exchange, "passenger"
+        elif path == PILOT_INVITE_PATH and pilot_account_invites_enabled(database_url, env):
+            redeem, expected_role = pilot_exchange, "pilot"
+        else:
             return next_app(wsgi, start_response)
 
         def reply(status, data):
@@ -110,10 +131,10 @@ def make_closed_invites_app(next_app, database_url, *, environ=None,
 
         access_token = token(48)
         try:
-            row = exchange(database_url, _hash(data["invite_code"]), _hash(access_token))
+            row = redeem(database_url, _hash(data["invite_code"]), _hash(access_token))
         except InviteStorageUnavailable:
             return reply("503 Service Unavailable", {"error": "invite_service_unavailable"})
-        if not row or row[1] != "passenger":
+        if not row or row[1] != expected_role:
             return reply("401 Unauthorized", {"error": "invalid_or_expired_invite"})
         return reply("200 OK", {
             "user_id": row[0], "role": row[1], "expires_at": row[2],

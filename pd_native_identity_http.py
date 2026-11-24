@@ -79,7 +79,7 @@ def use_restricted_identity_runtime(environ):
 
 
 def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=True,
-                      sms_enabled=False, restricted_runtime=False):
+                      sms_enabled=False, restricted_runtime=False, web_review_only=False):
     if not restricted_runtime:
         initialize_identity(database_url)
 
@@ -112,6 +112,8 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
             return next_app(environ, start_response)
         method = environ.get("REQUEST_METHOD", "")
         endpoint = route.removeprefix("/native-identity/")
+        if web_review_only and endpoint not in {"status", "submit"}:
+            return reply(start_response, "404 Not Found", {"error": "not_found"})
         now = int(clock())
         auth = environ.get("HTTP_AUTHORIZATION", "")
         if not auth.startswith("Bearer ") or not 40 <= len(auth[7:]) <= 256:

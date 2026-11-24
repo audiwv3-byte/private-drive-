@@ -57,9 +57,10 @@ device. An invite session lasts up to seven days; extend the pilot by issuing
 a new code, not by sharing credentials. The ordinary server logout, restore
 and order routes must use the same database and session contract.
 
-The invitation path does not create or sign in pilots or administrators.
-Pilot onboarding still requires approved account provisioning/identity,
-server-owned role and the existing photo approval workflow. The dispatcher
+The default passenger invitation path does not sign in pilots or administrators.
+An independent, separately enabled [pilot invitation](native-pilot-invite-onboarding.md)
+still requires approved account provisioning, a server-owned role and the
+existing photo approval workflow. No invitation grants an administrator role. The dispatcher
 continues to work in the website cabinet. Assignment, cross-device live
 GPS, iOS signing and tester distribution are separate readiness checks.
 

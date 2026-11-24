@@ -122,9 +122,12 @@ class NativePilotOrdersApi {
 /// Server-truth projection within the existing pilot cabin, not a trip demo.
 /// Reads only when mounted in the foreground; never invokes mutable actions.
 class PilotAssignedOrdersPanel extends StatefulWidget {
-  const PilotAssignedOrdersPanel({super.key, required this.api});
+  const PilotAssignedOrdersPanel({
+    super.key, required this.api, this.visible = true,
+  });
 
   final NativePilotOrdersApi api;
+  final bool visible;
 
   @override
   State<PilotAssignedOrdersPanel> createState() =>
@@ -153,9 +156,10 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
   void didUpdateWidget(PilotAssignedOrdersPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.api.baseUrl != widget.api.baseUrl ||
-        oldWidget.api.token != widget.api.token) {
+        oldWidget.api.token != widget.api.token ||
+        oldWidget.visible != widget.visible) {
       _forget();
-      unawaited(_refresh());
+      if (widget.visible) unawaited(_refresh());
     }
   }
 
@@ -178,7 +182,7 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
   }
 
   Future<void> _refresh() async {
-    if (!_foreground || _loading) return;
+    if (!widget.visible || !_foreground || _loading) return;
     _refreshTimer?.cancel();
     final generation = _generation;
     setState(() => _loading = true);
@@ -205,7 +209,7 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
     } finally {
       if (mounted && generation == _generation) {
         setState(() => _loading = false);
-        if (_foreground) {
+        if (widget.visible && _foreground) {
           _refreshTimer = Timer(const Duration(seconds: 10), () {
             unawaited(_refresh());
           });

@@ -23,6 +23,9 @@ import 'native_session_manager.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
 const closedPilotInviteBuild = bool.fromEnvironment('PD_CLOSED_PILOT_INVITE_ENTRY');
+const pilotAccountInviteBuild = closedPilotInviteBuild &&
+    bool.fromEnvironment('PD_NATIVE_PILOT_INVITE_ONBOARDING') &&
+    bool.fromEnvironment('PD_NATIVE_PILOT_ASSIGNMENT');
 // Opt-in only for the isolated static Safari/Android browser test artifact.
 // No production auth URL, payment gateway or automatic backend connection.
 const isolatedWebPreview = bool.fromEnvironment('PD_ISOLATED_WEB_PREVIEW');
@@ -68,8 +71,15 @@ class PrivateDriveApp extends StatelessWidget {
               child: NativeSignInScreen(enableOfflinePreview: true),
             )
           : PdNativeCabinEntry(
+              closedInviteOnly: closedPilotInviteBuild,
+              allowInvitedPilot: pilotAccountInviteBuild,
               signInBuilder: (_, role, onAuthenticated) =>
-                  closedPilotInviteBuild && role != 'passenger'
+                  closedPilotInviteBuild && role == 'dispatcher'
+                  ? const Center(child: Text(
+                      'Диспетчер работает в веб-кабинете.',
+                      textAlign: TextAlign.center))
+                  : closedPilotInviteBuild && role == 'pilot' &&
+                      !pilotAccountInviteBuild
                   ? const Center(child: Text(
                       'В этой сборке приглашения доступны только пассажирам.',
                       textAlign: TextAlign.center))
@@ -77,6 +87,7 @@ class PrivateDriveApp extends StatelessWidget {
                       enableOfflinePreview: enableOfflinePreview,
                       allowGuestEntry: role == 'passenger',
                       enableClosedInvite: closedPilotInviteBuild,
+                      pilotInvite: pilotAccountInviteBuild && role == 'pilot',
                       onAuthenticated: onAuthenticated,
                     ),
               identityApiBuilder: (session) => PdIdentityApi(
@@ -109,6 +120,7 @@ class NativeSignInScreen extends StatefulWidget {
     this.httpClient,
     this.allowGuestEntry = true,
     this.enableClosedInvite = false,
+    this.pilotInvite = false,
     this.onAuthenticated,
   });
 
@@ -117,6 +129,7 @@ class NativeSignInScreen extends StatefulWidget {
   final http.Client? httpClient;
   final bool allowGuestEntry;
   final bool enableClosedInvite;
+  final bool pilotInvite;
   final ValueChanged<PdNativeSession>? onAuthenticated;
 
   @override
@@ -157,7 +170,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   }
 
   PdClosedInviteApi get _inviteApi => PdClosedInviteApi(
-      baseUrl: widget.authApiUrl, client: widget.httpClient);
+      baseUrl: widget.authApiUrl, client: widget.httpClient,
+      pilotInvite: widget.enableClosedInvite && widget.pilotInvite);
 
   bool get _closedInviteEntry => widget.enableClosedInvite &&
       widget.onAuthenticated != null && _inviteApi.enabled;

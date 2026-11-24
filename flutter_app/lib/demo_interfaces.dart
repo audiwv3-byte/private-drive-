@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'native_orders_api.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -41,6 +42,7 @@ class PrivateDriveDemo extends StatefulWidget {
     this.adminOnly = false,
     this.pilotOnly = false,
     this.storageScope,
+    this.ordersApi,
     this.onSignOut,
     this.onBackToCabinets,
   });
@@ -54,6 +56,7 @@ class PrivateDriveDemo extends StatefulWidget {
   final bool adminOnly;
   final bool pilotOnly;
   final String? storageScope;
+  final NativeOrdersApi? ordersApi;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
 
@@ -87,6 +90,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
 
   Future<void> _restoreOrder() async {
     try {
+      if (widget.ordersApi != null) return;
       final saved = await _orderPrefs?.getString(_orderKey);
       if (mounted && saved != null && _trip.restorePersistedJson(saved)) {
         _lastSavedSnapshot = saved;
@@ -273,6 +277,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
           tripStore: _trip,
           onSignOut: widget.onSignOut,
           onBackToCabinets: widget.onBackToCabinets,
+          ordersApi: widget.ordersApi,
         ),
       );
     }

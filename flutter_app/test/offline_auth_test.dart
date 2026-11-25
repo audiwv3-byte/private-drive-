@@ -67,6 +67,29 @@ void main() {
     expect(find.textContaining('сервер авторизации не подключён'), findsOneWidget);
   });
 
+  testWidgets('Configured mobile sign-in offers SMS and Telegram after legal acknowledgement',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const MaterialApp(
+      home: NativeSignInScreen(authApiUrl: 'https://example.test'),
+    ));
+    final telegram = find.byKey(const Key('native-telegram-sign-in'));
+    final sms = find.widgetWithText(FilledButton, 'Получить код');
+    await tester.scrollUntilVisible(telegram, 120,
+        scrollable: find.byType(Scrollable).first);
+    expect(tester.widget<OutlinedButton>(telegram).onPressed, isNull);
+    expect(tester.widget<FilledButton>(sms).onPressed, isNull);
+    final legal = find.byKey(const Key('native-legal-acknowledgement'));
+    await tester.ensureVisible(legal);
+    await tester.tap(legal);
+    await tester.pumpAndSettle();
+    expect(tester.widget<OutlinedButton>(telegram).onPressed, isNotNull);
+    expect(tester.widget<FilledButton>(sms).onPressed, isNotNull);
+  });
+
   testWidgets('Only phone sign-in is offered and no OTP is sent offline',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: NativeSignInScreen()));

@@ -283,7 +283,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     } on PdHttpStatusException catch (error) {
       if (mounted) setState(() => message = switch (error.errorCode) {
         'telegram_link_conflict' =>
-          'Этот аккаунт Telegram уже связан с другим номером. Попробуй вход по SMS.',
+          'Этот номер или аккаунт Telegram уже привязан. Попробуй вход по SMS.',
         'telegram_code_invalid' =>
           'Код Telegram не принят. Проверь его или начни вход заново.',
         _ => 'Сервер входа через Telegram временно недоступен.',
@@ -508,7 +508,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
-                  'Версия 0.2.27 · сборка 2026112103',
+                  String.fromEnvironment('PD_QA_BUILD_LABEL',
+                    defaultValue: 'Версия 0.2.27 · сборка 2026112103'),
                   key: Key('app-demo-version'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: gold),

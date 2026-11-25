@@ -265,6 +265,28 @@ def register(app, authorized, csrf, valid_csrf, *, production=None):
                 abort(409)
         return jsonify(pilot_number=result[0])
 
+    @app.get("/dispatch/pilot-applications/invitation")
+    def pilot_intake_invitation():
+        if not authorized():
+            abort(401)
+        if not production:
+            abort(404)
+        return Response(render_template_string("""
+<!doctype html><html lang="ru"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Приглашение пилота · PRIVATE DRIVE</title>
+<h1>Код приглашения</h1>
+<p>Скопируй код и вставь его в поле «Код приглашения» в анкете пилота.</p>
+<p><code style="overflow-wrap:anywhere">{{ invitation }}</code></p>
+<p><a href="/pilot-registration">Открыть анкету пилота</a></p>
+<p><a href="/dispatch/pilot-applications">Вернуться в диспетчерскую</a></p>
+</html>
+""", invitation=production[2]), mimetype="text/html", headers={
+            "Cache-Control": "private, no-store",
+            "Referrer-Policy": "no-referrer",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'",
+        })
+
     @app.get("/dispatch/pilot-applications")
     def qa_pilot_review_page():
         if not authorized():
@@ -332,6 +354,7 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
 </script></body></html>"""
         if production:
             page = page.replace("анкеты пилотов QA", "анкеты пилотов").replace(" — тестовая модерация", "")
+            page = page.replace('<p id="status"', '<p><a href="/dispatch/pilot-applications/invitation">Код приглашения</a> · <a href="/pilot-registration">Открыть анкету</a></p><p id="status"', 1)
         return Response(page, mimetype="text/html", headers={
             "Cache-Control":"private, no-store",
             "X-Content-Type-Options":"nosniff",

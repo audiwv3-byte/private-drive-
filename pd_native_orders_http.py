@@ -27,7 +27,7 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                 or os.getenv("PD_DISPATCH_ORDERS_DATABASE_URL") != database_url):
             return reply("503 Service Unavailable", {"error":"orders_disabled"})
         method = environ.get("REQUEST_METHOD")
-        if method not in ("GET", "POST"):
+        if method not in ("GET", "POST", "PATCH"):
             return reply("405 Method Not Allowed", {"error":"method_not_allowed"})
         auth = environ.get("HTTP_AUTHORIZATION", "")
         token = auth[7:] if auth.startswith("Bearer ") else ""
@@ -55,6 +55,43 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                     return reply("200 OK", {"payment_mode":"disabled","orders":[
                         dict(zip(("order_id","from","to","trip_date","trip_time","status"),
                                  (str(r[0]), *r[1:]))) for r in rows]})
+                if method == "PATCH":
+                    # Only the order owner may cancel; never invent a local
+                    # cancellation or overwrite an underway/completed trip.
+                    try:
+                        length = int(environ.get("CONTENT_LENGTH", "0"))
+                        if (not 0 < length <= 512
+                                or environ.get("CONTENT_TYPE", "").split(";")[0] != "application/json"):
+                            raise ValueError()
+                        payload = json.loads(environ["wsgi.input"].read(length))
+                        if not isinstance(payload, dict) or set(payload) != {"order_id", "action"}:
+                            raise ValueError()
+                        if payload["action"] != "cancel":
+                            raise ValueError()
+                        order_id = str(uuid.UUID(payload["order_id"]))
+                    except (ValueError, TypeError, KeyError, AttributeError):
+                        return reply("400 Bad Request", {"error": "invalid_cancel"})
+                    cancelled = db.execute("""
+                        UPDATE public.pd_dispatch_orders AS o SET status='cancelled'
+                        FROM public.pd_native_order_owners AS n
+                        WHERE o.id=%s AND n.order_id=o.id AND n.user_id=%s
+                          AND o.status IN ('requested', 'assigned', 'approaching')
+                        RETURNING o.id, o.status
+                    """, (order_id, uid)).fetchone()
+                    if cancelled:
+                        return reply("200 OK", {"order_id": str(cancelled[0]),
+                            "status": cancelled[1], "payment_mode": "disabled"})
+                    current = db.execute("""
+                        SELECT o.status FROM public.pd_dispatch_orders AS o
+                        JOIN public.pd_native_order_owners AS n ON n.order_id=o.id
+                        WHERE o.id=%s AND n.user_id=%s
+                    """, (order_id, uid)).fetchone()
+                    if not current:
+                        return reply("404 Not Found", {"error": "order_not_found"})
+                    if current[0] == "cancelled":
+                        return reply("200 OK", {"order_id": order_id,
+                            "status": "cancelled", "payment_mode": "disabled"})
+                    return reply("409 Conflict", {"error": "cannot_cancel_active_trip"})
                 try:
                     length = int(environ.get("CONTENT_LENGTH", "0"))
                     if not 0 < length <= 8192 or environ.get("CONTENT_TYPE","").split(";")[0] != "application/json":

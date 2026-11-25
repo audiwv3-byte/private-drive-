@@ -41,7 +41,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 </style></head>
 <body>
 <header>
-<a class="brand" href="/dispatch"><img src="/pd-logo-transparent.png" alt=""><span>PRIVATE DRIVE<small>Диспетчерская · тестовый интерфейс</small></span></a>
+<a class="brand" href="/dispatch"><img src="/pd-logo-transparent.png" alt=""><span>PRIVATE DRIVE<small>{{ 'Диспетчерская' if live_orders_enabled else 'Диспетчерская · тестовый интерфейс' }}</small></span></a>
 <div class="toolbar">
 {% if test_sync_enabled or persistent_queue_enabled %}
 <a href="#ordersTitle">Заказы</a>
@@ -58,12 +58,12 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <main class="layout">
 <aside aria-label="Заказы">
 <h1>Диспетчерская</h1>
-{% if persistent_queue_enabled %}<p class="notice">Постоянная серверная очередь · <span id="syncStatus" role="status">Подключаемся…</span></p>{% elif test_sync_enabled %}<p class="notice">Тестовые заказы из приложения. <span id="syncStatus" role="status">Подключаемся…</span></p>{% else %}
+{% if live_orders_enabled %}<p class="notice"><span id="syncStatus" role="status">Загружаем заказы…</span></p>{% elif persistent_queue_enabled %}<p class="notice">Постоянная серверная очередь · <span id="syncStatus" role="status">Подключаемся…</span></p>{% elif test_sync_enabled %}<p class="notice">Тестовые заказы из приложения. <span id="syncStatus" role="status">Подключаемся…</span></p>{% else %}
 <p class="notice"><strong>Безопасный предпросмотр.</strong> Реальные заказы, персональные данные и местоположения пилотов здесь не загружаются. Доступ к ним появится только после серверной проверки роли диспетчера.</p>{% endif %}
 <div class="stats" aria-label="Показатели"><div class="stat"><b id="countNew">—</b><span>Новые</span></div><div class="stat"><b id="countActive">—</b><span>Активные</span></div><div class="stat"><b id="countOnline">—</b><span>На линии</span></div><div class="stat"><b id="countDone">—</b><span>Завершены</span></div></div>
 <div class="tabs" role="group" aria-label="Фильтр заказов"><button class="tab active" data-filter="all" aria-pressed="true">Все</button><button class="tab" data-filter="new" aria-pressed="false">Новые</button><button class="tab" data-filter="active" aria-pressed="false">В пути</button><button class="tab" data-filter="done" aria-pressed="false">История</button></div>
 <h2 id="ordersTitle">Все заказы</h2>
-{% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">Назначение пилотов включим после серверной проверки ролей.</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
+{% if live_orders_enabled %}<div id="ordersList"></div>{% elif persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">Назначение пилотов включим после серверной проверки ролей.</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
 <p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
 </aside>
 <section id="map" aria-label="Интерактивная карта диспетчерской">
@@ -98,7 +98,7 @@ let orderFilter='all';
 const labels={all:'Все заказы',new:'Новые заказы',active:'Заказы в пути',done:'История заказов'};
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});orderFilter=b.dataset.filter;$('ordersTitle').textContent=labels[orderFilter];document.dispatchEvent(new Event('pd-test-filter'));}));
 ['allPilots','onlinePilots'].forEach(id=>$(id).addEventListener('click',()=>{['allPilots','onlinePilots'].forEach(k=>{$(k).classList.toggle('active',k===id);$(k).setAttribute('aria-pressed',String(k===id))});document.dispatchEvent(new Event('pd-test-filter'));}));
-{% if persistent_queue_enabled %}
+{% if live_orders_enabled or persistent_queue_enabled %}
 const liveStatusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'К пассажиру',underway:'В поездке',finished:'Завершён',cancelled:'Отменён'};
 let lastOrders=null;
 function renderPersistentOrders(){
@@ -117,21 +117,31 @@ function renderPersistentOrders(){
    const card=document.createElement('article');card.className='card';
    const route=document.createElement('strong');route.textContent=order.origin+' → '+order.destination;
    const info=document.createElement('p');
-   info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
-     ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
+   info.textContent=(order.display_status||liveStatusLabels[order.status]||order.status)+
+     ' · '+(order.source ? order.source+' ' : '')+'№'+order.source_order_id+
+     ' · '+order.trip_date+' '+order.trip_time;
    card.append(route,info);return card;
  });
  $('ordersList').replaceChildren(...(cards.length?cards:['Заказов пока нет']));
 }
 async function pollPersistentOrders(){
  try{
-   const response=await fetch('/dispatch/orders/state',{cache:'no-store',credentials:'same-origin',
+   const response=await fetch({{ ('/dispatch/live/orders' if live_orders_enabled else '/dispatch/orders/state')|tojson }},{cache:'no-store',credentials:'same-origin',
      signal:AbortSignal.timeout(7000)});
    if(!response.ok)throw new Error('Cannot read orders');
    const body=await response.json();
-   if(!body.persistent||!Array.isArray(body.orders))throw new Error('Invalid response');
-   lastOrders=body.orders;renderPersistentOrders();
+   if(!Array.isArray(body.orders))throw new Error('Invalid response');
+   {% if live_orders_enabled %}
+   const statusGroup={'Новая':'requested','Подтверждена':'assigned','В пути':'underway','Выполнена':'finished','Отменена':'cancelled'};
+   lastOrders=body.orders.map(order=>({...order,source_order_id:order.id,
+     display_status:order.status,status:statusGroup[order.status]||order.status}));
+   $('syncStatus').textContent='Заказы обновлены.';
+   {% else %}
+   if(!body.persistent)throw new Error('Invalid response');
+   lastOrders=body.orders;
    $('syncStatus').textContent='Постоянное хранилище подключено.';
+   {% endif %}
+   renderPersistentOrders();
  }catch{
    $('syncStatus').textContent='Сервер недоступен. Последние данные не обновлялись.';
  }finally{setTimeout(pollPersistentOrders,5000)}

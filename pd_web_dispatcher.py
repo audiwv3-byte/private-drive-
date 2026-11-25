@@ -252,6 +252,24 @@ def register(app, core):
             hashlib.sha256(credential.encode()).hexdigest(),
         )
 
+    if require_mfa and os.environ.get("PD_DISPATCH_LIVE_ORDERS") == "1":
+        @app.get("/dispatch/live/orders")
+        def pd_dispatch_live_orders():
+            if not authorized():
+                return {"error": "unauthorized"}, 401, {"Cache-Control": "no-store"}
+            try:
+                with core.db(core.ORDERS_DB) as conn:
+                    rows = conn.execute("""
+                        SELECT id, origin, destination, trip_date, trip_time, status
+                        FROM orders
+                        ORDER BY id DESC
+                        LIMIT 50
+                    """).fetchall()
+            except Exception as exc:
+                app.logger.error("Dispatcher order list unavailable (%s)", type(exc).__name__)
+                return {"error": "orders_unavailable"}, 503, {"Cache-Control": "no-store"}
+            return {"orders": [dict(row) for row in rows]}, 200, {"Cache-Control": "no-store"}
+
     def within_attempt_limit(kind):
         ip = request.remote_addr or "unknown"
         history = attempts[kind, ip]

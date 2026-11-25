@@ -1,0 +1,22 @@
+name: Deploy test order entry to existing Telegram Mini App
+on:
+  push:
+    branches: [ops/telegram-dispatch-test-entry]
+    paths: [.github/workflows/deploy-telegram-dispatch-test.yml, ops/deploy_telegram_dispatch_test.py, ops/telegram_dispatch_test_fragment.html]
+permissions:
+  contents: read
+concurrency:
+  group: private-drive-pythonanywhere-miniapp-template
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install requests Jinja2
+      - run: python ops/deploy_telegram_dispatch_test.py
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}

@@ -1,0 +1,62 @@
+<details id="pdTelegramDispatchTest" class="secondary">
+  <summary>Тест заявки на сайте</summary>
+  <p>Вильнюс → Каунас. Тестовая заявка для диспетчерской.</p>
+  <button type="button" id="pdTelegramDispatchSubmit" disabled>Отправить тестовую заявку</button>
+  <p id="pdTelegramDispatchStatus" role="status"></p>
+  <p><a href="https://private-drive-dispatcher-staging.onrender.com/dispatch/test-miniapp"
+    target="_blank" rel="noopener noreferrer">Открыть тестовую заявку на сайте диспетчера</a></p>
+</details>
+<script id="pdTelegramDispatchTestScript">
+(() => {
+  const panel = document.getElementById('pdTelegramDispatchTest');
+  const submit = document.getElementById('pdTelegramDispatchSubmit');
+  const status = document.getElementById('pdTelegramDispatchStatus');
+  const endpoint = 'https://private-drive-dispatcher-staging.onrender.com/preview/telegram-miniapp';
+  let busy = false;
+  let created = false;
+
+  async function readOrder(method) {
+    if (busy) return;
+    const proof = window.Telegram?.WebApp?.initData;
+    if (!proof) {
+      status.textContent = 'Открой мини-приложение из Telegram.';
+      return;
+    }
+    busy = true;
+    submit.disabled = true;
+    try {
+      const response = await fetch(method === 'POST' ? endpoint : endpoint + '/status', {
+        method, headers: {'X-Telegram-Init-Data': proof},
+        credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
+        signal: AbortSignal.timeout(65000),
+      });
+      if (response.status === 403) {
+        created = true;
+        status.textContent = 'Заявка доступна аккаунту диспетчера в Telegram.';
+        return;
+      }
+      if (!response.ok) throw new Error('unavailable');
+      const data = await response.json();
+      created = Boolean(data.trip);
+      submit.hidden = created;
+      status.textContent = !created ? 'Готово к отправке.'
+        : data.trip.status === 'assigned' ? 'Тестовый пилот назначен.'
+        : 'Заявка №9900000000000000001 ожидает назначения.';
+    } catch {
+      if (!created || method === 'POST') {
+        status.textContent = 'Не удалось связаться с диспетчерской. Открой раздел заново.';
+      }
+    } finally {
+      busy = false;
+      submit.disabled = created;
+    }
+  }
+  panel.addEventListener('toggle', () => {
+    if (panel.open) readOrder('GET');
+  });
+  submit.addEventListener('click', () => readOrder('POST'));
+  setInterval(() => {
+    if (panel.open && created && !document.hidden) readOrder('GET');
+  }, 5000);
+})();
+</script>

@@ -1,5 +1,5 @@
 """Isolated release regression checks. Never uses production DBs, tokens or APIs."""
-import gc,hashlib,hmac,json,os,shutil,sys,tempfile,time,urllib.parse
+import gc,hashlib,hmac,io,json,os,shutil,sys,tempfile,time,urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -36,6 +36,12 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     core.bot.answer_callback_query=lambda *args,**kwargs:None
     server.app.config['TESTING']=True
     client=server.app.test_client()
+    for lang in ('ru','en','lt'):
+        page=client.get('/?lang='+lang)
+        assert page.status_code==200 and page.headers['Content-Language']==lang
+        assert b'pdObDriverTerms' in page.data and b'/assets/pd-pilot-jet.webp' in page.data
+    image=client.get('/assets/pd-pilot-jet.webp')
+    assert image.status_code==200 and image.mimetype=='image/webp'
     def signed(uid=101,**overrides):
         data={'auth_date':str(int(time.time())),'user':json.dumps({'id':uid,'first_name':'Test'})}
         data.update(overrides)
@@ -103,6 +109,55 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     assert (r['passengers'],r['luggage'],r['stop_address'],r['price'])==(3,'2 чемодана','Trakai','107.80')
     check(call('/api/payment/'+str(oid),uid=103),403)
     print('PASS route, pet pricing, map validation, passengers, luggage, stop and duplicate prevention')
+    # Activation controls API access. A passenger can see only the assigned pilot's card.
+    from PIL import Image
+    from pd_onboarding import ACTIVE_SIDES, DRIVER_TERMS_VERSION
+    pilot_id=104
+    application={'name':'Test Pilot','phone':'+37060000004','city':'Vilnius','vehicle':'Test Car',
+                 'vehicle_year':2022,'plate':'QA 104','seats':4}
+    path='/api/driver/application'
+    check(call(path,application,uid=pilot_id),400)
+    application.update(terms_accepted=True,terms_version=DRIVER_TERMS_VERSION)
+    check(call(path,application,uid=pilot_id),400)
+    uploads={}
+    for i,side in enumerate(ACTIVE_SIDES):
+        photo=io.BytesIO()
+        Image.new('RGB',(1200,800),(i*40,20,30)).save(photo,format='JPEG')
+        photo.seek(0)
+        uploads[side]=(photo,side+'.jpg')
+    check(client.post(path,data={'application':json.dumps(application),**uploads},
+                      headers={'X-Telegram-Init-Data':signed(pilot_id)}),200)
+    decision=f'/api/admin/driver-applications/{pilot_id}/decision'
+    check(call(decision,{'status':'approved'},uid=101),401)
+    pending=check(call('/api/admin/driver-applications',uid=999),200)['applications'][0]
+    assert pending['terms_version']==DRIVER_TERMS_VERSION and pending['terms_accepted_at']
+    assert pending['status']=='pending'
+    check(call('/api/driver/work',uid=pilot_id),401)
+    check(call(decision,{'status':'approved','updated_at':pending['updated_at']},uid=999),200)
+    check(call(decision,{'status':'rejected','updated_at':pending['updated_at']},uid=999),409)
+    profile=f'/api/orders/{oid}/pilot-profile'
+    assert check(call(profile),200)=={'pilot':None}
+    check(call(f'/api/admin/pilot-assignments/{oid}',{'pilot_id':pilot_id},uid=999),200)
+    check(call('/api/driver/work',uid=pilot_id),200)
+    card=check(call(profile),200)['pilot']
+    assert set(card)=={'name','vehicle','vehicle_year','plate','photos'}
+    assert card['name']==application['name'] and set(card['photos'])=={'portrait','car_front'}
+    for photo in card['photos'].values():
+        response=call(photo)
+        assert response.status_code==200 and response.mimetype=='image/jpeg'
+        assert response.headers['Cache-Control']=='private, no-store, max-age=0'
+        check(call(photo,uid=103),404)
+    check(call(profile,uid=103),404)
+    check(call(profile+'/photos/license_front'),404)
+    check(call(f'/api/driver/documents/{pilot_id}/license_front'),401)
+    check(call('/static/pilot_card.png'),403)
+    assert call(f'/api/driver/documents/{pilot_id}/license_front',uid=999).status_code==200
+    check(call(decision,{'status':'pending'},uid=999),200)
+    check(call('/api/driver/work',uid=pilot_id),401)
+    assert check(call(profile),200)=={'pilot':None}
+    check(call(card['photos']['portrait']),404)
+    check(call(f'/api/admin/pilot-assignments/{oid}',{'pilot_id':None},uid=999),200)
+    print('PASS driver terms, dispatcher activation/deactivation, and assigned-passenger profile privacy')
     check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=999),200)
     check(call('/api/admin/status',{'id':oid,'status':'Подтверждена'},uid=999),400)
     bank=check(call(f'/api/payment/{oid}/bank',{}),200)

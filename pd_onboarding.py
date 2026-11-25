@@ -3,18 +3,25 @@ import json,re,io,warnings,hashlib
 from PIL import Image,ImageOps,UnidentifiedImageError
 from flask import Response
 SIDES=("license_front","license_back","registration_front","registration_back","ltsa","activity","insurance","portrait","car_front","car_rear","car_interior")
-ACTIVE_SIDES=("license_front","license_back","car_front","car_rear","car_interior")
+ACTIVE_SIDES=("license_front","license_back","portrait","car_front","car_rear","car_interior")
+DRIVER_TERMS_VERSION="pd-driver-terms-v1"
+PROFILE_PHOTOS=("portrait","car_front")
 MAX_PHOTO=10*1024*1024
 from flask import request,jsonify
 import pd_languages
 
 def ensure_tables(core):
     with core.db(core.USERS_DB) as c:
+        c.execute('BEGIN IMMEDIATE')
         c.execute('''CREATE TABLE IF NOT EXISTS pd_driver_applications (
             telegram_id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL,
             city TEXT NOT NULL, vehicle TEXT NOT NULL, vehicle_year INTEGER NOT NULL,
             plate TEXT NOT NULL, seats INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
-            created_at TEXT NOT NULL, updated_at TEXT NOT NULL)''')
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            terms_version TEXT, terms_accepted_at TEXT)''')
+        columns={r['name'] for r in c.execute('PRAGMA table_info(pd_driver_applications)')}
+        for column in ('terms_version','terms_accepted_at'):
+            if column not in columns:c.execute(f'ALTER TABLE pd_driver_applications ADD COLUMN {column} TEXT')
         c.execute('''CREATE TABLE IF NOT EXISTS pd_driver_application_decisions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,telegram_id INTEGER NOT NULL,
             admin_id INTEGER NOT NULL,old_status TEXT NOT NULL,new_status TEXT NOT NULL,
@@ -25,7 +32,7 @@ def read_photos():
     for side in SIDES:
         f=request.files.get(side)
         if not f:continue
-        if side not in ACTIVE_SIDES:raise ValueError("Загружаются водительские права и три фотографии автомобиля")
+        if side not in ACTIVE_SIDES:raise ValueError("Загружаются обе стороны прав, портрет и три фотографии автомобиля")
         data=f.read(MAX_PHOTO+1)
         if len(data)>MAX_PHOTO:raise ValueError('Фото слишком большое: максимум 10 МБ')
         try:
@@ -53,6 +60,12 @@ def register(app,core,auth):
     def document_sides(uid):
         with core.db(core.USERS_DB) as c:
             return [r['side'] for r in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(uid,))]
+    def photo_response(row):
+        if not row:return jsonify(error='Фото не найдено'),404
+        return Response(bytes(row['image']),mimetype='image/jpeg',headers={
+          'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',
+          'Content-Disposition':'inline; filename="document.jpg"','Referrer-Policy':'no-referrer'})
+
     @app.get('/api/driver/documents/<int:applicant>/<side>')
     def pd_driver_document(applicant,side):
         uid,_=auth()
@@ -60,10 +73,51 @@ def register(app,core,auth):
         if side not in SIDES:return jsonify(error='Фото не найдено'),404
         with core.db(core.USERS_DB) as c:
             row=c.execute('SELECT image FROM pd_driver_documents WHERE telegram_id=? AND side=?',(applicant,side)).fetchone()
-        if not row:return jsonify(error='Фото не найдено'),404
-        return Response(bytes(row['image']),mimetype='image/jpeg',headers={
-          'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',
-          'Content-Disposition':'inline; filename="document.jpg"','Referrer-Policy':'no-referrer'})
+        return photo_response(row)
+
+    def assigned_pilot(uid,order_id):
+        with core.db(core.ORDERS_DB) as c:
+            return c.execute("""SELECT o.id,a.pilot_id FROM orders o
+                 LEFT JOIN pd_pilot_assignments a ON a.order_id=o.id
+                 WHERE o.telegram_id=? AND o.status<>'Отменена'
+                   AND ((? IS NOT NULL AND o.id=?) OR (? IS NULL
+                        AND o.status IN ('Новая','Подтверждена','В пути')))
+                 ORDER BY o.id DESC LIMIT 1""",(uid,order_id,order_id,order_id)).fetchone()
+
+    def approved_profile(pilot_id):
+        with core.db(core.USERS_DB) as c:
+            return c.execute("""SELECT name,vehicle,vehicle_year,plate,terms_version,terms_accepted_at
+                FROM pd_driver_applications WHERE telegram_id=? AND status='approved'""",(pilot_id,)).fetchone()
+
+    @app.get('/api/orders/pilot-profile')
+    @app.get('/api/orders/<int:order_id>/pilot-profile')
+    def passenger_pilot_profile(order_id=None):
+        uid,_=auth()
+        assignment=assigned_pilot(uid,order_id)
+        if order_id is not None and not assignment:return jsonify(error='Заказ не найден'),404
+        pilot=approved_profile(assignment['pilot_id']) if assignment else None
+        if not pilot:return jsonify(pilot=None)
+        profile={key:pilot[key] for key in ('name','vehicle','vehicle_year','plate')}
+        profile['photos']={}
+        if pilot['terms_version']==DRIVER_TERMS_VERSION and pilot['terms_accepted_at']:
+            profile['photos']={side:f"/api/orders/{assignment['id']}/pilot-profile/photos/{side}"
+                               for side in document_sides(assignment['pilot_id']) if side in PROFILE_PHOTOS}
+        return jsonify(pilot=profile)
+
+    @app.get('/api/orders/<int:order_id>/pilot-profile/photos/<side>')
+    def passenger_pilot_photo(order_id,side):
+        uid,_=auth()
+        if side not in PROFILE_PHOTOS:return photo_response(None)
+        assignment=assigned_pilot(uid,order_id)
+        if not assignment:return photo_response(None)
+        with core.db(core.USERS_DB) as c:
+            row=c.execute("""SELECT d.image FROM pd_driver_documents d
+                JOIN pd_driver_applications a ON a.telegram_id=d.telegram_id
+                WHERE d.telegram_id=? AND d.side=? AND a.status='approved'
+                 AND a.terms_version=? AND a.terms_accepted_at IS NOT NULL""",
+                (assignment['pilot_id'],side,DRIVER_TERMS_VERSION)).fetchone()
+        return photo_response(row)
+
     def own(uid):
         with core.db(core.USERS_DB) as c:
             row=c.execute('''SELECT name,phone,city,vehicle,vehicle_year,plate,seats,
@@ -81,6 +135,8 @@ def register(app,core,auth):
         try:d=json.loads(request.form.get('application','null')) if request.mimetype=='multipart/form-data' else request.get_json(silent=True)
         except (ValueError,TypeError):raise ValueError('Проверьте данные заявки водителя')
         if not isinstance(d,dict):raise ValueError('Проверьте данные заявки водителя')
+        if d.get('terms_accepted') is not True or d.get('terms_version')!=DRIVER_TERMS_VERSION:
+            raise ValueError('Подтвердите актуальные условия регистрации водителя')
         out={}
         for key,limit in [('name',80),('phone',40),('city',120),('vehicle',120),('plate',16)]:
             value=d.get(key)
@@ -107,12 +163,13 @@ def register(app,core,auth):
             for side,image in photos.items():
                 c.execute('INSERT INTO pd_driver_documents(telegram_id,side,image,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_id,side) DO UPDATE SET image=excluded.image,updated_at=excluded.updated_at',(uid,side,image,now))
             c.execute('''INSERT INTO pd_driver_applications
-              (telegram_id,name,phone,city,vehicle,vehicle_year,plate,seats,status,created_at,updated_at)
-              VALUES(?,?,?,?,?,?,?,?,'pending',?,?) ON CONFLICT(telegram_id) DO UPDATE SET
+              (telegram_id,name,phone,city,vehicle,vehicle_year,plate,seats,status,created_at,updated_at,terms_version,terms_accepted_at)
+              VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?,?) ON CONFLICT(telegram_id) DO UPDATE SET
               name=excluded.name,phone=excluded.phone,city=excluded.city,vehicle=excluded.vehicle,
               vehicle_year=excluded.vehicle_year,plate=excluded.plate,seats=excluded.seats,
-              status='pending',updated_at=excluded.updated_at''',
-              (uid,out['name'],phone,out['city'],out['vehicle'],year,plate,seats,now,now))
+              status='pending',updated_at=excluded.updated_at,terms_version=excluded.terms_version,
+              terms_accepted_at=excluded.terms_accepted_at''',
+              (uid,out['name'],phone,out['city'],out['vehicle'],year,plate,seats,now,now,DRIVER_TERMS_VERSION,now))
         return jsonify(ok=True,submitted=True)
 
     @app.get('/api/admin/driver-applications')
@@ -131,12 +188,16 @@ def register(app,core,auth):
         if target not in ('pending','approved','rejected'):raise ValueError('Некорректный статус заявки')
         with core.db(core.USERS_DB) as c:
             c.execute('BEGIN IMMEDIATE')
-            r=c.execute('SELECT status FROM pd_driver_applications WHERE telegram_id=?',(applicant,)).fetchone()
+            r=c.execute('SELECT status,updated_at,terms_version,terms_accepted_at FROM pd_driver_applications WHERE telegram_id=?',(applicant,)).fetchone()
             if not r:return jsonify(error='Заявка не найдена'),404
+            if 'updated_at' in d and d['updated_at']!=r['updated_at']:
+                return jsonify(error='Заявка изменилась. Проверьте обновлённые данные'),409
             if target=='approved' and r['status']!='approved':
+                if r['terms_version']!=DRIVER_TERMS_VERSION or not r['terms_accepted_at']:
+                    raise ValueError('Водитель должен подтвердить условия регистрации')
                 stored={x['side'] for x in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(applicant,))}
                 if set(ACTIVE_SIDES)-stored:
-                    raise ValueError('Для одобрения нужны обе стороны прав и три фотографии автомобиля')
+                    raise ValueError('Для активации нужны обе стороны прав, портрет и три фотографии автомобиля')
             if r['status']!=target:
                 now=core.now().isoformat()
                 c.execute('UPDATE pd_driver_applications SET status=?,updated_at=? WHERE telegram_id=?',(target,now,applicant))

@@ -63,6 +63,10 @@ def registered_passenger(uid):
 @app.before_request
 def protect_private_information():
     path = request.path.lower()
+    if path == '/static/pilot_card.png':
+        uid, _ = auth()
+        if not core.is_admin(uid):
+            return jsonify(error='Нет доступа'), 403
     protected = path.startswith(('/static/', '/api/pilot', '/api/admin/', '/api/payment'))
     if protected:
         uid, _ = auth()
@@ -72,7 +76,9 @@ def protect_private_information():
 @app.after_request
 def private_response_cache(response):
     path = request.path.lower()
-    if path in ('/api/me', '/api/orders') or path.startswith(('/static/', '/api/pilot', '/api/admin/', '/api/payment')):
+    private_paths=('/static/', '/api/pilot', '/api/admin/', '/api/payment', '/api/driver/documents/')
+    pilot_profile=path.startswith('/api/orders/') and '/pilot-profile' in path
+    if path in ('/api/me', '/api/orders') or path.startswith(private_paths) or pilot_profile:
         response.headers['Cache-Control'] = 'private, no-store, max-age=0'
         response.headers['Vary'] = 'X-Telegram-Init-Data'
     return response
@@ -108,16 +114,6 @@ def pd_release_hide_card_links(response):
 @app.get('/api/pilot-info')
 def registered_pilot_info():
     return jsonify(email='eurobaltictransfer@gmail.com')
-
-@app.get('/api/pilot-card')
-def registered_pilot_card():
-    uid, _ = auth()
-    if not core.is_admin(uid):
-        with core.db(core.ORDERS_DB) as conn:
-            booked = conn.execute('SELECT 1 FROM orders WHERE telegram_id=? LIMIT 1', (uid,)).fetchone()
-        if not booked:
-            return jsonify(error='Карточка пилота доступна после оформления заказа'), 403
-    return send_file(ROOT / 'miniapp' / 'static' / 'pilot_card.png', mimetype='image/png', max_age=0)
 
 @app.route('/')
 def index():
@@ -874,6 +870,10 @@ def pd_trip_runtime_v4_asset():
 @app.get('/assets/pd-pilot-cabinet-v4.js')
 def pd_pilot_cabinet_v4_asset():
     return send_file(ROOT / 'pd_pilot_cabinet_v4.js', mimetype='application/javascript', max_age=0)
+@app.get('/assets/pd-pilot-jet.webp')
+def pd_pilot_jet_asset():
+    return send_file(ROOT / 'miniapp' / 'static' / 'pd-pilot-jet.webp', mimetype='image/webp')
+
 @app.get('/assets/pd-admin-console-v4.js')
 def pd_admin_console_v4_asset():
     return send_file(ROOT / 'pd_admin_console_v4.js',mimetype='application/javascript',max_age=0)

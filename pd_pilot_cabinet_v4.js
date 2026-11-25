@@ -5,15 +5,65 @@ const tr=(ru,en,lt)=>window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru;
 const duration=s=>s===null||s===undefined?tr('Не зафиксировано','Not recorded','Neužfiksuota'):Math.floor(s/3600)+':'+String(Math.floor(s%3600/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
 const stamp=s=>s?new Date(s*1000).toLocaleString(window.PD_LANG||'ru',{timeZone:'Europe/Vilnius'}):'—';
 const euro=c=>(Number(c||0)/100).toFixed(2)+' €';
-const photoLabels={license_front:tr('Права — лицевая сторона','Licence — front','Pažymėjimas — priekis'),license_back:tr('Права — обратная сторона','Licence — back','Pažymėjimas — galas'),car_front:tr('Автомобиль — спереди','Car — front','Automobilis — priekis'),car_rear:tr('Автомобиль — сзади','Car — rear','Automobilis — galas'),car_interior:tr('Автомобиль — салон','Car — interior','Automobilis — salonas')};
+const photoLabels={portrait:tr('Фото пилота','Pilot portrait','Piloto portretas'),license_front:tr('Права — лицевая сторона','Licence — front','Pažymėjimas — priekis'),license_back:tr('Права — обратная сторона','Licence — back','Pažymėjimas — galas'),car_front:tr('Автомобиль — спереди','Car — front','Automobilis — priekis'),car_rear:tr('Автомобиль — сзади','Car — rear','Automobilis — galas'),car_interior:tr('Автомобиль — салон','Car — interior','Automobilis — salonas')};
 Object.entries(photoLabels).forEach(([key,value])=>{window.PD_UI[pdDocumentLabels[key]||key]=value});
-let tab='active',busy=false;
+let tab='map',workRequest=0,pilotMap=null;
+function closeMap(){
+ if(pilotMap)pilotMap.remove();
+ pilotMap=null;
+}
+function openMap(box,request){
+ const mapElement=document.createElement('div');mapElement.id='pdPilotMap';
+ mapElement.setAttribute('aria-label',tr('Карта пилота','Pilot map','Piloto žemėlapis'));
+ const hint=document.createElement('p');hint.setAttribute('role','status');
+ box.append(mapElement,hint);
+ const unavailable=tr('Карта не загрузилась. Нажмите «Обновить».','Could not load the map. Select Refresh.','Žemėlapis neįkeltas. Paspauskite „Atnaujinti“.');
+ if(!window.L){mapElement.hidden=true;hint.textContent=unavailable;return}
+ const map=L.map(mapElement).setView([54.6872,25.2797],13);
+ pilotMap=map;
+ const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+ }).addTo(map);
+ tiles.on('tileerror',()=>{hint.textContent=unavailable});
+ tiles.on('tileload',()=>{if(hint.textContent===unavailable)hint.textContent=''});
+ requestAnimationFrame(()=>{if(pilotMap===map)map.invalidateSize()});
+ let marker;
+ box.append(b(tr('Моё местоположение','My location','Mano buvimo vieta'),()=>{
+  const failed=()=>{if(request===workRequest)hint.textContent=tr('Разрешите геолокацию в настройках устройства.','Allow location access in your device settings.','Įrenginio nustatymuose leiskite pasiekti vietovę.')};
+  if(!navigator.geolocation){failed();return}
+  navigator.geolocation.getCurrentPosition(({coords})=>{
+   if(request!==workRequest)return;
+   const point=[coords.latitude,coords.longitude];
+   if(marker)marker.setLatLng(point);
+   else marker=L.circleMarker(point,{radius:8,color:'#fff',weight:2,fillColor:'#218bf3',fillOpacity:1}).addTo(map);
+   map.setView(point,16);hint.textContent='';
+  },failed,{enableHighAccuracy:true,timeout:12000});
+ }));
+}
+window.pdRenderPilotIdentityCard=function(box,profile,photos){
+ const card=document.createElement('div');card.className='pd-pilot-identity';box.append(card);
+ for(const side of ['portrait','car_front']){
+  if(!photos?.[side])continue;
+  const img=document.createElement('img');img.alt=photoLabels[side];img.hidden=true;card.append(img);
+  fetch(photos[side],{headers:{'X-Telegram-Init-Data':initData},cache:'no-store'})
+   .then(response=>response.ok?response.blob():null).then(blob=>{
+    if(!blob||!img.isConnected)return;
+    const url=URL.createObjectURL(blob);
+    img.onload=()=>{img.hidden=false;URL.revokeObjectURL(url)};
+    img.onerror=()=>URL.revokeObjectURL(url);
+    img.src=url;
+   }).catch(()=>{});
+ }
+ line(card,tr('Пилот','Pilot','Pilotas'),profile.name);
+ line(card,tr('Автомобиль','Vehicle','Automobilis'),[profile.vehicle,profile.vehicle_year].filter(Boolean).join(' · '));
+ line(card,tr('Номер автомобиля','Plate','Valstybinis numeris'),profile.plate);
+};
 function b(label,action){const el=document.createElement('button');el.type='button';el.className='secondary';el.textContent=label;el.onclick=action;return el}
 function line(parent,label,value){const p=document.createElement('p');const strong=document.createElement('strong');strong.textContent=label+': ';p.append(strong,document.createTextNode(value===null||value===undefined?'—':String(value)));parent.append(p)}
 function buttons(){
  let nav=document.getElementById('pdPilotNavV4');if(nav)return nav;
  nav=document.createElement('nav');nav.id='pdPilotNavV4';nav.className='actions';nav.setAttribute('aria-label',tr('Разделы кабинета пилота','Pilot cabinet sections','Piloto paskyros skyriai'));
- for(const [key,text]of [['active',tr('Активные заказы','Active orders','Aktyvūs užsakymai')],['history',tr('История поездок','Trip history','Kelionių istorija')],['vehicle',tr('Мой автомобиль','My vehicle','Mano automobilis')],['documents',tr('Документы и фото','Documents and photos','Dokumentai ir nuotraukos')]])nav.append(b(text,()=>{tab=key;pdPilotWork()}));
+ for(const [key,text]of [['map',tr('Карта','Map','Žemėlapis')],['active',tr('Активные заказы','Active orders','Aktyvūs užsakymai')],['history',tr('История поездок','Trip history','Kelionių istorija')],['vehicle',tr('Мой автомобиль','My vehicle','Mano automobilis')],['documents',tr('Документы и фото','Documents and photos','Dokumentai ir nuotraukos')]])nav.append(b(text,()=>{tab=key;pdPilotWork()}));
  const section=document.getElementById('pdPilotWork');section.insertBefore(nav,document.getElementById('pdPilotWorkList'));return nav;
 }
 pdEnterPilot=function(){
@@ -21,35 +71,44 @@ pdEnterPilot=function(){
  pdApplyRoleAccess(user,'driver');pdHideOnboarding();document.body.classList.add('admin-home','pd-pilot-cabinet');
  document.querySelectorAll('section[id^="step"]').forEach(x=>x.classList.add('hidden'));
  document.getElementById('pdPilotWork').classList.remove('hidden');document.getElementById('mainNav').classList.add('hidden');document.getElementById('pdPilotBack').classList.add('hidden');
- document.getElementById('pdPilotWorkTitle').textContent=tr('Кабинет пилота','Pilot cabinet','Piloto paskyra');
+ document.getElementById('pdPilotWorkTitle').textContent=tr('Кабина пилота','Pilot cockpit','Piloto kabina');
  document.getElementById('pdPilotWorkRefresh').textContent=tr('Обновить','Refresh','Atnaujinti');
  const passenger=document.getElementById('pdPilotPassenger');passenger.textContent=tr('Перейти в пассажирский кабинет','Open passenger cabinet','Atidaryti keleivio paskyrą');passenger.classList.toggle('hidden',!user.registered);
  buttons();pdPilotWork();window.scrollTo(0,0);
 };
-const oldPassenger=pdPilotPassenger;pdPilotPassenger=function(){document.body.classList.remove('pd-pilot-cabinet');oldPassenger()};
-pdPilotWork=async function(){
- if(busy)return;busy=true;const box=document.getElementById('pdPilotWorkList');box.replaceChildren();buttons();
+const oldPassenger=pdPilotPassenger;pdPilotPassenger=function(){workRequest++;closeMap();tab='map';document.body.classList.remove('pd-pilot-cabinet');oldPassenger()};
+pdPilotWork=async function(refresh=false){
+ const request=++workRequest;
+ const box=document.getElementById('pdPilotWorkList');closeMap();box.replaceChildren();buttons();
  try{
+  if(refresh){
+   const user=await api('/api/me');
+   if(request!==workRequest)return;
+   window.pdOnboardingUser=user;pdPilotEnabled=Boolean(user.pilot_access);pdApplyRoleAccess(user,'driver');
+  }
   const application=window.pdOnboardingUser?.driver_application;
   if(!pdPilotEnabled){
    const states={pending:tr('Заявка на проверке. Рабочие заказы будут доступны после одобрения.','Application under review. Work orders unlock after approval.','Paraiška tikrinama. Darbo užsakymai bus prieinami patvirtinus.'),rejected:tr('Заявка отклонена. Можно исправить данные и отправить повторно.','Application rejected. Correct your details and submit again.','Paraiška atmesta. Pataisykite duomenis ir pateikite iš naujo.')};
    line(box,tr('Статус заявки','Application status','Paraiškos būsena'),states[application?.status]||tr('Нет допуска к заказам','Work access not granted','Prieiga prie užsakymų nesuteikta'));
    if(tab==='active'||tab==='history')return;
   }
+  if(tab==='map'){openMap(box,request);return}
   if(tab==='vehicle'||tab==='documents'){
    if(!application){line(box,tr('Профиль','Profile','Profilis'),tr('Данные заявки отсутствуют','No application data','Paraiškos duomenų nėra'));return}
    if(tab==='vehicle'){
-    for(const [key,label]of [['name',tr('Пилот','Pilot','Pilotas')],['phone',tr('Телефон','Phone','Telefonas')],['city',tr('Город','City','Miestas')],['vehicle',tr('Автомобиль','Vehicle','Automobilis')],['vehicle_year',tr('Год','Year','Metai')],['plate',tr('Номер автомобиля','Plate','Valstybinis numeris')],['seats',tr('Пассажирских мест','Passenger seats','Keleivių vietos')]])line(box,label,application[key]);
-   }
-   for(const [key,title]of Object.entries(photoLabels)){
-    if(tab==='vehicle'&&!key.startsWith('car_'))continue;
-    if((application.document_sides||[]).includes(key))box.append(b(title,()=>pdPreviewDocument(key,window.pdOnboardingUser.id)));
-    else line(box,title,tr('Не загружено','Not uploaded','Neįkelta'));
+    const photos=Object.fromEntries(['portrait','car_front'].filter(side=>(application.document_sides||[]).includes(side))
+     .map(side=>[side,'/api/driver/documents/'+Number(window.pdOnboardingUser.id)+'/'+side]));
+    window.pdRenderPilotIdentityCard(box,application,photos);
+   }else{
+    for(const [side,title]of Object.entries(photoLabels)){
+     if((application.document_sides||[]).includes(side))box.append(b(title,()=>pdPreviewDocument(side,window.pdOnboardingUser.id)));
+     else line(box,title,tr('Не загружено','Not uploaded','Neįkelta'));
+    }
    }
    line(box,tr('Изменение данных','Update details','Duomenų keitimas'),tr('Повторная отправка заявки возвращает её на проверку администратора.','Resubmitting returns the application to admin review.','Pakartotinai pateikta paraiška vėl tikrinama administratoriaus.'));
-   box.append(b(tr('Обновить данные и фотографии','Update details and photos','Atnaujinti duomenis ir nuotraukas'),pdStartDriverRegistration));return;
+   box.append(b(tr('Обновить данные и фотографии','Update details and photos','Atnaujinti duomenis ir nuotraukas'),()=>{closeMap();pdShowOnboarding('driver')}));return;
   }
-  const result=await api('/api/driver/work');const rows=result.orders.filter(o=>tab==='history'?['Выполнена','Отменена'].includes(o.status):!['Выполнена','Отменена'].includes(o.status));
+  const result=await api('/api/driver/work');if(request!==workRequest)return;const rows=result.orders.filter(o=>tab==='history'?['Выполнена','Отменена'].includes(o.status):!['Выполнена','Отменена'].includes(o.status));
   if(!rows.length){line(box,tr('Поездки','Trips','Kelionės'),tr('В этом разделе поездок пока нет','No trips in this section','Šiame skyriuje kelionių nėra'));return}
   for(const order of rows){
    const article=document.createElement('article');article.className='item';const h=document.createElement('h3');h.textContent='№'+order.id+' · '+pdL(order.status);article.append(h);
@@ -63,7 +122,7 @@ pdPilotWork=async function(){
    line(article,tr('Время движения','Driving time','Važiavimo laikas'),duration(order.drive_seconds));
    article.append(b(tr('Открыть рабочую поездку','Open work trip','Atidaryti darbo kelionę'),()=>pdOpenLiveTripV4(order.id)));box.append(article);
   }
- }catch(e){line(box,tr('Ошибка','Error','Klaida'),e.message)}finally{busy=false}
+ }catch(e){if(request===workRequest)line(box,tr('Ошибка','Error','Klaida'),e.message)}
 };
 window.pdOpenAdminTripV4=async function(id){
  if(!admin)return;

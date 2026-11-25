@@ -60,12 +60,6 @@ h1{margin:0 0 10px;font:normal 25px Georgia,serif;color:var(--gold)}p{margin:8px
 .field input:focus,.field textarea:focus,.field select:focus{outline:2px solid #f0c477;outline-offset:1px}
 .panel .btn{border-radius:11px}
 .panel .btn.main{min-height:52px;font-size:15px;box-shadow:0 6px 25px #0007}
-.ride-extras{margin:16px 0;padding:0 13px;border:1px solid #68563e;border-radius:13px;background:#111a20}
-.ride-extras>summary{min-height:48px;display:flex;align-items:center;padding:12px 0;font-weight:700;color:#e9c78f;cursor:pointer}
-.ride-extras>summary::marker{color:#e5b875}
-.ride-extras[open]>summary{border-bottom:1px solid #5d523e}
-.ride-extras .payment-methods{gap:5px}
-.ride-extras .payment-methods span{font-size:11px}
 .map-preview-caption{position:fixed;bottom:18px;right:20px;z-index:700;max-width:270px;padding:9px 14px;border:1px solid #b28a51;border-radius:12px;background:#101820e8;color:#f1dab0;font-size:12px;pointer-events:none;box-shadow:0 8px 24px #0007}
 @media(max-width:640px){
  .topbar{top:8px;left:8px;right:8px;gap:6px}
@@ -148,11 +142,26 @@ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
 .pd-map-menu nav .map-theme{max-width:none;box-shadow:none;border:0}
 body.pd-map-full #map{inset:0;width:auto;height:auto;border:0;border-radius:0}
 body.pd-map-full .panel{display:none}
-#climateOn{width:auto;margin-right:4px}
-#climate{min-width:0}
-
-.pd-map-menu nav :is(a,button):hover{background:#392a19}
-.pd-climate{display:flex;align-items:center;gap:8px;min-width:0}.pd-climate input{width:100%;accent-color:#edc780}.pd-climate output{min-width:3ch;color:#f5d596;font-weight:700}
+ .pd-map-menu nav :is(a,button):hover{background:#392a19}
+.pd-comfort-jump{display:inline-flex;align-items:center;min-height:44px;margin:0 0 10px;color:#f2d09a;font-weight:700;text-underline-offset:4px}
+.ride-comfort{margin:14px 0;padding:13px;border:1px solid #a7824c;border-radius:13px;background:#111a20}
+.ride-comfort:focus{outline:2px solid #eac06b;outline-offset:-3px}
+.ride-comfort h2{margin:0;color:#ffdfab;font-size:19px}
+.ride-comfort fieldset{border:0;padding:0;margin:12px 0;min-width:0}
+.ride-comfort legend,.climate-label{padding:0;color:#efd4a2;font-weight:650}
+.radio-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}
+.radio-option{position:relative;min-width:0;cursor:pointer;touch-action:manipulation}
+.radio-option input{position:absolute;width:1px;height:1px;opacity:0}
+.radio-option span{display:flex;align-items:center;justify-content:center;min-height:44px;padding:5px;border:1px solid #8d7555;border-radius:8px;color:#f6e8d2;background:#20282d;text-align:center;overflow-wrap:anywhere}
+.radio-option input:checked+span{background:#efce91;border-color:#ffe2a8;color:#22160a;font-weight:700}
+.radio-option input:focus-visible+span{outline:2px solid #ffe2a8;outline-offset:2px}
+.ride-comfort [hidden],.pd-comfort-jump[hidden]{display:none}
+.ride-comfort .field input{font-size:16px}
+.temperature-control{display:grid;grid-template-columns:44px 1fr 44px;gap:8px;align-items:center;margin:6px 0}
+.temperature-control button{min-height:44px;color:#ffdfab;border:1px solid #a7824c;border-radius:8px;background:#232421;font:700 21px system-ui;touch-action:manipulation}
+.temperature-control button:disabled{opacity:.5}
+.temperature-control output{text-align:center;color:#ffe9bf;font-weight:700}
+.temperature-reset{min-height:44px;padding:0;background:none;border:0;color:#f2d09a;text-decoration:underline;text-underline-offset:3px}
 </style>
 <link rel="stylesheet" href="/assets/site-analytics.css"></head>
 <body>
@@ -166,7 +175,7 @@ body.pd-map-full .panel{display:none}
    <a href="index.html">← На сайт</a>
    <button type="button" id="menuFull" hidden aria-pressed="false">Карта на весь экран</button>
    <button type="button" id="menuAddresses">Откуда и куда</button>
-   <button type="button" id="menuPreferences">Музыка и климат</button>
+   <button type="button" id="menuPreferences">Музыка и температура</button>
    <button class="map-theme" type="button" id="mapTheme" hidden aria-label="Переключить дневной или ночной вид карты">Дневная карта</button>
   </nav>
  </details>
@@ -175,6 +184,7 @@ body.pd-map-full .panel{display:none}
  <p class="booking-kicker">PRIVATE DRIVE · ПРЕДВАРИТЕЛЬНЫЙ ЗАКАЗ</p>
  <h1>Карта и заказ поездки</h1>
  <p class="booking-intro">Укажи адрес подачи, пункт назначения и время. На карте можно проверить расположение точек.</p>
+ <a class="pd-comfort-jump" id="comfortJump" href="#rideComfort">Музыка и температура ↓</a>
  <form id="orderForm">
   <div class="route-fields">
   <div class="field"><label for="from">Откуда</label><input id="from" name="from" placeholder="Город, улица, дом" autocomplete="street-address" maxlength="200" required></div>
@@ -187,23 +197,37 @@ body.pd-map-full .panel{display:none}
   </div>
   <div class="field"><label for="rideDate">Дата поездки (необязательно)</label><input type="date" id="rideDate" name="rideDate"></div>
   <div class="field"><label for="rideTime">Время подачи (необязательно)</label><input type="time" id="rideTime" name="rideTime" step="300"></div>
-  <details class="ride-extras"><summary>Дополнительные пожелания и способы оплаты</summary>
-  <div class="field"><label for="radio">Радиостанция в поездке (необязательно)</label><select id="radio" name="radio"><option value="">Без предпочтений</option><option value="M-1">M-1</option><option value="Radiocentras">Radiocentras</option><option value="ZIP FM">ZIP FM</option><option value="LRT Opus">LRT Opus</option><option value="Другая">Другая радиостанция</option></select></div>
-  <div class="field" id="radioOtherField" hidden><label for="radioOther">Название радиостанции</label><input id="radioOther" maxlength="100" placeholder="Название или частота" autocomplete="off"></div>
-  <div class="field"><label for="music">Любимый трек в поездке (необязательно)</label><input id="music" name="music" maxlength="160" placeholder="Исполнитель — название песни"></div>
-  <div class="field">
-   <label for="climateOn"><input type="checkbox" id="climateOn"> Указать климат в салоне</label>
-   <div class="pd-climate"><input type="range" id="climate" min="16" max="28" value="21" disabled aria-label="Желаемая температура в салоне"><output for="climate" id="climateValue">21°</output></div>
-  </div>
+  <section class="ride-comfort" id="rideComfort" aria-labelledby="rideComfortTitle" tabindex="-1">
+   <h2 id="rideComfortTitle">Музыка и температура</h2>
+   <p class="note">По желанию. Добавим выбранное в заявку для водителя.</p>
+   <fieldset><legend>Радиостанция</legend><div class="radio-options">
+     <label class="radio-option"><input type="radio" name="radio" value="" checked><span>Без предпочтений</span></label>
+     <label class="radio-option"><input type="radio" name="radio" value="M-1"><span>M-1</span></label>
+     <label class="radio-option"><input type="radio" name="radio" value="Radiocentras"><span>Radiocentras</span></label>
+     <label class="radio-option"><input type="radio" name="radio" value="ZIP FM"><span>ZIP FM</span></label>
+     <label class="radio-option"><input type="radio" name="radio" value="LRT Opus"><span>LRT Opus</span></label>
+     <label class="radio-option"><input type="radio" name="radio" value="Другая"><span>Другая…</span></label>
+   </div></fieldset>
+   <div class="field" id="radioOtherField" hidden><label for="radioOther">Другая радиостанция</label><input id="radioOther" name="radioOther" maxlength="100" placeholder="Название или частота" autocomplete="off" disabled></div>
+   <div class="field"><label for="music">Трек или исполнитель</label><input id="music" name="music" maxlength="160" placeholder="Например, Агата Кристи"></div>
+   <div role="group" aria-label="Температура в салоне">
+    <span class="climate-label">Температура в салоне</span>
+    <div class="temperature-control">
+     <button type="button" id="climateDown" aria-label="Уменьшить температуру">−</button>
+     <output id="climateValue" aria-live="polite">Не выбрана</output>
+     <button type="button" id="climateUp" aria-label="Увеличить температуру">+</button>
+    </div>
+    <button type="button" class="temperature-reset" id="climateReset" hidden>Сбросить температуру</button>
+   </div>
+  </section>
   <div class="field"><label for="comment">Пожелания (необязательно)</label><textarea id="comment" name="comment" maxlength="500" placeholder="Багаж, детское кресло, встреча с табличкой…"></textarea></div>
   <section class="field" aria-label="Способы оплаты">
    <label>Способы оплаты после подтверждения заказа</label>
    <div class="payment-methods" aria-label="Visa, Mastercard, Apple Pay, Google Pay, PayPal">
     <span>Visa</span><span>Mastercard</span><span>Apple Pay</span><span>Google Pay</span><span>PayPal</span>
    </div>
-   <p class="note">Информационный список. Онлайн-оплата на тестовом сайте ещё не активирована; доступность способов проверим при подключении Stripe.</p>
+   <p class="note">Оплата после подтверждения поездки. Доступные способы уточним при согласовании заказа.</p>
   </section>
-  </details>
   <p id="status" class="status" role="status" aria-live="polite"></p>
   <button type="button" class="btn" id="verifyAddresses" hidden>Проверить адреса</button>
   <p class="note" id="addressCheckHint" hidden>Сначала уточни оба адреса, затем нажми «Проверить адреса». Для проверки адреса отправляются в сервис Nominatim. При недоступности сервиса заявка по быстрому маршруту не откроется.</p>
@@ -223,7 +247,7 @@ body.pd-map-full .panel{display:none}
 'use strict';
 const $=id=>document.getElementById(id),status=$('status');
 const params=new URLSearchParams(location.search);
-const extrasPanel=document.querySelector('.ride-extras'),menu=$('mapMenu');
+const comfortPanel=$('rideComfort'),comfortJump=$('comfortJump'),menu=$('mapMenu');
 const menuFull=$('menuFull');
 function setFullMap(full){
  document.body.classList.toggle('pd-map-full',full);
@@ -233,16 +257,31 @@ function setFullMap(full){
 }
 menuFull.addEventListener('click',()=>{setFullMap(!document.body.classList.contains('pd-map-full'));menu.open=false;menu.querySelector('summary').focus()});
 $('menuAddresses').addEventListener('click',()=>{setFullMap(false);menu.open=false;$('from').focus()});
-$('menuPreferences').addEventListener('click',()=>{setFullMap(false);menu.open=false;extrasPanel.open=true;$('radio').focus()});
-menu.addEventListener('keydown',e=>{if(e.key==='Escape'){menu.open=false;menu.querySelector('summary').focus()}});
-const climate=$('climate'),climateOn=$('climateOn');
-function syncClimate(){
- climate.disabled=!climateOn.checked;
- $('climateValue').value=climate.value+'°';
+function showComfort(){
+ setFullMap(false);
+ menu.open=false;
+ comfortPanel.scrollIntoView({block:'start'});
+ comfortPanel.focus({preventScroll:true});
 }
-climateOn.addEventListener('change',syncClimate);
-climate.addEventListener('input',syncClimate);
-syncClimate();
+$('menuPreferences').addEventListener('click',showComfort);
+comfortJump.addEventListener('click',event=>{event.preventDefault();showComfort()});
+menu.addEventListener('keydown',e=>{if(e.key==='Escape'){menu.open=false;menu.querySelector('summary').focus()}});
+let chosenTemperature=null;
+const cool=$('climateDown'),warm=$('climateUp'),resetTemperature=$('climateReset');
+function syncTemperature(){
+ $('climateValue').textContent=chosenTemperature===null?'Не выбрана':chosenTemperature+' °C';
+ cool.disabled=chosenTemperature===16;
+ warm.disabled=chosenTemperature===28;
+ resetTemperature.hidden=chosenTemperature===null;
+}
+function adjustTemperature(step){
+ chosenTemperature=Math.min(28,Math.max(16,(chosenTemperature??21)+step));
+ syncTemperature();
+}
+cool.addEventListener('click',()=>adjustTemperature(-1));
+warm.addEventListener('click',()=>adjustTemperature(1));
+resetTemperature.addEventListener('click',()=>{chosenTemperature=null;syncTemperature();warm.focus()});
+syncTemperature();
 const preorder=params.get('mode')==='preorder';
 let airportDirection=['to','from'].includes(params.get('airport'))?params.get('airport'):null;
 const airportLabel='Аэропорт Вильнюса (VNO)';
@@ -280,11 +319,11 @@ if(selectedRoute && !airportDirection){
 
 const serviceNames={'flowers':'Цветы к поездке','surprise':'Поездка-сюрприз','sober-driver':'Трезвый водитель','jump-start':'Запуск автомобиля · 20 €','meet-sign':'Встреча с табличкой · +15 €','luggage':'Помощь с багажом','parcel':'Доставка посылки','personal-driver':'Персональный водитель','music':'Выбор радиостанции или любимой композиции'};
 const selectedService=Object.prototype.hasOwnProperty.call(serviceNames,params.get('service'))?serviceNames[params.get('service')]:null;
-if(selectedService){
- if(params.get('service')==='music'){
-  const extras=document.querySelector('.ride-extras');
-  if(extras)extras.open=true;
- }
+const musicEntry=params.get('service')==='music';
+if(musicEntry){
+ $('orderForm').prepend(comfortPanel);
+ comfortJump.hidden=true;
+} else if(selectedService){
  const info=document.createElement('p');info.className='note';
  info.textContent='Выбрана услуга: '+selectedService+'. Доступность и окончательная стоимость подтверждаются отдельно.';
  $('rideDate').closest('.field').before(info);
@@ -320,12 +359,16 @@ function updateDateLimits(){
 updateDateLimits();
 $('rideDate').addEventListener('change',updateDateLimits);
 $('rideDate').addEventListener('focus',updateDateLimits);
-$('radio').addEventListener('change',()=>{
- const other=$('radio').value==='Другая';
+function selectedStation(){return document.querySelector('input[name="radio"]:checked')?.value??''}
+function syncStation(){
+ const other=selectedStation()==='Другая';
  $('radioOtherField').hidden=!other;
+ $('radioOther').disabled=!other;
  $('radioOther').required=other;
- if(!other)$('radioOther').value='';
-});
+}
+document.querySelectorAll('input[name="radio"]').forEach(input=>input.addEventListener('change',syncStation));
+syncStation();
+window.addEventListener('pageshow',syncStation);
 let map=null,markers=[],selectedPosition=null,vehicleMarker=null,routeLine=null;
 const mapboxToken=typeof window.PD_MAPBOX_PUBLIC_TOKEN==='string'&&/^pk\.[\w.-]+$/.test(window.PD_MAPBOX_PUBLIC_TOKEN)?window.PD_MAPBOX_PUBLIC_TOKEN:null;
 function say(s){status.textContent=s}
@@ -590,16 +633,17 @@ $('orderForm').addEventListener('submit',async e=>{
   if(Number.isNaN(selected.getTime())||selected.getTime()<Date.now()){say('Выбери будущую дату и время.');return}
  }
  const date=day&&time?day+'T'+time:'';
- const radio=$('radio').value==='Другая'?$('radioOther').value.trim():$('radio').value;
+ const station=selectedStation(), radio=station==='Другая'?$('radioOther').value.trim():station;
+ if(station==='Другая'&&!radio){say('Укажи название или частоту станции.');$('radioOther').focus();return}
  const music=$('music').value.trim();
- const climateChoice=climateOn.checked?climate.value+' °C':'';
+ const climateChoice=chosenTemperature===null?'':chosenTemperature+' °C';
 
  const draft=[
   airportDirection?'PRIVATE DRIVE — трансфер аэропорт · 40 €':preorder?'PRIVATE DRIVE — предварительный заказ':'PRIVATE DRIVE — запрос поездки',
   'Откуда: '+from,
   'Куда: '+to,
   date?'Дата/время: '+date.replace('T',' '):'',
-  selectedService?'Дополнительная услуга: '+selectedService:'',
+  selectedService&&!musicEntry?'Дополнительная услуга: '+selectedService:'',
   radio?'Радиостанция: '+radio:'',
   music?'Любимый трек: '+music:'',
   climateChoice?'Климат в салоне: '+climateChoice:'',

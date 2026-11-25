@@ -11,6 +11,7 @@ import 'native_session.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_identity_notice_page.dart';
 import 'remote_sync_demo.dart';
+import 'pilot_push_qa_page.dart';
 
 typedef PdSignInBuilder = Widget Function(BuildContext context, String role,
     ValueChanged<PdNativeSession> onAuthenticated);
@@ -272,6 +273,15 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
                 label: const Text('Тестовая связь с диспетчерской'),
               ),
             ],
+            if (pdLocalQaEntryEnabled &&
+                const bool.fromEnvironment('PD_QA_FIREBASE_PUSH'))
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(builder: (_) => const PilotPushQaPage()),
+                ),
+                icon: const Icon(Icons.notifications_outlined),
+                label: const Text('Тест push-уведомлений'),
+              ),
             if (_message != null) Text(_message!, key: const Key('entry-role-message')),
             const SizedBox(height: 16),
             const Text(pdLocalQaEntryEnabled

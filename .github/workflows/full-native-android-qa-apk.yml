@@ -2,7 +2,7 @@ name: PRIVATE DRIVE complete Android internal QA APK
 
 on:
   push:
-    branches: [feature/flutter-independent-auth, qa/pilot-background-gps]
+    branches: [feature/flutter-independent-auth, qa/pilot-background-gps, qa/pilot-firebase-push]
     paths:
       - 'flutter_app/**'
       - '.github/workflows/full-native-android-qa-apk.yml'
@@ -120,6 +120,7 @@ jobs:
         shell: bash
         env:
           MAPBOX_PUBLIC_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+          PD_FIREBASE_ANDROID_CONFIG: ${{ secrets.PD_FIREBASE_ANDROID_QA_CONFIG }}
         run: |
           set -euo pipefail
           if [[ "$MAPBOX_PUBLIC_TOKEN" != pk.* ]]; then
@@ -150,10 +151,18 @@ jobs:
           # Stable TEST signing key: never use this public development key for release.
           mkdir -p "$HOME/.android"
           base64 --decode ../flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
-          QA_VERSION=0.2.35
-          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112308 \
+          PD_PUSH_READY=false
+          if [[ -n "$PD_FIREBASE_ANDROID_CONFIG" ]]; then
+            python3 ../flutter_app/tool/configure_android_qa_firebase.py
+            PD_PUSH_READY=true
+          else
+            echo "::notice::Firebase QA configuration is absent. Push test remains disabled."
+          fi
+          QA_VERSION=0.2.36
+          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112309 \
             --dart-define="PD_QA_BUILD_LABEL=Версия $QA_VERSION · внутренняя сборка" \
             --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN" \
+            --dart-define=PD_QA_FIREBASE_PUSH="$PD_PUSH_READY" \
             --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN" \
             --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com
           APK=build/app/outputs/flutter-apk/app-debug.apk
@@ -162,7 +171,7 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
           grep "name='lt.privatedrive.private_drive.photo_qa'" ../full-qa-apk-badging.txt
-          grep "versionCode='2026112308'" ../full-qa-apk-badging.txt
+          grep "versionCode='2026112309'" ../full-qa-apk-badging.txt
           grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt

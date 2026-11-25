@@ -281,7 +281,8 @@ jobs:
           flutter build apk --debug \
             --dart-define="PD_NATIVE_AUTH_API_URL=$base_url" \
             --dart-define="PD_NATIVE_PILOT_ASSIGNMENT=$PD_CONNECTED_PILOT_APK" \
-            --dart-define="PD_WEB_DISPATCH_ONLY=true"
+            --dart-define="PD_WEB_DISPATCH_ONLY=true" \
+            --dart-define="PD_QUICK_RESUME=true"
           mkdir -p ../private_drive_qa
           cp build/app/outputs/flutter-apk/app-debug.apk ../private_drive_qa/private-drive-qa.apk
           cd ../private_drive_qa

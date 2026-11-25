@@ -118,7 +118,7 @@ class StationaryLocation extends GeolocatorPlatform {
 
   @override
   Future<Position> getCurrentPosition({LocationSettings? locationSettings}) async =>
-    Position(latitude: 54.69, longitude: 25.28, timestamp: DateTime(2026, 11, 23),
+    Position(latitude: 54.69, longitude: 25.28, timestamp: DateTime.now(),
       accuracy: 5, altitude: 0, altitudeAccuracy: 0, heading: 0, headingAccuracy: 0,
       speed: 0, speedAccuracy: 0);
 }

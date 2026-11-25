@@ -37,12 +37,14 @@ class RemoteSyncDemo extends StatefulWidget {
   const RemoteSyncDemo({super.key, this.gateway, this.enableMapTiles = true,
     this.pollInterval = const Duration(seconds: 3),
     this.onIncomingMessageVoice, this.stagingDispatcher = false,
-    this.onReturnHome, this.initialFrom = '', this.initialTo = ''});
+    this.onReturnHome, this.initialFrom = '', this.initialTo = '',
+    this.enableBackgroundPilotGps = false, this.cabinVisible = true});
   final RemoteTripGateway? gateway;
   final bool enableMapTiles;
   final Duration pollInterval;
   final VoidCallback? onIncomingMessageVoice;
   final bool stagingDispatcher;
+  final bool enableBackgroundPilotGps, cabinVisible;
   final VoidCallback? onReturnHome;
   /// Pre-populated route from the main passenger booking screen (QA only).
   final String initialFrom, initialTo;
@@ -359,7 +361,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     ],
   );
 
-  bool get _usesMobileShiftGps => widget.stagingDispatcher && !kIsWeb &&
+  bool get _usesMobileShiftGps => widget.enableBackgroundPilotGps &&
+      widget.stagingDispatcher && !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
        defaultTargetPlatform == TargetPlatform.iOS);
 
@@ -389,19 +392,33 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     return const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 5);
   }
 
+  @override
+  void didUpdateWidget(covariant RemoteSyncDemo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cabinVisible && !widget.cabinVisible && gpsOn) {
+      unawaited(_stopGps());
+    }
+  }
+
+  Future<void> _stopGps() async {
+    _gpsGeneration++;
+    final stopped = gps;
+    gps = null;
+    _clearLocation = widget.stagingDispatcher;
+    setState(() {
+      gpsOn = false;
+      location = null;
+      _lastFixAt = null;
+      gpsLabel = 'GPS выключен';
+    });
+    if (_clearLocation) unawaited(refresh(immediately: true));
+    await stopped?.cancel();
+  }
+
   Future<void> toggleGps() async {
-    if (_requestingGpsPermission) return;
+    if (_requestingGpsPermission || !widget.cabinVisible) return;
     if (gpsOn) {
-      _gpsGeneration++;
-      final stopped = gps;
-      gps = null;
-      _clearLocation = widget.stagingDispatcher;
-      setState(() {
-        gpsOn = false; location = null; _lastFixAt = null;
-        gpsLabel = 'GPS выключен';
-      });
-      if (_clearLocation) unawaited(refresh(immediately: true));
-      await stopped?.cancel();
+      await _stopGps();
       return;
     }
     _requestingGpsPermission = true;
@@ -438,7 +455,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           return;
         }
       }
-      if (!mounted) return;
+      if (!mounted || !widget.cabinVisible) return;
       final generation = ++_gpsGeneration;
       setState(() { gpsOn = true; gpsLabel = 'Ожидание GPS…'; });
       void updatePosition(Position position) {

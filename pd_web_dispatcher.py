@@ -252,7 +252,13 @@ def register(app, core):
             hashlib.sha256(credential.encode()).hexdigest(),
         )
 
-    if require_mfa and os.environ.get("PD_DISPATCH_LIVE_ORDERS") == "1":
+    live_orders_enabled = (
+        require_mfa
+        and os.environ.get("PD_DISPATCH_LIVE_ORDERS") == "1"
+        and os.environ.get("PD_DISPATCH_STAGING_ONLY") != "1"
+        and hasattr(core, "ORDERS_DB")
+    )
+    if live_orders_enabled:
         @app.get("/dispatch/live/orders")
         def pd_dispatch_live_orders():
             if not authorized():
@@ -430,7 +436,7 @@ def register(app, core):
 
     @app.get("/dispatch")
     def pd_dispatch_home():
-        if test_sync_enabled or persistent_queue_enabled:
+        if live_orders_enabled or test_sync_enabled or persistent_queue_enabled:
             return pd_dispatch_map()
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
@@ -450,7 +456,8 @@ def register(app, core):
             token = ""
         page = Path(__file__).with_name("pd_dispatcher_mapbox.html").read_text(encoding="utf-8")
         response = app.make_response(render_template_string(
-            page, mapbox_token=token, test_sync_enabled=test_sync_enabled and not persistent_queue_enabled,
+            page, mapbox_token=token, live_orders_enabled=live_orders_enabled,
+            test_sync_enabled=test_sync_enabled and not persistent_queue_enabled,
             persistent_queue_enabled=persistent_queue_enabled,
             analytics_enabled="pd_site_analytics" in app.view_functions,
             csrf=csrf() if test_sync_enabled else "",

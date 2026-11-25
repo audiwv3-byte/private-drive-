@@ -236,7 +236,10 @@ jobs:
           if [[ "$PD_CONNECTED_PILOT_APK" == true ]]; then
             base_url=https://private-drive-drbd.onrender.com
           fi
-          # The connected internal build must enable the existing read-only\n          # pilot assignment panel; offline QA stays disconnected.\n          flutter build apk --debug --dart-define="PD_NATIVE_AUTH_API_URL=$base_url" \\\n            --dart-define="PD_NATIVE_PILOT_ASSIGNMENT=$PD_CONNECTED_PILOT_APK"
+          # Enable pilot orders in connected internal QA builds only.
+          flutter build apk --debug \
+            --dart-define="PD_NATIVE_AUTH_API_URL=$base_url" \
+            --dart-define="PD_NATIVE_PILOT_ASSIGNMENT=$PD_CONNECTED_PILOT_APK"
           mkdir -p ../private_drive_qa
           cp build/app/outputs/flutter-apk/app-debug.apk ../private_drive_qa/private-drive-qa.apk
           cd ../private_drive_qa

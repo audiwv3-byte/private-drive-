@@ -35,6 +35,7 @@ jobs:
           cp -R flutter_app/lib/. private_drive_build/lib/
           cp -R flutter_app/assets private_drive_build/assets
           cp -R flutter_app/test/. private_drive_build/test/
+          cp -R flutter_app/integration_test private_drive_build/integration_test
           cp flutter_app/pubspec.yaml private_drive_build/pubspec.yaml
           cp flutter_app/analysis_options.yaml private_drive_build/analysis_options.yaml
           rm -f private_drive_build/test/widget_test.dart
@@ -149,8 +150,8 @@ jobs:
           # Stable TEST signing key: never use this public development key for release.
           mkdir -p "$HOME/.android"
           base64 --decode ../flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
-          QA_VERSION=0.2.39
-          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112503 \
+          QA_VERSION=0.2.40
+          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112504 \
             --dart-define="PD_QA_BUILD_LABEL=Версия $QA_VERSION · внутренняя сборка" \
             --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN" \
             --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com
@@ -160,7 +161,7 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
           grep "name='lt.privatedrive.private_drive.photo_qa'" ../full-qa-apk-badging.txt
-          grep "versionCode='2026112503'" ../full-qa-apk-badging.txt
+          grep "versionCode='2026112504'" ../full-qa-apk-badging.txt
           grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt
@@ -173,6 +174,25 @@ jobs:
           cp ../full-qa-apk-signature.txt ../full-qa-apk-badging.txt ../full-qa-apk-permissions.txt ../full_native_qa_apk/
           cp ../docs/native-photo-review-qa.md ../full_native_qa_apk/README.md
           (cd ../full_native_qa_apk && sha256sum PRIVATE-DRIVE-full-qa-debug.apk > SHA256SUMS)
+      - name: Release Gradle memory and enable Android emulator acceleration
+        run: |
+          (cd private_drive_build/android && ./gradlew --stop) || true
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Render passenger and pilot maps on Android
+        timeout-minutes: 18
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          ram-size: 1536M
+          heap-size: 256M
+          cores: 2
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: cd private_drive_build && flutter test integration_test/maps_android_smoke_test.dart -d emulator-5554 --reporter expanded --timeout 4m
       - name: Upload installable full-native QA Android APK
         uses: actions/upload-artifact@v4
         with:
@@ -191,11 +211,11 @@ jobs:
         with:
           name: private-drive-full-native-qa-apk
           path: apk
-      - name: Download the published Android QA 0.2.38 baseline
+      - name: Download the published Android QA 0.2.39 baseline
         uses: actions/download-artifact@v4
         with:
           name: private-drive-full-native-qa-apk
-          run-id: 45557327113
+          run-id: 45566780468
           github-token: ${{ github.token }}
           path: previous-apk
       - name: Verify both APK signing certificates and versions
@@ -209,8 +229,8 @@ jobs:
             "$BUILD_TOOLS/apksigner" verify --print-certs "$file" | grep -F 'certificate SHA-256 digest:' > "$path/certificates.txt"
           done
           diff -u previous-apk/certificates.txt apk/certificates.txt
-          "$BUILD_TOOLS/aapt" dump badging previous-apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112502' versionName='0.2.38'"
-          "$BUILD_TOOLS/aapt" dump badging apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112503' versionName='0.2.39'"
+          "$BUILD_TOOLS/aapt" dump badging previous-apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112503' versionName='0.2.39'"
+          "$BUILD_TOOLS/aapt" dump badging apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112504' versionName='0.2.40'"
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -225,9 +245,9 @@ jobs:
           script: |
             set -e
             adb install previous-apk/PRIVATE-DRIVE-full-qa-debug.apk
-            adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.38'
-            adb install -r apk/PRIVATE-DRIVE-full-qa-debug.apk
             adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.39'
+            adb install -r apk/PRIVATE-DRIVE-full-qa-debug.apk
+            adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.40'
             adb logcat -c
             adb shell am start -W -n lt.privatedrive.private_drive.photo_qa/lt.privatedrive.private_drive.MainActivity
             sleep 12

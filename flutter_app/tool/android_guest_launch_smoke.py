@@ -71,12 +71,14 @@ def scroll_to_label(label, xml, *, scroll_back=False):
     raise AssertionError(f'Missing screen label after scrolling: {label}')
 
 
+wait_for_labels('Русский', 'English', 'Lietuvių')
+click_node('Русский')
 entry = wait_for_labels('Выбери кабинет', 'Пассажир', 'Пилот')
 assert 'Тестовый вход' not in entry, 'Account build must not require a local PIN'
 assert 'Локальные тестовые данные' not in entry
 
 click_node('Пассажир')
-signin = wait_for_labels('Вход пассажира', 'Вход по SMS или через Telegram')
+signin = wait_for_labels('Вход пассажира', 'Войди через Telegram или SMS')
 signin = scroll_to_label('Войти через Telegram', signin)
 signin = scroll_to_label('Получить код', signin, scroll_back=True)
 assert 'Продолжить как гость' not in signin, 'Registration build must not offer guest entry'

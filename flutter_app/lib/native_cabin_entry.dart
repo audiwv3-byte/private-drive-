@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
+import 'app_language.dart' show pdEntryTr;
 import 'private_drive_bright_backdrop.dart';
 import 'demo_interfaces.dart';
 import 'permissions_onboarding.dart';
 import 'native_session.dart';
+import 'native_session_store.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_identity_notice_page.dart';
 import 'remote_sync_demo.dart';
@@ -20,9 +22,10 @@ const pdLocalQaEntryEnabled = !kIsWeb &&
 /// Cabin choice is navigation intent, never a server role grant.
 class PdNativeCabinEntry extends StatefulWidget {
   const PdNativeCabinEntry({super.key, required this.signInBuilder,
-    required this.identityApiBuilder});
+    required this.identityApiBuilder, this.sessionStore});
   final PdSignInBuilder signInBuilder;
   final PdIdentityApi Function(PdNativeSession session) identityApiBuilder;
+  final PdNativeSessionStore? sessionStore;
   @override
   State<PdNativeCabinEntry> createState() => _PdNativeCabinEntryState();
 }
@@ -37,7 +40,42 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   bool _testSyncStarted = false;
   bool _showTestSync = false;
   bool _localPilotOpened = false;
+  bool _restoring = false;
+  bool _restoreFailed = false;
+  Future<void> _storageOperation = Future.value();
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.sessionStore != null && !pdLocalQaEntryEnabled) {
+      _restoring = true;
+      unawaited(_restoreSession());
+    }
+  }
+
+  Future<void> _restoreSession() async {
+    try {
+      final restored = await widget.sessionStore!.restore();
+      if (!mounted) return;
+      if (restored == null) {
+        setState(() => _restoring = false);
+        return;
+      }
+      final (session, cabin) = restored;
+      _requestedRole = cabin;
+      _openSession(session);
+    } catch (_) {
+      if (mounted) setState(() {
+        _restoring = false;
+        _restoreFailed = true;
+      });
+    }
+  }
+
+  void _changeSavedSession(Future<void> Function() operation) {
+    _storageOperation = _storageOperation.then((_) => operation()).catchError((Object _) {});
+  }
 
   void _openTestSync() {
     setState(() {
@@ -52,6 +90,17 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
   void _signOut() {
     _expiry?.cancel();
+    final session = _session;
+    final store = widget.sessionStore;
+    if (store != null) {
+      _changeSavedSession(() async {
+        try {
+          await store.clear();
+        } finally {
+          if (session != null) await store.revoke(session);
+        }
+      });
+    }
     _session = null;
     _qaUnlocked = false;
     _testSyncStarted = false;
@@ -81,11 +130,21 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
   void _authenticated(PdNativeSession session) {
     if (!mounted || !session.active) return;
+    final store = widget.sessionStore;
+    if (store != null) {
+      final cabin = _requestedRole;
+      _changeSavedSession(() => store.save(session, cabin));
+    }
+    _openSession(session);
+  }
+
+  void _openSession(PdNativeSession session) {
     _expiry?.cancel();
     _expiry = Timer(session.expiresAt.difference(DateTime.now()), () {
       if (mounted) _signOut();
     });
     setState(() {
+      _restoring = false;
       _session = session;
       if (_requestedRole == 'pilot' && session.canPilot) {
         _page = 'photo';
@@ -188,6 +247,41 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
 
   Widget _buildCabin(BuildContext context) {
+    String tr(String ru, String lt, String en) => pdEntryTr(context, ru, lt, en);
+
+    if (_restoring || _restoreFailed) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: _restoring ? const CircularProgressIndicator() : Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(tr('Не удалось проверить сохранённый вход.',
+                  'Nepavyko patikrinti išsaugotos sesijos.',
+                  'Could not verify the saved session.'), textAlign: TextAlign.center),
+                FilledButton(
+                  onPressed: () {
+                    setState(() {
+                      _restoreFailed = false;
+                      _restoring = true;
+                    });
+                    unawaited(_restoreSession());
+                  },
+                  child: Text(tr('Повторить', 'Bandyti dar kartą', 'Try again')),
+                ),
+                TextButton(
+                  onPressed: () {
+                    _changeSavedSession(widget.sessionStore!.clear);
+                    setState(() => _restoreFailed = false);
+                  },
+                  child: Text(tr('Войти заново', 'Prisijungti iš naujo', 'Sign in again')),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
     if (pdLocalQaEntryEnabled) {
       if (!_qaUnlocked) {
         return _LocalQaSignIn(
@@ -207,7 +301,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       return PopScope(canPop: false,
         onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
         child: Scaffold(
-          appBar: AppBar(title: Text(_requestedRole == 'pilot' ? 'Вход пилота' : 'Вход пассажира'),
+          appBar: AppBar(title: Text(_requestedRole == 'pilot'
+              ? tr('Вход пилота', 'Vairuotojo prisijungimas', 'Driver sign-in')
+              : tr('Вход пассажира', 'Keleivio prisijungimas', 'Passenger sign-in')),
             leading: BackButton(onPressed: _entry)),
           body: widget.signInBuilder(context, _requestedRole, _authenticated),
         ),
@@ -231,7 +327,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [
         if (session != null || _qaUnlocked) IconButton(onPressed: _signOut,
-          icon: const Icon(Icons.logout), tooltip: 'Выйти'),
+          icon: const Icon(Icons.logout),
+          tooltip: tr('Выйти', 'Atsijungti', 'Sign out')),
       ]),
       body: Stack(children: [
         const Positioned.fill(child: PrivateDriveBrightBackdrop()),
@@ -240,16 +337,17 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
           child: ListView(shrinkWrap: true, padding: const EdgeInsets.all(24), children: [
             const PrivateDriveBrandLogo(size: 156, transparentBackground: true),
             const SizedBox(height: 16),
-            const Text('Выбери кабинет', key: Key('entry-cabin-selection'),
-              textAlign: TextAlign.center, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+            Text(tr('Выбери кабинет', 'Pasirink paskyrą', 'Choose your account'),
+              key: const Key('entry-cabin-selection'),
+              textAlign: TextAlign.center, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             FilledButton.icon(key: const Key('entry-passenger'),
               onPressed: () => _select('passenger'), icon: const Icon(Icons.person_outline),
-              label: const Text('Пассажир')),
+              label: Text(tr('Пассажир', 'Keleivis', 'Passenger'))),
             const SizedBox(height: 12),
             FilledButton.icon(key: const Key('entry-pilot'),
               onPressed: () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
-              label: const Text('Пилот')),
+              label: Text(tr('Пилот', 'Vairuotojas', 'Driver'))),
             if (pdLocalQaEntryEnabled) ...[
               const SizedBox(height: 12),
               OutlinedButton.icon(
@@ -261,10 +359,13 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             ],
             if (_message != null) Text(_message!, key: const Key('entry-role-message')),
             const SizedBox(height: 16),
-            const Text(pdLocalQaEntryEnabled
+            Text(pdLocalQaEntryEnabled
               ? 'Оба кабинета используют локальные тестовые данные.'
-              : 'Фотопроверка требуется только пилоту. '
-                'Доступ пилота подтверждается сервером.',
+              : tr(
+                  'Фотопроверка требуется только пилоту. Доступ пилота подтверждается сервером.',
+                  'Nuotrauką turi patvirtinti tik vairuotojai. Vairuotojo prieigą patvirtina serveris.',
+                  'Only drivers need photo verification. Driver access is verified by the server.',
+                ),
               textAlign: TextAlign.center),
             const SizedBox(height: 12),
             const Text(String.fromEnvironment('PD_QA_BUILD_LABEL',

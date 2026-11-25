@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'app_language.dart';
 
 /// Only foreground location and notification permissions are requested.
 /// No background location, SMS-reading or other sensitive permissions.
@@ -61,7 +62,7 @@ class PdPermissionsFirstLaunch extends StatefulWidget {
 class _PdPermissionsFirstLaunchState extends State<PdPermissionsFirstLaunch> {
   bool? _completed;
   bool _busy = false;
-  String? _error;
+  bool _requestFailed = false;
 
   @override
   void initState() {
@@ -102,7 +103,7 @@ class _PdPermissionsFirstLaunchState extends State<PdPermissionsFirstLaunch> {
     if (_busy) return;
     setState(() {
       _busy = true;
-      _error = null;
+      _requestFailed = false;
     });
     try {
       // Two separate native prompts, always following a user tap.
@@ -110,8 +111,7 @@ class _PdPermissionsFirstLaunchState extends State<PdPermissionsFirstLaunch> {
       await widget.gateway.requestLocation();
     } catch (_) {
       if (mounted) {
-        setState(() => _error =
-            'Не удалось запросить разрешения. Можно включить их в настройках приложения.');
+        setState(() => _requestFailed = true);
       }
     } finally {
       await _finish();
@@ -126,6 +126,7 @@ class _PdPermissionsFirstLaunchState extends State<PdPermissionsFirstLaunch> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
+    String tr(String ru, String lt, String en) => pdEntryTr(context, ru, lt, en);
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE')),
       body: SafeArea(
@@ -138,35 +139,47 @@ class _PdPermissionsFirstLaunchState extends State<PdPermissionsFirstLaunch> {
               const Icon(Icons.admin_panel_settings_outlined,
                 size: 66, color: Color(0xFFDDC184)),
               const SizedBox(height: 18),
-              const Text('Разрешения приложения',
+              Text(tr('Разрешения приложения', 'Programėlės leidimai', 'App permissions'),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              const ListTile(
-                leading: Icon(Icons.notifications_active_outlined),
-                title: Text('Уведомления'),
-                subtitle: Text('Для сообщений пилота и изменений заказа после подключения уведомлений.'),
+              ListTile(
+                leading: const Icon(Icons.notifications_active_outlined),
+                title: Text(tr('Уведомления', 'Pranešimai', 'Notifications')),
+                subtitle: Text(tr(
+                  'Для сообщений пилота и изменений заказа после подключения уведомлений.',
+                  'Vairuotojo žinutėms ir kelionės pakeitimams, kai pranešimai įjungti.',
+                  'For driver messages and booking updates when notifications are enabled.')),
               ),
-              const ListTile(
-                leading: Icon(Icons.my_location_outlined),
-                title: Text('Местоположение'),
-                subtitle: Text('Для определения точки посадки на карте. Только при использовании приложения.'),
+              ListTile(
+                leading: const Icon(Icons.my_location_outlined),
+                title: Text(tr('Местоположение', 'Vieta', 'Location')),
+                subtitle: Text(tr(
+                  'Для определения точки посадки на карте. Только при использовании приложения.',
+                  'Paėmimo vietai žemėlapyje nustatyti, tik naudojantis programėle.',
+                  'To locate your pickup point on the map, only while using the app.')),
               ),
               const SizedBox(height: 16),
-              if (_error != null) Text(_error!,
+              if (_requestFailed) Text(tr(
+                'Не удалось запросить разрешения. Можно включить их в настройках приложения.',
+                'Nepavyko paprašyti leidimų. Juos gali įjungti programėlės nustatymuose.',
+                'Could not request permissions. You can enable them in the app settings.'),
                 key: const Key('permission-onboarding-error')),
               FilledButton(
                 key: const Key('permission-onboarding-allow'),
                 onPressed: _busy ? null : _request,
-                child: const Text('Разрешить'),
+                child: Text(tr('Разрешить', 'Leisti', 'Allow')),
               ),
               TextButton(
                 key: const Key('permission-onboarding-skip'),
                 onPressed: _busy ? null : _finish,
-                child: const Text('Продолжить без разрешений'),
+                child: Text(tr('Продолжить без разрешений', 'Tęsti be leidimų',
+                  'Continue without permissions')),
               ),
-              const Text('Отказ не блокирует вход. Разрешения можно '
-                'включить позднее в настройках PRIVATE DRIVE.',
+              Text(tr('Отказ не блокирует вход. Разрешения можно '
+                  'включить позднее в настройках PRIVATE DRIVE.',
+                'Prisijungti gali ir be leidimų. Vėliau juos gali įjungti PRIVATE DRIVE nustatymuose.',
+                'You can sign in without permissions and enable them later in PRIVATE DRIVE settings.'),
                 textAlign: TextAlign.center),
             ],
           ),

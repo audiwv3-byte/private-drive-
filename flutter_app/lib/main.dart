@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:http/http.dart' as http;
@@ -12,6 +12,7 @@ import 'demo_backup_page.dart';
 import 'brand_logo.dart';
 import 'private_drive_bright_backdrop.dart';
 import 'app_language.dart';
+import 'first_launch_language_page.dart';
 import 'permissions_onboarding.dart';
 import 'company_info.dart';
 import 'pd_http_api.dart';
@@ -19,8 +20,10 @@ import 'pilot_identity_api.dart';
 import 'pilot_photo_capture.dart';
 import 'native_cabin_entry.dart';
 import 'native_session.dart';
+import 'native_session_store.dart';
 
 const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
+const _qaBuildLabel = String.fromEnvironment('PD_QA_BUILD_LABEL');
 // Opt-in only for the isolated static Safari/Android browser test artifact.
 // No production auth URL, payment gateway or automatic backend connection.
 const isolatedWebPreview = bool.fromEnvironment('PD_ISOLATED_WEB_PREVIEW');
@@ -35,41 +38,54 @@ Future<void> main() async {
 }
 
 class PrivateDriveApp extends StatelessWidget {
-  const PrivateDriveApp({super.key, this.enableOfflinePreview = false});
+  const PrivateDriveApp({
+    super.key,
+    this.enableOfflinePreview = false,
+    this.language,
+  });
 
   final bool enableOfflinePreview;
+  final PdLanguage? language;
+
+  Widget _home() {
+    if (kIsWeb && isolatedWebPreview) return const RemoteSyncDemo();
+    if (enableOfflinePreview) {
+      return const PdPermissionsFirstLaunch(
+        child: NativeSignInScreen(enableOfflinePreview: true),
+      );
+    }
+    final entry = PdNativeCabinEntry(
+      signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
+        allowGuestEntry: role == 'passenger',
+        onAuthenticated: onAuthenticated,
+      ),
+      identityApiBuilder: (session) =>
+          PdIdentityApi(baseUrl: apiBaseUrl, token: session.token),
+      sessionStore: !kIsWeb && apiBaseUrl.isNotEmpty &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+           defaultTargetPlatform == TargetPlatform.iOS)
+          ? PdNativeSessionStore(apiBaseUrl) : null,
+    );
+    if (pdLocalQaEntryEnabled) return entry;
+    return PdFirstLaunchLanguage(child: entry);
+  }
 
   @override
   Widget build(BuildContext context) {
     return PdLanguageScope(
-      language: pdLanguage,
+      language: language ?? pdLanguage,
       child: MaterialApp(
-      title: 'PRIVATE DRIVE',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFB99954),
-          brightness: Brightness.dark,
+        title: 'PRIVATE DRIVE',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFB99954),
+            brightness: Brightness.dark,
+          ),
+          scaffoldBackgroundColor: const Color(0xFF111111),
         ),
-        scaffoldBackgroundColor: const Color(0xFF111111),
-      ),
-      home: kIsWeb && isolatedWebPreview
-          ? const RemoteSyncDemo()
-          : enableOfflinePreview
-          // Explicit developer harness only. Normal launch starts with cabins.
-          ? const PdPermissionsFirstLaunch(
-              child: NativeSignInScreen(enableOfflinePreview: true),
-            )
-          : PdNativeCabinEntry(
-              signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
-                enableOfflinePreview: enableOfflinePreview,
-                allowGuestEntry: role == 'passenger',
-                onAuthenticated: onAuthenticated,
-              ),
-              identityApiBuilder: (session) => PdIdentityApi(
-                baseUrl: apiBaseUrl, token: session.token),
-            ),
+        home: _home(),
       ),
     );
   }
@@ -83,6 +99,7 @@ class NativeSignInScreen extends StatefulWidget {
     this.httpClient,
     this.allowGuestEntry = true,
     this.onAuthenticated,
+    this.telegramLauncher,
   });
 
   final String authApiUrl;
@@ -90,6 +107,7 @@ class NativeSignInScreen extends StatefulWidget {
   final http.Client? httpClient;
   final bool allowGuestEntry;
   final ValueChanged<PdNativeSession>? onAuthenticated;
+  final Future<bool> Function(Uri)? telegramLauncher;
 
   @override
   State<NativeSignInScreen> createState() => _NativeSignInScreenState();
@@ -101,12 +119,20 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   bool busy = false;
   bool _guest = false;
   bool _acknowledgedLegal = false;
-  // Authentication belongs to the Russian-only shared/native shell.
-  // Passenger language selection is available inside the passenger cabin.
-  String tr(String ru, String lt, String en) => ru;
+  String _language = 'RU';
+  String tr(String ru, String lt, String en) => switch (_language) {
+    'LT' => lt,
+    'EN' => en,
+    _ => ru,
+  };
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _language = PdLanguageScope.of(context).value;
+  }
   String? challengeId;
-  String? telegramState;
-  String? telegramSecret;
+  (String, String)? telegramAttempt;
   String message = '';
   String? sessionToken;
   String? signedInUserId;
@@ -122,11 +148,9 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     super.dispose();
   }
 
-  Future<Map<String, dynamic>> post(String path, Map<String, String> payload,
-      {Duration timeout = const Duration(seconds: 10)}) {
+  Future<Map<String, dynamic>> post(String path, Map<String, String> payload) {
     final uri = PdHttpApi.secureUri(widget.authApiUrl, path);
-    return const PdHttpApi().postJson(uri, payload,
-      client: widget.httpClient, timeout: timeout);
+    return const PdHttpApi().postJson(uri, payload, client: widget.httpClient);
   }
 
   Future<void> requestCode() async {
@@ -139,7 +163,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       final result = await post('/native-auth/request-code', {
         'channel': 'phone',
         'destination': destination.text.trim(),
-      }, timeout: const Duration(seconds: 70));
+      });
       final id = result['challenge_id'];
       if (id is! String || id.isEmpty) {
         throw const FormatException('Сервер не выдал идентификатор проверки.');
@@ -147,21 +171,47 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       if (!mounted) return;
       setState(() {
         challengeId = id;
-        message = 'Код запрошен. Введи полученный код подтверждения.';
+        message = tr('Код запрошен. Введи полученный код подтверждения.',
+            'Kodas išsiųstas. Įvesk gautą patvirtinimo kodą.',
+            'Code requested. Enter the verification code you received.');
       });
     } on PdHttpStatusException catch (error) {
       if (mounted) setState(() => message = switch (error.errorCode) {
-        'sms_disabled' => 'Вход по SMS сейчас отключён на тестовом сервере. '
-            'Код не отправлен. Во внутренней сборке можно продолжить как гость.',
-        'sms_unavailable' => 'Сервис SMS временно недоступен. Код не отправлен. Повтори позже.',
-        'invalid_phone' => 'Проверь номер: укажи код страны, например +370, и номер телефона.',
-        'sms_number_not_enabled' => 'SMS доступны для номера, включённого в тестирование.',
-        'try_later' => 'Слишком частые запросы. Подожди минуту и повтори.',
-        _ => 'Сервер входа временно недоступен. Повтори позже.',
+        'sms_disabled' => tr(
+            'Вход по SMS сейчас отключён на тестовом сервере. '
+                'Код не отправлен. Во внутренней сборке можно продолжить как гость.',
+            'Bandomajame serveryje prisijungimas SMS žinute išjungtas. '
+                'Kodas neišsiųstas. Vidinėje versijoje galima tęsti kaip svečiui.',
+            'SMS sign-in is disabled on the test server. The code was not sent. '
+                'Guest access is available in the internal build.'),
+        'sms_unavailable' => tr(
+            'Сервис SMS временно недоступен. Код не отправлен. Повтори позже.',
+            'SMS paslauga laikinai nepasiekiama. Kodas neišsiųstas. Bandyk vėliau.',
+            'SMS service is temporarily unavailable. The code was not sent. Try again later.'),
+        'invalid_phone' => tr(
+            'Проверь номер: укажи код страны, например +370, и номер телефона.',
+            'Patikrink numerį. Įvesk šalies kodą, pavyzdžiui, +370, ir telefono numerį.',
+            'Check your number. Include the country code, such as +370.'),
+        'sms_number_not_enabled' => tr(
+            'Этот номер не включён в SMS-тест. Можно войти через Telegram.',
+            'Šis numeris neįtrauktas į SMS testą. Gali prisijungti per „Telegram“.',
+            'This number is not enabled for SMS testing. You can sign in with Telegram.'),
+        'try_later' => tr(
+            'Слишком частые запросы. Подожди минуту и повтори.',
+            'Per daug užklausų. Palauk minutę ir bandyk dar kartą.',
+            'Too many requests. Wait a minute and try again.'),
+        _ => tr('Сервер входа временно недоступен. Повтори позже.',
+            'Prisijungimo serveris laikinai nepasiekiamas. Bandyk vėliau.',
+            'The sign-in server is temporarily unavailable. Try again later.'),
       });
     } catch (_) {
-      if (mounted) setState(() => message = 'Сервер входа не ответил вовремя. '
-          'Повтори запрос позже или продолжи как гость во внутренней сборке.');
+      if (mounted) setState(() => message = tr(
+          'Сервер входа не ответил вовремя. Повтори запрос позже или продолжи '
+              'как гость во внутренней сборке.',
+          'Prisijungimo serveris neatsakė laiku. Bandyk vėliau arba tęsk '
+              'kaip svečias vidinėje versijoje.',
+          'The sign-in server did not respond in time. Try again later or '
+              'continue as a guest in the internal build.'));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -179,123 +229,128 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         'challenge_id': id,
         'code': code.text.trim(),
       });
-      completeSignIn(result);
+      _completeSignIn(result);
     } catch (_) {
-      if (mounted) setState(() => message = 'Код не подтверждён. Проверь код или срок действия.');
+      if (mounted) setState(() => message = tr(
+          'Код не подтверждён. Проверь код или срок действия.',
+          'Kodas nepatvirtintas. Patikrink kodą ir jo galiojimo laiką.',
+          'The code could not be verified. Check the code and its expiry.'));
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
 
-  void completeSignIn(Map<String, dynamic> result) {
-    final token = result['access_token'];
-    final userId = result['user_id'];
-    final tokenType = result['token_type'];
-    final expiresIn = result['expires_in'];
-    final role = result['role'];
-    if (result['verified'] != true ||
-        token is! String || token.length < 40 ||
-        userId is! String || userId.isEmpty ||
-        tokenType != 'Bearer' ||
-        !const {'passenger', 'admin', 'pilot', 'dispatcher', 'pilot_dispatcher'}.contains(role) ||
-        expiresIn is! int || expiresIn <= 0) {
-      throw const FormatException('Сервер не выдал корректную сессию.');
-    }
+  void _completeSignIn(Map<String, dynamic> result) {
     if (!mounted) return;
-    final expiry = DateTime.now().add(Duration(seconds: expiresIn));
+    final session = PdNativeSession.fromApi(result);
     final onAuthenticated = widget.onAuthenticated;
     if (onAuthenticated != null) {
-      onAuthenticated(PdNativeSession(token: token, userId: userId,
-        role: role as String, expiresAt: expiry));
+      onAuthenticated(session);
       return;
     }
     setState(() {
-      sessionToken = token;
-      signedInUserId = userId;
-      signedInRole = role as String;
+      sessionToken = session.token;
+      signedInUserId = session.userId;
+      signedInRole = session.role;
+      sessionExpiry = session.expiresAt;
       showVerifiedIdentity = true;
-      sessionExpiry = expiry;
-      message = '';
-      challengeId = null;
-      telegramState = null;
-      telegramSecret = null;
-      code.clear();
+      _resetChallenge();
     });
   }
 
-  Future<void> startTelegram() async {
+  void _resetChallenge() {
+    challengeId = null;
+    telegramAttempt = null;
+    code.clear();
+    message = '';
+  }
+
+  Future<void> _startTelegram() async {
     if (busy || !_acknowledgedLegal) return;
-    final random = Random.secure();
-    final secret = base64UrlEncode(
-      List<int>.generate(32, (_) => random.nextInt(256)),
-    ).replaceAll('=', '');
     setState(() {
       busy = true;
-      message = '';
+      _resetChallenge();
     });
     try {
+      final random = Random.secure();
+      final secret = base64UrlEncode(
+        List.generate(32, (_) => random.nextInt(256)),
+      ).replaceAll('=', '');
       final result = await post('/native-auth/telegram/start', {
         'app_secret': secret,
-      }, timeout: const Duration(seconds: 70));
+        'language': _language,
+      });
       final state = result['state'];
       final url = result['authorization_url'];
       final uri = url is String ? Uri.tryParse(url) : null;
       if (state is! String || !RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(state) ||
-          uri == null || uri.scheme != 'https' ||
-          uri.host != 'oauth.telegram.org' || uri.userInfo.isNotEmpty ||
-          uri.port != 443 || uri.path != '/auth' || uri.queryParameters['state'] != state) {
-        throw const FormatException('Сервер вернул неверную ссылку Telegram.');
+          uri == null || uri.scheme != 'https' || uri.host != 'oauth.telegram.org' ||
+          uri.port != 443 || uri.path != '/auth' || uri.userInfo.isNotEmpty ||
+          uri.queryParameters['state'] != state) {
+        throw const FormatException('Invalid Telegram authorization response.');
       }
       if (!mounted) return;
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        throw const FormatException('Не удалось открыть Telegram.');
-      }
-      if (!mounted) return;
-      setState(() {
-        telegramState = state;
-        telegramSecret = secret;
-        code.clear();
-        message = 'Разреши Telegram передать номер. Затем введи код с открывшейся страницы.';
-      });
+      final opened = await (widget.telegramLauncher?.call(uri) ??
+          launchUrl(uri, mode: LaunchMode.externalApplication));
+      if (!opened) throw StateError('Telegram authorization could not be opened.');
+      if (mounted) setState(() => telegramAttempt = (state, secret));
     } on PdHttpStatusException catch (error) {
       if (mounted) setState(() => message = error.errorCode == 'telegram_disabled'
-          ? 'Вход через Telegram ещё не включён на сервере.'
-          : 'Сервер входа через Telegram временно недоступен.');
+          ? tr('Вход через Telegram пока недоступен. Попробуй SMS.',
+              'Prisijungimas per „Telegram“ kol kas nepasiekiamas. Bandyk SMS.',
+              'Telegram sign-in is currently unavailable. Try SMS.')
+          : _telegramStartError());
     } catch (_) {
-      if (mounted) setState(() => message = 'Не удалось начать вход через Telegram.');
+      if (mounted) setState(() => message = _telegramStartError());
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
 
-  Future<void> finishTelegram() async {
-    final state = telegramState;
-    final secret = telegramSecret;
-    if (busy || state == null || secret == null) return;
+  String _telegramStartError() => tr(
+    'Не удалось открыть вход через Telegram. Повтори или выбери SMS.',
+    'Nepavyko atidaryti prisijungimo per „Telegram“. Bandyk dar kartą arba rinkis SMS.',
+    'Could not open Telegram sign-in. Try again or use SMS.',
+  );
+
+  Future<void> _finishTelegram() async {
+    final attempt = telegramAttempt;
+    final digits = code.text.trim();
+    if (busy || attempt == null || !RegExp(r'^[0-9]{8}$').hasMatch(digits)) return;
     setState(() {
       busy = true;
       message = '';
     });
     try {
-      completeSignIn(await post('/native-auth/telegram/finish', {
+      final (state, secret) = attempt;
+      final result = await post('/native-auth/telegram/finish', {
         'state': state,
         'app_secret': secret,
-        'code': code.text.trim(),
-      }));
-    } on PdHttpStatusException catch (error) {
-      if (mounted) setState(() => message = switch (error.errorCode) {
-        'telegram_link_conflict' =>
-          'Этот номер или аккаунт Telegram уже привязан. Попробуй вход по SMS.',
-        'telegram_code_invalid' =>
-          'Код Telegram не принят. Проверь его или начни вход заново.',
-        _ => 'Сервер входа через Telegram временно недоступен.',
+        'code': digits,
       });
+      _completeSignIn(result);
+    } on PdHttpStatusException catch (error) {
+      if (mounted) setState(() => message = error.errorCode == 'telegram_link_conflict'
+          ? tr('Этот Telegram связан с другим аккаунтом. Используй вход по SMS.',
+              'Ši „Telegram“ paskyra susieta su kita paskyra. Prisijunk SMS žinute.',
+              'This Telegram account is linked to another account. Sign in with SMS.')
+          : error.errorCode == 'telegram_code_invalid'
+          ? tr('Проверь код. Если он истёк, начни вход заново.',
+              'Patikrink kodą. Jei jis nebegalioja, pradėk iš naujo.',
+              'Check the code. If it expired, start sign-in again.')
+          : _telegramFinishError());
     } catch (_) {
-      if (mounted) setState(() => message = 'Не удалось завершить вход через Telegram.');
+      if (mounted) setState(() => message = _telegramFinishError());
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
+
+  String _telegramFinishError() => tr(
+    'Не удалось завершить вход. Повтори попытку.',
+    'Nepavyko užbaigti prisijungimo. Bandyk dar kartą.',
+    'Could not complete sign-in. Try again.',
+  );
 
   void signOut() {
     setState(() {
@@ -306,11 +361,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       selectedStaffRole = null;
       showVerifiedIdentity = false;
       sessionExpiry = null;
-      challengeId = null;
-      telegramState = null;
-      telegramSecret = null;
-      code.clear();
-      message = '';
+      _resetChallenge();
     });
   }
 
@@ -476,7 +527,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
           actions: [
             IconButton(
               key: const Key('native-permission-settings'),
-              tooltip: 'Разрешения приложения',
+              tooltip: tr('Разрешения приложения', 'Programėlės leidimai',
+                  'App permissions'),
               icon: const Icon(Icons.settings_outlined),
               onPressed: () => Navigator.push(
                 context,
@@ -504,17 +556,18 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 12),
-                Text(widget.authApiUrl.isEmpty
-                    ? 'Независимый вход без Telegram'
-                    : 'Вход по SMS или через Telegram',
+                Text(tr('Войди через Telegram или SMS',
+                    'Prisijunk per „Telegram“ arba SMS žinute',
+                    'Sign in with Telegram or SMS'),
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
-                const Text(
-                  String.fromEnvironment('PD_QA_BUILD_LABEL',
-                    defaultValue: 'Версия 0.2.27 · сборка 2026112103'),
-                  key: Key('app-demo-version'),
+                Text(
+                  _qaBuildLabel.isNotEmpty ? _qaBuildLabel : tr('Версия 0.2.27 · сборка 2026112103',
+                      'Versija 0.2.27 · 2026112103 leidimas',
+                      'Version 0.2.27 · build 2026112103'),
+                  key: const Key('app-demo-version'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: gold),
+                  style: const TextStyle(fontSize: 12, color: gold),
                 ),
                 if (widget.enableOfflinePreview && widget.authApiUrl.isEmpty)
                   Padding(
@@ -544,29 +597,38 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 ],
                 const SizedBox(height: 20),
-                if (telegramState == null) TextField(
-                  controller: destination,
-                  enabled: !busy && challengeId == null,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: tr('Телефон в формате +370...',
-                      'Telefono numeris +370...', 'Phone number +370...'),
-                    border: const OutlineInputBorder(),
+                if (telegramAttempt == null) ...[
+                  TextField(
+                    controller: destination,
+                    enabled: !busy && challengeId == null,
+                    keyboardType: TextInputType.phone,
+                    autofillHints: const [AutofillHints.telephoneNumber],
+                    decoration: InputDecoration(
+                      labelText: tr('Телефон в формате +370...',
+                        'Telefono numeris +370...', 'Phone number +370...'),
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                if (challengeId == null && telegramState == null) ...[
+                  const SizedBox(height: 12),
+                ],
+                if (challengeId == null && telegramAttempt == null) ...[
                   CheckboxListTile(
                     key: const Key('native-legal-acknowledgement'),
                     controlAffinity: ListTileControlAffinity.leading,
                     value: _acknowledgedLegal,
                     onChanged: busy ? null : (v) =>
                         setState(() => _acknowledgedLegal = v ?? false),
-                    title: const Text('Я ознакомился с условиями сервиса '
-                      'и политикой конфиденциальности'),
-                    subtitle: const Text(
+                    title: Text(tr(
+                      'Я ознакомился с условиями сервиса и политикой конфиденциальности',
+                      'Susipažinau su paslaugos sąlygomis ir privatumo politika',
+                      'I have read the terms of service and privacy policy')),
+                    subtitle: Text(tr(
                       'Это подтверждение ознакомления, не согласие '
-                      'на рекламу или необязательное отслеживание.'),
+                          'на рекламу или необязательное отслеживание.',
+                      'Taip patvirtini, kad susipažinai su dokumentais. '
+                          'Tai nėra sutikimas gauti reklamą ar būti sekamam.',
+                      'This confirms that you have read the documents. It does '
+                          'not opt you in to advertising or optional tracking.')),
                   ),
                   TextButton.icon(
                     key: const Key('native-open-legal-documents'),
@@ -574,35 +636,42 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       MaterialPageRoute<void>(
                         builder: (_) => const CompanyInfoPage())),
                     icon: const Icon(Icons.gavel_outlined),
-                    label: const Text('Условия, конфиденциальность, отмена и возврат'),
+                    label: Text(tr(
+                      'Условия, конфиденциальность, отмена и возврат',
+                      'Sąlygos, privatumas, atšaukimas ir pinigų grąžinimas',
+                      'Terms, privacy, cancellations and refunds')),
                   ),
                 ],
                 const SizedBox(height: 8),
-                if (telegramState != null) ...[
+                if (telegramAttempt != null) ...[
+                  Text(tr(
+                    'Разреши Telegram передать номер телефона, затем вернись сюда и введи код с открывшейся страницы.',
+                    'Leisk „Telegram“ perduoti telefono numerį, tada grįžk čia ir įvesk puslapyje rodomą kodą.',
+                    'Allow Telegram to share your phone number, then return here and enter the code shown in the browser.',
+                  )),
+                  const SizedBox(height: 12),
                   TextField(
+                    key: const Key('native-telegram-code'),
                     controller: code,
                     enabled: !busy,
                     maxLength: 8,
                     onChanged: (_) => setState(() {}),
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Код со страницы Telegram',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: tr('Код из браузера', 'Kodas iš naršyklės', 'Code from browser'),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   FilledButton(
-                    onPressed: busy || !RegExp(r'^\d{8}$').hasMatch(code.text.trim())
-                        ? null : finishTelegram,
-                    child: const Text('Подтвердить вход через Telegram'),
+                    key: const Key('native-telegram-finish'),
+                    onPressed: busy || !RegExp(r'^[0-9]{8}$').hasMatch(code.text.trim())
+                        ? null : _finishTelegram,
+                    child: Text(tr('Войти', 'Prisijungti', 'Sign in')),
                   ),
                   TextButton(
-                    onPressed: busy ? null : () => setState(() {
-                      telegramState = null;
-                      telegramSecret = null;
-                      code.clear();
-                      message = '';
-                    }),
-                    child: const Text('Выбрать другой способ входа'),
+                    onPressed: busy ? null : () => setState(_resetChallenge),
+                    child: Text(tr('Вернуться к способам входа', 'Grįžti prie prisijungimo būdų',
+                        'Back to sign-in options')),
                   ),
                 ] else if (challengeId == null) ...[
                   FilledButton(
@@ -610,20 +679,23 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                         ? null : requestCode,
                     child: Text(tr('Получить код', 'Gauti kodą', 'Get code')),
                   ),
-                  if (widget.authApiUrl.isNotEmpty && !kIsWeb)
-                    OutlinedButton(
-                      key: const Key('native-telegram-sign-in'),
-                      onPressed: busy || !_acknowledgedLegal ? null : startTelegram,
-                      child: const Text('Войти через Telegram'),
-                    ),
-                ]
-                else ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const Key('native-telegram-start'),
+                    onPressed: busy || widget.authApiUrl.isEmpty || !_acknowledgedLegal
+                        ? null : _startTelegram,
+                    icon: const Icon(Icons.send_outlined),
+                    label: Text(tr('Войти через Telegram', 'Prisijungti per „Telegram“',
+                        'Sign in with Telegram')),
+                  ),
+                ] else ...[
                   TextField(
                     controller: code,
                     enabled: !busy,
                     maxLength: 6,
                     onChanged: (_) => setState(() {}),
                     keyboardType: TextInputType.number,
+                    autofillHints: const [AutofillHints.oneTimeCode],
                     decoration: InputDecoration(
                       labelText: tr('Код подтверждения',
                         'Patvirtinimo kodas', 'Verification code'),
@@ -636,11 +708,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     child: Text(tr('Подтвердить', 'Patvirtinti', 'Verify')),
                   ),
                   TextButton(
-                    onPressed: busy ? null : () => setState(() {
-                      challengeId = null;
-                      code.clear();
-                      message = '';
-                    }),
+                    onPressed: busy ? null : () => setState(_resetChallenge),
                     child: Text(tr('Изменить контакт', 'Keisti kontaktą', 'Change contact')),
                   ),
                 ],
@@ -651,12 +719,14 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     child: Text(message, textAlign: TextAlign.center),
                   ),
                 if (widget.authApiUrl.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 20),
-                    child: Text(
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: Text(tr(
                       'В этой сборке сервер авторизации не подключён.',
+                      'Šioje versijoje prisijungimo serveris neprijungtas.',
+                      'The sign-in server is not connected in this build.'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: gold),
+                      style: const TextStyle(color: gold),
                     ),
                   ),
                 if (!kIsWeb && widget.enableOfflinePreview && widget.authApiUrl.isEmpty)

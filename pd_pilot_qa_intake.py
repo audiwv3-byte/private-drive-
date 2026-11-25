@@ -26,6 +26,14 @@ RATE_LIMIT = 3
 TERMS_VERSION = "pilot-shift-v1"
 
 
+def normalize_pilot_phone(value):
+    """Match verified SMS identities without guessing a country code."""
+    number = value.replace(" ", "").replace("-", "")
+    if not re.fullmatch(r"\+[1-9][0-9]{7,14}", number):
+        raise ValueError("invalid_phone")
+    return number
+
+
 def configured():
     return (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
             and os.environ.get("PD_PILOT_QA_INTAKE_ENABLED") == "1"
@@ -196,11 +204,12 @@ def register(app, authorized, csrf, valid_csrf, *, production=None):
         first = request.form.get("first_name", "").strip()
         last = request.form.get("last_name", "").strip()
         name = f"{first} {last}"
-        phone = request.form.get("phone", "").strip()
+        try:
+            phone = normalize_pilot_phone(request.form.get("phone", "").strip())
+        except ValueError:
+            return jsonify(error="invalid_phone"), 400
         email = request.form.get("email", "").strip()
         if (not 1 <= len(first) <= 80 or not 1 <= len(last) <= 80
-                or not re.fullmatch(r"\+?[0-9 -]{8,32}", phone)
-                or not 8 <= sum(ch.isdigit() for ch in phone) <= 15
                 or len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email)):
             return jsonify(error="invalid_contact"), 400
         plate = request.form.get("plate", "").strip().upper()
@@ -252,6 +261,28 @@ def register(app, authorized, csrf, valid_csrf, *, production=None):
             if production:
                 execute(cur, "BEGIN IMMEDIATE")
             next_number = "(SELECT COALESCE(MAX(pilot_number), 0) + 1 FROM pd_qa_pilot_applications)" if production else "nextval('pd_qa_pilot_numbers')"
+            if not production:
+                execute(cur, "SELECT pg_advisory_xact_lock(145384022)")
+            execute(cur, """SELECT phone FROM pd_qa_pilot_applications
+                WHERE id=%s AND status='pending'""", (app_id,))
+            candidate = cur.fetchone()
+            if candidate:
+                key = cipher()
+                phone = key.decrypt(bytes(candidate[0])).decode()
+                try:
+                    phone = normalize_pilot_phone(phone)
+                except ValueError:
+                    return jsonify(error="invalid_phone"), 409
+                execute(cur, """SELECT phone FROM pd_qa_pilot_applications
+                    WHERE status='approved'""")
+                for (encrypted_phone,) in cur.fetchall():
+                    existing = key.decrypt(bytes(encrypted_phone)).decode()
+                    try:
+                        existing = normalize_pilot_phone(existing)
+                    except ValueError:
+                        continue
+                    if hmac.compare_digest(phone, existing):
+                        return jsonify(error="pilot_phone_already_approved"), 409
             execute(cur, f"""UPDATE pd_qa_pilot_applications
                 SET status='approved', pilot_number={next_number}
                 WHERE id=%s AND status='pending' AND terms_version=%s
@@ -340,9 +371,18 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
          try{
            const reply=await fetch("/dispatch/qa-pilot-applications/"+app.id+"/approve",{
              method:"POST",body:new URLSearchParams({csrf:data.csrf})});
-           if(!reply.ok)throw Error();
+           if(!reply.ok){
+             const error=await reply.json();
+             if(error.error==="pilot_phone_already_approved"){
+               throw Error("На этот телефон уже зарегистрирован пилот.");
+             }
+             if(error.error==="invalid_phone"){
+               throw Error("Для одобрения нужен номер с международным кодом.");
+             }
+             throw Error("Не удалось подтвердить одобрение.");
+           }
            location.reload();
-         }catch{approve.disabled=false;status.textContent="Не удалось подтвердить одобрение.";}
+         }catch(error){approve.disabled=false;status.textContent=error.message;}
        };
        card.append(approve);
      }

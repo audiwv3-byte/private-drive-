@@ -96,6 +96,14 @@ class PilotIntakeIntegration(unittest.TestCase):
                 ).mimetype
                 == "image/webp"
             )
+        form["phone"] = "+370 000-00000"
+        repeat = submit(terms_version="pilot-shift-v1")
+        self.assertEqual(repeat.status_code, 201)
+        duplicate_url = "/dispatch/qa-pilot-applications/" + repeat.json["application_id"] + "/approve"
+        rejected = client.post(duplicate_url, data={"csrf": "test-csrf"})
+        self.assertEqual(rejected.status_code, 409)
+        self.assertEqual(rejected.json["error"], "pilot_phone_already_approved")
+
         print(
             "Verified synthetic pilot #1, contacts, plate, consent, two private photos and repeat approval"
         )

@@ -29,7 +29,7 @@ input[type=file]{padding:10px;font-size:12px}input::placeholder{color:#889099}in
 <fieldset><legend>Контакты</legend><div class="grid">
 <div class="field"><label for="first-name">Имя</label><input id="first-name" name="first_name" maxlength="80" required></div>
 <div class="field"><label for="last-name">Фамилия</label><input id="last-name" name="last_name" maxlength="80" required></div>
-<div class="field"><label for="phone">Телефон</label><input id="phone" name="phone" type="tel" inputmode="tel" maxlength="32" required></div>
+<div class="field"><label for="phone">Телефон</label><input id="phone" name="phone" type="tel" inputmode="tel" placeholder="+370…" maxlength="32" required></div>
 <div class="field"><label for="email">Электронная почта</label><input id="email" name="email" type="email" maxlength="254" required></div>
 </div></fieldset>
 <fieldset><legend>Автомобиль и фотографии</legend><div class="grid">
@@ -58,6 +58,7 @@ document.getElementById('pilot-form').addEventListener('submit',async event=>{
  try{
    const response=await fetch('/pilot-registration',{method:'POST',body:new FormData(form),credentials:'same-origin'});
    const data=await response.json();
+   if(data.error==='invalid_phone')throw Error('Введи телефон с международным кодом, например +370…');
    if(!response.ok||!data.ok||!data.application_id)throw Error(response.status===413?'Слишком большие файлы. Не больше 10 МБ на фото.':(data.error||'Не удалось подтвердить анкету.'));
    result.textContent='Анкета №'+data.application_id.slice(0,8)+' принята. Статус: На проверке.';
    form.reset();

@@ -1,4 +1,4 @@
-"""Staging-only server-to-server bridge for already saved Telegram Mini App orders.
+"""Staging-only server-to-server bridge for already saved Telegram orders.
 
 Never accept a client supplied source or endpoint. The dispatcher is the sole
 order queue; Telegram's local row only supplies the stable legacy order ID.
@@ -23,10 +23,12 @@ def bridge_enabled():
             and os.getenv("PD_PAYMENT_MODE") == "disabled")
 
 
-def publish_telegram_order(order, *, open_url=urlopen, now=time.time):
+def publish_telegram_order(order, *, source="telegram_miniapp", open_url=urlopen, now=time.time):
     """Return central order ID, or raise. No local rows are deleted or rewritten."""
     if not bridge_enabled():
         return None
+    if source not in ("telegram_miniapp", "telegram_bot"):
+        raise DispatchBridgeUnavailable("invalid_source")
     secret = os.getenv("PD_DISPATCH_ORDERS_INGEST_SECRET", "")
     endpoint = os.getenv("PD_MINIAPP_DISPATCH_IMPORT_URL", "")
     try:
@@ -46,7 +48,7 @@ def publish_telegram_order(order, *, open_url=urlopen, now=time.time):
     except (ValueError, TypeError, KeyError) as exc:
         raise DispatchBridgeUnavailable("invalid_local_order") from exc
     payload = {
-        "source": "telegram_miniapp",
+        "source": source,
         "source_order_id": str(order["id"]),
         "from": str(order["origin"]),
         "to": str(order["destination"]),
@@ -68,7 +70,7 @@ def publish_telegram_order(order, *, open_url=urlopen, now=time.time):
                 raise DispatchBridgeUnavailable("dispatch_rejected")
             result = json.loads(response.read(8192))
             if (not isinstance(result, dict)
-                    or result.get("source") != "telegram_miniapp"
+                    or result.get("source") != source
                     or result.get("source_order_id") != str(order["id"])
                     or not result.get("order_id")
                     or result.get("payment_mode") != "disabled"):

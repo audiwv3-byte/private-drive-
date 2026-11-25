@@ -141,7 +141,10 @@ class PassengerRideEntry extends StatelessWidget {
               onTap: () => _openExtra(context, ExtraServiceType.delivery),
             )),
             const SizedBox(height: 20),
-            Text(pdLabel(context, 'Тестовый режим. Реальные заказы и оплата выключены.'),
+            Text(
+              ordersApi == null
+                  ? pdLabel(context, 'Демонстрационный режим: заявки остаются на устройстве.')
+                  : 'Заказы передаются через защищённый сервер. Оплата отключена.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 12)),
           ]),

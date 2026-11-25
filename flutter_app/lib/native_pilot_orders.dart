@@ -14,6 +14,8 @@ class PilotAssignedOrder {
     required this.date,
     required this.time,
     required this.status,
+    this.waitingSeconds = 0,
+    this.waitingActive = false,
   });
 
   final String orderId;
@@ -22,6 +24,8 @@ class PilotAssignedOrder {
   final String date;
   final String time;
   final String status;
+  final int waitingSeconds;
+  final bool waitingActive;
 
   static final _uuid = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -52,6 +56,10 @@ class PilotAssignedOrder {
       date: value('trip_date', maxLength: 10),
       time: value('trip_time', maxLength: 5),
       status: status,
+      waitingSeconds: data['waiting_seconds'] is int &&
+          (data['waiting_seconds'] as int) >= 0
+          ? data['waiting_seconds'] as int : 0,
+      waitingActive: data['waiting_active'] == true,
     );
   }
 
@@ -77,6 +85,48 @@ class NativePilotOrdersApi {
   final http.Client? _client;
   static const stage = 'https://private-drive-drbd.onrender.com';
   static const _timeout = Duration(seconds: 7);
+
+  Future<Map<String, dynamic>> action(String orderId, String action) async {
+    if (baseUrl != stage) {
+      throw const FormatException('Pilot trip actions require staging');
+    }
+    if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
+      throw const PdHttpStatusException(401);
+    }
+    if (!PilotAssignedOrder._uuid.hasMatch(orderId) ||
+        !const {'approach', 'start', 'finish', 'stop_start', 'stop_end'}.contains(action)) {
+      throw const FormatException('Invalid trip action');
+    }
+    final client = _client ?? http.Client();
+    try {
+      final request = http.Request(
+        'PATCH', PdHttpApi.secureUri(baseUrl, '/native-pilot-orders'))
+        ..followRedirects = false
+        ..headers['Authorization'] = 'Bearer $token'
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode({'order_id': orderId, 'action': action});
+      final response = await client.send(request).timeout(_timeout);
+      if (response.statusCode != 200) {
+        throw PdHttpStatusException(response.statusCode);
+      }
+      final bytes = <int>[];
+      await response.stream.timeout(_timeout).forEach((chunk) {
+        if (bytes.length + chunk.length > 8192) {
+          throw const FormatException('Trip response too large');
+        }
+        bytes.addAll(chunk);
+      }).timeout(_timeout);
+      final data = jsonDecode(utf8.decode(bytes));
+      if (data is! Map<String, dynamic> ||
+          data['order_id'] != orderId || data['payment_mode'] != 'disabled' ||
+          !const {'approaching', 'underway', 'finished'}.contains(data['status'])) {
+        throw const FormatException('Invalid trip acknowledgement');
+      }
+      return data;
+    } finally {
+      if (_client == null) client.close();
+    }
+  }
 
   Future<List<PilotAssignedOrder>> load() async {
     if (baseUrl != stage) {
@@ -142,6 +192,24 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
   bool _loading = false;
   bool _foreground = true;
   int _generation = 0;
+  String? _actingOrderId;
+
+  Future<void> _perform(PilotAssignedOrder order, String action) async {
+    if (_actingOrderId != null || _loading) return;
+    setState(() { _actingOrderId = order.orderId; _error = null; });
+    try {
+      await widget.api.action(order.orderId, action);
+      if (mounted) {
+        setState(() => _actingOrderId = null);
+        await _refresh();
+      }
+    } catch (_) {
+      if (mounted) setState(() {
+        _actingOrderId = null;
+        _error = 'Сервер не подтвердил действие. Статус заказа не изменён.';
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -255,6 +323,41 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
                   children: [
                     Text('${order.date} ${order.time} · ${order.statusLabel}'),
                     SelectableText('ID заказа: ${order.orderId}'),
+                    if (order.waitingSeconds > 0 || order.waitingActive)
+                      Text('Ожидание: ${order.waitingSeconds} сек · '
+                          'начатые минуты оплачиваемого ожидания: '
+                          '${(order.waitingSeconds + 59) ~/ 60}'
+                          '${order.waitingActive ? ' · таймер идёт' : ''}'),
+                    if (order.status == 'assigned')
+                      FilledButton(
+                        key: ValueKey('pilot-trip-approach-${order.orderId}'),
+                        onPressed: _actingOrderId != null ? null :
+                            () => _perform(order, 'approach'),
+                        child: const Text('К пассажиру'),
+                      ),
+                    if (order.status == 'approaching')
+                      FilledButton(
+                        key: ValueKey('pilot-trip-start-${order.orderId}'),
+                        onPressed: _actingOrderId != null ? null :
+                            () => _perform(order, 'start'),
+                        child: const Text('В путь'),
+                      ),
+                    if (order.status == 'underway') ...[
+                      OutlinedButton(
+                        key: ValueKey('pilot-trip-stop-${order.orderId}'),
+                        onPressed: _actingOrderId != null ? null :
+                            () => _perform(order,
+                                order.waitingActive ? 'stop_end' : 'stop_start'),
+                        child: Text(order.waitingActive
+                            ? 'Продолжить поездку' : 'Остановка'),
+                      ),
+                      FilledButton(
+                        key: ValueKey('pilot-trip-finish-${order.orderId}'),
+                        onPressed: _actingOrderId != null ? null :
+                            () => _perform(order, 'finish'),
+                        child: const Text('Завершить'),
+                      ),
+                    ],
                   ],
                 ),
               ),

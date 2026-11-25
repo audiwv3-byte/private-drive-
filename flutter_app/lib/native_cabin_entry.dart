@@ -23,13 +23,16 @@ class PdNativeCabinEntry extends StatefulWidget {
   const PdNativeCabinEntry({super.key, required this.signInBuilder,
     required this.identityApiBuilder, this.logoutApi, this.sessionManager,
     this.isolatedSyncGatewayBuilder, this.closedInviteOnly = false,
-    this.allowInvitedPilot = false});
+    this.allowInvitedPilot = false, this.quickResume = false});
   final PdSignInBuilder signInBuilder;
   final PdIdentityApi Function(PdNativeSession session) identityApiBuilder;
   final PdNativeLogoutApi? logoutApi;
   final PdNativeSessionManager? sessionManager;
   final bool closedInviteOnly;
   final bool allowInvitedPilot;
+  /// Resume a server-verified account directly, without redundant role taps.
+  /// The pilot still passes the existing photo/approval gate.
+  final bool quickResume;
   /// Explicit internal QA only. Uses the existing verified phone token,
   /// never a separate manual demo token or an unverified guest session.
   final RemoteTripGateway Function(PdNativeSession session, String cabin)?
@@ -166,10 +169,20 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     });
     setState(() {
       _session = session;
-      // After a cold start, never auto-enter a previously chosen staff cabin.
-      // Require explicit cabin selection from freshly verified server rights.
+      // Quick resume is allowed only after SessionManager.restore() has
+      // checked the Bearer token, expiry and current role on the server.
+      // Never auto-enter the dispatcher or bypass the pilot photo gate.
       if (restored) {
-        _page = 'entry';
+        if (widget.quickResume && session.role == 'passenger') {
+          _requestedRole = 'passenger';
+          _page = 'passenger';
+        } else if (widget.quickResume &&
+            session.role == 'pilot' && _canOpenPilot(session)) {
+          _requestedRole = 'pilot';
+          _page = 'photo';
+        } else {
+          _page = 'entry';
+        }
       } else if (widget.closedInviteOnly) {
         // The server's invitation principal, not the chosen screen, decides
         // the first cabin. A pilot session always starts at the photo gate.

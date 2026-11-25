@@ -255,6 +255,57 @@ class DispatcherBrowserTests(unittest.TestCase):
         self.assertEqual(client.get("/dispatch").data, b"owner")
         self.assertEqual(client.get("/dispatch/login").data, b"owner login")
 
+    def test_production_wsgi_owner_reads_the_same_orders_without_writing(self):
+        from pathlib import Path
+        import sqlite3
+        from tempfile import TemporaryDirectory
+        from contextlib import closing
+
+        from pd_dispatcher_production_wsgi import create_app, mount_dispatcher
+        from werkzeug.test import Client
+
+        with TemporaryDirectory() as directory:
+            orders = Path(directory) / "orders.db"
+            with closing(sqlite3.connect(orders)) as db, db:
+                db.execute("""CREATE TABLE orders (
+                    id INTEGER, origin TEXT, destination TEXT, trip_date TEXT,
+                    trip_time TEXT, status TEXT, telegram_id INTEGER
+                )""")
+                db.execute("INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (7, "Vilnius", "Airport", "01.12.2026", "12:00", "Новая", 999))
+            cfg = {
+                "PD_DISPATCH_SESSION_SECRET": "synthetic-dispatcher-test-secret-123456789",
+                "PD_DISPATCH_PASSWORD_HASH": generate_password_hash("synthetic-password"),
+                "PD_DISPATCH_ADMIN_ID": "999",
+                "PD_DISPATCH_REQUIRE_MFA": "1",
+                "PD_DISPATCH_LIVE_ORDERS": "1",
+                "PD_DISPATCH_TOTP_BASE32": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+                "PD_DISPATCH_ORDERS_SQLITE": str(orders),
+                "PD_DISPATCH_OWNER_STATE_DIR": directory,
+            }
+            miniapp = Flask("synthetic_live_miniapp")
+            miniapp.add_url_rule("/", "home", lambda: "Mini App")
+
+            with patch.dict(os.environ, cfg, clear=True):
+                browser = Client(mount_dispatcher(miniapp, create_app()))
+                self.assertEqual(browser.get("/").data, b"Mini App")
+                self.assertEqual(browser.get("/dispatch/live/orders").status_code, 401)
+                form = browser.get("/dispatch/login")
+                csrf = re.search(rb'name="csrf" value="([^"]+)"', form.data)[1].decode()
+                with patch("pd_web_dispatcher.totp_counter", return_value=12345):
+                    response = browser.post("/dispatch/login", data={
+                        "csrf": csrf, "password": "synthetic-password", "totp": "123456",
+                    })
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("Загружаем заказы".encode(), browser.get("/dispatch").data)
+                response = browser.get("/dispatch/live/orders")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json["orders"][0]["id"], 7)
+                self.assertEqual(response.json["orders"][0]["destination"], "Airport")
+                self.assertNotIn("telegram_id", response.json["orders"][0])
+            with closing(sqlite3.connect(orders)) as db:
+                self.assertEqual(db.execute("SELECT count(*) FROM orders").fetchone()[0], 1)
+
     def test_mapbox_public_token_configuration_diagnostic(self):
         """Report only token presence and validity, never the token itself."""
         import re

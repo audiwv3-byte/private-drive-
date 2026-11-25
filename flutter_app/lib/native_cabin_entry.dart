@@ -267,10 +267,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
                 'Доступ пилота подтверждается сервером.',
               textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            const Text(pdLocalQaEntryEnabled
-              ? String.fromEnvironment('PD_QA_BUILD_LABEL',
-                defaultValue: 'Внутренняя сборка')
-              : 'Версия 0.2.27 · сборка 2026112103', key: Key('app-demo-version'),
+            const Text(String.fromEnvironment('PD_QA_BUILD_LABEL',
+              defaultValue: 'Версия 0.2.27 · сборка 2026112103'), key: Key('app-demo-version'),
               textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
           ]),
         ))),

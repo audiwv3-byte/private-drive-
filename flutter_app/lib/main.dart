@@ -122,9 +122,11 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     super.dispose();
   }
 
-  Future<Map<String, dynamic>> post(String path, Map<String, String> payload) {
+  Future<Map<String, dynamic>> post(String path, Map<String, String> payload,
+      {Duration timeout = const Duration(seconds: 10)}) {
     final uri = PdHttpApi.secureUri(widget.authApiUrl, path);
-    return const PdHttpApi().postJson(uri, payload, client: widget.httpClient);
+    return const PdHttpApi().postJson(uri, payload,
+      client: widget.httpClient, timeout: timeout);
   }
 
   Future<void> requestCode() async {
@@ -137,7 +139,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       final result = await post('/native-auth/request-code', {
         'channel': 'phone',
         'destination': destination.text.trim(),
-      });
+      }, timeout: const Duration(seconds: 70));
       final id = result['challenge_id'];
       if (id is! String || id.isEmpty) {
         throw const FormatException('Сервер не выдал идентификатор проверки.');
@@ -234,7 +236,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     try {
       final result = await post('/native-auth/telegram/start', {
         'app_secret': secret,
-      });
+      }, timeout: const Duration(seconds: 70));
       final state = result['state'];
       final url = result['authorization_url'];
       final uri = url is String ? Uri.tryParse(url) : null;

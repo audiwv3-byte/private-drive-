@@ -1,8 +1,4 @@
-"""Exercise the actual assembled internal APK on a disposable CI emulator.
-
-No phone number, OTP, camera, paid service or server role is used.
-"""
-import os
+"""Exercise account registration entry in the assembled Android APK."""
 from pathlib import Path
 import re
 import subprocess
@@ -58,7 +54,7 @@ def wait_for_labels(*labels, timeout=45):
     raise AssertionError(f'Missing screen labels: {labels}')
 
 
-def scroll_to_passenger_option(label, xml, *, scroll_back=False):
+def scroll_to_label(label, xml, *, scroll_back=False):
     screen_sizes = re.findall(r'(\d+)x(\d+)', adb('shell', 'wm', 'size').decode())
     width, height = map(int, screen_sizes[-1])
     for _ in range(4):
@@ -72,36 +68,20 @@ def scroll_to_passenger_option(label, xml, *, scroll_back=False):
         xml = snapshot()
     if label in xml:
         return xml
-    raise AssertionError(f'Missing passenger option after scrolling: {label}')
+    raise AssertionError(f'Missing screen label after scrolling: {label}')
 
 
-wait_for_labels('Тестовый вход')
-click_node('Ввести цифрами на экране')
-for digit in os.environ['PD_QA_LOCAL_PIN']:
-    click_node(digit, announce=False)
-click_node('Войти в тест')
 entry = wait_for_labels('Выбери кабинет', 'Пассажир', 'Пилот')
-assert 'Диспетчер' not in entry, 'Dispatcher must stay on the website'
+assert 'Тестовый вход' not in entry, 'Account build must not require a local PIN'
+assert 'Локальные тестовые данные' not in entry
 
-for role, labels in [
-    ('Пассажир', ('Такси',)),
-    ('Пилот', ('Кабина пилота', 'Не на линии')),
-]:
-    click_node(role)
-    xml = wait_for_labels('Локальные данные · подключить диспетчерскую', *labels)
-    if role == 'Пассажир':
-        xml = scroll_to_passenger_option('Трансфер', xml)
-        xml = scroll_to_passenger_option('Доставка', xml)
-        scroll_to_passenger_option('Трансфер', xml, scroll_back=True)
-        click_node('Трансфер')
-        wait_for_labels('Mapbox')
-        assert b'PD_MAPBOX_TILE_OK' in adb('logcat', '-d'), 'Mapbox tile probe did not succeed'
-        Path('android-guest-mapbox.png').write_bytes(adb('exec-out', 'screencap', '-p'))
-        adb('shell', 'input', 'keyevent', '4')
-        wait_for_labels('Такси')
-    assert 'Фотоконтроль' not in xml and 'Проверка личности' not in xml
-    Path(f'android-guest-{role}.xml').write_text(xml, encoding='utf-8')
-    Path(f'android-guest-{role}.png').write_bytes(adb('exec-out', 'screencap', '-p'))
-    adb('shell', 'input', 'keyevent', '4')
-    wait_for_labels('Выбери кабинет')
-print('PASS: actual APK opened both local cabins without phone or camera.', flush=True)
+click_node('Пассажир')
+signin = wait_for_labels('Вход пассажира', 'Вход по SMS или через Telegram')
+signin = scroll_to_label('Войти через Telegram', signin)
+signin = scroll_to_label('Получить код', signin, scroll_back=True)
+assert 'Продолжить как гость' not in signin, 'Registration build must not offer guest entry'
+Path('android-launch-account.xml').write_text(signin, encoding='utf-8')
+Path('android-launch-account.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+adb('shell', 'input', 'keyevent', '4')
+wait_for_labels('Выбери кабинет')
+print('PASS: the assembled APK exposes SMS and Telegram without a local PIN.', flush=True)

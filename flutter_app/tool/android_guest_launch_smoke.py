@@ -73,6 +73,11 @@ def scroll_to_label(label, xml, *, scroll_back=False):
 
 wait_for_labels('Русский', 'English', 'Lietuvių')
 click_node('Русский')
+terms = 'Я ознакомился с условиями сервиса и политикой конфиденциальности'
+scroll_to_label(terms, snapshot())
+click_node(terms)
+scroll_to_label('Продолжить', snapshot())
+click_node('Продолжить')
 entry = wait_for_labels('Выбери кабинет', 'Пассажир', 'Пилот')
 assert 'Тестовый вход' not in entry, 'Account build must not require a local PIN'
 assert 'Локальные тестовые данные' not in entry

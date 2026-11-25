@@ -32,7 +32,7 @@ class TelegramClaimsTests(unittest.TestCase):
         url = urlsplit(oidc.authorization_url("state", "verifier"))
         query = parse_qs(url.query)
         self.assertEqual(url.hostname, "oauth.telegram.org")
-        self.assertEqual(query["scope"], ["openid phone"])
+        self.assertEqual(query["scope"], ["openid profile phone"])
         self.assertEqual(query["code_challenge_method"], ["S256"])
         self.assertNotIn("client_secret", query)
         self.assertNotEqual(query["code_challenge"], ["verifier"])
@@ -77,6 +77,25 @@ class MobileSignInTests(unittest.TestCase):
         status, started = self.request("telegram/start", {"app_secret": secret})
         self.assertEqual(status, 201)
         return secret, started["state"]
+
+    def test_automatic_telegram_finishes_only_in_initiating_app(self):
+        secret = secrets.token_urlsafe(32)
+        status, started = self.request("telegram/start", {
+            "app_secret": secret, "mode": "automatic",
+        })
+        self.assertEqual(status, 201)
+        self.assertTrue(started["automatic"])
+        payload = {"state": started["state"], "app_secret": secret}
+        self.assertEqual(self.request("telegram/finish", payload), (202, {"pending": True}))
+        query = {"state": started["state"], "code": "provider-auth-code"}
+        status, page = self.request("telegram/callback", query=query)
+        self.assertEqual(status, 200)
+        self.assertNotIn("Код входа", page)
+        self.assertEqual(self.request("telegram/finish", {
+            **payload, "app_secret": secrets.token_urlsafe(32),
+        })[0], 401)
+        self.assertEqual(self.request("telegram/finish", payload)[0], 200)
+        self.assertEqual(self.request("telegram/finish", payload)[0], 401)
 
     def test_sms_and_telegram_use_one_account_and_callback_is_single_use(self):
         status, result = self.request("request-code",

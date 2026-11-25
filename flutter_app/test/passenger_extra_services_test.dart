@@ -24,11 +24,16 @@ void main() {
     addTearDown(store.dispose);
     await tester.pumpWidget(MaterialApp(home: PassengerRideEntry(
       enableMapTiles: false, tripStore: store)));
-    // Standalone delivery is on the entry screen; assistance is on the
-    // subsequent booking screen as requested.
-    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-delivery')), 180);
-    expect(find.byKey(const Key('passenger-entry-delivery')), findsOneWidget);
-    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-taxi')), -180);
+    expect(find.byKey(const Key('passenger-entry-delivery')), findsNothing);
+    await tester.tap(find.byKey(const Key('passenger-entry-services')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('passenger-services-delivery')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PassengerExtraServices), findsOneWidget);
+    expect(find.text('Доставка товаров'), findsWidgets);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-taxi')), 180);
     await tester.tap(find.byKey(const Key('passenger-entry-taxi')));
     await tester.pumpAndSettle();
     final bookingScroll = find.descendant(

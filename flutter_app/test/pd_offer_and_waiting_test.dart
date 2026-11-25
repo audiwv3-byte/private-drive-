@@ -64,13 +64,19 @@ void main() {
 
   testWidgets('branded waiting indicator is non-financial',
       (tester) async {
-    await tester.pumpWidget(const MaterialApp(
-      home: Scaffold(body: Center(child: PdPilotAssignmentWaiting())),
+    var opened = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: Center(child: PdPilotAssignmentWaiting(
+        onOpenOrder: () => opened = true,
+      ))),
     ));
     expect(find.byKey(const Key('passenger-pd-waiting-indicator')),
       findsOneWidget);
     expect(find.text('Ожидаем назначения пилота'), findsOneWidget);
     expect(find.textContaining('тестовый режим'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.tap(find.byKey(const Key('passenger-waiting-open-order')));
+    expect(opened, isTrue);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

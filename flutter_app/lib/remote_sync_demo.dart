@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -61,6 +62,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   RemoteTripGateway? api;
   Timer? timer;
   StreamSubscription<Position>? gps;
+  StreamSubscription<ServiceStatus>? _gpsStatus;
   bool owned = false, busy = false, refreshing = false, gpsOn = false;
   String? role, lastTripId;
   String error = '', gpsLabel = 'GPS выключен';
@@ -69,6 +71,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   int chatSeq = 0;
   bool _loadedChatForTrip = false;
   bool _clearLocation = false;
+  bool get _canShareGps => widget.stagingDispatcher &&
+      (role == 'pilot' || role == 'passenger');
   bool _refreshRequested = false;
   bool _requestingGpsPermission = false;
   int _gpsGeneration = 0;
@@ -156,7 +160,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         throw const RemoteDemoException('Неверный формат поездки');
       }
       final current = raw as Map<String, dynamic>?;
-      if (widget.stagingDispatcher && role == 'pilot') {
+      if (_canShareGps) {
         final point = gpsOn ? location : null;
         if (point != null || _clearLocation) {
           try {
@@ -350,15 +354,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   Future<void> toggleGps() async {
     if (_requestingGpsPermission) return;
     if (gpsOn) {
-      _gpsGeneration++;
-      final stopped = gps;
-      gps = null;
-      _clearLocation = widget.stagingDispatcher;
-      setState(() {
-        gpsOn = false; location = null; gpsLabel = 'GPS выключен';
-      });
-      if (_clearLocation) unawaited(refresh(immediately: true));
-      await stopped?.cancel();
+      await _stopGps('GPS выключен');
       return;
     }
     _requestingGpsPermission = true;
@@ -384,28 +380,54 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         final point = LatLng(position.latitude, position.longitude);
         setState(() {
           location = point;
-          gpsLabel = widget.stagingDispatcher
+          gpsLabel = _canShareGps
               ? 'Координаты получены · отправляем…'
               : 'GPS активен · только на устройстве';
         });
         if (widget.enableMapTiles) map.move(point, map.camera.zoom);
-        if (widget.stagingDispatcher) unawaited(refresh(immediately: true));
+        if (_canShareGps) unawaited(refresh(immediately: true));
       }
       gps = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high, distanceFilter: 5,
         ),
       ).listen(updatePosition, onError: (Object _) {
-        if (mounted && _gpsGeneration == generation && location == null) {
-          setState(() => gpsLabel = 'GPS недоступен');
+        if (mounted && _gpsGeneration == generation) {
+          unawaited(_stopGps('GPS недоступен'));
         }
       });
+      if (!kIsWeb && _canShareGps) {
+        _gpsStatus = Geolocator.getServiceStatusStream().listen((status) {
+          if (status == ServiceStatus.disabled && _gpsGeneration == generation) {
+            unawaited(_stopGps('Геолокация устройства выключена'));
+          }
+        }, onError: (Object _) {
+          // Failures of the position stream are handled separately.
+        });
+      }
       unawaited(_getInitialFix(generation, updatePosition));
-    } on Exception {
-      if (mounted) setState(() => gpsLabel = 'GPS недоступен');
+    } catch (_) {
+      if (mounted) await _stopGps('GPS недоступен');
     } finally {
       _requestingGpsPermission = false;
     }
+  }
+
+  Future<void> _stopGps(String label) async {
+    _gpsGeneration++;
+    final stopped = gps;
+    final stoppedStatus = _gpsStatus;
+    gps = null;
+    _gpsStatus = null;
+    _clearLocation = _canShareGps;
+    setState(() {
+      gpsOn = false;
+      location = null;
+      gpsLabel = label;
+    });
+    if (_clearLocation) unawaited(refresh(immediately: true));
+    await stopped?.cancel();
+    await stoppedStatus?.cancel();
   }
 
   Future<void> _getInitialFix(int generation, ValueChanged<Position> updatePosition) async {
@@ -427,6 +449,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   void dispose() {
     timer?.cancel();
     gps?.cancel();
+    _gpsStatus?.cancel();
     if (owned) api?.close();
     url.dispose(); token.dispose(); origin.dispose(); destination.dispose();
     chatDraft.dispose();
@@ -535,6 +558,15 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           Text(statusText, key: const Key('remote-trip-status')),
           if (isPassenger && widget.enableMapTiles)
             SizedBox(height: 240, child: _sharedMap()),
+          if (isPassenger && _canShareGps) ...[
+            OutlinedButton.icon(
+              key: Key(gpsOn ? 'remote-disable-gps' : 'remote-enable-gps'),
+              onPressed: toggleGps,
+              icon: Icon(gpsOn ? Icons.location_off : Icons.my_location),
+              label: Text(gpsOn ? 'Остановить передачу GPS' : 'Поделиться GPS с диспетчером'),
+            ),
+            Text(gpsLabel),
+          ],
           if (trip != null)
             Text(trip!['origin'].toString() + ' → ' +
                 trip!['destination'].toString(),
@@ -600,7 +632,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
             FilledButton.tonalIcon(
               key: Key(gpsOn ? 'remote-disable-gps' : 'remote-enable-gps'),
               onPressed: toggleGps,
-              label: Text(gpsOn ? 'Выключить GPS' : widget.stagingDispatcher
+              label: Text(gpsOn ? 'Выключить GPS' : _canShareGps
                   ? 'Поделиться GPS' : 'Включить GPS'),
               icon: Icon(gpsOn ? Icons.location_off : Icons.my_location)),
             Text(gpsLabel, style: const TextStyle(fontSize: 11)),

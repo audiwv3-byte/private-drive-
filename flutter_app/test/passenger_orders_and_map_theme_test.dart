@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+// ignore: depend_on_referenced_packages
+import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:private_drive/demo_map_tile_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +19,39 @@ DemoTripStore makeOrder() {
     departure: DateTime(2026, 11, 18), services: const [],
   ), isTrue);
   return store;
+}
+
+class MovingLocation extends GeolocatorPlatform {
+  final positions = StreamController<Position>.broadcast();
+  final status = StreamController<ServiceStatus>.broadcast();
+
+  Position fix(double latitude, double longitude) => Position(
+    latitude: latitude, longitude: longitude, timestamp: DateTime.now(),
+    accuracy: 5, altitude: 0, altitudeAccuracy: 0, heading: 0,
+    headingAccuracy: 0, speed: 0, speedAccuracy: 0,
+  );
+
+  @override
+  Future<bool> isLocationServiceEnabled() async => true;
+
+  @override
+  Future<LocationPermission> checkPermission() async =>
+      LocationPermission.whileInUse;
+
+  @override
+  Future<LocationAccuracyStatus> getLocationAccuracy() async =>
+      LocationAccuracyStatus.precise;
+
+  @override
+  Future<Position> getCurrentPosition({LocationSettings? locationSettings}) async =>
+      fix(54.700001, 25.300002);
+
+  @override
+  Stream<Position> getPositionStream({LocationSettings? locationSettings}) =>
+      positions.stream;
+
+  @override
+  Stream<ServiceStatus> getServiceStatusStream() => status.stream;
 }
 
 void main() {
@@ -91,7 +128,7 @@ void main() {
     await tester.tap(find.byKey(const Key('passenger-locate-me')));
     await tester.pumpAndSettle();
     expect(requests, 1);
-    expect(find.byKey(const Key('passenger-locate-me')), findsNothing);
+    expect(find.byKey(const Key('passenger-locate-me')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-use-current-as-pickup')), 130,
       scrollable: find.byType(Scrollable).first);
@@ -102,6 +139,50 @@ void main() {
     expect(tester.widget<TextField>(
       find.byKey(const Key('passenger-from'))).controller!.text,
       '54.700001, 25.300002');
+  });
+
+  testWidgets('Passenger GPS follows new fixes without moving a chosen pickup',
+      (tester) async {
+    final platform = GeolocatorPlatform.instance;
+    final moving = MovingLocation();
+    GeolocatorPlatform.instance = moving;
+    addTearDown(() async {
+      GeolocatorPlatform.instance = platform;
+      await moving.positions.close();
+      await moving.status.close();
+    });
+    await tester.pumpWidget(const MaterialApp(
+      home: PassengerDemo(enableMapTiles: false),
+    ));
+
+    expect(moving.positions.hasListener, isFalse);
+    await tester.tap(find.byKey(const Key('passenger-locate-me')));
+    await tester.pumpAndSettle();
+    expect(moving.positions.hasListener, isTrue);
+
+    final pickup = find.byKey(const Key('passenger-use-current-as-pickup'));
+    final address = find.byKey(const Key('passenger-from'));
+    moving.positions.add(moving.fix(54.710003, 25.310004));
+    await tester.pump();
+    await tester.scrollUntilVisible(pickup, 130,
+      scrollable: find.byType(Scrollable).first);
+    await tester.tap(pickup);
+    await tester.pump();
+    expect(tester.widget<TextField>(address).controller!.text,
+      '54.710003, 25.310004');
+
+    moving.positions.add(moving.fix(54.720005, 25.320006));
+    await tester.pump();
+    expect(tester.widget<TextField>(address).controller!.text,
+      '54.710003, 25.310004');
+
+    moving.status.add(ServiceStatus.disabled);
+    await tester.pump();
+    expect(moving.positions.hasListener, isFalse);
+    expect(pickup, findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(moving.status.hasListener, isFalse);
   });
 
   testWidgets('GPS errors are shown and do not invent passenger coordinates',

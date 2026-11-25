@@ -22,8 +22,10 @@ void main() {
     await tester.tap(finder);
     await tester.pumpAndSettle();
   }
-  Future<void> pumpEntry(WidgetTester tester, {String serverRole = 'passenger'}) async {
-    final client = MockClient((request) async => http.Response('{"status":"approved"}', 200));
+  Future<void> pumpEntry(WidgetTester tester, {String serverRole = 'passenger',
+      bool photoRequested = false}) async {
+    final client = MockClient((request) async => http.Response(
+      '{"status":"unverified","requested":$photoRequested}', 200));
     addTearDown(client.close);
     await tester.pumpWidget(MaterialApp(home: PdNativeCabinEntry(
       signInBuilder: (_, role, authenticated) => Scaffold(
@@ -54,28 +56,15 @@ void main() {
     expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
   });
 
-  testWidgets('pilot opens photo first without granting pilot cabin access', (tester) async {
+  testWidgets('pilot selection opens sign-in directly without a photo prompt', (tester) async {
     await pumpEntry(tester);
     await tap(tester, 'entry-pilot');
-    expect(find.byType(PdPilotIdentityNoticePage), findsOneWidget);
+    expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
     expect(find.byType(PilotCabin), findsNothing);
-    expect(find.byKey(const Key('entry-test-sign-in')), findsNothing);
+    expect(find.byKey(const Key('entry-test-sign-in')), findsOneWidget);
     await tester.tap(find.byType(BackButton).first);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('entry-cabin-selection')), findsOneWidget);
-  });
-
-  testWidgets('QA photo skip returns to selection without entering pilot cabin', (tester) async {
-    await pumpEntry(tester);
-    await tap(tester, 'entry-pilot');
-    final skip = find.byKey(const Key('pilot-identity-notice-qa-skip'));
-    if (const bool.fromEnvironment('PD_INTERNAL_QA')) {
-      await tap(tester, 'pilot-identity-notice-qa-skip');
-      expect(find.byKey(const Key('entry-cabin-selection')), findsOneWidget);
-    } else {
-      expect(skip, findsNothing);
-    }
-    expect(find.byType(PilotCabin), findsNothing);
   });
 
   testWidgets('passenger never sees photo and guest never receives staff rights', (tester) async {
@@ -92,24 +81,30 @@ void main() {
   testWidgets('a dispatcher account does not unlock the native pilot cabin', (tester) async {
     await pumpEntry(tester, serverRole: 'dispatcher');
     await tap(tester, 'entry-pilot');
-    await tap(tester, 'pilot-identity-notice-sign-in');
     await tap(tester, 'entry-test-authenticate');
     expect(find.byKey(const Key('entry-role-message')), findsOneWidget);
     expect(find.byType(PilotCabin), findsNothing);
-    expect(find.byKey(const Key('entry-dispatcher')), findsNothing);
+    expect(find.byKey(const Key('entry-dispatcher')), findsOneWidget);
   });
 
-  testWidgets('pilot cabin opens only after server-approved photo status', (tester) async {
+  testWidgets('pilot cabin opens before photo approval', (tester) async {
     await pumpEntry(tester, serverRole: 'pilot');
     await tap(tester, 'entry-pilot');
-    await tap(tester, 'pilot-identity-notice-sign-in');
     await tap(tester, 'entry-test-authenticate');
-    expect(find.byType(PilotCabin), findsNothing);
-    await tap(tester, 'pilot-identity-notice-acknowledge');
-    await tap(tester, 'pilot-identity-notice-continue');
-    expect(find.byType(PilotCabin), findsNothing);
-    await tap(tester, 'pilot-identity-refresh');
     await skipPermissions(tester);
     expect(find.byType(PilotCabin), findsOneWidget);
+    expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
+    expect(find.byKey(const Key('pilot-open-identity-check')), findsNothing);
+  });
+
+  testWidgets('dispatcher request shows an optional photo action inside the cabin', (tester) async {
+    await pumpEntry(tester, serverRole: 'pilot', photoRequested: true);
+    await tap(tester, 'entry-pilot');
+    await tap(tester, 'entry-test-authenticate');
+    await skipPermissions(tester);
+    expect(find.byType(PilotCabin), findsOneWidget);
+    expect(find.byType(PdPilotIdentityNoticePage), findsNothing);
+    await tap(tester, 'pilot-open-identity-check');
+    expect(find.byType(PdPilotIdentityNoticePage), findsOneWidget);
   });
 }

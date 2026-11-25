@@ -56,7 +56,7 @@ class FakeGateway extends RemoteTripGateway {
 
   @override
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> data) async {
-    if (path == '/v1/position' && role == 'pilot') {
+    if (path == '/v1/position' && (role == 'pilot' || role == 'passenger')) {
       server.positions.add(data);
       return {'ok': true};
     }
@@ -117,6 +117,9 @@ class StationaryLocation extends GeolocatorPlatform {
     const Stream<Position>.empty();
 
   @override
+  Stream<ServiceStatus> getServiceStatusStream() => const Stream.empty();
+
+  @override
   Future<Position> getCurrentPosition({LocationSettings? locationSettings}) async =>
     Position(latitude: 54.69, longitude: 25.28, timestamp: DateTime(2026, 11, 23),
       accuracy: 5, altitude: 0, altitudeAccuracy: 0, heading: 0, headingAccuracy: 0,
@@ -124,26 +127,28 @@ class StationaryLocation extends GeolocatorPlatform {
 }
 
 void main() {
-  testWidgets('Sharing GPS sends a first fix with no stream events and clears on stop',
-      (tester) async {
-    final savedPlatform = GeolocatorPlatform.instance;
-    GeolocatorPlatform.instance = StationaryLocation();
-    addTearDown(() => GeolocatorPlatform.instance = savedPlatform);
-    final server = FakeDemoServer();
-    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
-      gateway: server.actor('pilot'), enableMapTiles: false,
-      stagingDispatcher: true, pollInterval: const Duration(hours: 1),
-    )));
-    await tester.pumpAndSettle();
-    expect(server.positions, isEmpty);
-    await tester.tap(find.text('Поделиться GPS'));
-    await tester.pumpAndSettle();
-    expect(server.positions.single, {'latitude': 54.69, 'longitude': 25.28});
-    expect(find.text('GPS передаётся в тестовую диспетчерскую'), findsOneWidget);
-    await tester.tap(find.text('Выключить GPS'));
-    await tester.pumpAndSettle();
-    expect(server.positions.last, {'latitude': null, 'longitude': null});
-  });
+  for (final role in ['pilot', 'passenger']) {
+    testWidgets('$role GPS sends a stationary fix and clears on stop',
+        (tester) async {
+      final savedPlatform = GeolocatorPlatform.instance;
+      GeolocatorPlatform.instance = StationaryLocation();
+      addTearDown(() => GeolocatorPlatform.instance = savedPlatform);
+      final server = FakeDemoServer();
+      await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+        gateway: server.actor(role), enableMapTiles: false,
+        stagingDispatcher: true, pollInterval: const Duration(hours: 1),
+      )));
+      await tester.pumpAndSettle();
+      expect(server.positions, isEmpty);
+      await tester.tap(find.byKey(const Key('remote-enable-gps')));
+      await tester.pumpAndSettle();
+      expect(server.positions.single, {'latitude': 54.69, 'longitude': 25.28});
+      expect(find.text('GPS передаётся в тестовую диспетчерскую'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('remote-disable-gps')));
+      await tester.pumpAndSettle();
+      expect(server.positions.last, {'latitude': null, 'longitude': null});
+    });
+  }
 
   test('Safari map tiles have public HTTPS primary and fallback hosts', () {
     expect(remoteDemoTileTemplate(false),

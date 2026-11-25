@@ -6,22 +6,38 @@ import 'package:shared_preferences/shared_preferences.dart';
 class PdLanguage extends ChangeNotifier {
   String _value = 'RU';
   bool _hasSelection = false;
+  bool _hasAcknowledgedTerms = false;
   String get value => _value;
   bool get hasSelection => _hasSelection;
+  bool get hasAcknowledgedTerms => _hasAcknowledgedTerms;
   static const _storageKey = 'pd_native_language_v1';
+  static const _termsKey = 'pd_native_terms_acknowledged_v1';
 
   Future<void> restore() async {
     try {
-      final stored = await SharedPreferencesAsync().getString(_storageKey);
-      if (stored != null && (stored == 'RU' || stored == 'LT' || stored == 'EN')) {
-        if (_hasSelection && _value == stored) return;
-        _value = stored;
+      final preferences = SharedPreferencesAsync();
+      final stored = await preferences.getString(_storageKey);
+      final acknowledged = await preferences.getBool(_termsKey) ?? false;
+      if (stored == 'RU' || stored == 'LT' || stored == 'EN') {
+        _value = stored!;
         _hasSelection = true;
-        notifyListeners();
       }
+      _hasAcknowledgedTerms = acknowledged;
+      notifyListeners();
     } catch (_) {
       // Offline preview also runs in widget tests without platform storage.
     }
+  }
+
+  Future<void> acknowledgeTerms() async {
+    if (_hasAcknowledgedTerms) return;
+    try {
+      await SharedPreferencesAsync().setBool(_termsKey, true);
+    } catch (_) {
+      // Keep the acknowledgement for the current run if storage is unavailable.
+    }
+    _hasAcknowledgedTerms = true;
+    notifyListeners();
   }
 
   void set(String language, {bool persist = true}) {

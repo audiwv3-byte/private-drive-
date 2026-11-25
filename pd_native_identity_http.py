@@ -57,6 +57,14 @@ def initialize_identity(database_url):
         conn.execute("""CREATE INDEX IF NOT EXISTS native_identity_user_created
             ON native_identity_checks(user_id, created_at DESC)""")
 
+        conn.execute("""CREATE TABLE IF NOT EXISTS native_identity_schedule (
+            user_id TEXT PRIMARY KEY REFERENCES native_auth_users(id),
+            interval_days INTEGER CHECK(interval_days BETWEEN 1 AND 30),
+            next_due_at BIGINT,
+            manual_requested BOOLEAN NOT NULL DEFAULT FALSE,
+            CHECK ((interval_days IS NULL) = (next_due_at IS NULL))
+        )""")
+
 
 def purge_expired(database_url, now):
     with psycopg.connect(database_url) as conn:
@@ -120,7 +128,24 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
                     status = row[1] if row else "unverified"
                     if row and status == "approved" and now >= row[2] + APPROVAL_TTL:
                         status = "expired"
-                    return reply(start_response, "200 OK", {"status": status})
+                    schedule = conn.execute("""SELECT manual_requested, next_due_at
+                        FROM native_identity_schedule WHERE user_id=%s""", (uid,)).fetchone()
+                    requested = bool(schedule and (schedule[0] or
+                        (schedule[1] is not None and schedule[1] <= now)))
+                    return reply(start_response, "200 OK", {
+                        "status": status, "requested": requested and status != "pending",
+                    })
+                if endpoint == "pilots" and method == "GET":
+                    pilots = conn.execute("""SELECT r.user_id, s.interval_days, s.next_due_at,
+                                COALESCE(s.manual_requested,FALSE)
+                          FROM native_auth_roles r
+                          LEFT JOIN native_identity_schedule s ON s.user_id=r.user_id
+                          WHERE r.role IN ('pilot', 'pilot_dispatcher', 'admin') AND r.user_id<>%s
+                          ORDER BY r.user_id""", (uid,)).fetchall()
+                    return reply(start_response, "200 OK", {"items": [
+                        {"user_id": row[0], "interval_days": row[1], "next_due_at": row[2],
+                         "requested": row[3] or (row[2] is not None and row[2] <= now)}
+                        for row in pilots]})
                 if endpoint == "queue" and method == "GET":
                     rows = conn.execute("""SELECT id,user_id FROM native_identity_checks
                         WHERE status='pending' AND expires_at>%s AND user_id<>%s
@@ -134,7 +159,8 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
                     if not row or row[0] is None:
                         return reply(start_response, "404 Not Found", {"error": "not_found"})
                     return reply(start_response, "200 OK", {"photo": base64.b64encode(row[0]).decode()})
-                if method != "POST" or not (endpoint == "submit" or endpoint.startswith("decision/")):
+                if method != "POST" or not (endpoint in {"submit", "request", "schedule"}
+                        or endpoint.startswith("decision/")):
                     return reply(start_response, "404 Not Found", {"error": "not_found"})
                 try:
                     length = int(environ.get("CONTENT_LENGTH", "0"))
@@ -146,6 +172,30 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
                         raise ValueError("invalid_request")
                 except (ValueError, TypeError, KeyError, UnicodeError):
                     return reply(start_response, "400 Bad Request", {"error": "invalid_request"})
+                if endpoint in {"request", "schedule"}:
+                    pilot = payload.get("user_id")
+                    if not isinstance(pilot, str) or not pilot or len(pilot) > 128 or pilot == uid:
+                        return reply(start_response, "400 Bad Request", {"error": "invalid_pilot"})
+                    target = conn.execute("""SELECT role FROM native_auth_roles
+                        WHERE user_id=%s""", (pilot,)).fetchone()
+                    if not target or target[0] not in PILOTS:
+                        return reply(start_response, "404 Not Found", {"error": "pilot_not_found"})
+                    if endpoint == "request":
+                        conn.execute("""INSERT INTO native_identity_schedule(user_id,manual_requested)
+                            VALUES (%s,TRUE) ON CONFLICT(user_id)
+                            DO UPDATE SET manual_requested=TRUE""", (pilot,))
+                    else:
+                        days, first_due = payload.get("interval_days"), payload.get("next_due_at")
+                        if not (days is None and first_due is None) and not (
+                            type(days) is int and 1 <= days <= 30 and type(first_due) is int
+                            and now <= first_due <= now + 366 * 86400
+                        ):
+                            return reply(start_response, "400 Bad Request", {"error": "invalid_schedule"})
+                        conn.execute("""INSERT INTO native_identity_schedule(user_id,interval_days,next_due_at)
+                            VALUES (%s,%s,%s) ON CONFLICT(user_id) DO UPDATE SET
+                            interval_days=EXCLUDED.interval_days,next_due_at=EXCLUDED.next_due_at""",
+                            (pilot, days, first_due))
+                    return reply(start_response, "200 OK", {"ok": True})
                 if endpoint == "submit":
                     # Lock per account: retries and concurrent requests cannot create a queue flood.
                     conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (uid,))
@@ -173,9 +223,15 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
                 updated = conn.execute("""UPDATE native_identity_checks SET status=%s,
                     photo=NULL,reviewer_id=%s,decided_at=%s
                     WHERE id=%s AND user_id<>%s AND status='pending' AND expires_at>%s
-                    RETURNING id""", (decision, uid, now, endpoint[9:], uid, now)).fetchone()
+                    RETURNING user_id""", (decision, uid, now, endpoint[9:], uid, now)).fetchone()
                 if not updated:
                     return reply(start_response, "409 Conflict", {"error": "not_pending"})
+                if decision == "approved":
+                    conn.execute("""UPDATE native_identity_schedule SET manual_requested=FALSE,
+                        next_due_at=CASE WHEN next_due_at<=%s THEN
+                            next_due_at + ((%s-next_due_at)/(interval_days*86400)+1)
+                                * interval_days*86400 ELSE next_due_at END
+                        WHERE user_id=%s""", (now, now, updated[0]))
                 return reply(start_response, "200 OK", {"status": decision})
         except psycopg.Error:
             return reply(start_response, "503 Service Unavailable", {"error": "database_unavailable"})

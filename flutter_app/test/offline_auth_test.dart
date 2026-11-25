@@ -16,6 +16,18 @@ import 'package:private_drive/native_cabin_entry.dart';
 import 'package:private_drive/native_session.dart';
 import 'package:private_drive/native_session_store.dart';
 
+Future<void> acceptFirstLaunchTerms(WidgetTester tester) async {
+  final checkbox = find.byKey(const Key('first-launch-terms-acknowledgement'));
+  final next = find.byKey(const Key('first-launch-continue'));
+  expect(tester.widget<FilledButton>(next).onPressed, isNull);
+  await tester.ensureVisible(checkbox);
+  await tester.tap(checkbox);
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(next);
+  await tester.tap(next);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   // These tests cover sign-in, not the separately tested first-run prompts.
   setUp(() => SharedPreferences.setMockInitialValues({
@@ -50,6 +62,7 @@ void main() {
       await tester.tap(find.byKey(const Key('first-language-RU')));
       await tester.pumpAndSettle();
       expect(language.hasSelection, isTrue);
+      await acceptFirstLaunchTerms(tester);
     }
     expect(find.textContaining('0.2.27'), findsOneWidget);
     expect(find.textContaining('2026112103'), findsOneWidget);
@@ -62,11 +75,17 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('first-language-EN')));
     await tester.pumpAndSettle();
+    expect(find.text('Choose your account'), findsNothing);
+    expect(find.text('I have read the terms of service and privacy policy'),
+        findsOneWidget);
+    await acceptFirstLaunchTerms(tester);
+    expect(language.hasAcknowledgedTerms, isTrue);
     expect(find.text('Choose your account'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('entry-passenger')));
     await tester.pumpAndSettle();
     expect(find.text('Passenger sign-in'), findsOneWidget);
+    expect(find.byKey(const Key('native-legal-acknowledgement')), findsNothing);
     expect(find.text('Phone number +370...'), findsOneWidget);
   }, skip: pdLocalQaEntryEnabled || const bool.fromEnvironment('PD_INTERNAL_QA'));
 
@@ -181,6 +200,55 @@ void main() {
     await tester.pumpAndSettle();
     expect(authenticated?.userId, 'person-1');
     expect(authenticated?.token, token);
+  });
+
+  testWidgets('Telegram approval completes automatically without a browser code',
+      (tester) async {
+    final state = List.filled(43, 's').join();
+    final token = List.filled(64, 't').join();
+    String? proof;
+    PdNativeSession? authenticated;
+    var checks = 0;
+    final client = MockClient((request) async {
+      final data = jsonDecode(request.body) as Map<String, dynamic>;
+      if (request.url.path.endsWith('/start')) {
+        expect(data['mode'], 'automatic');
+        proof = data['app_secret'] as String;
+        return http.Response(jsonEncode({
+          'state': state, 'automatic': true,
+          'authorization_url': 'https://oauth.telegram.org/auth?state=$state',
+        }), 201);
+      }
+      expect(request.url.path, '/native-auth/telegram/finish');
+      expect(data, {'state': state, 'app_secret': proof});
+      if (++checks == 1) return http.Response('{"pending":true}', 202);
+      return http.Response(jsonEncode({
+        'verified': true, 'role': 'pilot', 'user_id': 'pilot-1',
+        'access_token': token, 'token_type': 'Bearer', 'expires_in': 3600,
+      }), 200);
+    });
+    addTearDown(client.close);
+    await tester.pumpWidget(MaterialApp(home: NativeSignInScreen(
+      authApiUrl: 'https://example.test',
+      legalAcknowledged: true,
+      httpClient: client,
+      onAuthenticated: (session) => authenticated = session,
+      telegramLauncher: (_) async => true,
+    )));
+    final start = find.byKey(const Key('native-telegram-start'));
+    await tester.scrollUntilVisible(start, 100,
+      scrollable: find.byType(Scrollable).first);
+    await tester.tap(start);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('native-telegram-code')), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    expect(authenticated, isNull);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    expect(authenticated?.userId, 'pilot-1');
+    expect(authenticated?.token, token);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   test('Saved session is validated, isolated by server and cleared on expiry', () async {
@@ -310,24 +378,7 @@ void main() {
         await tester.tap(pilot);
         await tester.pumpAndSettle();
         expect(find.byType(PilotCabin), findsOneWidget);
-        if (const bool.fromEnvironment('PD_INTERNAL_QA')) {
-          final photoEntry = find.byKey(const Key('pilot-open-identity-check'));
-          await tester.ensureVisible(photoEntry);
-          await tester.tap(photoEntry);
-          await tester.pumpAndSettle();
-          final qaSkip = find.byKey(const Key('pilot-identity-notice-qa-skip'));
-          expect(qaSkip, findsOneWidget);
-          await tester.tap(qaSkip);
-          await tester.pumpAndSettle();
-          expect(find.byKey(const Key('authorized-role-selection')),
-              findsOneWidget,
-              reason: 'QA photo flow must never strand the pilot');
-          // Leaving photo check does not change the server role.
-          expect(tester.widget<FilledButton>(pilot).onPressed, isNotNull);
-          await tester.tap(pilot);
-          await tester.pumpAndSettle();
-          expect(find.byType(PilotCabin), findsOneWidget);
-        }
+        expect(find.byKey(const Key('pilot-open-identity-check')), findsNothing);
         await tester.tap(find.byType(BackButton).first);
         await tester.pumpAndSettle();
       }

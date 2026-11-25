@@ -43,8 +43,11 @@ class PdNativeSessionStore {
     try {
       final response = await _post('/native-auth/session', token);
       final session = PdNativeSession.fromApi(response, savedToken: token);
-      final cabin = data is Map && data['cabin'] == 'pilot' && session.canPilot
-          ? 'pilot' : 'passenger';
+      final cabin = switch (data is Map ? data['cabin'] : null) {
+        'pilot' when session.canPilot => 'pilot',
+        'dispatcher' when session.canDispatch => 'dispatcher',
+        _ => 'passenger',
+      };
       return (session, cabin);
     } on PdHttpStatusException catch (error) {
       if (error.statusCode != 401) rethrow;

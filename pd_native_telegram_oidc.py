@@ -7,7 +7,7 @@ import json
 import re
 import secrets
 from html import escape
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -32,6 +32,10 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
+class TelegramPhoneUnavailable(ValueError):
+    pass
+
+
 class TelegramOidc:
     def __init__(self, client_id, client_secret, callback_url):
         callback = urlsplit(callback_url)
@@ -52,7 +56,7 @@ class TelegramOidc:
             "client_id": self.client_id,
             "redirect_uri": self.callback_url,
             "response_type": "code",
-            "scope": "openid phone",
+            "scope": "openid profile phone",
             "state": state,
             "code_challenge": challenge.decode().rstrip("="),
             "code_challenge_method": "S256",
@@ -64,6 +68,7 @@ class TelegramOidc:
         ).decode()
         request = Request(ISSUER + "/token", data=urlencode({
             "grant_type": "authorization_code",
+            "client_id": self.client_id,
             "code": code,
             "redirect_uri": self.callback_url,
             "code_verifier": verifier,
@@ -101,7 +106,7 @@ def verified_phone_claim(claims):
     if (not isinstance(subject, str) or not 1 <= len(subject) <= 255
             or not isinstance(number, str)
             or claims.get("phone_number_verified", True) is not True):
-        raise ValueError("Verified Telegram phone unavailable")
+        raise TelegramPhoneUnavailable("Verified Telegram phone unavailable")
     phone = normalize_destination("phone", "+" + number.removeprefix("+"))
     return subject, phone
 
@@ -115,6 +120,9 @@ def initialize_telegram(database_url):
         )""")
         conn.execute("""CREATE INDEX IF NOT EXISTS native_telegram_attempt_expiry
             ON native_telegram_attempts (expires_at)""")
+        conn.execute("""ALTER TABLE native_telegram_attempts
+            ADD COLUMN IF NOT EXISTS automatic BOOLEAN NOT NULL DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS failure TEXT""")
         conn.execute("""CREATE TABLE IF NOT EXISTS native_telegram_links (
             subject TEXT PRIMARY KEY,
             user_id TEXT NOT NULL UNIQUE REFERENCES native_auth_users(id)
@@ -144,35 +152,58 @@ def make_telegram_routes(database_url, oidc, *, reply, read_json, clock,
     initialize_telegram(database_url)
 
     def callback(environ, start_response, now):
+        state = None
+        claimed = False
         try:
             fields = parse_qs(environ.get("QUERY_STRING", ""), max_num_fields=12)
-            state, code = fields["state"], fields["code"]
-            if (len(state) != 1 or not TICKET.fullmatch(state[0])
-                    or len(code) != 1 or not 1 <= len(code[0]) <= 2048):
+            states = fields.get("state", [])
+            if len(states) != 1 or not TICKET.fullmatch(states[0]):
                 raise ValueError("Invalid authorization response")
-            state, code = state[0], code[0]
+            state = states[0]
             with psycopg.connect(database_url) as conn:
-                attempt = conn.execute("""SELECT verifier FROM native_telegram_attempts
+                attempt = conn.execute("""SELECT verifier,automatic FROM native_telegram_attempts
                     WHERE state=%s AND expires_at>%s FOR UPDATE""",
                     (state, now)).fetchone()
                 if not attempt or not attempt[0]:
                     raise ValueError("Authorization already used or expired")
                 conn.execute("UPDATE native_telegram_attempts SET verifier=NULL WHERE state=%s",
                              (state,))
-            subject, phone = oidc.verified_identity(code, attempt[0])
-            handoff = f"{secrets.randbelow(100_000_000):08d}"
+            claimed = True
+            verifier, automatic = attempt
+            codes = fields.get("code", [])
+            if len(codes) != 1 or not 1 <= len(codes[0]) <= 2048:
+                if fields.get("error") == ["access_denied"]:
+                    raise PermissionError("Telegram consent cancelled")
+                raise ValueError("Invalid authorization code")
+            subject, phone = oidc.verified_identity(codes[0], verifier)
+            handoff = None if automatic else f"{secrets.randbelow(100_000_000):08d}"
             with psycopg.connect(database_url) as conn:
                 result = conn.execute("""UPDATE native_telegram_attempts
                     SET subject=%s, phone=%s, handoff_hash=%s
                     WHERE state=%s AND expires_at>%s""",
-                    (subject, phone, oidc.handoff_digest(state, handoff), state, int(clock())))
+                    (subject, phone, oidc.handoff_digest(state, handoff) if handoff else None,
+                     state, int(clock())))
                 if result.rowcount != 1:
                     raise ValueError("Authorization expired")
-            return _browser_reply(start_response, "200 OK",
-                "Код входа: " + handoff + ". Введи его в приложении Private Drive.")
-        except (ValueError, KeyError, URLError, TimeoutError, jwt.PyJWTError):
-            return _browser_reply(start_response, "400 Bad Request",
-                "Вход не завершён. Вернись в приложение и повтори, разрешив передачу номера.")
+            message = ("Telegram подтверждён. Вернись в приложение Private Drive."
+                       if automatic else "Код входа: " + handoff + ". Введи его в приложении Private Drive.")
+            return _browser_reply(start_response, "200 OK", message)
+        except PermissionError:
+            failure, message = "telegram_cancelled", "Вход отменён. Вернись в приложение Private Drive."
+        except TelegramPhoneUnavailable:
+            failure = "telegram_phone_required"
+            message = "Telegram не передал подтверждённый номер. Разреши передачу номера или используй SMS."
+        except (HTTPError, URLError, TimeoutError, jwt.PyJWTError):
+            failure = "telegram_provider_error"
+            message = "Не удалось получить подтверждение от Telegram. Вернись в приложение или используй SMS."
+        except (ValueError, KeyError):
+            failure = "telegram_failed"
+            message = "Попытка входа истекла или уже использована. Начни вход заново в приложении."
+        if claimed:
+            with psycopg.connect(database_url) as conn:
+                conn.execute("UPDATE native_telegram_attempts SET failure=%s WHERE state=%s",
+                             (failure, state))
+        return _browser_reply(start_response, "400 Bad Request", message)
 
     def app(environ, start_response):
         route = environ.get("PATH_INFO", "")
@@ -191,27 +222,36 @@ def make_telegram_routes(database_url, oidc, *, reply, read_json, clock,
             except (TypeError, ValueError, KeyError, UnicodeError):
                 return reply(start_response, "400 Bad Request", {"error": "invalid_request"})
             if route.endswith("/start"):
+                automatic = payload.get("mode") == "automatic"
                 state, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
                 with psycopg.connect(database_url) as conn:
                     conn.execute("DELETE FROM native_telegram_attempts WHERE expires_at<=%s", (now,))
                     conn.execute("""INSERT INTO native_telegram_attempts
-                        (state,app_hash,verifier,expires_at) VALUES (%s,%s,%s,%s)""",
-                        (state, digest(secret), verifier, now + TTL))
+                        (state,app_hash,verifier,expires_at,automatic)
+                        VALUES (%s,%s,%s,%s,%s)""",
+                        (state, digest(secret), verifier, now + TTL, automatic))
                 return reply(start_response, "201 Created", {
-                    "state": state, "authorization_url": oidc.authorization_url(state, verifier)})
+                    "state": state, "automatic": automatic,
+                    "authorization_url": oidc.authorization_url(state, verifier)})
             state, code = payload.get("state"), payload.get("code")
             if (not isinstance(state, str) or not TICKET.fullmatch(state)
-                    or not isinstance(code, str) or not re.fullmatch(r"[0-9]{8}", code)):
+                    or (code is not None and (not isinstance(code, str)
+                        or not re.fullmatch(r"[0-9]{8}", code)))):
                 return reply(start_response, "400 Bad Request", {"error": "invalid_request"})
             with psycopg.connect(database_url) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("""SELECT subject,phone,handoff_hash,finish_attempts
+                    cur.execute("""SELECT subject,phone,handoff_hash,finish_attempts,automatic,failure
                         FROM native_telegram_attempts WHERE state=%s AND app_hash=%s
                         AND expires_at>%s FOR UPDATE""", (state, digest(secret), now))
                     row = cur.fetchone()
-                    if not row or not row[2] or row[3] >= MAX_ATTEMPTS:
+                    if not row or row[3] >= MAX_ATTEMPTS or (code is None) != row[4]:
                         return reply(start_response, "401 Unauthorized", {"error": "telegram_code_invalid"})
-                    if not hmac.compare_digest(row[2], oidc.handoff_digest(state, code)):
+                    if row[4] and row[5]:
+                        return reply(start_response, "400 Bad Request", {"error": row[5]})
+                    if row[4] and not row[0]:
+                        return reply(start_response, "202 Accepted", {"pending": True})
+                    if not row[4] and (not row[2] or not hmac.compare_digest(
+                            row[2], oidc.handoff_digest(state, code))):
                         cur.execute("""UPDATE native_telegram_attempts SET finish_attempts=finish_attempts+1
                             WHERE state=%s""", (state,))
                         return reply(start_response, "401 Unauthorized", {"error": "telegram_code_invalid"})

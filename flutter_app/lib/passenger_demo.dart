@@ -102,6 +102,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   final DraggableScrollableController _passengerSheetController = DraggableScrollableController();
   late final MapController _passengerMapController = widget.passengerMapController ?? MapController();
   bool _findingPassenger = false;
+  bool _followPassenger = false;
   LatLng? _passengerLocation;
   LatLng? _pickedPickup;
   String? _locationMessage;
@@ -195,6 +196,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   Timer? _addressTimer;
   Timer? _gpsFreshnessTimer;
   StreamSubscription<ServiceStatus>? _passengerGpsStatus;
+  StreamSubscription<Position>? _passengerGpsPositions;
   int _addressGeneration = 0;
   String? _editingAddress;
   List<String> _addressSuggestions = const [];
@@ -426,32 +428,99 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
   Future<void> _locatePassenger() async {
     if (_findingPassenger) return;
-    setState(() { _findingPassenger = true; _locationMessage = null; });
+    if (_passengerLocation case final LatLng point) {
+      setState(() => _followPassenger = true);
+      _centerOnPassenger(point, firstFix: true);
+      return;
+    }
+    setState(() {
+      _findingPassenger = true;
+      _followPassenger = true;
+      _locationMessage = null;
+    });
     try {
       final point = await (widget.currentPositionLoader?.call() ??
           _readDevicePosition()).timeout(const Duration(seconds: 22));
       if (!mounted) return;
-      if (!point.latitude.isFinite || !point.longitude.isFinite ||
-          point.latitude.abs() > 90 || point.longitude.abs() > 180) {
+      if (!_applyPassengerFix(point, firstFix: true)) {
         throw const FormatException('Некорректные координаты GPS');
       }
-      setState(() => _passengerLocation = point);
-      if (!kIsWeb && widget.currentPositionLoader == null) {
-        _passengerGpsStatus ??= Geolocator.getServiceStatusStream().listen((status) {
-          if (mounted && status == ServiceStatus.disabled) {
-            setState(() => _passengerLocation = null);
-          }
-        }, onError: (Object _) {
-          if (mounted) setState(() => _passengerLocation = null);
-        });
+      if (widget.currentPositionLoader == null) {
+        _passengerGpsPositions = Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high, distanceFilter: 3,
+          ),
+        ).listen(
+          (position) => _applyPassengerFix(
+            LatLng(position.latitude, position.longitude)),
+          onError: (Object _) => _stopPassengerTracking(),
+          onDone: _stopPassengerTracking,
+        );
+        if (!kIsWeb) {
+          _passengerGpsStatus ??= Geolocator.getServiceStatusStream()
+              .listen((status) {
+            if (status == ServiceStatus.disabled) _stopPassengerTracking();
+          }, onError: (Object _) {
+            // The position stream still reports its own errors.
+          });
+          unawaited(_checkPassengerLocationAccuracy());
+        }
       }
-      if (widget.enableMapTiles) _passengerMapController.move(point, 16);
     } catch (_) {
-      if (mounted) setState(() => _locationMessage =
-        'Не удалось определить местоположение. Проверь GPS и разрешение в настройках.');
+      _stopPassengerTracking();
     } finally {
       if (mounted) setState(() => _findingPassenger = false);
     }
+  }
+
+  bool _applyPassengerFix(LatLng point, {bool firstFix = false}) {
+    if (!mounted || !point.latitude.isFinite || !point.longitude.isFinite ||
+        point.latitude.abs() > 90 || point.longitude.abs() > 180) return false;
+    if (point == _passengerLocation) return true;
+    setState(() => _passengerLocation = point);
+    _centerOnPassenger(point, firstFix: firstFix);
+    return true;
+  }
+
+  void _centerOnPassenger(LatLng point, {required bool firstFix}) {
+    if (!widget.enableMapTiles || !_followPassenger) return;
+    _passengerMapController.move(
+      point, firstFix ? 16 : _passengerMapController.camera.zoom,
+    );
+  }
+
+  Future<void> _checkPassengerLocationAccuracy() async {
+    try {
+      final accuracy = await Geolocator.getLocationAccuracy();
+      if (!mounted || _passengerGpsPositions == null ||
+          accuracy != LocationAccuracyStatus.reduced) return;
+      final message = pdTr(context,
+        'Доступна только приблизительная геолокация. Включи точное местоположение в настройках приложения.',
+        'Galima tik apytikslė vieta. Programėlės nustatymuose įjunkite tikslią vietą.',
+        'Only approximate location is available. Enable precise location in the app settings.',
+      );
+      setState(() => _locationMessage = message);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } catch (_) {
+      // Some platforms cannot report the permission's accuracy.
+    }
+  }
+
+  void _stopPassengerTracking() {
+    if (!mounted) return;
+    unawaited(_passengerGpsPositions?.cancel());
+    unawaited(_passengerGpsStatus?.cancel());
+    _passengerGpsPositions = null;
+    _passengerGpsStatus = null;
+    setState(() {
+      _passengerLocation = null;
+      _followPassenger = false;
+      _locationMessage = pdTr(context,
+        'Не удалось определить местоположение. Проверь GPS и разрешение в настройках.',
+        'Nepavyko nustatyti vietos. Patikrinkite GPS ir leidimą nustatymuose.',
+        'Could not determine your location. Check GPS and location permission in settings.',
+      );
+    });
   }
 
   void _usePickupPoint(LatLng point) {
@@ -595,7 +664,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void _scheduleFollowPilot() {
     final store = widget.tripStore;
     final seen = store?.pilotLastSeen;
-    if (!widget.enableMapTiles || !_followPilot || store == null ||
+    if (!widget.enableMapTiles || !_followPilot || _followPassenger || store == null ||
         !store.isActive || !store.pilotOnline || seen == null ||
         DateTime.now().difference(seen) >= const Duration(minutes: 2) ||
         store.pilotLatitude == null || store.pilotLongitude == null) return;
@@ -603,7 +672,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     if (_lastPilotCameraFix == point) return;
     _lastPilotCameraFix = point;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_followPilot || !widget.enableMapTiles) return;
+      if (!mounted || !_followPilot || _followPassenger || !widget.enableMapTiles) return;
       try {
         _passengerMapController.move(point, _passengerMapController.camera.zoom);
       } catch (_) {
@@ -950,6 +1019,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _addressTimer?.cancel();
     _gpsFreshnessTimer?.cancel();
     unawaited(_passengerGpsStatus?.cancel());
+    unawaited(_passengerGpsPositions?.cancel());
     if (widget.passengerMapController == null) _passengerMapController.dispose();
     _from.dispose();
     _to.dispose();
@@ -1046,6 +1116,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         mapController: _passengerMapController,
                         options: MapOptions(
                           onTap: (_, point) => _usePickupPoint(point),
+                          onPositionChanged: (_, hasGesture) {
+                            if (hasGesture && _followPassenger) {
+                              setState(() {
+                                _followPassenger = false;
+                                _followPilot = false;
+                              });
+                            }
+                          },
                           initialCenter: startMap,
                           initialZoom: mapZoom,
                           backgroundColor: _nightMap
@@ -1175,7 +1253,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
                           key: Key('passenger-map-checking'),
                           style: TextStyle(color: Colors.white, fontSize: 11)),
                       ),
-                    if (_passengerLocation == null)
                     Positioned(
                       top: 8, left: 8,
                       child: Material(
@@ -1202,15 +1279,16 @@ class _PassengerDemoState extends State<PassengerDemo> {
                           borderRadius: BorderRadius.circular(12),
                           child: IconButton(
                             key: const Key('passenger-follow-pilot'),
-                            tooltip: _followPilot
+                            tooltip: _followPilot && !_followPassenger
                               ? 'Остановить слежение за пилотом'
                               : 'Следить за пилотом',
-                            icon: Icon(_followPilot
+                            icon: Icon(_followPilot && !_followPassenger
                               ? Icons.gps_fixed : Icons.gps_not_fixed,
                               color: const Color(0xFFDDC184)),
                             onPressed: () {
                               setState(() {
-                                _followPilot = !_followPilot;
+                                _followPilot = _followPassenger || !_followPilot;
+                                _followPassenger = false;
                                 _lastPilotCameraFix = null;
                               });
                               if (_followPilot) _scheduleFollowPilot();
@@ -2014,14 +2092,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
           // Status is driven by the existing order store; no simulated GPS
           // matching, polling or server contact is started here.
           if (widget.tripStore?.status == DemoTripStatus.requested)
-            const Positioned(
+            Positioned(
               top: 74,
               left: 14,
               right: 14,
               child: Center(
-                child: IgnorePointer(
-                  child: PdPilotAssignmentWaiting(),
-                ),
+                child: PdPilotAssignmentWaiting(onOpenOrder: _openOrders),
               ),
             ),
         ]), // viewport map stack

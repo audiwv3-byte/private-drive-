@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'pilot_offer_tone.dart';
 import 'pilot_sound_settings.dart';
 import 'pilot_payment_settings.dart';
-import 'pilot_identity_notice_page.dart';
+import 'pilot_photo_request.dart';
 import 'pilot_identity_api.dart';
 import 'brand_logo.dart';
 import 'app_language.dart';
@@ -171,11 +171,13 @@ class _PilotCabinState extends State<PilotCabin> {
 
 
   void _openMap() {
+    final photoApi = widget.showIdentityCheck ? PdIdentityScope.maybeOf(context) : null;
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => PilotDemo(
         enableMapTiles: widget.enableMapTiles,
         tripStore: widget.tripStore,
         showAssignedOffer: false,
+        photoApi: photoApi,
       ),
     ));
   }
@@ -355,26 +357,9 @@ class _PilotCabinState extends State<PilotCabin> {
                       letterSpacing: 1.3,
                     ),
                   ),
-                  if (widget.showIdentityCheck) ...[
-                    const SizedBox(height: 18),
-                    OutlinedButton.icon(
-                      key: const Key('pilot-open-identity-check'),
-                      icon: const Icon(Icons.verified_user_outlined),
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => PdPilotIdentityNoticePage(
-                            api: PdIdentityScope.maybeOf(context),
-                            onContinueWithoutVerification: () {
-                              // Never mark identity verified or change server rights.
-                              Navigator.of(context).popUntil((route) => route.isFirst);
-                              widget.onBackToCabinets?.call();
-                            },
-                          ),
-                        ),
-                      ),
-                      label: const Text('Проверка личности · раз в 7 дней'),
-                    ),
-                  ],
+                  if (widget.showIdentityCheck)
+                    if (PdIdentityScope.maybeOf(context) case final PdIdentityApi api)
+                      PdPilotPhotoRequest(api: api),
                   if (_onLine) ...[
                     const SizedBox(height: 18),
                     OutlinedButton.icon(

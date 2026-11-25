@@ -63,6 +63,24 @@ class IdentityHttpTests(unittest.TestCase):
         result = b''.join(self.app(env, lambda status, headers: response.append(status)))
         return int(response[0][:3]), json.loads(result)
 
+    def test_dispatcher_controls_manual_and_recurring_photo_requests(self):
+        self.assertFalse(self.request('pilot', 'status')[1]['requested'])
+        self.assertEqual(self.request('pilot', 'request', {'user_id': 'other'})[0], 403)
+        self.assertEqual(self.request('reviewer', 'request', {'user_id': 'passenger'})[0], 404)
+        self.assertEqual(self.request('reviewer', 'schedule', {
+            'user_id': 'pilot', 'interval_days': 7, 'next_due_at': self.now + 3600,
+        })[0], 200)
+        self.assertFalse(self.request('pilot', 'status')[1]['requested'])
+        self.assertEqual(self.request('reviewer', 'request', {'user_id': 'pilot'})[0], 200)
+        self.assertTrue(self.request('pilot', 'status')[1]['requested'])
+        check_id = self.request('pilot', 'submit', self.payload)[1]['id']
+        self.assertEqual(self.request('reviewer', 'decision/' + check_id, {
+            'decision': 'approved',
+        })[0], 200)
+        self.assertFalse(self.request('pilot', 'status')[1]['requested'])
+        self.now += 3600
+        self.assertTrue(self.request('pilot', 'status')[1]['requested'])
+
     def test_submit_review_delete_and_expire_without_role_grants(self):
         code, result = self.request('pilot', 'submit', self.payload)
         self.assertEqual(code, 202)

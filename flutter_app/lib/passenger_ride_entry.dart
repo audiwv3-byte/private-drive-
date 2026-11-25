@@ -38,17 +38,6 @@ class PassengerRideEntry extends StatelessWidget {
     ));
   }
 
-  void _openDelivery(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute<void>(
-      builder: (_) => PdPassengerLanguageScope(
-        child: PassengerExtraServices(
-          type: ExtraServiceType.delivery,
-          tripStore: tripStore,
-        ),
-      ),
-    ));
-  }
-
   /// Advance booking is available for both ride types. Pick date/time before
   /// opening the address and trip details form.
   Future<void> _startAdvanceBooking(BuildContext context) async {
@@ -110,6 +99,38 @@ class PassengerRideEntry extends StatelessWidget {
           ? null
           : BackButton(onPressed: onBackToCabinets),
       actions: [
+        IconButton(
+          key: const Key('passenger-entry-advance-booking'),
+          tooltip: pdTr(context, 'Предварительный заказ',
+              'Išankstinis užsakymas', 'Advance booking'),
+          icon: const Icon(Icons.event_available_outlined),
+          onPressed: () => _startAdvanceBooking(context),
+        ),
+        PopupMenuButton<ExtraServiceType>(
+          key: const Key('passenger-entry-services'),
+          tooltip: pdTr(context, 'Наши услуги', 'Mūsų paslaugos', 'Our services'),
+          icon: const Icon(Icons.miscellaneous_services_outlined),
+          onSelected: (type) => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PdPassengerLanguageScope(
+                child: PassengerExtraServices(type: type, tripStore: tripStore),
+              ),
+            ),
+          ),
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              key: const Key('passenger-services-delivery'),
+              value: ExtraServiceType.delivery,
+              child: Text(pdTr(context, 'Доставка товаров · 20 €',
+                'Prekių pristatymas · 20 €', 'Goods delivery · €20')),
+            ),
+            PopupMenuItem(
+              value: ExtraServiceType.jumpstart,
+              child: Text(pdTr(context, 'Запуск автомобиля · 20 €',
+                'Automobilio užvedimas · 20 €', 'Car jump-start · €20')),
+            ),
+          ],
+        ),
         const PdLanguageMenu(),
         if (onSignOut != null)
           IconButton(
@@ -130,29 +151,6 @@ class PassengerRideEntry extends StatelessWidget {
             const Center(
               child: PrivateDriveBrandLogo(
                 size: 196, transparentBackground: true)),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                key: const Key('passenger-entry-advance-booking'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFE5C57B),
-                  foregroundColor: const Color(0xFF17130C),
-                  padding: const EdgeInsets.symmetric(vertical: 17, horizontal: 12),
-                  textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                ),
-                icon: const Icon(Icons.event_available_outlined),
-                label: Text(pdTr(context, 'Предварительный заказ',
-                    'Išankstinis užsakymas', 'Advance booking')),
-                onPressed: () => _startAdvanceBooking(context),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(pdTr(context, 'Забронируй поездку заранее — выбери дату и время',
-                'Užsisakyk kelionę iš anksto — pasirink datą ir laiką',
-                'Book ahead — choose your date and time'),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
             const SizedBox(height: 16),
             Text(pdLabel(context, 'Выбери тип поездки'),
               key: const Key('passenger-entry-title'),
@@ -175,17 +173,6 @@ class PassengerRideEntry extends StatelessWidget {
               subtitle: Text(pdLabel(context, 'Междугородние поездки и аэропорты')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _open(context, 'Трансфер'),
-            )),
-            const SizedBox(height: 12),
-            Card(child: ListTile(
-              key: const Key('passenger-entry-delivery'),
-              leading: const Icon(Icons.local_shipping_outlined, size: 36),
-              title: Text(pdTr(context, 'Доставка',
-                  'Pristatymas', 'Delivery')),
-              subtitle: Text(pdTr(context, 'Доставка товаров · 20 €',
-                  'Prekių pristatymas · 20 €', 'Goods delivery · €20')),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _openDelivery(context),
             )),
             const SizedBox(height: 20),
             Text(pdLabel(context, 'Тестовый режим. Реальные заказы и оплата выключены.'),

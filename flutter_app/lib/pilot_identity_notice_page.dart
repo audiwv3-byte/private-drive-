@@ -109,7 +109,7 @@ class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
               onVerificationApproved: widget.onVerificationApproved))),
           child: Text(tr('Продолжить к съёмке', 'Tęsti', 'Continue to camera'))),
         TextButton(onPressed: widget.onBack ?? () => Navigator.maybePop(context),
-          child: Text(tr('Вернуться к выбору кабинета', 'Grįžti', 'Return to cabin selection'))),
+          child: Text(tr('Назад', 'Grįžti', 'Back'))),
       ],
     )),
     );

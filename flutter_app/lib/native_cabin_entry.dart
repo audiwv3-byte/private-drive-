@@ -9,7 +9,6 @@ import 'permissions_onboarding.dart';
 import 'native_session.dart';
 import 'native_session_store.dart';
 import 'pilot_identity_api.dart';
-import 'pilot_identity_notice_page.dart';
 import 'remote_sync_demo.dart';
 
 typedef PdSignInBuilder = Widget Function(BuildContext context, String role,
@@ -120,12 +119,12 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       _requestedRole = role;
       _message = null;
       final session = _activeSession;
-      if (role == 'pilot') {
-        _page = 'photo';
-      } else {
-        _page = session != null || const bool.fromEnvironment('PD_INTERNAL_QA')
-            ? 'passenger' : 'signin';
-      }
+      _page = switch (role) {
+        'pilot' => session?.canPilot == true ? 'pilot' : 'signin',
+        'dispatcher' => session?.canDispatch == true ? 'dispatcher' : 'signin',
+        _ => session != null || const bool.fromEnvironment('PD_INTERNAL_QA')
+            ? 'passenger' : 'signin',
+      };
     });
   }
   void _authenticated(PdNativeSession session) {
@@ -147,7 +146,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       _restoring = false;
       _session = session;
       if (_requestedRole == 'pilot' && session.canPilot) {
-        _page = 'photo';
+        _page = 'pilot';
+      } else if (_requestedRole == 'dispatcher' && session.canDispatch) {
+        _page = 'dispatcher';
       } else if (_requestedRole == 'passenger') {
         _page = 'passenger';
       } else {
@@ -155,15 +156,6 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
         _message = 'У аккаунта нет серверных прав для выбранного кабинета.';
       }
     });
-  }
-  void _photoApproved() {
-    if (_activeSession?.canPilot != true) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    setState(() => _page = 'pilot');
-  }
-  void _photoSignIn() {
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    setState(() { _requestedRole = 'pilot'; _page = 'signin'; });
   }
   @override
   void dispose() { _expiry?.cancel(); super.dispose(); }
@@ -173,6 +165,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     final cabin = PrivateDriveDemo(
       key: ValueKey('entry-$role-${session?.userId ?? (localQa ? 'local-qa' : 'guest')}'),
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',
+      adminOnly: role == 'dispatcher',
       showPilotIdentityCheck: !localQa,
       showPilotCockpit: showPilotCockpit,
       storageScope: session?.userId ?? (localQa ? 'local-qa' : 'internal-guest'),
@@ -301,29 +294,23 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       return PopScope(canPop: false,
         onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
         child: Scaffold(
-          appBar: AppBar(title: Text(_requestedRole == 'pilot'
-              ? tr('Вход пилота', 'Vairuotojo prisijungimas', 'Driver sign-in')
-              : tr('Вход пассажира', 'Keleivio prisijungimas', 'Passenger sign-in')),
+          appBar: AppBar(title: Text(switch (_requestedRole) {
+            'pilot' => tr('Вход пилота', 'Vairuotojo prisijungimas', 'Driver sign-in'),
+            'dispatcher' => tr('Вход диспетчера', 'Dispečerio prisijungimas', 'Dispatcher sign-in'),
+            _ => tr('Вход пассажира', 'Keleivio prisijungimas', 'Passenger sign-in'),
+          }),
             leading: BackButton(onPressed: _entry)),
           body: widget.signInBuilder(context, _requestedRole, _authenticated),
         ),
       );
     }
-    if (_page == 'photo') {
-      return PopScope(canPop: false,
-        onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
-        child: PdPilotIdentityNoticePage(
-        api: session != null && session.canPilot ? widget.identityApiBuilder(session) : null,
-        onBack: _entry,
-        onRequestSignIn: _photoSignIn,
-        onVerificationApproved: _photoApproved,
-        onContinueWithoutVerification: _entry,
-      ));
-    }
     if (_page == 'passenger' && (session != null || const bool.fromEnvironment('PD_INTERNAL_QA'))) {
       return _cabin('passenger', session);
     }
     if (_page == 'pilot' && session?.canPilot == true) return _cabin('pilot', session);
+    if (_page == 'dispatcher' && session?.canDispatch == true) {
+      return _cabin('dispatcher', session);
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [
         if (session != null || _qaUnlocked) IconButton(onPressed: _signOut,
@@ -348,6 +335,15 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             FilledButton.icon(key: const Key('entry-pilot'),
               onPressed: () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
               label: Text(tr('Пилот', 'Vairuotojas', 'Driver'))),
+            if (session?.canDispatch == true) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: const Key('entry-dispatcher'),
+                onPressed: () => _select('dispatcher'),
+                icon: const Icon(Icons.support_agent),
+                label: Text(tr('Диспетчер', 'Dispečeris', 'Dispatcher')),
+              ),
+            ],
             if (pdLocalQaEntryEnabled) ...[
               const SizedBox(height: 12),
               OutlinedButton.icon(
@@ -362,9 +358,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             Text(pdLocalQaEntryEnabled
               ? 'Оба кабинета используют локальные тестовые данные.'
               : tr(
-                  'Фотопроверка требуется только пилоту. Доступ пилота подтверждается сервером.',
-                  'Nuotrauką turi patvirtinti tik vairuotojai. Vairuotojo prieigą patvirtina serveris.',
-                  'Only drivers need photo verification. Driver access is verified by the server.',
+                  'Доступ в кабину пилота определяется правами аккаунта.',
+                  'Vairuotojo prieiga priklauso nuo paskyros teisių.',
+                  'Driver access is based on account permissions.',
                 ),
               textAlign: TextAlign.center),
             const SizedBox(height: 12),

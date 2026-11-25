@@ -6,7 +6,7 @@ import 'package:private_drive/passenger_ride_entry.dart';
 import 'package:private_drive/app_language.dart';
 
 void main() {
-  testWidgets('PD logo and advance booking appear above three passenger choices', (tester) async {
+  testWidgets('PD logo and exactly two ride choices appear on the entry screen', (tester) async {
     final store = DemoTripStore();
     addTearDown(store.dispose);
     await tester.pumpWidget(MaterialApp(
@@ -20,9 +20,8 @@ void main() {
     final transfer = find.byKey(const Key('passenger-entry-transfer'));
     await tester.scrollUntilVisible(transfer, 180);
     expect(transfer, findsOneWidget);
-    final delivery = find.byKey(const Key('passenger-entry-delivery'));
-    await tester.scrollUntilVisible(delivery, 180);
-    expect(delivery, findsOneWidget);
+    expect(find.byType(ListTile), findsNWidgets(2));
+    expect(find.byKey(const Key('passenger-entry-delivery')), findsNothing);
   });
 
   testWidgets('Passenger language picker changes all screens without returning to login',

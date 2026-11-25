@@ -9,6 +9,7 @@ import 'app_language.dart';
 import 'passenger_orders_demo.dart';
 import 'pilot_cabin.dart';
 import 'pilot_identity_api.dart';
+import 'pilot_photo_request.dart';
 import 'pilot_identity_review_page.dart';
 import 'pilot_sound_settings.dart';
 import 'pilot_payment_settings.dart';
@@ -180,7 +181,10 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
     if (_startingLocation || !mounted || !_trip.pilotOnline) return;
     _startingLocation = true;
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return;
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _schedulePilotGpsRetry();
+        return;
+      }
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -417,6 +421,7 @@ class PilotDemo extends StatefulWidget {
     this.onIncomingMessageVoice,
     this.showAssignedOffer = true,
     this.testRoadPoints,
+    this.photoApi,
   });
 
   final bool enableMapTiles;
@@ -435,6 +440,7 @@ class PilotDemo extends StatefulWidget {
   final bool showAssignedOffer;
   /// Synthetic route fixture for widget tests only; never used by app UI.
   final List<LatLng>? testRoadPoints;
+  final PdIdentityApi? photoApi;
 
   @override
   State<PilotDemo> createState() => _PilotDemoState();
@@ -1363,6 +1369,12 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                     child: Icon(Icons.navigation, size: 44,
                         color: Color(0xFFB6FF36),
                         shadows: [Shadow(color: Colors.black, blurRadius: 8)]),
+                  ),
+                if (widget.photoApi case final PdIdentityApi api)
+                  Positioned(
+                    top: 8,
+                    right: 12,
+                    child: PdPilotPhotoRequest(api: api),
                   ),
                 if (widget.tripStore == null)
                   Positioned(

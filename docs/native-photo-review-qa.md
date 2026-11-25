@@ -17,15 +17,19 @@ returns to the PIN prompt. Existing QA package ID and signing key are reused.
 Branch: feature/flutter-independent-auth. No production deployment, paid SMS,
 real booking or payment activation is part of this change.
 
-## Implemented
+## Account-based Android QA 0.2.41
 
-- The native role selector offers Passenger and Pilot. The dispatcher uses the
-  website. Outside the local PIN build, Pilot opens the photo notice before
-  optional location and notification onboarding.
-- Pilot upload requires a verified native session with server-authorized pilot
-  entitlement. Pilot cabin navigation follows server-approved photo status.
-  The server continues to manage dispatcher entitlements for its own clients.
-- Internal QA photo skip returns to cabin choice and never approves identity.
+- Sign in with Telegram or SMS. An account with the server's pilot role opens
+  the cabin directly. An authorized dispatcher can open the dispatcher cabinet
+  after signing in and returning to the cabin selector.
+- The dispatcher cabinet's photo review page can request a photo from a specific
+  pilot or set a first due date and a recurring interval. The default interval
+  in the schedule editor is seven days.
+- When a check is due, the pilot sees an action in the cabin. Opening the action
+  leads to the existing photo information, capture and review flow.
+- This build uses the isolated QA auth service. Code-free Telegram and photo
+  schedules require compatible server endpoints. Older Telegram servers still
+  use browser codes.
 
 - Internal QA only: explicit guest entry opens the passenger cabin without
   requesting an OTP, claiming phone verification or exposing staff roles.
@@ -79,5 +83,4 @@ Paid SMS remains disabled. Real phone sign-in therefore requires a separate
 approved SMS setup and verified-account role assignment before real users can
 exercise the photo workflow. The existing cabins still contain local test
 trip behavior; this change does not make bookings, payments or cross-device
-trip synchronization production-ready. Native sessions are currently held in
-process memory; app restart requires sign-in again.
+trip synchronization production-ready. Saved native sessions are revalidated on app startup.

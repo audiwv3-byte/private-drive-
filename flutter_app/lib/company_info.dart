@@ -5,7 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 /// Informational preview. Legal texts require owner and legal review
 /// before real bookings, payments or tracking are launched.
 class CompanyInfoPage extends StatelessWidget {
-  const CompanyInfoPage({super.key});
+  const CompanyInfoPage({super.key, this.initialTab = 0});
+
+  final int initialTab;
 
   static const gold = Color(0xFFDDC184);
 
@@ -32,6 +34,7 @@ class CompanyInfoPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DefaultTabController(
     length: 4,
+    initialIndex: initialTab,
     child: Scaffold(
       appBar: AppBar(
         title: Text(pdLabel(context, 'PRIVATE DRIVE · Информация')),

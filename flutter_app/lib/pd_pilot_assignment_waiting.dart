@@ -1,27 +1,12 @@
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
 
-/// Visual waiting state only. It must never imply a server-side driver search.
-class PdPilotAssignmentWaiting extends StatefulWidget {
-  const PdPilotAssignmentWaiting({super.key});
+import 'app_language.dart';
 
-  @override
-  State<PdPilotAssignmentWaiting> createState() =>
-      _PdPilotAssignmentWaitingState();
-}
+class PdPilotAssignmentWaiting extends StatelessWidget {
+  const PdPilotAssignmentWaiting({super.key, required this.onOpenOrder});
 
-class _PdPilotAssignmentWaitingState extends State<PdPilotAssignmentWaiting>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _rotation = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 2),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _rotation.dispose();
-    super.dispose();
-  }
+  final VoidCallback onOpenOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -36,35 +21,27 @@ class _PdPilotAssignmentWaitingState extends State<PdPilotAssignmentWaiting>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                RotationTransition(
-                  turns: _rotation,
-                  child: const SizedBox(
-                    height: 68,
-                    width: 68,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      valueColor: AlwaysStoppedAnimation<Color>(gold),
-                    ),
-                  ),
-                ),
-                const PrivateDriveBrandLogo(size: 51, circular: true),
-              ],
-            ),
+            const PrivateDriveBrandLogo(size: 51, circular: true),
             const SizedBox(width: 12),
-            const Flexible(
+            Flexible(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Ожидаем назначения пилота',
-                    style: TextStyle(color: gold,
-                      fontWeight: FontWeight.w700)),
-                  SizedBox(height: 5),
-                  Text('Заявка создана · тестовый режим',
-                    style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  Text(pdTr(context, 'Ожидаем назначения пилота',
+                      'Laukiama vairuotojo paskyrimo', 'Waiting for a driver'),
+                    style: const TextStyle(color: gold, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 5),
+                  Text(pdTr(context, 'Заявка создана · тестовый режим',
+                      'Užsakymas sukurtas · bandomasis režimas',
+                      'Booking created · test mode'),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  TextButton(
+                    key: const Key('passenger-waiting-open-order'),
+                    onPressed: onOpenOrder,
+                    child: Text(pdTr(context, 'Управление заказом',
+                      'Valdyti užsakymą', 'Manage booking')),
+                  ),
                 ],
               ),
             ),

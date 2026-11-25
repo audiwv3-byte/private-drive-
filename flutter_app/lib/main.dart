@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'remote_sync_demo.dart';
 import 'demo_interfaces.dart';
 import 'demo_backup_page.dart';
@@ -101,6 +105,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   // Passenger language selection is available inside the passenger cabin.
   String tr(String ru, String lt, String en) => ru;
   String? challengeId;
+  String? telegramState;
+  String? telegramSecret;
   String message = '';
   String? sessionToken;
   String? signedInUserId;
@@ -147,6 +153,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
             'Код не отправлен. Во внутренней сборке можно продолжить как гость.',
         'sms_unavailable' => 'Сервис SMS временно недоступен. Код не отправлен. Повтори позже.',
         'invalid_phone' => 'Проверь номер: укажи код страны, например +370, и номер телефона.',
+        'sms_number_not_enabled' => 'SMS доступны для номера, включённого в тестирование.',
         'try_later' => 'Слишком частые запросы. Подожди минуту и повтори.',
         _ => 'Сервер входа временно недоступен. Повтори позже.',
       });
@@ -170,39 +177,119 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         'challenge_id': id,
         'code': code.text.trim(),
       });
-      final token = result['access_token'];
-      final userId = result['user_id'];
-      final tokenType = result['token_type'];
-      final expiresIn = result['expires_in'];
-      final role = result['role'];
-      if (result['verified'] != true ||
-          token is! String || token.length < 40 ||
-          userId is! String || userId.isEmpty ||
-          tokenType != 'Bearer' ||
-          !const {'passenger', 'admin', 'pilot', 'dispatcher', 'pilot_dispatcher'}.contains(role) ||
-          expiresIn is! int || expiresIn <= 0) {
-        throw const FormatException('Сервер не выдал корректную сессию.');
-      }
-      if (!mounted) return;
-      final expiry = DateTime.now().add(Duration(seconds: expiresIn));
-      final onAuthenticated = widget.onAuthenticated;
-      if (onAuthenticated != null) {
-        onAuthenticated(PdNativeSession(token: token, userId: userId,
-          role: role as String, expiresAt: expiry));
-        return;
-      }
-      setState(() {
-        sessionToken = token;
-        signedInUserId = userId;
-        signedInRole = role as String;
-        showVerifiedIdentity = true;
-        sessionExpiry = expiry;
-        message = '';
-        challengeId = null;
-        code.clear();
-      });
+      completeSignIn(result);
     } catch (_) {
       if (mounted) setState(() => message = 'Код не подтверждён. Проверь код или срок действия.');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  void completeSignIn(Map<String, dynamic> result) {
+    final token = result['access_token'];
+    final userId = result['user_id'];
+    final tokenType = result['token_type'];
+    final expiresIn = result['expires_in'];
+    final role = result['role'];
+    if (result['verified'] != true ||
+        token is! String || token.length < 40 ||
+        userId is! String || userId.isEmpty ||
+        tokenType != 'Bearer' ||
+        !const {'passenger', 'admin', 'pilot', 'dispatcher', 'pilot_dispatcher'}.contains(role) ||
+        expiresIn is! int || expiresIn <= 0) {
+      throw const FormatException('Сервер не выдал корректную сессию.');
+    }
+    if (!mounted) return;
+    final expiry = DateTime.now().add(Duration(seconds: expiresIn));
+    final onAuthenticated = widget.onAuthenticated;
+    if (onAuthenticated != null) {
+      onAuthenticated(PdNativeSession(token: token, userId: userId,
+        role: role as String, expiresAt: expiry));
+      return;
+    }
+    setState(() {
+      sessionToken = token;
+      signedInUserId = userId;
+      signedInRole = role as String;
+      showVerifiedIdentity = true;
+      sessionExpiry = expiry;
+      message = '';
+      challengeId = null;
+      telegramState = null;
+      telegramSecret = null;
+      code.clear();
+    });
+  }
+
+  Future<void> startTelegram() async {
+    if (busy || !_acknowledgedLegal) return;
+    final random = Random.secure();
+    final secret = base64UrlEncode(
+      List<int>.generate(32, (_) => random.nextInt(256)),
+    ).replaceAll('=', '');
+    setState(() {
+      busy = true;
+      message = '';
+    });
+    try {
+      final result = await post('/native-auth/telegram/start', {
+        'app_secret': secret,
+      });
+      final state = result['state'];
+      final url = result['authorization_url'];
+      final uri = url is String ? Uri.tryParse(url) : null;
+      if (state is! String || !RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(state) ||
+          uri == null || uri.scheme != 'https' ||
+          uri.host != 'oauth.telegram.org' || uri.userInfo.isNotEmpty ||
+          uri.port != 443 || uri.path != '/auth' || uri.queryParameters['state'] != state) {
+        throw const FormatException('Сервер вернул неверную ссылку Telegram.');
+      }
+      if (!mounted) return;
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        throw const FormatException('Не удалось открыть Telegram.');
+      }
+      if (!mounted) return;
+      setState(() {
+        telegramState = state;
+        telegramSecret = secret;
+        code.clear();
+        message = 'Разреши Telegram передать номер. Затем введи код с открывшейся страницы.';
+      });
+    } on PdHttpStatusException catch (error) {
+      if (mounted) setState(() => message = error.errorCode == 'telegram_disabled'
+          ? 'Вход через Telegram ещё не включён на сервере.'
+          : 'Сервер входа через Telegram временно недоступен.');
+    } catch (_) {
+      if (mounted) setState(() => message = 'Не удалось начать вход через Telegram.');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> finishTelegram() async {
+    final state = telegramState;
+    final secret = telegramSecret;
+    if (busy || state == null || secret == null) return;
+    setState(() {
+      busy = true;
+      message = '';
+    });
+    try {
+      completeSignIn(await post('/native-auth/telegram/finish', {
+        'state': state,
+        'app_secret': secret,
+        'code': code.text.trim(),
+      }));
+    } on PdHttpStatusException catch (error) {
+      if (mounted) setState(() => message = switch (error.errorCode) {
+        'telegram_link_conflict' =>
+          'Этот аккаунт Telegram уже связан с другим номером. Попробуй вход по SMS.',
+        'telegram_code_invalid' =>
+          'Код Telegram не принят. Проверь его или начни вход заново.',
+        _ => 'Сервер входа через Telegram временно недоступен.',
+      });
+    } catch (_) {
+      if (mounted) setState(() => message = 'Не удалось завершить вход через Telegram.');
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -218,6 +305,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       showVerifiedIdentity = false;
       sessionExpiry = null;
       challengeId = null;
+      telegramState = null;
+      telegramSecret = null;
       code.clear();
       message = '';
     });
@@ -413,9 +502,9 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 12),
-                Text(tr('Независимый вход без Telegram',
-                    'Nepriklausomas prisijungimas be Telegram',
-                    'Independent sign-in without Telegram'),
+                Text(widget.authApiUrl.isEmpty
+                    ? 'Независимый вход без Telegram'
+                    : 'Вход по SMS или через Telegram',
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
                 const Text(
@@ -452,7 +541,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     textAlign: TextAlign.center),
                 ],
                 const SizedBox(height: 20),
-                TextField(
+                if (telegramState == null) TextField(
                   controller: destination,
                   enabled: !busy && challengeId == null,
                   keyboardType: TextInputType.phone,
@@ -463,7 +552,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                if (challengeId == null) ...[
+                if (challengeId == null && telegramState == null) ...[
                   CheckboxListTile(
                     key: const Key('native-legal-acknowledgement'),
                     controlAffinity: ListTileControlAffinity.leading,
@@ -486,12 +575,45 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   ),
                 ],
                 const SizedBox(height: 8),
-                if (challengeId == null)
+                if (telegramState != null) ...[
+                  TextField(
+                    controller: code,
+                    enabled: !busy,
+                    maxLength: 8,
+                    onChanged: (_) => setState(() {}),
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Код со страницы Telegram',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: busy || !RegExp(r'^\d{8}$').hasMatch(code.text.trim())
+                        ? null : finishTelegram,
+                    child: const Text('Подтвердить вход через Telegram'),
+                  ),
+                  TextButton(
+                    onPressed: busy ? null : () => setState(() {
+                      telegramState = null;
+                      telegramSecret = null;
+                      code.clear();
+                      message = '';
+                    }),
+                    child: const Text('Выбрать другой способ входа'),
+                  ),
+                ] else if (challengeId == null) ...[
                   FilledButton(
                     onPressed: busy || widget.authApiUrl.isEmpty || !_acknowledgedLegal
                         ? null : requestCode,
                     child: Text(tr('Получить код', 'Gauti kodą', 'Get code')),
-                  )
+                  ),
+                  if (widget.authApiUrl.isNotEmpty && !kIsWeb)
+                    OutlinedButton(
+                      key: const Key('native-telegram-sign-in'),
+                      onPressed: busy || !_acknowledgedLegal ? null : startTelegram,
+                      child: const Text('Войти через Telegram'),
+                    ),
+                ]
                 else ...[
                   TextField(
                     controller: code,

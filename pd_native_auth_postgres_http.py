@@ -53,13 +53,61 @@ def initialize_database(database_url):
                 ON native_auth_roles(role) WHERE role='admin'""")
 
 
+def read_json(environ):
+    length = int(environ.get("CONTENT_LENGTH", "0"))
+    if length < 1 or length > MAX_BODY or not environ.get(
+            "CONTENT_TYPE", "").lower().startswith("application/json"):
+        raise ValueError("Invalid request content")
+    payload = json.loads(environ["wsgi.input"].read(length).decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Expected object")
+    return payload
+
+
+def get_phone_account(cur, phone, now):
+    uid = secrets.token_urlsafe(24)
+    cur.execute("""INSERT INTO native_auth_users
+        (id,channel,destination,created_at) VALUES (%s,'phone',%s,%s)
+        ON CONFLICT(channel,destination) DO NOTHING""", (uid, phone, now))
+    cur.execute("""SELECT id FROM native_auth_users
+        WHERE channel='phone' AND destination=%s""", (phone,))
+    return cur.fetchone()[0]
+
+
+def issue_session(cur, uid, now):
+    cur.execute("SELECT role FROM native_auth_roles WHERE user_id=%s", (uid,))
+    stored_role = cur.fetchone()
+    token = secrets.token_urlsafe(48)
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    cur.execute("""INSERT INTO native_auth_sessions
+        (token_hash,user_id,created_at,expires_at)
+        VALUES (%s,%s,%s,%s)""", (digest, uid, now, now + SESSION_TTL))
+    return {
+        "verified": True, "role": stored_role[0] if stored_role else "passenger",
+        "user_id": uid, "access_token": token, "token_type": "Bearer",
+        "expires_in": SESSION_TTL,
+    }
+
+
+def reply(start_response, status, payload):
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    start_response(status, [
+        ("Content-Type", "application/json; charset=utf-8"),
+        ("Content-Length", str(len(body))),
+        ("Cache-Control", "no-store"),
+        ("X-Content-Type-Options", "nosniff"),
+    ])
+    return [body]
+
 def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_phone=None,
-             live=False,
+             live=False, sms_test_phone=None, telegram_oidc=None,
              start_sms=None, check_sms=None, clock=None):
     if not database_url or not database_url.startswith(("postgresql://", "postgres://")):
         raise ValueError("A private PostgreSQL DATABASE_URL is required")
     role_for_phone = native_phone_role_resolver(
         admin_phone=admin_phone, dispatcher_phone=dispatcher_phone, pilot_phone=pilot_phone)
+    if sms_test_phone is not None:
+        sms_test_phone = normalize_destination("phone", sms_test_phone)
     if live:
         if not (start_sms and check_sms):
             start_sms = start_sms or start_verification
@@ -67,19 +115,20 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
     clock = clock or time.time
     initialize_database(database_url)
 
-    def reply(start_response, status, payload):
-        body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-        start_response(status, [
-            ("Content-Type", "application/json; charset=utf-8"),
-            ("Content-Length", str(len(body))),
-            ("Cache-Control", "no-store"),
-            ("X-Content-Type-Options", "nosniff"),
-        ])
-        return [body]
+    telegram = None
+    if telegram_oidc is not None:
+        from pd_native_telegram_oidc import make_telegram_routes
+        telegram = make_telegram_routes(
+            database_url, telegram_oidc, reply=reply, read_json=read_json,
+            clock=clock, get_phone_account=get_phone_account, issue_session=issue_session)
 
     def app(environ, start_response):
         route = environ.get("PATH_INFO", "")
         method = environ.get("REQUEST_METHOD", "")
+        if route.startswith("/native-auth/telegram/"):
+            if telegram is not None:
+                return telegram(environ, start_response)
+            return reply(start_response, "503 Service Unavailable", {"error": "telegram_disabled"})
         if method == "GET" and route == "/health":
             return reply(start_response, "200 OK", {"status": "ok", "sms_enabled": live})
         if method != "POST" or route not in (
@@ -89,13 +138,7 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
             return reply(start_response, "503 Service Unavailable",
                          {"error": "sms_disabled"})
         try:
-            length = int(environ.get("CONTENT_LENGTH", "0"))
-            if length < 1 or length > MAX_BODY or not environ.get(
-                    "CONTENT_TYPE", "").lower().startswith("application/json"):
-                raise ValueError("Invalid request content")
-            payload = json.loads(environ["wsgi.input"].read(length).decode("utf-8"))
-            if not isinstance(payload, dict):
-                raise ValueError("Expected object")
+            payload = read_json(environ)
         except (TypeError, ValueError, KeyError, UnicodeError):
             return reply(start_response, "400 Bad Request", {"error": "invalid_request"})
 
@@ -107,6 +150,8 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
                 phone = normalize_destination("phone", payload["destination"])
             except (KeyError, ValueError, TypeError):
                 return reply(start_response, "400 Bad Request", {"error": "invalid_phone"})
+            if sms_test_phone is not None and phone != sms_test_phone:
+                return reply(start_response, "403 Forbidden", {"error": "sms_number_not_enabled"})
             try:
                 with psycopg.connect(database_url) as conn:
                     with conn.cursor() as cur:
@@ -150,6 +195,8 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
                         return reply(start_response, "401 Unauthorized",
                                      {"error": "invalid_or_expired_code"})
                     phone = row[0]
+                    if sms_test_phone is not None and phone != sms_test_phone:
+                        return reply(start_response, "403 Forbidden", {"error": "sms_number_not_enabled"})
                     # Count attempts even when the provider rejects or times out.
                     cur.execute("""UPDATE native_twilio_challenges
                         SET attempts=attempts+1 WHERE id=%s""", (challenge_id,))
@@ -163,27 +210,9 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
                                      {"error": "invalid_or_expired_code"})
                     cur.execute("""UPDATE native_twilio_challenges
                         SET consumed_at=%s WHERE id=%s""", (now, challenge_id))
-                    uid = secrets.token_urlsafe(24)
-                    cur.execute("""INSERT INTO native_auth_users
-                        (id,channel,destination,created_at) VALUES (%s,'phone',%s,%s)
-                        ON CONFLICT(channel,destination) DO NOTHING""",
-                        (uid, phone, now))
-                    cur.execute("""SELECT id FROM native_auth_users
-                        WHERE channel='phone' AND destination=%s""", (phone,))
-                    uid = cur.fetchone()[0]
-                    cur.execute("""SELECT role FROM native_auth_roles WHERE user_id=%s""", (uid,))
-                    stored_role = cur.fetchone()
-                    stored_role = stored_role[0] if stored_role else "passenger"
-                    token = secrets.token_urlsafe(48)
-                    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
-                    cur.execute("""INSERT INTO native_auth_sessions
-                        (token_hash,user_id,created_at,expires_at)
-                        VALUES (%s,%s,%s,%s)""", (digest, uid, now, now + SESSION_TTL))
-            return reply(start_response, "200 OK", {
-                "verified": True, "role": stored_role, "user_id": uid,
-                "access_token": token, "token_type": "Bearer",
-                "expires_in": SESSION_TTL,
-            })
+                    uid = get_phone_account(cur, phone, now)
+                    session = issue_session(cur, uid, now)
+            return reply(start_response, "200 OK", session)
         except psycopg.Error:
             return reply(start_response, "503 Service Unavailable",
                          {"error": "database_unavailable"})

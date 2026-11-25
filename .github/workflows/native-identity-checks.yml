@@ -1,10 +1,14 @@
 name: PRIVATE DRIVE isolated photo review tests
 on:
   push:
-    branches: [feature/flutter-independent-auth]
+    branches: [feature/flutter-independent-auth, feature/mobile-sms-telegram-login]
     paths:
       - 'pd_native_identity_http.py'
       - 'test_native_identity_http.py'
+      - 'pd_native_auth_postgres_http.py'
+      - 'pd_native_telegram_oidc.py'
+      - 'test_native_telegram_oidc.py'
+      - 'requirements-sms-render.txt'
       - 'isolated_sms_wsgi.py'
       - '.github/workflows/native-identity-checks.yml'
 jobs:
@@ -27,4 +31,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements-sms-render.txt
-      - run: python -m unittest -v test_native_identity_http.py
+      - run: python -m unittest -v test_native_identity_http.py test_native_telegram_oidc.py

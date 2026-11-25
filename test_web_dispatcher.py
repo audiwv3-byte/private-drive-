@@ -151,6 +151,22 @@ class DispatcherBrowserTests(unittest.TestCase):
             headers=passenger).status_code, 200)
         self.assertEqual(mobile.get(f"/v1/trips/{trip['id']}/messages?after=0",
             headers=pilot).json["messages"], [])
+        chat = f"/dispatch/test-sync/trips/{trip['id']}/messages"
+        outbound = {"text": "Встречаемся у входа", "client_id": "1" * 32}
+        self.assertEqual(mobile.get(chat, headers=pilot).status_code, 401)
+        self.assertEqual(dispatcher.post(chat, data=outbound).status_code, 403)
+        for _ in range(2):
+            self.assertEqual(dispatcher.post(chat, data={**outbound, "csrf": csrf}).status_code, 201)
+        mobile_chat = f"/v1/trips/{trip['id']}/messages"
+        for role in (passenger, pilot):
+            messages = mobile.get(mobile_chat, headers=role).json["messages"]
+            self.assertEqual([(item["role"], item["body"]) for item in messages],
+                             [("dispatcher", outbound["text"])])
+        self.assertEqual(mobile.post(mobile_chat, headers=pilot, json={
+            "text": "Понял", "client_id": "2" * 32,
+        }).status_code, 201)
+        self.assertEqual([item["role"] for item in dispatcher.get(chat).json["messages"]],
+                         ["dispatcher", "pilot"])
         advanced = mobile.post(f"/v1/trips/{trip['id']}/action", headers=pilot,
             json={"action": "advance", "version": 2})
         self.assertEqual(advanced.json["trip"]["status"], "approaching")

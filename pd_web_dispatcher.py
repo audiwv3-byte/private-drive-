@@ -334,6 +334,11 @@ def register(app, core):
         from pd_dispatch_accounts import register as register_dispatch_accounts
         register_dispatch_accounts(app, authorized, passwords.connect if passwords else None)
 
+    pilot_intake_available = False
+    if os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
+        from pd_pilot_qa_intake import configured as pilot_intake_configured
+        pilot_intake_available = pilot_intake_configured()
+
     # Separate, fail-closed pilot intake shares the existing dispatcher session.
     if os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
         from pd_pilot_qa_intake import register as register_qa_pilots
@@ -372,6 +377,9 @@ def register(app, core):
             telegram_test_enabled=telegram_test_ready,
             analytics_enabled="pd_site_analytics" in app.view_functions,
             csrf=csrf() if test_sync_enabled else "",
+            pilot_intake_enabled=pilot_intake_available,
+            pilot_add_url="/pilot-registration" if pilot_intake_available else None,
+            staging_registry="dispatch_accounts_state" in app.view_functions,
         ))
         response.headers.update({
             "Cache-Control": "private, no-store",

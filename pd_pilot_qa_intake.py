@@ -206,7 +206,12 @@ def register(app, authorized, csrf, valid_csrf):
 main{max-width:850px;margin:auto}h1,a{color:#e8c581}
 article{border:1px solid #675234;padding:15px;margin:12px 0;border-radius:12px;background:#201b14}
 small{color:#c8bba3}a{display:inline-block;margin:8px 14px 4px 0}
-a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
+a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}
+.admission{display:inline-block;margin-top:8px;border:1px solid;border-radius:8px;padding:8px 12px;font:inherit}
+.admission.pending{color:#ffd8d8;background:#512020;border-color:#a75050;cursor:pointer}
+.admission.approved{color:#d3fae2;background:#1e4932;border-color:#589976}
+.admission:disabled{opacity:.6;cursor:wait}
+</style></head>
 <body><main><h1>Анкеты пилотов — тестовая модерация</h1>
 <p>Защищённая очередь. Статус новых анкет: «На проверке».</p>
 <p id="status" role="status">Проверяем подключение…</p>
@@ -237,8 +242,16 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
        const contact=document.createElement("a");
        contact.href=scheme+value;contact.textContent=value;card.append(contact);
      }
-     if(app.status==="pending" && app.terms_version){
+     if(app.status==="approved"){
+       const approved=document.createElement("strong");
+       approved.className="admission approved";
+       approved.textContent="Анкета одобрена";
+       card.append(approved);
+     }
+     if(app.status==="pending" && app.terms_version && app.plate){
        const approve=document.createElement("button");
+       approve.type="button";
+       approve.className="admission pending";
        approve.textContent="Одобрить анкету";
        approve.onclick=async()=>{
          approve.disabled=true;

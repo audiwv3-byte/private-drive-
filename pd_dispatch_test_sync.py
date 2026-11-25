@@ -435,6 +435,27 @@ document.querySelectorAll('[data-copy]').forEach((button) => {
         store.set_autopilot(enabled == "1")
         return reply(store.snapshot())
 
+    @app.route("/dispatch/test-sync/trips/<trip_id>/messages", methods=["GET", "POST"])
+    def pd_test_sync_chat(trip_id):
+        if not authorized():
+            return reply({"error": "unauthorized"}, 401)
+        if not TRIP_ID.fullmatch(trip_id):
+            return reply({"error": "not_found"}, 404)
+        try:
+            if request.method == "GET":
+                return reply({"messages": store.messages(
+                    trip_id, "dispatcher", "dispatcher_test", cursor())})
+            if request.content_length is None or request.content_length > MAX_BODY:
+                raise TripError("invalid_body", 400)
+            if not valid_csrf():
+                raise TripError("forbidden", 403)
+            message = store.send_message(trip_id, "dispatcher", "dispatcher_test", {
+                "text": request.form.get("text"), "client_id": request.form.get("client_id"),
+            })
+            return reply({"message": message}, 201)
+        except TripError as exc:
+            return reply({"error": exc.code}, exc.status)
+
     @app.post("/dispatch/test-sync/assign")
     def pd_test_sync_assign():
         if not authorized():

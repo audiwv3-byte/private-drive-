@@ -68,6 +68,7 @@ def stage(monkeypatch):
         REVOKE CREATE ON SCHEMA public FROM PUBLIC;
         GRANT EXECUTE ON FUNCTION public.pd_validate_native_session(text,bigint),
                                    public.pd_native_pilot_order_state(text,bigint),
+                                   public.pd_native_pilot_trip_action(text,uuid,text,bigint),
                                    public.pd_redeem_closed_pilot_invite(text,text),
                                    public.pd_redeem_closed_pilot_account_invite(text,text) TO {native};
         GRANT SELECT (id,user_id,status,photo,created_at,expires_at,decided_at),
@@ -293,6 +294,24 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     assert [o["order_id"] for o in assignments("pilotInvite").json["orders"]] == [invited_order_id]
     assert order_id in {o["order_id"] for o in assignments("pilotA").json["orders"]}
     assert order_id not in {o["order_id"] for o in assignments("pilotB").json["orders"]}
+    def trip(user, action, target=order_id):
+        return native.patch("/native-pilot-orders", headers=auth(tokens, user),
+                            json={"order_id": target, "action": action})
+
+    assert trip("pilotB", "approach").status_code == 404
+    assert trip("passenger", "approach").status_code == 403
+    assert trip("pilotA", "start").status_code == 409
+    assert trip("pilotA", "approach").json["status"] == "approaching"
+    assert trip("pilotA", "start").json["status"] == "underway"
+    assert trip("pilotA", "stop_start").json["waiting_active"] is True
+    assert trip("pilotA", "stop_start").status_code == 409
+    end = trip("pilotA", "stop_end")
+    assert end.status_code == 200 and end.json["waiting_active"] is False
+    assert end.json["waiting_billable_minutes"] >= 0
+    assert trip("pilotA", "finish").json["status"] == "finished"
+    assert trip("pilotA", "finish").status_code == 409
+    assert next(o for o in orders() if o["order_id"] == order_id)["status"] == "finished"
+
     owner.execute("""INSERT INTO public.native_identity_checks
         (id,user_id,status,created_at,expires_at) VALUES (%s,'pilotA','pending',%s,%s)""",
         (uuid.uuid4().hex, int(time.time()), int(time.time()) + 1000))

@@ -13,6 +13,7 @@
 *{box-sizing:border-box}html,body{margin:0;height:100%;font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#f9efe1}
 a{color:var(--gold)}button,input,select,textarea{font:inherit}button{cursor:pointer}
 #map{position:fixed;inset:0;z-index:0;background:#242424}
+.map-fallback[hidden]{display:none}
 .map-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;background:#25211d;color:#f9e1b0;z-index:1}
 .leaflet-container{font:inherit}
 .topbar{position:fixed;top:12px;left:12px;right:12px;z-index:1000;pointer-events:none;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
@@ -138,15 +139,37 @@ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
  .map-theme{font-size:10px}
 }
 
+.pd-map-menu{position:relative;min-width:0;margin-left:auto}
+.pd-map-menu summary{list-style:none;cursor:pointer;background:#1c1711;color:#f5d596;padding:10px 13px;border:1px solid #a98043;border-radius:10px;white-space:nowrap}
+.pd-map-menu summary::-webkit-details-marker{display:none}
+.pd-map-menu nav{position:absolute;right:0;top:calc(100% + 7px);width:min(17rem,70vw);background:#1c1711;border:1px solid #a98043;border-radius:12px;padding:5px;box-shadow:0 12px 30px #0008;z-index:2}
+.pd-map-menu nav :is(a,button){display:block;text-align:left;width:100%;padding:10px;color:#f5d596;background:transparent;border:0;border-radius:6px;font:inherit;text-decoration:none;cursor:pointer}
+.pd-map-menu nav [hidden]{display:none}
+.pd-map-menu nav .map-theme{max-width:none;box-shadow:none;border:0}
+body.pd-map-full #map{inset:0;width:auto;height:auto;border:0;border-radius:0}
+body.pd-map-full .panel{display:none}
+#climateOn{width:auto;margin-right:4px}
+#climate{min-width:0}
+
+.pd-map-menu nav :is(a,button):hover{background:#392a19}
+.pd-climate{display:flex;align-items:center;gap:8px;min-width:0}.pd-climate input{width:100%;accent-color:#edc780}.pd-climate output{min-width:3ch;color:#f5d596;font-weight:700}
 </style>
 <link rel="stylesheet" href="/assets/site-analytics.css"></head>
 <body>
 <div id="map" aria-label="Интерактивная карта Вильнюса"><div id="mapFallback" class="map-fallback">Загрузка карты…</div></div>
-<div class="map-preview-caption" aria-hidden="true">Карта · Mapbox</div>
+<div class="map-preview-caption" id="mapProvider" hidden>Карта · Mapbox</div>
 <div class="topbar">
  <a class="brand" href="index.html" aria-label="PRIVATE DRIVE — вернуться на сайт"><img src="assets/pd-logo.webp" alt=""><span>PRIVATE DRIVE<small>КАРТА ПОЕЗДКИ</small></span></a>
- <button class="map-theme" type="button" id="mapTheme" hidden aria-label="Переключить дневной или ночной вид карты">☀ Дневная карта</button>
- <a class="back" href="index.html">← На сайт</a>
+ <details class="pd-map-menu" id="mapMenu">
+  <summary aria-label="Открыть меню карты">☰ Меню</summary>
+  <nav aria-label="Навигация по странице заказа">
+   <a href="index.html">← На сайт</a>
+   <button type="button" id="menuFull" hidden aria-pressed="false">Карта на весь экран</button>
+   <button type="button" id="menuAddresses">Откуда и куда</button>
+   <button type="button" id="menuPreferences">Музыка и климат</button>
+   <button class="map-theme" type="button" id="mapTheme" hidden aria-label="Переключить дневной или ночной вид карты">Дневная карта</button>
+  </nav>
+ </details>
 </div>
 <main class="panel">
  <p class="booking-kicker">PRIVATE DRIVE · ПРЕДВАРИТЕЛЬНЫЙ ЗАКАЗ</p>
@@ -168,6 +191,10 @@ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
   <div class="field"><label for="radio">Радиостанция в поездке (необязательно)</label><select id="radio" name="radio"><option value="">Без предпочтений</option><option value="M-1">M-1</option><option value="Radiocentras">Radiocentras</option><option value="ZIP FM">ZIP FM</option><option value="LRT Opus">LRT Opus</option><option value="Другая">Другая радиостанция</option></select></div>
   <div class="field" id="radioOtherField" hidden><label for="radioOther">Название радиостанции</label><input id="radioOther" maxlength="100" placeholder="Название или частота" autocomplete="off"></div>
   <div class="field"><label for="music">Любимый трек в поездке (необязательно)</label><input id="music" name="music" maxlength="160" placeholder="Исполнитель — название песни"></div>
+  <div class="field">
+   <label for="climateOn"><input type="checkbox" id="climateOn"> Указать климат в салоне</label>
+   <div class="pd-climate"><input type="range" id="climate" min="16" max="28" value="21" disabled aria-label="Желаемая температура в салоне"><output for="climate" id="climateValue">21°</output></div>
+  </div>
   <div class="field"><label for="comment">Пожелания (необязательно)</label><textarea id="comment" name="comment" maxlength="500" placeholder="Багаж, детское кресло, встреча с табличкой…"></textarea></div>
   <section class="field" aria-label="Способы оплаты">
    <label>Способы оплаты после подтверждения заказа</label>
@@ -181,7 +208,7 @@ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
   <button type="button" class="btn" id="verifyAddresses" hidden>Проверить адреса</button>
   <p class="note" id="addressCheckHint" hidden>Сначала уточни оба адреса, затем нажми «Проверить адреса». Для проверки адреса отправляются в сервис Nominatim. При недоступности сервиса заявка по быстрому маршруту не откроется.</p>
   <button type="submit" class="btn main">Открыть заявку в Telegram</button>
-  <p class="note">Перед проверкой адресов прочитай <a href="privacy.html">политику конфиденциальности</a> и <a href="terms.html">условия поездок</a>. Адреса передаются сервису Nominatim при проверке; при открытии заявки её содержание передаётся в Telegram. Сообщение отправляешь только ты.</p>
+  <p class="note">Перед проверкой адресов прочитай <a href="privacy.html">политику конфиденциальности</a> и <a href="terms.html">условия поездок</a>. При проверке адреса передаются Nominatim, а при построении маршрута координаты передаются Mapbox. При открытии заявки её содержание передаётся в Telegram. Сообщение отправляешь только ты.</p>
   <p class="note">Это предварительная заявка, не подтверждённый заказ. Telegram откроет чат с уже заполненным сообщением — проверь его и нажми «Отправить». Сайт не списывает деньги и не отправляет сообщения автоматически.</p>
  </form>
 </main>
@@ -196,6 +223,26 @@ html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
 'use strict';
 const $=id=>document.getElementById(id),status=$('status');
 const params=new URLSearchParams(location.search);
+const extrasPanel=document.querySelector('.ride-extras'),menu=$('mapMenu');
+const menuFull=$('menuFull');
+function setFullMap(full){
+ document.body.classList.toggle('pd-map-full',full);
+ menuFull.setAttribute('aria-pressed',String(full));
+ menuFull.textContent=full?'Вернуться к заказу':'Карта на весь экран';
+ if(map)requestAnimationFrame(()=>map.invalidateSize({pan:false}));
+}
+menuFull.addEventListener('click',()=>{setFullMap(!document.body.classList.contains('pd-map-full'));menu.open=false;menu.querySelector('summary').focus()});
+$('menuAddresses').addEventListener('click',()=>{setFullMap(false);menu.open=false;$('from').focus()});
+$('menuPreferences').addEventListener('click',()=>{setFullMap(false);menu.open=false;extrasPanel.open=true;$('radio').focus()});
+menu.addEventListener('keydown',e=>{if(e.key==='Escape'){menu.open=false;menu.querySelector('summary').focus()}});
+const climate=$('climate'),climateOn=$('climateOn');
+function syncClimate(){
+ climate.disabled=!climateOn.checked;
+ $('climateValue').value=climate.value+'°';
+}
+climateOn.addEventListener('change',syncClimate);
+climate.addEventListener('input',syncClimate);
+syncClimate();
 const preorder=params.get('mode')==='preorder';
 let airportDirection=['to','from'].includes(params.get('airport'))?params.get('airport'):null;
 const airportLabel='Аэропорт Вильнюса (VNO)';
@@ -279,12 +326,13 @@ $('radio').addEventListener('change',()=>{
  $('radioOther').required=other;
  if(!other)$('radioOther').value='';
 });
-let map=null,markers=[],selectedPosition=null,vehicleMarker=null;
+let map=null,markers=[],selectedPosition=null,vehicleMarker=null,routeLine=null;
+const mapboxToken=typeof window.PD_MAPBOX_PUBLIC_TOKEN==='string'&&/^pk\.[\w.-]+$/.test(window.PD_MAPBOX_PUBLIC_TOKEN)?window.PD_MAPBOX_PUBLIC_TOKEN:null;
 function say(s){status.textContent=s}
 try{
  if(typeof L!=='undefined'){
   map=L.map('map',{zoomControl:false}).setView([54.6872,25.2797],12);
-  const token=window.PD_MAPBOX_PUBLIC_TOKEN;
+  const token=mapboxToken;
   const osmCredit='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
   const theme=$('mapTheme');
   const addOsm=()=>L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
@@ -322,22 +370,42 @@ try{
    };
    logo.addTo(map);
    theme.hidden=false;
+   menuFull.hidden=false;
+   $('mapProvider').hidden=false;
    theme.addEventListener('click',()=>{night=!night;showTheme();});
    showTheme();
   }else{
-    say('Публичная конфигурация Mapbox пока не загружена. Уточни подключение Mapbox для тестового сайта.');
+    say('Публичная конфигурация Mapbox пока не загружена. Адреса можно ввести вручную.');
     const fallback=$('mapFallback');
     if(fallback)fallback.textContent='Mapbox пока не настроен для этого сайта. Заявку можно оформить по адресам вручную.';
   }
   L.control.zoom({position:'bottomright'}).addTo(map);
-  if(typeof token==='string' && /^pk\.[\w.-]+$/.test(token)) $('mapFallback')?.remove();
+  if(token)$('mapFallback').hidden=true;
   setTimeout(()=>map.invalidateSize(),200);
   window.addEventListener('resize',()=>map.invalidateSize({pan:false}),{passive:true});
   window.addEventListener('orientationchange',()=>setTimeout(()=>map.invalidateSize({pan:false}),250),{passive:true});
  }else{$('mapFallback').textContent='Карта временно недоступна. Адреса можно ввести вручную и отправить заявку.'}
 }catch(e){$('mapFallback').textContent='Не удалось открыть карту. Заявку можно отправить без неё.'}
 function pin(lat,lon,label){if(!map)return;const marker=L.marker([lat,lon]).addTo(map).bindPopup(label);markers.push(marker)}
-function clearPins(){if(map)markers.forEach(m=>map.removeLayer(m));markers=[]}
+function clearPins(){
+ if(map)markers.forEach(m=>map.removeLayer(m));
+ markers=[];
+ if(routeLine){routeLine.remove();routeLine=null}
+}
+async function roadGeometry(a,b){
+ if(!mapboxToken)return null;
+ const controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),7000);
+ try{
+  const url=new URL('https://api.mapbox.com/directions/v5/mapbox/driving/'+[a,b].map(([lat,lon])=>lon+','+lat).join(';'));
+  url.searchParams.set('geometries','geojson');
+  url.searchParams.set('overview','full');
+  url.searchParams.set('access_token',mapboxToken);
+  const response=await fetch(url,{signal:controller.signal});
+  if(!response.ok)return null;
+  const geometry=(await response.json()).routes?.[0]?.geometry;
+  return geometry?.type==='LineString'&&geometry.coordinates?.length>1?geometry:null;
+ }catch{return null}finally{clearTimeout(timeout)}
+}
 $('swapAddresses').addEventListener('click',()=>{
  if(busy||verifying)return;
  const previousOrigin=$('from').value;
@@ -373,8 +441,8 @@ $('locate').addEventListener('click',()=>{
 });
 async function geocode(value){
  if(airportDirection&&value===airportLabel)return [54.6341,25.2858];
- const coords=value.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
- if(coords)return [+coords[1],+coords[2]];
+ const point=coordinates(value);
+ if(point)return point;
  const q=new URL('https://nominatim.openstreetmap.org/search');q.searchParams.set('q',value);q.searchParams.set('format','jsonv2');q.searchParams.set('limit','1');
  const controller=new AbortController();
  const timeout=setTimeout(()=>controller.abort(),12000);
@@ -399,7 +467,13 @@ $('showRoute').addEventListener('click',async()=>{
   const b=await geocode(to);
   clearPins();pin(...a,'Откуда');pin(...b,'Куда');
   map.fitBounds(L.latLngBounds([a,b]).pad(.3),{maxZoom:15,padding:[25,25]});
-  say('Точки отмечены. Маршрут дороги и цена уточняются при подтверждении заявки.');
+  const geometry=await roadGeometry(a,b);
+  if(from!==$('from').value.trim()||to!==$('to').value.trim()){clearPins();say('Адреса изменились. Покажи маршрут заново.');return}
+  if(geometry){
+   routeLine=L.geoJSON(geometry,{style:{color:'#eac06b',weight:5,opacity:.95}}).addTo(map);
+   map.fitBounds(routeLine.getBounds().pad(.12),{maxZoom:15,padding:[30,30]});
+   say('Маршрут показан. Цена уточняется при подтверждении заявки.');
+  }else say('Точки отмечены. Дорожный маршрут пока недоступен, заявку можно продолжить.');
  }catch(e){say(e.message||'Не удалось найти адреса. Проверь их написание.')}finally{busy=false;$('showRoute').disabled=false}
 });
 // Airport is a fixed landmark; all other quick-route endpoints need a confirmed address.
@@ -518,6 +592,7 @@ $('orderForm').addEventListener('submit',async e=>{
  const date=day&&time?day+'T'+time:'';
  const radio=$('radio').value==='Другая'?$('radioOther').value.trim():$('radio').value;
  const music=$('music').value.trim();
+ const climateChoice=climateOn.checked?climate.value+' °C':'';
 
  const draft=[
   airportDirection?'PRIVATE DRIVE — трансфер аэропорт · 40 €':preorder?'PRIVATE DRIVE — предварительный заказ':'PRIVATE DRIVE — запрос поездки',
@@ -527,6 +602,7 @@ $('orderForm').addEventListener('submit',async e=>{
   selectedService?'Дополнительная услуга: '+selectedService:'',
   radio?'Радиостанция: '+radio:'',
   music?'Любимый трек: '+music:'',
+  climateChoice?'Климат в салоне: '+climateChoice:'',
   comment?'Пожелания: '+comment:''
  ].filter(Boolean).join('\n');
  // Telegram public username deep link: opens the intended chat with a prefilled, unsent draft.

@@ -32,3 +32,13 @@
  .hero.hero-night .hero-night-intro .hero-lux-actions .button{width:auto;min-height:44px;padding:8px 12px}
  .hero.hero-night .hero-lux-photo{object-position:50% 55%}
 }
+
+/* Keep booking clearly primary and display prices on an opaque surface. */
+.header-actions{display:flex;align-items:center;gap:8px}
+.header-actions .header-tips,.pd-lang{background:#17130f;color:#f4d498;border:1px solid #967746;box-shadow:none;text-decoration:none}
+.header-actions .header-tips:hover,.pd-lang:hover{background:#352718}
+.pd-lang{display:inline-grid;place-items:center;border-radius:9px;min-width:40px;min-height:40px;font-weight:750}
+.pd-booking-channel{display:table;margin:8px 0;padding:4px 8px;border-radius:6px;background:#17130f;color:#f4e7cf;font-size:.8rem}
+.hero.hero-night .hero-night-proof{display:flex;flex-wrap:wrap;gap:6px;border:0;padding:0}
+.hero.hero-night .hero-night-proof>span{display:inline-flex;gap:6px;margin:0;padding:5px 8px;border:1px solid #9e7d49;border-radius:7px;background:#17130f;color:#f4e7cf}
+@media(max-width:400px){.header-actions .header-tips{padding:6px;font-size:.72rem}.header-actions .header-tips svg{display:none}.pd-lang{min-width:38px}}

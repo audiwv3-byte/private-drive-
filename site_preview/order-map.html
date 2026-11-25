@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#100e0c">
 <title>Заказать поездку — PRIVATE DRIVE</title>
 <link rel="icon" href="assets/pd-logo.webp" type="image/webp">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyo0SS+uqOGdGQ=" crossorigin="">
+<link rel="stylesheet" href="assets/vendor/leaflet-1.9.4/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=">
 <style>
 :root{color-scheme:dark;--gold:#edcc86;--bg:#100e0c;--panel:#191511;--border:#745c3c}
 *{box-sizing:border-box}html,body{margin:0;height:100%;font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#f9efe1}
@@ -162,6 +162,7 @@ body.pd-map-full .panel{display:none}
 .temperature-control button:disabled{opacity:.5}
 .temperature-control output{text-align:center;color:#ffe9bf;font-weight:700}
 .temperature-reset{min-height:44px;padding:0;background:none;border:0;color:#f2d09a;text-decoration:underline;text-underline-offset:3px}
+.order-channel{margin:0 0 12px;padding:9px 11px;border-left:2px solid #ab864d;color:#f5e5c5;background:#211b14;font-size:13px}.panel input,.panel textarea,.panel select{font-size:16px}
 </style>
 <link rel="stylesheet" href="/assets/site-analytics.css"></head>
 <body>
@@ -185,6 +186,7 @@ body.pd-map-full .panel{display:none}
  <h1>Карта и заказ поездки</h1>
  <p class="booking-intro">Укажи адрес подачи, пункт назначения и время. На карте можно проверить расположение точек.</p>
  <a class="pd-comfort-jump" id="comfortJump" href="#rideComfort">Музыка и температура ↓</a>
+ <p class="order-channel"><strong>Отправка через Telegram.</strong> Заполни форму, затем отправь готовое сообщение. Поездка подтверждается после согласования.</p>
  <form id="orderForm">
   <div class="route-fields">
   <div class="field"><label for="from">Откуда</label><input id="from" name="from" placeholder="Город, улица, дом" autocomplete="street-address" maxlength="200" required></div>
@@ -223,8 +225,8 @@ body.pd-map-full .panel{display:none}
   <div class="field"><label for="comment">Пожелания (необязательно)</label><textarea id="comment" name="comment" maxlength="500" placeholder="Багаж, детское кресло, встреча с табличкой…"></textarea></div>
   <section class="field" aria-label="Способы оплаты">
    <label>Способы оплаты после подтверждения заказа</label>
-   <div class="payment-methods" aria-label="Visa, Mastercard, Apple Pay, Google Pay, PayPal">
-    <span>Visa</span><span>Mastercard</span><span>Apple Pay</span><span>Google Pay</span><span>PayPal</span>
+   <div class="payment-methods" aria-label="Visa, Mastercard, Apple Pay, Google Pay">
+    <span>Visa</span><span>Mastercard</span><span>Apple Pay</span><span>Google Pay</span>
    </div>
    <p class="note">Оплата после подтверждения поездки. Доступные способы уточним при согласовании заказа.</p>
   </section>
@@ -241,7 +243,7 @@ body.pd-map-full .panel{display:none}
 <script src="assets/mapbox-local-config.js"></script>
 <!-- Public pk token config emitted by existing Mapbox QA Render build. No secret tokens exposed here. -->
 <!-- Mapbox token generated from GitHub Actions MAPBOX_PUBLIC_TOKEN in local assets/mapbox-config.js -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="assets/vendor/leaflet-1.9.4/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
 <script>
 (()=>{
 'use strict';

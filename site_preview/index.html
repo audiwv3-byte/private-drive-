@@ -176,13 +176,15 @@
 
 </style>
   <link rel="stylesheet" href="assets/ride-comfort.css">
+  <link rel="alternate" hreflang="lt" href="https://privatedrive.lt/lt.html">
+  <link rel="alternate" hreflang="ru" href="https://privatedrive.lt/">
 </head>
 <body>
   <header class="top" id="top">
     <div class="wrap top-inner">
       <a class="brand" href="#top" aria-label="PRIVATE DRIVE — главная"><img src="assets/pd-logo.webp" width="52" height="52" alt="Логотип PRIVATE DRIVE"><span>PRIVATE DRIVE</span></a>
       <nav aria-label="Основное меню"><a href="#top">Главная</a><a href="services.html">Наши услуги</a><a href="directions.html">Направления</a><a href="payments.html">Оплата</a><a href="#partners">Друзья</a><a href="#about">О нас</a><a href="#contact">Контакты</a></nav>
-      <div class="header-actions"><a class="button header-tips" href="https://t.me/EuroBalticTransferBot?start=tips"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 10h13v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zm13 1h2a2 2 0 0 1 0 4h-2M2 22h19M8 7c-3-3 3-3 0-6m5 6c-3-3 3-3 0-6"/></svg>Чаевые</a></div>
+      <div class="header-actions"><a class="pd-lang" href="lt.html" lang="lt" hreflang="lt" aria-label="Lietuviškai">LT</a><a class="button header-tips" href="https://t.me/EuroBalticTransferBot?start=tips"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 10h13v5a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zm13 1h2a2 2 0 0 1 0 4h-2M2 22h19M8 7c-3-3 3-3 0-6m5 6c-3-3 3-3 0-6"/></svg>Чаевые</a></div>
       <details class="mobile-menu">
         <summary aria-label="Открыть меню сайта"><span class="mobile-menu-icon" aria-hidden="true">☰</span> Меню</summary>
         <nav aria-label="Мобильное меню">
@@ -206,15 +208,16 @@
           <p class="hero-detail">Комфорт начинается с мелочей.</p>
           <div class="actions hero-lux-actions">
             <a class="button outline" href="services.html">Узнать о сервисе</a>
-            <a class="button gold" href="order-map.html?mode=preorder">Забронировать поездку</a>
+            <a class="button gold" href="order-map.html?mode=preorder" aria-describedby="booking-channel">Забронировать поездку</a>
           </div>
+          <p id="booking-channel" class="pd-booking-channel">Заявка через Telegram · подтверждение после согласования</p>
           <div class="hero-night-proof" aria-label="Условия сервиса">
             <span>Вильнюс ↔ аэропорт <strong>40 €</strong></span>
             <span>Вильнюс → Каунас <strong>100 €</strong></span>
           </div>
         </div>
         <a class="pd-radio-display" href="order-map.html?mode=preorder&amp;service=music" aria-label="Музыка и температура: настроить поездку">
-          <small>ВЫБРАТЬ ДЛЯ ПОЕЗДКИ ↗</small><strong>Музыка и температура</strong><span aria-hidden="true" class="pd-fm-scale"></span><span>Радиостанция · Трек · °C</span>
+          <small>ВЫБРАТЬ ДЛЯ ПОЕЗДКИ</small><strong>Музыка и температура</strong><span aria-hidden="true" class="pd-fm-scale"></span><span>Радиостанция · Трек · °C</span>
         </a>
         <ul class="pd-amenities" aria-label="Что можно попросить в поездке">
           <li><span aria-hidden="true">💧</span>Вода</li><li><span aria-hidden="true">🍬</span>Конфеты</li><li><span aria-hidden="true">▤</span>Салфетки</li><li><span aria-hidden="true">🔌</span>Зарядка</li><li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0m-11 4a6 6 0 0 1 8 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>Wi‑Fi</li>
@@ -306,7 +309,7 @@
     </div>
     <aside class="contact-payments" aria-labelledby="contact-payments-title">
       <h3 id="contact-payments-title">Способы оплаты</h3>
-      <p>Visa · Mastercard · Apple Pay · Google Pay · PayPal · Paysera · Криптовалюта</p>
+      <p>Visa · Mastercard · Apple Pay · Google Pay</p>
       <p class="contact-payment-note">Оплата после подтверждения заказа. Доступность каждого способа уточняется при оформлении.</p>
       <a class="button outline" href="payments.html">Платёжная информация →</a>
     </aside>

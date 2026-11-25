@@ -1,0 +1,87 @@
+import unittest
+from unittest.mock import patch
+from io import BytesIO
+import os
+
+from cryptography.fernet import Fernet
+from PIL import Image
+from flask import Flask, session, request
+from pd_pilot_qa_intake import register
+
+
+@unittest.skipUnless(
+    os.getenv("PD_TEST_FRESH_POSTGRES"), "requires disposable PostgreSQL"
+)
+class PilotIntakeIntegration(unittest.TestCase):
+    def test_enrollment(self):
+        environment = patch.dict(os.environ)
+        environment.start()
+        self.addCleanup(environment.stop)
+        os.environ.update(
+            PD_DISPATCH_STAGING_ONLY="1",
+            PD_PILOT_QA_INTAKE_ENABLED="1",
+            PD_PILOT_QA_DATABASE_URL=os.environ["PD_TEST_FRESH_POSTGRES"],
+            PD_PILOT_QA_INVITE_SECRET="x" * 40,
+            PD_PILOT_QA_FERNET_KEY=Fernet.generate_key().decode(),
+        )
+        app = Flask(__name__)
+        app.secret_key = os.urandom(32)
+        register(
+            app,
+            lambda: session.get("owner"),
+            lambda: "test-csrf",
+            lambda: request.form.get("csrf") == "test-csrf",
+        )
+        client = app.test_client()
+
+        def photo():
+            f = BytesIO()
+            Image.new("RGB", (120, 80), "gold").save(f, "PNG")
+            f.seek(0)
+            return f, "fixture.png"
+
+        form = dict(
+            first_name="Тест",
+            last_name="Пилот",
+            email="pilot@example.invalid",
+            phone="+37000000000",
+            plate="TEST 01",
+            qa_invitation="x" * 40,
+        )
+
+        def submit(**extra):
+            return client.post(
+                "/pilot-registration",
+                data=dict(form, license_front=photo(), car_front=photo(), **extra),
+                headers={"Origin": "http://localhost"},
+            )
+
+        assert submit().status_code == 400
+        response = submit(terms_version="pilot-shift-v1")
+        assert response.status_code == 201, (response.status_code, response.data)
+        key = response.json["application_id"]
+        url = "/dispatch/qa-pilot-applications/" + key + "/approve"
+        assert client.post(url).status_code == 403
+        with client.session_transaction() as s:
+            s["owner"] = True
+        assert client.post(url).status_code == 403
+        for _ in range(2):
+            assert client.post(url, data={"csrf": "test-csrf"}).json == {
+                "pilot_number": 1
+            }
+        row = client.get("/dispatch/qa-pilot-applications").json["applications"][0]
+        assert (
+            row["status"] == "approved"
+            and row["plate"] == "TEST 01"
+            and row["pilot_number"] == 1
+        )
+        for doc in ("license_front", "car_front"):
+            assert (
+                client.get(
+                    "/dispatch/qa-pilot-applications/" + key + "/documents/" + doc
+                ).mimetype
+                == "image/webp"
+            )
+        print(
+            "Verified synthetic pilot #1, contacts, plate, consent, two private photos and repeat approval"
+        )

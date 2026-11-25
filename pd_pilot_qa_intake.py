@@ -20,6 +20,7 @@ REQUIRED_PHOTOS = ("license_front", "car_front")
 MAX_FILE = 10 * 1024 * 1024
 MAX_REQUEST = 2 * MAX_FILE + 1024 * 1024
 RATE_LIMIT = 3
+TERMS_VERSION = "pilot-shift-v1"
 
 
 def configured():
@@ -73,6 +74,12 @@ def init_schema(conn):
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )""")
         cur.execute("ALTER TABLE pd_qa_pilot_applications ADD COLUMN IF NOT EXISTS email BYTEA")
+        cur.execute("""ALTER TABLE pd_qa_pilot_applications
+            ADD COLUMN IF NOT EXISTS plate BYTEA,
+            ADD COLUMN IF NOT EXISTS terms_version TEXT,
+            ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS pilot_number BIGINT UNIQUE""")
+        cur.execute("CREATE SEQUENCE IF NOT EXISTS pd_qa_pilot_numbers")
         cur.execute("""CREATE TABLE IF NOT EXISTS pd_qa_pilot_documents (
             application_id TEXT NOT NULL REFERENCES pd_qa_pilot_applications(id)
                 ON DELETE CASCADE,
@@ -81,7 +88,7 @@ def init_schema(conn):
         )""")
 
 
-def register(app, authorized):
+def register(app, authorized, csrf, valid_csrf):
     """Mount fail-closed endpoints only on isolated staging app."""
     attempts = defaultdict(deque)
 
@@ -127,6 +134,11 @@ def register(app, authorized):
                 or not 8 <= sum(ch.isdigit() for ch in phone) <= 15
                 or len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email)):
             return jsonify(error="invalid_contact"), 400
+        plate = request.form.get("plate", "").strip().upper()
+        if not re.fullmatch(r"[A-Z0-9][A-Z0-9 -]{1,14}", plate):
+            return jsonify(error="invalid_plate"), 400
+        if request.form.get("terms_version") != TERMS_VERSION:
+            return jsonify(error="terms_required"), 400
         if set(request.files) != set(REQUIRED_PHOTOS) or any(
                 len(request.files.getlist(kind)) != 1 for kind in REQUIRED_PHOTOS):
             return jsonify(error="required_photos_missing"), 400
@@ -143,9 +155,11 @@ def register(app, authorized):
                 init_schema(conn)
                 with conn.cursor() as cur:
                     cur.execute("""INSERT INTO pd_qa_pilot_applications
-                        (id,full_name,phone,email,status) VALUES (%s,%s,%s,%s,'pending')""",
+                        (id,full_name,phone,email,status,plate,terms_version,accepted_at)
+                        VALUES (%s,%s,%s,%s,'pending',%s,%s,NOW())""",
                         (app_id, key.encrypt(name.encode()),
-                         key.encrypt(phone.encode()), key.encrypt(email.encode())))
+                         key.encrypt(phone.encode()), key.encrypt(email.encode()),
+                         key.encrypt(plate.encode()), TERMS_VERSION))
                     for kind, data in images.items():
                         cur.execute("""INSERT INTO pd_qa_pilot_documents
                             (application_id,kind,encrypted_bytes) VALUES (%s,%s,%s)""",
@@ -157,6 +171,26 @@ def register(app, authorized):
         except Exception:
             app.logger.exception("QA pilot intake storage unavailable")
             return jsonify(error="storage_unavailable"), 503
+
+    @app.post("/dispatch/qa-pilot-applications/<app_id>/approve")
+    def approve_application(app_id):
+        if not authorized() or not valid_csrf():
+            abort(403)
+        if not configured():
+            abort(503)
+        with db() as conn, conn.cursor() as cur:
+            cur.execute("""UPDATE pd_qa_pilot_applications
+                SET status='approved', pilot_number=nextval('pd_qa_pilot_numbers')
+                WHERE id=%s AND status='pending' AND terms_version=%s
+                AND plate IS NOT NULL RETURNING pilot_number""", (app_id, TERMS_VERSION))
+            result = cur.fetchone()
+            if result is None:
+                cur.execute("""SELECT pilot_number FROM pd_qa_pilot_applications
+                    WHERE id=%s AND status='approved'""", (app_id,))
+                result = cur.fetchone()
+            if result is None:
+                abort(409)
+        return jsonify(pilot_number=result[0])
 
     @app.get("/dispatch/pilot-applications")
     def qa_pilot_review_page():
@@ -188,7 +222,7 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
    status.textContent="Анкет: "+data.applications.length;
    for(const app of data.applications){
      const card=document.createElement("article");
-     for(const text of [app.full_name,app.phone,app.email,app.label,"Подана: "+app.created_at]){
+     for(const text of [app.full_name,app.plate,app.pilot_number && "Пилот №"+app.pilot_number,app.label,"Подана: "+app.created_at]){
        if(!text)continue;
        const p=document.createElement("p");p.textContent=text;card.append(p);
      }
@@ -197,6 +231,25 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
        const link=document.createElement("a");
        link.href="/dispatch/qa-pilot-applications/"+encodeURIComponent(app.id)+"/documents/"+kind;
        link.textContent=label;link.rel="noreferrer";card.append(link);
+     }
+     for(const [value,scheme] of [[app.phone,"tel:"],[app.email,"mailto:"]]){
+       if(!value)continue;
+       const contact=document.createElement("a");
+       contact.href=scheme+value;contact.textContent=value;card.append(contact);
+     }
+     if(app.status==="pending" && app.terms_version){
+       const approve=document.createElement("button");
+       approve.textContent="Одобрить анкету";
+       approve.onclick=async()=>{
+         approve.disabled=true;
+         try{
+           const reply=await fetch("/dispatch/qa-pilot-applications/"+app.id+"/approve",{
+             method:"POST",body:new URLSearchParams({csrf:data.csrf})});
+           if(!reply.ok)throw Error();
+           location.reload();
+         }catch{approve.disabled=false;status.textContent="Не удалось подтвердить одобрение.";}
+       };
+       card.append(approve);
      }
      target.append(card);
    }
@@ -225,18 +278,19 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
                 init_schema(conn)
                 with conn.cursor() as cur:
                     cur.execute("""SELECT id,full_name,phone,status,created_at,email,
-                        ARRAY(SELECT kind FROM pd_qa_pilot_documents WHERE application_id=a.id)
+                        ARRAY(SELECT kind FROM pd_qa_pilot_documents WHERE application_id=a.id), plate,terms_version,pilot_number
                         FROM pd_qa_pilot_applications a ORDER BY created_at DESC LIMIT 50""")
                     data = [
                         {"id":row[0], "full_name":key.decrypt(bytes(row[1])).decode(),
                          "phone":key.decrypt(bytes(row[2])).decode(),
-                         "status":row[3], "label":"На проверке" if row[3]=="pending" else row[3],
+                         "status":row[3], "label":"На проверке" if row[3]=="pending" else {"approved":"Одобрена","rejected":"Отклонена"}.get(row[3],row[3]),
                          "created_at":row[4].isoformat(),
                          "email":key.decrypt(bytes(row[5])).decode() if row[5] else "",
-                         "documents":row[6]}
+                         "documents":row[6], "plate":key.decrypt(bytes(row[7])).decode() if row[7] else "",
+                         "terms_version":row[8], "pilot_number":row[9]}
                         for row in cur.fetchall()
                     ]
-            return jsonify(applications=data), 200, {"Cache-Control":"private, no-store"}
+            return jsonify(applications=data, csrf=csrf()), 200, {"Cache-Control":"private, no-store"}
         except Exception:
             app.logger.exception("QA pilot application list unavailable")
             return jsonify(error="storage_unavailable"), 503

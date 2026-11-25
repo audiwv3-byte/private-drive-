@@ -432,7 +432,7 @@ def register(app, core, *, owner_passwords=None):
     # Separate, fail-closed pilot intake shares the existing dispatcher session.
     if os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
         from pd_pilot_qa_intake import register as register_qa_pilots
-        register_qa_pilots(app, authorized)
+        register_qa_pilots(app, authorized, csrf, valid_csrf)
 
     @app.get("/dispatch")
     def pd_dispatch_home():

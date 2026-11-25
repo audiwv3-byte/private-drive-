@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -16,6 +17,34 @@ void main() {
       }));
     expect((await api.call({'request_id':NativeOrdersApi.requestId()}))['order_id'], 'test');
   });
+  testWidgets('history reloads from server when app returns to foreground',
+      (tester) async {
+    var reads = 0;
+    final api = NativeOrdersApi('https://example.invalid', 'test-token',
+      client: MockClient((request) async {
+        expect(request.method, 'GET');
+        reads++;
+        return http.Response(
+          '{"orders":[{"from":"Vilnius","to":"Airport",'
+          '"trip_date":"2026-12-01","trip_time":"12:30",'
+          '"status":"${reads == 1 ? 'requested' : 'assigned'}"}],'
+          '"payment_mode":"disabled"}',
+          200,
+        );
+      }),
+    );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpWidget(MaterialApp(home: NativeOrdersHistory(api: api)));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('requested'), findsOneWidget);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('assigned'), findsOneWidget);
+    expect(reads, 2);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   test('GET rejects unsafe payment mode', () async {
     final api = NativeOrdersApi('https://example.invalid', 'test-token',
       client: MockClient((request) async {

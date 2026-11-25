@@ -48,8 +48,31 @@ class NativeOrdersHistory extends StatefulWidget {
   @override
   State<NativeOrdersHistory> createState() => _NativeOrdersHistoryState();
 }
-class _NativeOrdersHistoryState extends State<NativeOrdersHistory> {
+class _NativeOrdersHistoryState extends State<NativeOrdersHistory>
+    with WidgetsBindingObserver {
   late Future<Map<String,dynamic>> result = widget.api.call();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Show the server's latest status when returning to the app.
+    // Never update the booking locally without confirmation from the API.
+    if (mounted && state == AppLifecycleState.resumed) {
+      setState(() => result = widget.api.call());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Мои заказы'), actions: [

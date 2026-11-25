@@ -131,6 +131,8 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
             return reply(start_response, "503 Service Unavailable", {"error": "telegram_disabled"})
         if method == "GET" and route == "/health":
             return reply(start_response, "200 OK", {"status": "ok", "sms_enabled": live})
+        if method == "POST" and route in ("/native-auth/session", "/native-auth/sign-out"):
+            return session_request(database_url, environ, start_response, route, int(clock()))
         if method != "POST" or route not in (
                 "/native-auth/request-code", "/native-auth/verify-code"):
             return reply(start_response, "404 Not Found", {"error": "not_found"})
@@ -218,3 +220,28 @@ def make_app(database_url, *, admin_phone=None, dispatcher_phone=None, pilot_pho
                          {"error": "database_unavailable"})
 
     return app
+
+
+def session_request(database_url, environ, start_response, route, now):
+    auth = environ.get("HTTP_AUTHORIZATION", "")
+    if not auth.startswith("Bearer ") or not 40 <= len(auth[7:]) <= 256:
+        return reply(start_response, "401 Unauthorized", {"error": "invalid_session"})
+    digest = hashlib.sha256(auth[7:].encode("utf-8")).hexdigest()
+    try:
+        with psycopg.connect(database_url) as conn:
+            if route == "/native-auth/sign-out":
+                conn.execute("""UPDATE native_auth_sessions SET revoked_at=%s
+                    WHERE token_hash=%s AND revoked_at IS NULL""", (now, digest))
+                return reply(start_response, "200 OK", {"signed_out": True})
+            row = conn.execute("""SELECT s.user_id, COALESCE(r.role,'passenger'), s.expires_at
+                FROM native_auth_sessions s LEFT JOIN native_auth_roles r ON r.user_id=s.user_id
+                WHERE s.token_hash=%s AND s.expires_at>%s AND s.revoked_at IS NULL""",
+                (digest, now)).fetchone()
+            if row is None:
+                return reply(start_response, "401 Unauthorized", {"error": "invalid_session"})
+            return reply(start_response, "200 OK", {
+                "verified": True, "user_id": row[0], "role": row[1],
+                "token_type": "Bearer", "expires_in": row[2] - now,
+            })
+    except psycopg.Error:
+        return reply(start_response, "503 Service Unavailable", {"error": "database_unavailable"})

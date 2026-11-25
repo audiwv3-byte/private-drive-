@@ -26,6 +26,7 @@ class PdHttpApi {
     Uri uri,
     Map<String, String> payload, {
     http.Client? client,
+    String? bearerToken,
     Duration timeout = const Duration(seconds: 10),
   }) async {
     if (uri.scheme != 'https' || uri.userInfo.isNotEmpty) {
@@ -35,8 +36,12 @@ class PdHttpApi {
     final transport = client ?? http.Client();
     try {
       final request = http.Request('POST', uri)
+        ..followRedirects = false
         ..headers['Content-Type'] = 'application/json; charset=utf-8'
         ..body = jsonEncode(payload);
+      if (bearerToken != null) {
+        request.headers['Authorization'] = 'Bearer $bearerToken';
+      }
       final response = await transport.send(request).timeout(timeout);
       final body = await http.Response.fromStream(response).timeout(timeout);
       return _decode(body);

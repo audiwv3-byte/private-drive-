@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -12,6 +13,8 @@ import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/brand_logo.dart';
 import 'package:private_drive/app_language.dart';
 import 'package:private_drive/native_cabin_entry.dart';
+import 'package:private_drive/native_session.dart';
+import 'package:private_drive/native_session_store.dart';
 
 void main() {
   // These tests cover sign-in, not the separately tested first-run prompts.
@@ -72,7 +75,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('PRIVATE DRIVE'), findsWidgets);
-    expect(find.text('Независимый вход без Telegram'), findsOneWidget);
+    expect(find.text('Войди через Telegram или SMS'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Получить код'), 120,
       scrollable: find.byType(Scrollable).first);
     expect(find.text('Получить код'), findsOneWidget);
@@ -92,7 +95,7 @@ void main() {
     expect(find.textContaining('сервер авторизации не подключён'), findsOneWidget);
   });
 
-  testWidgets('Only phone sign-in is offered and no OTP is sent offline',
+  testWidgets('Both sign-in options stay offline without an API',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: NativeSignInScreen()));
     await tester.pumpAndSettle();
@@ -105,6 +108,94 @@ void main() {
     expect(tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Получить код'),
     ).onPressed, isNull);
+    final telegram = find.byKey(const Key('native-telegram-start'));
+    await tester.scrollUntilVisible(telegram, 120,
+      scrollable: find.byType(Scrollable).first);
+    expect(tester.widget<OutlinedButton>(telegram).onPressed, isNull);
+  });
+
+  testWidgets('Telegram sign-in binds the browser code to the app attempt',
+      (tester) async {
+    final state = List.filled(43, 's').join();
+    final token = List.filled(64, 't').join();
+    String? proof;
+    PdNativeSession? authenticated;
+    final client = MockClient((request) async {
+      final data = jsonDecode(request.body) as Map<String, dynamic>;
+      if (request.url.path.endsWith('/start')) {
+        proof = data['app_secret'] as String;
+        expect(proof, matches(r'^[A-Za-z0-9_-]{43}$'));
+        expect(data['language'], 'RU');
+        return http.Response(jsonEncode({
+          'state': state,
+          'authorization_url': 'https://oauth.telegram.org/auth?state=$state',
+        }), 201);
+      }
+      expect(request.url.path, '/native-auth/telegram/finish');
+      expect(data, {'state': state, 'app_secret': proof, 'code': '00123456'});
+      return http.Response(jsonEncode({
+        'verified': true, 'role': 'passenger', 'user_id': 'person-1',
+        'access_token': token, 'token_type': 'Bearer', 'expires_in': 3600,
+      }), 200);
+    });
+    await tester.pumpWidget(MaterialApp(home: NativeSignInScreen(
+      authApiUrl: 'https://example.test',
+      httpClient: client,
+      onAuthenticated: (session) => authenticated = session,
+      telegramLauncher: (uri) async {
+        expect(uri.host, 'oauth.telegram.org');
+        return true;
+      },
+    )));
+    final legal = find.byKey(const Key('native-legal-acknowledgement'));
+    await tester.scrollUntilVisible(legal, 100,
+      scrollable: find.byType(Scrollable).first);
+    await tester.tap(legal);
+    await tester.pumpAndSettle();
+    final start = find.byKey(const Key('native-telegram-start'));
+    await tester.scrollUntilVisible(start, 100,
+      scrollable: find.byType(Scrollable).first);
+    await tester.tap(start);
+    await tester.pumpAndSettle();
+    final code = find.byKey(const Key('native-telegram-code'));
+    await tester.scrollUntilVisible(code, 100,
+      scrollable: find.byType(Scrollable).first);
+    await tester.enterText(code, '00123456');
+    await tester.pumpAndSettle();
+    final finish = find.byKey(const Key('native-telegram-finish'));
+    await tester.ensureVisible(finish);
+    await tester.tap(finish);
+    await tester.pumpAndSettle();
+    expect(authenticated?.userId, 'person-1');
+    expect(authenticated?.token, token);
+  });
+
+  test('Saved session is validated, isolated by server and cleared on expiry', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final token = List.filled(64, 't').join();
+    var expired = false;
+    final client = MockClient((request) async {
+      expect(request.headers['authorization'], 'Bearer $token');
+      expect(request.url.path, '/native-auth/session');
+      if (expired) return http.Response('{"error":"invalid_session"}', 401);
+      return http.Response(jsonEncode({
+        'verified': true, 'role': 'passenger', 'user_id': 'person-1',
+        'token_type': 'Bearer', 'expires_in': 3600,
+      }), 200);
+    });
+    final store = PdNativeSessionStore('https://example.test', client: client);
+    await store.save(PdNativeSession(
+      token: token, userId: 'person-1', role: 'pilot',
+      expiresAt: DateTime.now().add(const Duration(hours: 1)),
+    ), 'pilot');
+    expect(await PdNativeSessionStore('https://other.test', client: client).restore(), isNull);
+    final restored = (await store.restore())!;
+    expect(restored.$1.userId, 'person-1');
+    expect(restored.$2, 'passenger');
+    expired = true;
+    expect(await store.restore(), isNull);
+    expired = false;
+    expect(await store.restore(), isNull);
   });
   testWidgets('Server-authorized admin shell shows dispatcher, not passenger or pilot',
       (tester) async {

@@ -42,7 +42,7 @@ application = make_app(
     live=live, sms_test_phone=sms_test_phone, telegram_oidc=telegram,
 )
 application = make_identity_app(application, database_url, sms_enabled=live,
-    telegram_enabled=telegram is not None)
+    telegram_enabled=telegram is not None, session_resume_enabled=True)
 
 def _report_sms_setup():
     from pd_twilio_setup_diagnostics import inspect_setup

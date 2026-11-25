@@ -21,6 +21,14 @@ PREFIX = "/native-auth/telegram/"
 TTL = 300
 MAX_ATTEMPTS = 5
 TICKET = re.compile(r"[A-Za-z0-9_-]{43}")
+HANDOFF_TEXT = {
+    "RU": ("Код входа: {code}. Введи его в приложении Private Drive.",
+           "Вход не завершён. Вернись в приложение и повтори, разрешив передачу номера."),
+    "EN": ("Sign-in code: {code}. Enter it in the Private Drive app.",
+           "Sign-in was not completed. Return to the app and allow access to your phone number."),
+    "LT": ("Prisijungimo kodas: {code}. Įvesk jį „Private Drive“ programėlėje.",
+           "Prisijungimas nebaigtas. Grįžk į programėlę ir leisk perduoti telefono numerį."),
+}
 
 
 def digest(value):
@@ -115,15 +123,17 @@ def initialize_telegram(database_url):
         )""")
         conn.execute("""CREATE INDEX IF NOT EXISTS native_telegram_attempt_expiry
             ON native_telegram_attempts (expires_at)""")
+        conn.execute("""ALTER TABLE native_telegram_attempts
+            ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'RU'""")
         conn.execute("""CREATE TABLE IF NOT EXISTS native_telegram_links (
             subject TEXT PRIMARY KEY,
             user_id TEXT NOT NULL UNIQUE REFERENCES native_auth_users(id)
         )""")
 
 
-def _browser_reply(start_response, status, heading):
+def _browser_reply(start_response, status, heading, language):
     body = (
-        '<!doctype html><html lang="ru"><meta charset="utf-8">'
+        f'<!doctype html><html lang="{language.lower()}"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         '<title>PRIVATE DRIVE</title><h1>PRIVATE DRIVE</h1><p>'
         + escape(heading) + "</p></html>"
@@ -144,6 +154,7 @@ def make_telegram_routes(database_url, oidc, *, reply, read_json, clock,
     initialize_telegram(database_url)
 
     def callback(environ, start_response, now):
+        language = "RU"
         try:
             fields = parse_qs(environ.get("QUERY_STRING", ""), max_num_fields=12)
             state, code = fields["state"], fields["code"]
@@ -152,9 +163,11 @@ def make_telegram_routes(database_url, oidc, *, reply, read_json, clock,
                 raise ValueError("Invalid authorization response")
             state, code = state[0], code[0]
             with psycopg.connect(database_url) as conn:
-                attempt = conn.execute("""SELECT verifier FROM native_telegram_attempts
+                attempt = conn.execute("""SELECT verifier,language FROM native_telegram_attempts
                     WHERE state=%s AND expires_at>%s FOR UPDATE""",
                     (state, now)).fetchone()
+                if attempt and attempt[1] in HANDOFF_TEXT:
+                    language = attempt[1]
                 if not attempt or not attempt[0]:
                     raise ValueError("Authorization already used or expired")
                 conn.execute("UPDATE native_telegram_attempts SET verifier=NULL WHERE state=%s",
@@ -169,10 +182,10 @@ def make_telegram_routes(database_url, oidc, *, reply, read_json, clock,
                 if result.rowcount != 1:
                     raise ValueError("Authorization expired")
             return _browser_reply(start_response, "200 OK",
-                "Код входа: " + handoff + ". Введи его в приложении Private Drive.")
+                HANDOFF_TEXT[language][0].format(code=handoff), language)
         except (ValueError, KeyError, URLError, TimeoutError, jwt.PyJWTError):
             return _browser_reply(start_response, "400 Bad Request",
-                "Вход не завершён. Вернись в приложение и повтори, разрешив передачу номера.")
+                HANDOFF_TEXT[language][1], language)
 
     def app(environ, start_response):
         route = environ.get("PATH_INFO", "")
@@ -192,11 +205,14 @@ def make_telegram_routes(database_url, oidc, *, reply, read_json, clock,
                 return reply(start_response, "400 Bad Request", {"error": "invalid_request"})
             if route.endswith("/start"):
                 state, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+                requested_language = payload.get("language")
+                language = (requested_language if isinstance(requested_language, str)
+                            and requested_language in HANDOFF_TEXT else "RU")
                 with psycopg.connect(database_url) as conn:
                     conn.execute("DELETE FROM native_telegram_attempts WHERE expires_at<=%s", (now,))
                     conn.execute("""INSERT INTO native_telegram_attempts
-                        (state,app_hash,verifier,expires_at) VALUES (%s,%s,%s,%s)""",
-                        (state, digest(secret), verifier, now + TTL))
+                        (state,app_hash,verifier,expires_at,language) VALUES (%s,%s,%s,%s,%s)""",
+                        (state, digest(secret), verifier, now + TTL, language))
                 return reply(start_response, "201 Created", {
                     "state": state, "authorization_url": oidc.authorization_url(state, verifier)})
             state, code = payload.get("state"), payload.get("code")

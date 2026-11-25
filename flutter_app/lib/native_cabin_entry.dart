@@ -8,6 +8,7 @@ import 'private_drive_bright_backdrop.dart';
 import 'demo_interfaces.dart';
 import 'permissions_onboarding.dart';
 import 'native_session.dart';
+import 'native_session_store.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_identity_notice_page.dart';
 import 'remote_sync_demo.dart';
@@ -22,9 +23,10 @@ const pdLocalQaEntryEnabled = !kIsWeb &&
 /// Cabin choice is navigation intent, never a server role grant.
 class PdNativeCabinEntry extends StatefulWidget {
   const PdNativeCabinEntry({super.key, required this.signInBuilder,
-    required this.identityApiBuilder});
+    required this.identityApiBuilder, this.sessionStore});
   final PdSignInBuilder signInBuilder;
   final PdIdentityApi Function(PdNativeSession session) identityApiBuilder;
+  final PdNativeSessionStore? sessionStore;
   @override
   State<PdNativeCabinEntry> createState() => _PdNativeCabinEntryState();
 }
@@ -39,7 +41,42 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   bool _testSyncStarted = false;
   bool _showTestSync = false;
   bool _localPilotOpened = false;
+  bool _restoring = false;
+  bool _restoreFailed = false;
+  Future<void> _storageOperation = Future.value();
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.sessionStore != null && !pdLocalQaEntryEnabled) {
+      _restoring = true;
+      unawaited(_restoreSession());
+    }
+  }
+
+  Future<void> _restoreSession() async {
+    try {
+      final restored = await widget.sessionStore!.restore();
+      if (!mounted) return;
+      if (restored == null) {
+        setState(() => _restoring = false);
+        return;
+      }
+      final (session, cabin) = restored;
+      _requestedRole = cabin;
+      _openSession(session);
+    } catch (_) {
+      if (mounted) setState(() {
+        _restoring = false;
+        _restoreFailed = true;
+      });
+    }
+  }
+
+  void _changeSavedSession(Future<void> Function() operation) {
+    _storageOperation = _storageOperation.then((_) => operation()).catchError((Object _) {});
+  }
 
   void _openTestSync() {
     setState(() {
@@ -54,6 +91,17 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
   void _signOut() {
     _expiry?.cancel();
+    final session = _session;
+    final store = widget.sessionStore;
+    if (store != null) {
+      _changeSavedSession(() async {
+        try {
+          await store.clear();
+        } finally {
+          if (session != null) await store.revoke(session);
+        }
+      });
+    }
     _session = null;
     _qaUnlocked = false;
     _testSyncStarted = false;
@@ -83,11 +131,21 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
   void _authenticated(PdNativeSession session) {
     if (!mounted || !session.active) return;
+    final store = widget.sessionStore;
+    if (store != null) {
+      final cabin = _requestedRole;
+      _changeSavedSession(() => store.save(session, cabin));
+    }
+    _openSession(session);
+  }
+
+  void _openSession(PdNativeSession session) {
     _expiry?.cancel();
     _expiry = Timer(session.expiresAt.difference(DateTime.now()), () {
       if (mounted) _signOut();
     });
     setState(() {
+      _restoring = false;
       _session = session;
       if (_requestedRole == 'pilot' && session.canPilot) {
         _page = 'photo';
@@ -192,6 +250,39 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   Widget _buildCabin(BuildContext context) {
     String tr(String ru, String lt, String en) => pdEntryTr(context, ru, lt, en);
 
+    if (_restoring || _restoreFailed) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: _restoring ? const CircularProgressIndicator() : Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(tr('Не удалось проверить сохранённый вход.',
+                  'Nepavyko patikrinti išsaugotos sesijos.',
+                  'Could not verify the saved session.'), textAlign: TextAlign.center),
+                FilledButton(
+                  onPressed: () {
+                    setState(() {
+                      _restoreFailed = false;
+                      _restoring = true;
+                    });
+                    unawaited(_restoreSession());
+                  },
+                  child: Text(tr('Повторить', 'Bandyti dar kartą', 'Try again')),
+                ),
+                TextButton(
+                  onPressed: () {
+                    _changeSavedSession(widget.sessionStore!.clear);
+                    setState(() => _restoreFailed = false);
+                  },
+                  child: Text(tr('Войти заново', 'Prisijungti iš naujo', 'Sign in again')),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
     if (pdLocalQaEntryEnabled) {
       if (!_qaUnlocked) {
         return _LocalQaSignIn(

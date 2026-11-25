@@ -41,3 +41,25 @@ for folder in ("drawable", "drawable-v21"):
     target.mkdir(parents=True, exist_ok=True)
     (target / "launch_background.xml").write_text(xml, encoding="utf-8")
 print("PRIVATE DRIVE native launch: bright Vilnius backdrop and transparent PD logo")
+
+# Keep device-bound session storage out of cloud and device-transfer backups.
+manifest = ANDROID / "AndroidManifest.xml"
+text = manifest.read_text(encoding="utf-8")
+if 'android:fullBackupContent="@xml/pd_backup_rules"' not in text:
+    replacement = (
+        '<application\n'
+        '        android:fullBackupContent="@xml/pd_backup_rules"\n'
+        '        android:dataExtractionRules="@xml/pd_data_extraction_rules"'
+    )
+    manifest.write_text(text.replace("<application", replacement, 1), encoding="utf-8")
+rules = ANDROID / "res/xml"
+rules.mkdir(parents=True, exist_ok=True)
+exclusions = """
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+    <exclude domain="sharedpref" path="FlutterSecureKeyStorage.xml" />
+"""
+(rules / "pd_backup_rules.xml").write_text(
+    f"<full-backup-content>{exclusions}</full-backup-content>", encoding="utf-8")
+(rules / "pd_data_extraction_rules.xml").write_text(
+    f"<data-extraction-rules><cloud-backup>{exclusions}</cloud-backup>"
+    f"<device-transfer>{exclusions}</device-transfer></data-extraction-rules>", encoding="utf-8")

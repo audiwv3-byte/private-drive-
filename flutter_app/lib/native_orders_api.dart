@@ -101,7 +101,7 @@ class _NativeOrdersHistoryState extends State<NativeOrdersHistory>
     setState(() { _cancelling = orderId; _errorMessage = null; });
     try {
       await widget.api.cancel(orderId);
-      if (mounted) setState(() => result = widget.api.call());
+      if (mounted) setState(() { result = widget.api.call(); });
     } catch (_) {
       if (mounted) setState(() => _errorMessage =
           'Заказ не отменён. Проверь соединение и повтори попытку.');
@@ -121,7 +121,7 @@ class _NativeOrdersHistoryState extends State<NativeOrdersHistory>
     // Show the server's latest status when returning to the app.
     // Never update the booking locally without confirmation from the API.
     if (mounted && state == AppLifecycleState.resumed) {
-      setState(() => result = widget.api.call());
+      setState(() { result = widget.api.call(); });
     }
   }
 
@@ -135,7 +135,7 @@ class _NativeOrdersHistoryState extends State<NativeOrdersHistory>
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Мои заказы'), actions: [
       IconButton(icon: const Icon(Icons.refresh), onPressed: () {
-        setState(() => result = widget.api.call());
+        setState(() { result = widget.api.call(); });
       })
     ]),
     body: Column(children: [

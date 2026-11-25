@@ -119,6 +119,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   bool busy = false;
   bool _guest = false;
   bool _acknowledgedLegal = false;
+  final _legalAcknowledgementAnchor = GlobalKey();
   String _language = 'RU';
   String tr(String ru, String lt, String en) => switch (_language) {
     'LT' => lt,
@@ -153,8 +154,25 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
     return const PdHttpApi().postJson(uri, payload, client: widget.httpClient);
   }
 
+  bool _canStartSignIn() {
+    if (busy || widget.authApiUrl.isEmpty) return false;
+    if (_acknowledgedLegal) return true;
+    final acknowledgement = _legalAcknowledgementAnchor.currentContext;
+    if (acknowledgement != null) {
+      Scrollable.ensureVisible(acknowledgement);
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(tr(
+        'Отметь, что ознакомился с условиями, чтобы войти.',
+        'Norėdamas prisijungti, pažymėk, kad susipažinai su sąlygomis.',
+        'To sign in, confirm that you have read the terms.',
+      ))));
+    return false;
+  }
+
   Future<void> requestCode() async {
-    if (busy || !_acknowledgedLegal) return;
+    if (!_canStartSignIn()) return;
     setState(() {
       busy = true;
       message = '';
@@ -266,7 +284,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   }
 
   Future<void> _startTelegram() async {
-    if (busy || !_acknowledgedLegal) return;
+    if (!_canStartSignIn()) return;
     setState(() {
       busy = true;
       _resetChallenge();
@@ -612,23 +630,30 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   const SizedBox(height: 12),
                 ],
                 if (challengeId == null && telegramAttempt == null) ...[
-                  CheckboxListTile(
-                    key: const Key('native-legal-acknowledgement'),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    value: _acknowledgedLegal,
-                    onChanged: busy ? null : (v) =>
-                        setState(() => _acknowledgedLegal = v ?? false),
-                    title: Text(tr(
-                      'Я ознакомился с условиями сервиса и политикой конфиденциальности',
-                      'Susipažinau su paslaugos sąlygomis ir privatumo politika',
-                      'I have read the terms of service and privacy policy')),
-                    subtitle: Text(tr(
-                      'Это подтверждение ознакомления, не согласие '
-                          'на рекламу или необязательное отслеживание.',
-                      'Taip patvirtini, kad susipažinai su dokumentais. '
-                          'Tai nėra sutikimas gauti reklamą ar būti sekamam.',
-                      'This confirms that you have read the documents. It does '
-                          'not opt you in to advertising or optional tracking.')),
+                  KeyedSubtree(
+                    key: _legalAcknowledgementAnchor,
+                    child: CheckboxListTile(
+                      key: const Key('native-legal-acknowledgement'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: _acknowledgedLegal,
+                      onChanged: busy ? null : (value) {
+                        setState(() => _acknowledgedLegal = value ?? false);
+                        if (_acknowledgedLegal) {
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        }
+                      },
+                      title: Text(tr(
+                        'Я ознакомился с условиями сервиса и политикой конфиденциальности',
+                        'Susipažinau su paslaugos sąlygomis ir privatumo politika',
+                        'I have read the terms of service and privacy policy')),
+                      subtitle: Text(tr(
+                        'Это подтверждение ознакомления, не согласие '
+                            'на рекламу или необязательное отслеживание.',
+                        'Taip patvirtini, kad susipažinai su dokumentais. '
+                            'Tai nėra sutikimas gauti reklamą ar būti sekamam.',
+                        'This confirms that you have read the documents. It does '
+                            'not opt you in to advertising or optional tracking.')),
+                    ),
                   ),
                   TextButton.icon(
                     key: const Key('native-open-legal-documents'),
@@ -675,14 +700,14 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                   ),
                 ] else if (challengeId == null) ...[
                   FilledButton(
-                    onPressed: busy || widget.authApiUrl.isEmpty || !_acknowledgedLegal
+                    onPressed: busy || widget.authApiUrl.isEmpty
                         ? null : requestCode,
                     child: Text(tr('Получить код', 'Gauti kodą', 'Get code')),
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     key: const Key('native-telegram-start'),
-                    onPressed: busy || widget.authApiUrl.isEmpty || !_acknowledgedLegal
+                    onPressed: busy || widget.authApiUrl.isEmpty
                         ? null : _startTelegram,
                     icon: const Icon(Icons.send_outlined),
                     label: Text(tr('Войти через Telegram', 'Prisijungti per „Telegram“',

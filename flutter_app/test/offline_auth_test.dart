@@ -42,6 +42,8 @@ void main() {
     expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
     expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
     if (!pdLocalQaEntryEnabled) {
+      expect(find.byKey(const Key('private-drive-bright-auth-background')),
+          findsOneWidget);
       for (final flag in ['🇷🇺 RU', '🇬🇧 EN', '🇱🇹 LT']) {
         expect(find.text(flag), findsOneWidget);
       }
@@ -151,13 +153,19 @@ void main() {
         return true;
       },
     )));
-    final legal = find.byKey(const Key('native-legal-acknowledgement'));
-    await tester.scrollUntilVisible(legal, 100,
+    final start = find.byKey(const Key('native-telegram-start'));
+    await tester.scrollUntilVisible(start, 100,
       scrollable: find.byType(Scrollable).first);
+    await tester.tap(start);
+    await tester.pumpAndSettle();
+    expect(find.text('Отметь, что ознакомился с условиями, чтобы войти.'),
+        findsOneWidget);
+    expect(proof, isNull);
+
+    final legal = find.byKey(const Key('native-legal-acknowledgement'));
     await tester.ensureVisible(legal);
     await tester.tap(legal);
     await tester.pumpAndSettle();
-    final start = find.byKey(const Key('native-telegram-start'));
     await tester.scrollUntilVisible(start, 100,
       scrollable: find.byType(Scrollable).first);
     await tester.tap(start);

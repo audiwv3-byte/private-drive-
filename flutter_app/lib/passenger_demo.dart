@@ -18,6 +18,7 @@ import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'demo_map_tile_provider.dart';
+import 'pd_mapbox_qa_config.dart';
 import 'pd_http_api.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -69,7 +70,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _music = false;
   bool _flowers = false;
   bool _coffee = false;
-  bool _nightMap = false;
+  bool _nightMap = PdMapboxQaConfig.canUseMapbox;
   String _menuSection = 'booking';
   bool _followPilot = true;
   LatLng? _lastPilotCameraFix;
@@ -869,16 +870,21 @@ class _PassengerDemoState extends State<PassengerDemo> {
     }
     final client = http.Client();
     try {
+      final tile = _mapboxTileUrl
+          ?.replaceAll('{z}', '10')
+          .replaceAll('{x}', '583')
+          .replaceAll('{y}', '325');
       final uri = Uri.parse(
-        'https://tile.openstreetmap.org/10/583/325.png');
+        tile ?? 'https://tile.openstreetmap.org/10/583/325.png');
       final response = await client.get(uri).timeout(const Duration(seconds: 7));
       if (response.statusCode != 200 ||
-          !response.headers['content-type'].toString().contains('image/png')) {
+          !(response.headers['content-type'] ?? '').startsWith('image/')) {
         throw Exception('HTTP ${response.statusCode}');
       }
       if (response.bodyBytes.isEmpty) {
         throw const FormatException('Пустое изображение');
       }
+      if (tile != null) debugPrint('PD_MAPBOX_TILE_OK');
       if (mounted) setState(() {
         _mapNetworkError = null;
         _mapTilesFailed = false;
@@ -911,6 +917,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
     });
     unawaited(_checkMapNetwork());
   }
+
+  String? get _mapboxTileUrl => _useBackupTiles
+      ? null : PdMapboxQaConfig.rasterTileUrl(night: _nightMap);
 
   @override
   void dispose() {
@@ -954,6 +963,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             (start.longitude + finish.longitude) / 2)
         : start ?? const LatLng(54.6872, 25.2797);
     final mapGeneration = _tileRetry;
+    final mapboxTileUrl = _mapboxTileUrl;
     final mapZoom = start != null && finish != null
         ? (start.longitude - finish.longitude).abs() > 2 ? 6.3 : 8.2
         : 10.0;
@@ -985,7 +995,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
           point: pilotPosition,
           width: 52,
           height: 52,
-          child: const Icon(
+          child: PdMapboxQaConfig.canUseMapbox
+              ? const PdPilotMapMarker(key: Key('passenger-pilot-map-marker'))
+              : const Icon(
             Icons.location_on,
             key: Key('passenger-pilot-map-marker'),
             color: Color(0xFFB6FF36),
@@ -1023,7 +1035,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             key: ValueKey('passenger-raster-tile-generation-$mapGeneration'),
                             child: ColorFiltered(
                             key: const Key('passenger-map-night-filter'),
-                            colorFilter: _nightMap
+                            colorFilter: _nightMap && mapboxTileUrl == null
                                 ? const ColorFilter.matrix(<double>[
                                     -0.65, 0, 0, 0, 170,
                                     0, -0.65, 0, 0, 170,
@@ -1039,10 +1051,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                             child: TileLayer(
                             key: const Key('passenger-map-tiles'),
                             tileProvider: demoTileProvider(),
-                            // Both modes use keyless OSM raster tiles; fallback is for isolated tests.
-                            urlTemplate: _useBackupTiles
+                            // Mapbox requires an explicit QA flag and public token.
+                            urlTemplate: mapboxTileUrl ?? (_useBackupTiles
                                 ? 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'
-                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
                             userAgentPackageName: 'lt.privatedrive.privateDrive.demo',
                             errorTileCallback: (tile, error, stackTrace) {
                               debugPrint('PD_PASSENGER_TILE_ERROR: $error');
@@ -1086,7 +1098,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
                               ],
                             ),
                           MarkerLayer(markers: mapMarkers),
-                          const RichAttributionWidget(
+                          if (mapboxTileUrl != null)
+                            const PdMapboxAttribution()
+                          else const RichAttributionWidget(
                             attributions: [
                               TextSourceAttribution('© OpenStreetMap contributors'),
                               TextSourceAttribution('© OpenStreetMap.de'),

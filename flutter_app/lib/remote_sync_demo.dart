@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
+import 'package:permission_handler/permission_handler.dart' as permissions;
 import 'remote_sync_client.dart';
 import 'demo_map_tile_provider.dart';
 import 'message_voice.dart';
@@ -69,6 +71,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   int chatSeq = 0;
   bool _loadedChatForTrip = false;
   bool _clearLocation = false;
+  DateTime? _lastFixAt;
   bool _refreshRequested = false;
   bool _requestingGpsPermission = false;
   int _gpsGeneration = 0;
@@ -157,7 +160,16 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       }
       final current = raw as Map<String, dynamic>?;
       if (widget.stagingDispatcher && role == 'pilot') {
-        final point = gpsOn ? location : null;
+        final point = gpsOn && _lastFixAt != null &&
+            DateTime.now().difference(_lastFixAt!) <= const Duration(seconds: 12)
+            ? location : null;
+        if (mounted && gpsOn && point == null && location != null) {
+          _clearLocation = true;
+          setState(() {
+            location = null;
+            gpsLabel = 'GPS устарел · ожидаем новые координаты';
+          });
+        }
         if (point != null || _clearLocation) {
           try {
             await client.post('/v1/position', {'latitude': point?.latitude,
@@ -347,6 +359,36 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     ],
   );
 
+  bool get _usesMobileShiftGps => widget.stagingDispatcher && !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+       defaultTargetPlatform == TargetPlatform.iOS);
+
+  LocationSettings _pilotLocationSettings() {
+    if (_usesMobileShiftGps && defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 0,
+        intervalDuration: const Duration(seconds: 4),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'PRIVATE DRIVE · GPS пилота',
+          notificationText: 'Позиция передаётся, пока включён GPS в кабинете.',
+          notificationChannelName: 'GPS пилота',
+          setOngoing: true,
+        ),
+      );
+    }
+    if (_usesMobileShiftGps && defaultTargetPlatform == TargetPlatform.iOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.high,
+        activityType: ActivityType.automotiveNavigation,
+        distanceFilter: 0,
+        allowBackgroundLocationUpdates: true,
+        showBackgroundLocationIndicator: true,
+      );
+    }
+    return const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 5);
+  }
+
   Future<void> toggleGps() async {
     if (_requestingGpsPermission) return;
     if (gpsOn) {
@@ -355,7 +397,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       gps = null;
       _clearLocation = widget.stagingDispatcher;
       setState(() {
-        gpsOn = false; location = null; gpsLabel = 'GPS выключен';
+        gpsOn = false; location = null; _lastFixAt = null;
+        gpsLabel = 'GPS выключен';
       });
       if (_clearLocation) unawaited(refresh(immediately: true));
       await stopped?.cancel();
@@ -376,14 +419,38 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         if (mounted) setState(() => gpsLabel = 'Нет разрешения GPS');
         return;
       }
+      if (_usesMobileShiftGps) {
+        if (await Geolocator.getLocationAccuracy() != LocationAccuracyStatus.precise) {
+          if (mounted) setState(() => gpsLabel = 'Включи точную геопозицию в настройках');
+          return;
+        }
+        final notifications = await permissions.Permission.notification.request();
+        if (notifications != permissions.PermissionStatus.granted) {
+          if (mounted) setState(() => gpsLabel = 'Разреши уведомления в настройках');
+          return;
+        }
+        try {
+          final client = api;
+          if (client == null) throw const RemoteDemoException('Нет связи');
+          await client.get('/v1/current');
+        } on Exception {
+          if (mounted) setState(() => gpsLabel = 'Нет связи с диспетчерской');
+          return;
+        }
+      }
       if (!mounted) return;
       final generation = ++_gpsGeneration;
       setState(() { gpsOn = true; gpsLabel = 'Ожидание GPS…'; });
       void updatePosition(Position position) {
         if (!mounted || !gpsOn || _gpsGeneration != generation) return;
+        final fixAge = DateTime.now().difference(position.timestamp);
+        if (fixAge > const Duration(seconds: 12) ||
+            !position.latitude.isFinite || position.latitude.abs() > 90 ||
+            !position.longitude.isFinite || position.longitude.abs() > 180) return;
         final point = LatLng(position.latitude, position.longitude);
         setState(() {
           location = point;
+          _lastFixAt = position.timestamp;
           gpsLabel = widget.stagingDispatcher
               ? 'Координаты получены · отправляем…'
               : 'GPS активен · только на устройстве';
@@ -392,9 +459,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         if (widget.stagingDispatcher) unawaited(refresh(immediately: true));
       }
       gps = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high, distanceFilter: 5,
-        ),
+        locationSettings: _pilotLocationSettings(),
       ).listen(updatePosition, onError: (Object _) {
         if (mounted && _gpsGeneration == generation && location == null) {
           setState(() => gpsLabel = 'GPS недоступен');
@@ -402,7 +467,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       });
       unawaited(_getInitialFix(generation, updatePosition));
     } on Exception {
-      if (mounted) setState(() => gpsLabel = 'GPS недоступен');
+      if (mounted) setState(() { gpsOn = false; gpsLabel = 'GPS недоступен'; });
     } finally {
       _requestingGpsPermission = false;
     }

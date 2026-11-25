@@ -2,7 +2,7 @@ name: PRIVATE DRIVE complete Android internal QA APK
 
 on:
   push:
-    branches: [feature/flutter-independent-auth]
+    branches: [feature/flutter-independent-auth, qa/pilot-background-gps]
     paths:
       - 'flutter_app/**'
       - '.github/workflows/full-native-android-qa-apk.yml'
@@ -66,6 +66,8 @@ jobs:
               'android:icon="@drawable/private_drive_app_icon"')
           permissions = '''<uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <uses-permission android:name="android.permission.CAMERA"/>

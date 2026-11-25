@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 import telebot
 from telebot import types
 from dotenv import load_dotenv
+from pd_miniapp_dispatch_bridge import bridge_enabled, publish_telegram_order, DispatchBridgeUnavailable
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
@@ -566,7 +567,28 @@ def process(message):
             say(message.chat.id, 'Выбранное время уже прошло. Начните оформление заново.')
             begin_order(message)
             return
-        order_id = order_save(uid, st)
+        # Keep the local order ID in the dialog across central API failures:
+        # retries must never create a second local or PostgreSQL order.
+        order_id = st.get('_dispatch_local_order_id')
+        if order_id is None:
+            order_id = order_save(uid, st)
+            if bridge_enabled():
+                st['_dispatch_local_order_id'] = order_id
+                state_set(uid, st)
+        if bridge_enabled():
+            try:
+                central_id = publish_telegram_order(order_find(order_id), source='telegram_bot')
+            except DispatchBridgeUnavailable:
+                LOG.warning('Telegram bot order %s awaiting central dispatch acknowledgement', order_id)
+                say(message.chat.id,
+                    f'Заявка №{order_id} сохранена, но диспетчер не подтвердил получение. '
+                    'Нажмите «✅ Подтвердить заявку» ещё раз для безопасной повторной отправки.')
+                return
+            state_clear(uid)
+            say(message.chat.id,
+                f'✅ Заявка №{order_id} принята диспетчерской (ID {central_id}). '
+                'Это не окончательное подтверждение поездки или цены.', menu())
+            return
         state_clear(uid)
         say(message.chat.id,
             f'✅ Заявка №{order_id} принята и ожидает подтверждения водителем.\n'

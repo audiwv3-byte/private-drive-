@@ -204,6 +204,10 @@ void main() {
 
   testWidgets('Telegram approval completes automatically without a browser code',
       (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1050);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final state = List.filled(43, 's').join();
     final token = List.filled(64, 't').join();
     String? proof;
@@ -238,6 +242,8 @@ void main() {
     final start = find.byKey(const Key('native-telegram-start'));
     await tester.scrollUntilVisible(start, 100,
       scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(start);
+    await tester.pumpAndSettle();
     await tester.tap(start);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('native-telegram-code')), findsNothing);

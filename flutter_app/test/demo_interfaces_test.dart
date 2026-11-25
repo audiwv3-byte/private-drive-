@@ -55,7 +55,8 @@ void main() {
     await tester.tap(transfer);
     await tester.pumpAndSettle();
     expect(find.byType(PassengerDemo), findsOneWidget);
-    expect(find.widgetWithText(Text, 'Трансфер'), findsOneWidget);
+    expect(tester.widget<Text>(
+      find.byKey(const Key('passenger-selected-ride-type'))).data, 'Трансфер');
     expect(find.byKey(const Key('passenger-ride-type')), findsNothing);
     expect(find.byKey(const Key('passenger-form')), findsOneWidget);
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);

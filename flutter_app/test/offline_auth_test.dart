@@ -54,6 +54,10 @@ void main() {
     expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
     expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
     if (!pdLocalQaEntryEnabled) {
+      final launchLogo = tester.widget<PrivateDriveBrandLogo>(
+          find.byType(PrivateDriveBrandLogo));
+      expect(launchLogo.circular, isFalse);
+      expect(launchLogo.transparentBackground, isTrue);
       expect(find.byKey(const Key('private-drive-bright-auth-background')),
           findsOneWidget);
       for (final flag in ['🇷🇺 RU', '🇬🇧 EN', '🇱🇹 LT']) {

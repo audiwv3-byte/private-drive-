@@ -169,10 +169,14 @@ void main() {
     await tester.tap(find.byKey(const Key('remote-enable-gps')));
     await tester.pumpAndSettle();
     expect(server.positions.single, {'latitude': 54.69, 'longitude': 25.28});
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     platform.positions.add(platform.fix(54.71, 25.32));
     await tester.pump();
     expect(server.positions.last, {'latitude': 54.71, 'longitude': 25.32});
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('remote-disable-gps')));
@@ -218,6 +222,8 @@ void main() {
     await show(active: true);
     expect(server.positions.last, {'latitude': 54.69, 'longitude': 25.28});
 
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pump();
     expect(server.positions.last, {'latitude': 54.69, 'longitude': 25.28});
@@ -225,6 +231,8 @@ void main() {
     await tester.pump();
     expect(server.positions.last, {'latitude': 54.70, 'longitude': 25.31});
 
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
     expect(server.positions.last, {'latitude': 54.70, 'longitude': 25.31});

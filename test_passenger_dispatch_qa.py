@@ -8,6 +8,7 @@ import json
 import os
 import time
 import unittest
+from urllib.parse import urlencode
 from unittest.mock import patch
 
 from flask import Flask
@@ -104,6 +105,37 @@ class PassengerToDispatcherTests(unittest.TestCase):
             result = self.signed_source_request(self.source_payload())
         self.assertEqual(result.status_code, 503)
         self.assertEqual(result.get_json()["error"], "bridge_disabled")
+
+    def test_transfer_miniapp_requires_staging_and_allowed_telegram_account(self):
+        path = "/preview/telegram-miniapp"
+        token = "123:unit-test-token"
+
+        def telegram_header(user_id):
+            params = {"auth_date": str(int(time.time())), "user": json.dumps({"id": user_id})}
+            signed = "\n".join(f"{key}={value}" for key, value in sorted(params.items()))
+            key = hmac.new(b"WebAppData", token.encode(), hashlib.sha256).digest()
+            params["hash"] = hmac.new(key, signed.encode(), hashlib.sha256).hexdigest()
+            return {"X-Telegram-Init-Data": urlencode(params)}
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(self.client.get(path).status_code, 503)
+        with patch.dict(os.environ, {"PD_DISPATCH_STAGING_ONLY": "1",
+                                     "PD_DISPATCH_TEST_SYNC": "1",
+                                     "PD_QA_TELEGRAM_BOT_TOKEN": token,
+                                     "PD_QA_TELEGRAM_TESTER_ID": "42"}, clear=True):
+            self.assertEqual(self.client.get(path).status_code, 200)
+            self.assertEqual(self.client.get(path + "/client.js").status_code, 200)
+            self.assertEqual(self.client.post(path).status_code, 401)
+            self.assertEqual(self.client.post(path, headers=telegram_header(43)).status_code, 403)
+            first = self.client.post(path, headers=telegram_header(42))
+            self.assertEqual(first.status_code, 201)
+            replay = self.client.post(path, headers=telegram_header(42))
+            self.assertEqual(replay.status_code, 200)
+            self.assertEqual(replay.json["trip"]["id"], first.json["trip"]["id"])
+            trips = self.client.get("/dispatch/test-sync/state").json["trips"]
+            self.assertEqual(len(trips), 1)
+            self.assertEqual(trips[0]["source"], "telegram_miniapp")
+            self.assertEqual(trips[0]["source_order_id"], "9900000000000000001")
 
     def test_telegram_source_bridge_preserves_ids_and_prevents_duplicates(self):
         with patch.dict(os.environ, {"PD_DISPATCH_STAGING_ONLY": "1",

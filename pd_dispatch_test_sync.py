@@ -11,8 +11,10 @@ import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from flask import jsonify, redirect, render_template_string, request, url_for
+from flask import jsonify, redirect, render_template, render_template_string, request, url_for
 
+from pd_dispatch_persistent import enabled as persistent_queue_enabled
+from pd_request_security import verify_telegram_user
 from test_sync_server.pd_demo_server import DB_LOCK, MAX_BODY, DemoStore, TripError
 
 
@@ -236,6 +238,9 @@ def register(app, authorized, valid_csrf):
             data = json.loads(raw)
         except (UnicodeError, ValueError):
             return reply({"error": "invalid_body"}, 400)
+        return import_source_order(data)
+
+    def import_source_order(data):
         if not isinstance(data, dict) or set(data) != {
                 "source", "source_order_id", "from", "to", "trip_date", "trip_time"}:
             return reply({"error": "invalid_body"}, 400)
@@ -284,6 +289,41 @@ def register(app, authorized, valid_csrf):
             except sqlite3.IntegrityError:
                 return reply({"error": "source_order_conflict"}, 409)
         return reply({"qa_only": True, "replayed": False, "trip": trip}, 201)
+
+    @app.route("/preview/telegram-miniapp", methods=["GET", "POST"])
+    def pd_test_telegram_miniapp():
+        token = os.environ.get("PD_QA_TELEGRAM_BOT_TOKEN", "")
+        tester_id = os.environ.get("PD_QA_TELEGRAM_TESTER_ID", "")
+        if (os.environ.get("PD_DISPATCH_STAGING_ONLY") != "1"
+                or os.environ.get("PD_DISPATCH_TEST_SYNC") != "1"
+                or not token or not re.fullmatch(r"[1-9][0-9]{0,15}", tester_id)
+                or persistent_queue_enabled()):
+            return reply({"error": "telegram_qa_disabled"}, 503)
+        if request.method == "GET":
+            return app.make_response((
+                render_template("pd_telegram_qa.html"),
+                {"Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer",
+                 "Content-Security-Policy": "default-src 'none'; script-src 'self' https://telegram.org; "
+                 "connect-src 'self'; form-action 'none'; base-uri 'none'"},
+            ))
+        try:
+            user_id, _ = verify_telegram_user(
+                request.headers.get("X-Telegram-Init-Data", ""), token, max_age=900)
+        except PermissionError:
+            return reply({"error": "unauthorized"}, 401)
+        if user_id != int(tester_id):
+            return reply({"error": "forbidden"}, 403)
+        return import_source_order({
+            "source": "telegram_miniapp", "source_order_id": "9900000000000000001",
+            "from": "Вильнюс, тестовая точка подачи", "to": "Каунас, тестовая точка назначения",
+            "trip_date": "2099-01-01", "trip_time": "12:00",
+        })
+
+    @app.get("/preview/telegram-miniapp/client.js")
+    def pd_test_telegram_miniapp_script():
+        return app.response_class(
+            Path(__file__).with_name("pd_telegram_qa.js").read_text(encoding="utf-8"),
+            mimetype="text/javascript")
 
     @app.get("/dispatch/test-sync")
     def pd_test_sync_setup():

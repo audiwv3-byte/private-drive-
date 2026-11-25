@@ -102,6 +102,15 @@ $$;
 
 -- The native API role passes a session digest, not an arbitrary pilot ID.
 -- Foreign or revoked sessions cannot read another pilot's order.
+-- Native pilot trip controller. Waiting uses server time and persists even if
+-- the pilot closes the app. Minutes are counted from the first started minute,
+-- but no monetary charge is calculated or collected here.
+CREATE TABLE IF NOT EXISTS public.pd_native_trip_waiting (
+    order_id uuid PRIMARY KEY REFERENCES public.pd_dispatch_orders(id),
+    started_at bigint,
+    accrued_seconds bigint NOT NULL DEFAULT 0 CHECK (accrued_seconds >= 0)
+);
+
 CREATE OR REPLACE FUNCTION public.pd_native_pilot_order_state(
     supplied_digest text, observed_at bigint
 ) RETURNS jsonb
@@ -123,9 +132,14 @@ BEGIN
 
     SELECT coalesce(jsonb_agg(to_jsonb(rows)), '[]'::jsonb) INTO result FROM (
         SELECT o.id AS order_id, o.origin AS "from", o.destination AS "to", o.trip_date,
-               o.trip_time, o.status
+               o.trip_time, o.status,
+               (w.started_at IS NOT NULL) AS waiting_active,
+               coalesce(w.accrued_seconds, 0) +
+                 CASE WHEN w.started_at IS NOT NULL
+                   THEN greatest(0, observed_at - w.started_at) ELSE 0 END AS waiting_seconds
         FROM public.pd_native_order_assignments a
         JOIN public.pd_dispatch_orders o ON o.id = a.order_id
+        LEFT JOIN public.pd_native_trip_waiting w ON w.order_id=o.id
         WHERE a.pilot_user_id = principal.user_id
           AND o.status IN ('assigned','approaching','underway')
         ORDER BY a.assigned_at DESC, o.id
@@ -134,15 +148,6 @@ BEGIN
     RETURN jsonb_build_object('orders', result, 'payment_mode', 'disabled');
 END
 $$;
-
--- Native pilot trip controller. Waiting uses server time and persists even if
--- the pilot closes the app. Minutes are counted from the first started minute,
--- but no monetary charge is calculated or collected here.
-CREATE TABLE IF NOT EXISTS public.pd_native_trip_waiting (
-    order_id uuid PRIMARY KEY REFERENCES public.pd_dispatch_orders(id),
-    started_at bigint,
-    accrued_seconds bigint NOT NULL DEFAULT 0 CHECK (accrued_seconds >= 0)
-);
 
 CREATE OR REPLACE FUNCTION public.pd_native_pilot_trip_action(
     supplied_digest text, target_order uuid, requested_action text, observed_at bigint

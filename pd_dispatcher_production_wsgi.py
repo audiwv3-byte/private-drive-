@@ -88,7 +88,7 @@ def create_app():
     def dispatch_assets():
         return {"dispatch_asset_prefix": "/dispatch"}
     core = SimpleNamespace(ADMIN_IDS=frozenset({admin_id}), is_admin=lambda uid: uid == admin_id,
-                           ORDERS_DB=orders, db=read_orders)
+                           ORDERS_DB=orders, USERS_DB=Path(os.environ.get("PD_DISPATCH_USERS_SQLITE", orders.with_name("users.db"))), db=read_orders)
     if not register(app, core, owner_passwords=OwnerCredentials(state, password_hash)):
         raise RuntimeError("Dispatcher could not enable owner authentication")
 

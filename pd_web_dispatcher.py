@@ -259,6 +259,9 @@ def register(app, core, *, owner_passwords=None):
         and hasattr(core, "ORDERS_DB")
     )
     if live_orders_enabled:
+        from pd_live_pilot_map import register_live_pilots
+        register_live_pilots(app, core, authorized)
+
         @app.get("/dispatch/live/orders")
         def pd_dispatch_live_orders():
             if not authorized():

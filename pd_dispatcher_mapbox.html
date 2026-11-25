@@ -78,7 +78,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 </section>
 <aside class="right" aria-label="Управление пилотами и коммуникации">
 <h2 id="pilotsTitle">Пилоты</h2><div class="tabs"><button class="tab active" id="allPilots" aria-pressed="true">Все</button><button class="tab" id="onlinePilots" aria-pressed="false">На линии</button></div>
-{% if persistent_queue_enabled %}<div class="empty">Список пилотов будет доступен после подключения подтверждённых учётных записей.</div>{% elif test_sync_enabled %}
+{% if live_orders_enabled %}<div id="fleetList"></div><article id="fleetCard" class="card" hidden></article>{% elif persistent_queue_enabled %}<div class="empty">Список пилотов будет доступен после подключения подтверждённых учётных записей.</div>{% elif test_sync_enabled %}
 <div class="card"><strong id="pilotName">Тестовый пилот</strong><p id="pilotStatus">Ожидание данных…</p></div>
 {% else %}<div class="empty">Позиции пилотов появятся после авторизованного подключения GPS к единому серверу.</div>
 <h2>Заказ и связь</h2>
@@ -110,7 +110,7 @@ function renderPersistentOrders(){
     (orderFilter==='done'&&['finished','cancelled'].includes(o.status)));
  for(const [id,n] of Object.entries({countNew:items.filter(o=>o.status==='requested').length,
  countActive:items.filter(o=>['assigned','approaching','underway'].includes(o.status)).length,
- countOnline:0,countDone:items.filter(o=>['finished','cancelled'].includes(o.status)).length})){
+ {% if not live_orders_enabled %}countOnline:0,{% endif %}countDone:items.filter(o=>['finished','cancelled'].includes(o.status)).length})){
    $(id).textContent=n;
  }
  const cards=chosen.map(order=>{
@@ -279,6 +279,73 @@ document.addEventListener('pd-test-gps',event=>{
     drawPilot();
 });
 
+{% if live_orders_enabled %}
+const fleetMarkers=new Map();
+let fleet=[], selectedPilot=null, mapOwner=null, serverTime=0;
+function hasFix(p){
+    return p.trip && Number.isFinite(p.trip.lat) && Number.isFinite(p.trip.lon) && p.trip.location_at>0;
+}
+function fresh(p){return hasFix(p) && serverTime-p.trip.location_at<=45;}
+function showPilot(p){
+    selectedPilot=p.telegram_id;
+    const card=$('fleetCard');
+    card.hidden=false;
+    card.replaceChildren();
+    for(const value of [p.name,p.vehicle,p.plate,p.trip && ('Заказ №'+p.trip.order_id+' · '+p.trip.status),
+            hasFix(p) && ('Последний GPS · '+new Date(p.trip.location_at*1000).toLocaleTimeString())]){
+        if(value){const line=document.createElement('p');line.textContent=value;card.append(line);}
+    }
+    if(p.phone){
+        const call=document.createElement('a');
+        call.textContent=p.phone;call.href='tel:'+p.phone.replace(/[^0-9+]/g,'');card.append(call);
+    }
+}
+function renderFleet(){
+    const map=vector || raster, seen=new Set();
+    if(map!==mapOwner){for(const m of fleetMarkers.values())m.remove();fleetMarkers.clear();mapOwner=map;}
+    $('fleetList').replaceChildren();
+    $('countOnline').textContent=fleet.filter(fresh).length;
+    for(const p of fleet){
+        const title=[p.plate||p.name,'ID '+p.telegram_id,p.trip?.status].filter(Boolean).join(' · ');
+        if(fresh(p) || $('allPilots').getAttribute('aria-pressed')==='true'){
+            const button=document.createElement('button');button.className='btn';button.textContent=title;
+            button.onclick=()=>showPilot(p);$('fleetList').append(button);
+        }
+        if(selectedPilot===p.telegram_id)showPilot(p);
+        if(!map || !hasFix(p))continue;
+        seen.add(p.telegram_id);
+        const lat=p.trip.lat,lon=p.trip.lon;
+        let mark=fleetMarkers.get(p.telegram_id);
+        if(!mark){
+            if(vector){
+                const arrow=document.createElement('button');arrow.className='pilot-marker';arrow.textContent='➤';
+                mark=new mapboxgl.Marker({element:arrow}).setLngLat([lon,lat]).addTo(vector);
+            }else{
+                mark=L.marker([lat,lon],{icon:L.divIcon({className:'pilot-marker',html:'➤'})}).addTo(raster);
+            }
+            fleetMarkers.set(p.telegram_id,mark);
+        }
+        if(vector)mark.setLngLat([lon,lat]);else mark.setLatLng([lat,lon]);
+        const el=mark.getElement();el.title=title;el.setAttribute('aria-label',title);
+        el.style.filter=fresh(p)?'':'grayscale(1)';el.onclick=()=>showPilot(p);
+    }
+    for(const [id,m] of fleetMarkers){if(!seen.has(id)){m.remove();fleetMarkers.delete(id);}}
+    if(!fleet.some(p=>p.telegram_id===selectedPilot))$('fleetCard').hidden=true;
+}
+async function pollFleet(){
+    try{
+        const res=await fetch('/dispatch/live/pilots',{cache:'no-store',signal:AbortSignal.timeout(7000)});
+        if(!res.ok)throw Error();
+        const data=await res.json();fleet=data.pilots;serverTime=data.now;
+        $('mapStatus').textContent=fleet.some(hasFix)?'Показаны последние позиции пилотов':'Ожидание GPS активных поездок';
+        renderFleet();
+    }catch{
+        fleet=[];renderFleet();$('mapStatus').textContent='Данные пилотов временно недоступны';
+    }finally{setTimeout(pollFleet,5000);}
+}
+document.addEventListener('pd-test-filter',renderFleet);
+pollFleet();
+{% endif %}
 function rasterStyle(mapbox){
     if(tileLayer)tileLayer.remove();
     $('rasterMap').classList.toggle('night',night&&mapbox);

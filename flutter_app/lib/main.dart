@@ -71,6 +71,7 @@ class PrivateDriveApp extends StatelessWidget {
               child: NativeSignInScreen(enableOfflinePreview: true),
             )
           : PdNativeCabinEntry(
+              quickResume: const bool.fromEnvironment('PD_QUICK_RESUME'),
               closedInviteOnly: closedPilotInviteBuild,
               allowInvitedPilot: pilotAccountInviteBuild,
               signInBuilder: (_, role, onAuthenticated) =>

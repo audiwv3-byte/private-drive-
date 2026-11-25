@@ -138,7 +138,8 @@ def make_native_pilot_orders_app(next_app, database_url, *, clock=time.time):
                 or os.getenv("PD_DISPATCH_ORDERS_DATABASE_URL") != database_url
                 or _database_target(database_url) is None):
             return reply("503 Service Unavailable", {"error": "assignment_disabled"})
-        if environ.get("REQUEST_METHOD") != "GET":
+        method = environ.get("REQUEST_METHOD")
+        if method not in ("GET", "PATCH"):
             return reply("405 Method Not Allowed", {"error": "method_not_allowed"})
         auth = environ.get("HTTP_AUTHORIZATION", "")
         token = auth[7:] if auth.startswith("Bearer ") else ""
@@ -146,6 +147,40 @@ def make_native_pilot_orders_app(next_app, database_url, *, clock=time.time):
         if not digest or any(c.isspace() for c in token):
             return reply("401 Unauthorized", {"error": "invalid_session"})
         try:
+            if method == "PATCH":
+                try:
+                    size = int(environ.get("CONTENT_LENGTH", "0"))
+                    if not 0 < size <= 512 or environ.get("CONTENT_TYPE", "").split(";")[0] != "application/json":
+                        raise ValueError()
+                    payload = json.loads(environ["wsgi.input"].read(size))
+                    if not isinstance(payload, dict) or set(payload) != {"order_id", "action"}:
+                        raise ValueError()
+                    from uuid import UUID
+                    order_id = str(UUID(payload["order_id"]))
+                    action = payload["action"]
+                    if action not in {"approach", "start", "stop_start", "stop_end", "finish"}:
+                        raise ValueError()
+                except (ValueError, TypeError, KeyError, AttributeError):
+                    return reply("400 Bad Request", {"error": "invalid_trip_action"})
+                with _connect(database_url) as db:
+                    result = db.execute(
+                        "SELECT public.pd_native_pilot_trip_action(%s,%s,%s,%s)",
+                        (digest, order_id, action, int(clock())),
+                    ).fetchone()[0]
+                if not isinstance(result, dict):
+                    return reply("503 Service Unavailable", {"error": "storage_unavailable"})
+                error = result.get("error")
+                if error:
+                    code = {"invalid_session": "401 Unauthorized",
+                            "pilot_required": "403 Forbidden",
+                            "order_not_found": "404 Not Found",
+                            "invalid_action": "400 Bad Request",
+                            "invalid_transition": "409 Conflict"}.get(error, "503 Service Unavailable")
+                    return reply(code, {"error": error})
+                if result.get("payment_mode") != "disabled" or result.get("status") not in (
+                    "approaching", "underway", "finished"):
+                    return reply("503 Service Unavailable", {"error": "unsafe_state"})
+                return reply("200 OK", result)
             with _connect(database_url) as db:
                 result = db.execute(
                     "SELECT public.pd_native_pilot_order_state(%s,%s)",

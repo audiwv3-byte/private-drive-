@@ -7,12 +7,14 @@ import os
 import sqlite3
 import re
 import secrets
+import subprocess
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from flask import jsonify, redirect, render_template_string, request, url_for
+from flask import jsonify, redirect, render_template, render_template_string, request, url_for
 
+from pd_telegram_test import VALID_ID, verify_init_data
 from test_sync_server.pd_demo_server import DB_LOCK, MAX_BODY, DemoStore, TripError
 
 
@@ -20,6 +22,18 @@ PILOT = "pilot_test"
 ROLES = {"passenger": "passenger_test", "pilot": PILOT}
 ONLINE_SECONDS = 15
 TRIP_ID = re.compile(r"[a-f0-9]{32}")
+TELEGRAM_TEST_ORDER = {
+    "source": "telegram_miniapp", "source_order_id": "9900000000000000001",
+    "from": "Вильнюс, тестовая точка подачи", "to": "Каунас, тестовая точка назначения",
+    "trip_date": "2099-01-01", "trip_time": "12:00",
+}
+
+
+def telegram_test_enabled():
+    return (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
+            and os.environ.get("PD_DISPATCH_TEST_SYNC") == "1"
+            and bool(VALID_ID.fullmatch(os.environ.get("PD_QA_TELEGRAM_BOT_ID", "")))
+            and bool(VALID_ID.fullmatch(os.environ.get("PD_DISPATCH_ADMIN_ID", ""))))
 
 
 class StagingTripStore(DemoStore):
@@ -55,7 +69,7 @@ class StagingTripStore(DemoStore):
             }
 
 
-def register(app, authorized, valid_csrf):
+def register(app, authorized, valid_csrf, *, csrf=None):
     directory = TemporaryDirectory(prefix="pd-test-trips-")
     store = StagingTripStore(Path(directory.name) / "trips.sqlite")
     app.extensions["pd_dispatch_test_sync"] = (directory, store)
@@ -236,6 +250,9 @@ def register(app, authorized, valid_csrf):
             data = json.loads(raw)
         except (UnicodeError, ValueError):
             return reply({"error": "invalid_body"}, 400)
+        return import_source_order(data)
+
+    def import_source_order(data):
         if not isinstance(data, dict) or set(data) != {
                 "source", "source_order_id", "from", "to", "trip_date", "trip_time"}:
             return reply({"error": "invalid_body"}, 400)
@@ -284,6 +301,69 @@ def register(app, authorized, valid_csrf):
             except sqlite3.IntegrityError:
                 return reply({"error": "source_order_conflict"}, 409)
         return reply({"qa_only": True, "replayed": False, "trip": trip}, 201)
+
+    def telegram_trip():
+        with DB_LOCK:
+            row = store.db.execute(
+                "SELECT trip_id FROM qa_source_imports WHERE source=? AND source_order_id=?",
+                (TELEGRAM_TEST_ORDER["source"], TELEGRAM_TEST_ORDER["source_order_id"]),
+            ).fetchone()
+            return store.get(row["trip_id"], "dispatcher", "dispatcher_test") if row else None
+
+    @app.get("/preview/telegram-miniapp/client.js")
+    def pd_test_telegram_miniapp_script():
+        return app.response_class(
+            Path(__file__).with_name("pd_telegram_qa.js").read_text(encoding="utf-8"),
+            mimetype="text/javascript")
+
+    @app.route("/preview/telegram-miniapp", methods=["GET", "POST"])
+    @app.get("/preview/telegram-miniapp/status")
+    def pd_test_telegram_miniapp():
+        if not telegram_test_enabled():
+            return reply({"error": "telegram_qa_disabled"}, 503)
+        if request.method == "GET" and not request.path.endswith("/status"):
+            return app.make_response((
+                render_template("pd_telegram_qa.html"),
+                {"Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer",
+                 "Content-Security-Policy": "default-src 'none'; script-src 'self' https://telegram.org; "
+                 "connect-src 'self'; form-action 'none'; base-uri 'none'"},
+            ))
+        try:
+            verify_init_data(
+                request.headers.get("X-Telegram-Init-Data", ""),
+                os.environ["PD_QA_TELEGRAM_BOT_ID"], os.environ["PD_DISPATCH_ADMIN_ID"],
+            )
+        except PermissionError as error:
+            return reply({"error": str(error)}, 403 if str(error) == "forbidden" else 401)
+        except (OSError, subprocess.SubprocessError):
+            return reply({"error": "telegram_validation_unavailable"}, 503)
+        if request.method == "GET":
+            trip = telegram_trip()
+            return reply({"trip": {"id": trip["id"], "status": trip["status"]} if trip else None})
+        return import_source_order(TELEGRAM_TEST_ORDER)
+
+    @app.route("/dispatch/test-miniapp", methods=["GET", "POST"])
+    def pd_dispatch_test_miniapp():
+        if not telegram_test_enabled() or csrf is None:
+            return reply({"error": "telegram_qa_disabled"}, 503)
+        if not authorized():
+            return redirect(url_for("pd_dispatch_login"))
+        trip = telegram_trip()
+        if request.method == "POST":
+            if request.content_length is None or request.content_length > MAX_BODY or not valid_csrf():
+                return reply({"error": "forbidden"}, 403)
+            if not trip or request.form.get("version") != str(trip["version"]):
+                return reply({"error": "version_conflict"}, 409)
+            try:
+                store.assign(trip["id"], PILOT, trip["version"], "dispatcher_test")
+            except TripError as error:
+                return reply({"error": error.code}, error.status)
+            return redirect(url_for("pd_dispatch_test_miniapp"), code=303)
+        return render_template("pd_dispatch_test_miniapp.html", trip=trip, csrf=csrf()), {
+            "Cache-Control": "private, no-store",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; "
+                                       "form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+        }
 
     @app.get("/dispatch/test-sync")
     def pd_test_sync_setup():

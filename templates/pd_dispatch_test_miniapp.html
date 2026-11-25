@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PRIVATE DRIVE — тест заявки из Telegram</title>
+  <style>
+    body { color-scheme: dark; max-width: 38rem; margin: 2rem auto; padding: 0 1rem;
+      background: #110f0c; color: #f6efdf; font: 1rem/1.5 system-ui; }
+    a, h1 { color: #e8c581; }
+    button { padding: .6rem 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <a href="/dispatch">Главная диспетчерской</a>
+    <h1>Тест заявки из Telegram</h1>
+    {% if trip %}
+      <p>Заявка №9900000000000000001</p>
+      <p>{{ trip.origin }} → {{ trip.destination }}</p>
+      {% if trip.status == "requested" %}
+        <p>Ожидает назначения</p>
+        <form method="post">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="version" value="{{ trip.version }}">
+          <button type="submit">Назначить тестового пилота</button>
+        </form>
+      {% else %}
+        <p>Тестовый пилот назначен</p>
+      {% endif %}
+    {% else %}
+      <p>Ожидаем тестовую заявку. После отправки из Telegram обнови страницу.</p>
+      <a href="/dispatch/test-miniapp">Обновить</a>
+    {% endif %}
+  </main>
+</body>
+</html>

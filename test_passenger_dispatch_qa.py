@@ -2,15 +2,20 @@
 
 No real SMS, payments, customer accounts or production services.
 """
+import base64
 import hashlib
 import hmac
 import json
 import os
 import time
+import subprocess
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from urllib.parse import urlencode
 import unittest
 from unittest.mock import patch
 
-from flask import Flask
+from flask import Flask, request
 from pd_dispatch_test_sync import register
 from pd_qa_source_bridge_client import signed_qa_request, send_synthetic_qa_order
 
@@ -98,6 +103,77 @@ class PassengerToDispatcherTests(unittest.TestCase):
             "X-PD-QA-Timestamp": issued,
             "X-PD-QA-Signature": signature_override or signature,
         })
+
+    def test_one_telegram_order_can_be_assigned_and_seen_by_passenger(self):
+        bot, tester = "12345", "42"
+        path = "/preview/telegram-miniapp"
+        self.assertEqual(self.client.get(path).status_code, 503)
+
+        with TemporaryDirectory() as directory:
+            key = Path(directory) / "key.pem"
+            subprocess.run(["openssl", "genpkey", "-algorithm", "ED25519", "-out", str(key)],
+                           check=True, capture_output=True)
+            public = subprocess.check_output(["openssl", "pkey", "-in", str(key),
+                                              "-pubout", "-outform", "DER"])
+
+            def signed_headers(user_id=42, age=0, bot_id=bot):
+                fields = {"auth_date": str(int(time.time()) - age),
+                          "user": json.dumps({"id": user_id})}
+                message = (bot_id + ":WebAppData\n" + "\n".join(
+                    f"{field}={value}" for field, value in sorted(fields.items())
+                )).encode()
+                source = Path(directory) / "proof.txt"
+                source.write_bytes(message)
+                signature = subprocess.check_output(["openssl", "pkeyutl", "-sign",
+                                                     "-inkey", str(key), "-rawin", "-in", str(source)])
+                fields["signature"] = base64.urlsafe_b64encode(signature).decode().rstrip("=")
+                return {"X-Telegram-Init-Data": urlencode(fields)}
+
+            app = Flask(__name__)
+            app.secret_key = "test-only"
+            state = {"operator": False}
+            @app.get("/dispatch/login")
+            def pd_dispatch_login():
+                return "login"
+            register(app, lambda: state["operator"],
+                     lambda: request.form.get("csrf") == "fixture-csrf",
+                     csrf=lambda: "fixture-csrf")
+            self.addCleanup(lambda: app.extensions["pd_dispatch_test_sync"][0].cleanup())
+            self.addCleanup(lambda: app.extensions["pd_dispatch_test_sync"][1].close())
+            c = app.test_client()
+            with patch("pd_telegram_test.PUBLIC_KEY", public), patch.dict(os.environ, {
+                "PD_DISPATCH_STAGING_ONLY": "1", "PD_DISPATCH_TEST_SYNC": "1",
+                "PD_QA_TELEGRAM_BOT_ID": bot, "PD_DISPATCH_ADMIN_ID": tester,
+                "PD_DISPATCH_PERSISTENT_QUEUE": "1",
+            }):
+                self.assertEqual(c.get(path).status_code, 200)
+                self.assertEqual(c.get(path + "/client.js").status_code, 200)
+                self.assertEqual(c.post(path).status_code, 401)
+                self.assertEqual(c.post(path, headers=signed_headers(user_id=43)).status_code, 403)
+                self.assertEqual(c.post(path, headers=signed_headers(age=901)).status_code, 401)
+                self.assertEqual(c.post(path, headers=signed_headers(bot_id="99999")).status_code, 401)
+                passenger = signed_headers()
+                self.assertIsNone(c.get(path + "/status", headers=passenger).json["trip"])
+                first = c.post(path, headers=passenger)
+                self.assertEqual(first.status_code, 201, first.json)
+                trip = first.json["trip"]
+                replay = c.post(path, headers=passenger)
+                self.assertEqual(replay.status_code, 200)
+                self.assertEqual(replay.json["trip"]["id"], trip["id"])
+                self.assertEqual(c.get("/dispatch/test-miniapp").status_code, 302)
+                state["operator"] = True
+                board = c.get("/dispatch/test-miniapp")
+                self.assertIn("Назначить тестового пилота", board.text)
+                self.assertIn("9900000000000000001", board.text)
+                self.assertEqual(c.post("/dispatch/test-miniapp",
+                    data={"version": trip["version"]}).status_code, 403)
+                result = c.post("/dispatch/test-miniapp",
+                    data={"version": trip["version"], "csrf": "fixture-csrf"})
+                self.assertEqual(result.status_code, 303, result.text)
+                self.assertIn("Тестовый пилот назначен", c.get("/dispatch/test-miniapp").text)
+                self.assertEqual(c.get(path + "/status", headers=passenger).json["trip"],
+                                 {"id": trip["id"], "status": "assigned"})
+                self.assertEqual(len(c.get("/dispatch/test-sync/state").json["trips"]), 1)
 
     def test_telegram_source_bridge_disabled_without_staging_secret(self):
         with patch.dict(os.environ, {"PD_DISPATCH_STAGING_ONLY": "1"}, clear=True):

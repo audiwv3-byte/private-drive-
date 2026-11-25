@@ -323,9 +323,11 @@ def register(app, core):
 
     test_sync_enabled = (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
                          and os.environ.get("PD_DISPATCH_TEST_SYNC") == "1")
+    telegram_test_ready = False
     if test_sync_enabled:
-        from pd_dispatch_test_sync import register as register_test_sync
-        register_test_sync(app, authorized, valid_csrf)
+        from pd_dispatch_test_sync import register as register_test_sync, telegram_test_enabled
+        register_test_sync(app, authorized, valid_csrf, csrf=csrf)
+        telegram_test_ready = telegram_test_enabled()
 
     # Unified registry has no write routes and stays disabled until reviewed migration.
     if os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
@@ -360,7 +362,7 @@ def register(app, core):
         page = Path(__file__).with_name("pd_dispatcher_mapbox.html").read_text(encoding="utf-8")
         response = app.make_response(render_template_string(
             page, mapbox_token=token, test_sync_enabled=test_sync_enabled and not persistent_queue_enabled,
-            persistent_queue_enabled=persistent_queue_enabled,
+            persistent_queue_enabled=persistent_queue_enabled, telegram_test_enabled=telegram_test_ready,
             analytics_enabled="pd_site_analytics" in app.view_functions,
             csrf=csrf() if test_sync_enabled else "",
         ))

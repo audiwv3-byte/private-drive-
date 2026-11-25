@@ -60,6 +60,7 @@ def pilot_db():
                 public.pd_revoke_current_session(text,bigint) TO pd_ci_order_api;
             GRANT SELECT, INSERT ON public.pd_dispatch_orders,
                 public.pd_native_order_owners TO pd_ci_order_api;
+            GRANT UPDATE (status) ON public.pd_dispatch_orders TO pd_ci_order_api;
             GRANT SELECT ON public.pd_dispatch_orders TO pd_ci_order_dispatcher;
             GRANT SELECT (id,user_id,status,photo,created_at,expires_at,decided_at),
                   INSERT (id,user_id,status,photo,created_at,expires_at),
@@ -124,6 +125,25 @@ def test_native_order_appears_in_authenticated_web_dispatch_and_passenger_histor
     assert [row["order_id"] for row in
             api.get("/native-orders", headers=passenger).json["orders"]] == [order_id]
     assert api.get("/native-orders", headers=auth(tokens["other"])).json["orders"] == []
+
+    # Owner-only cancellation: unrelated passenger cannot mutate or even
+    # discover the booking, while dispatcher reads the same persisted status.
+    assert api.patch("/native-orders", headers=auth(tokens["other"]),
+                     json={"order_id": order_id, "action": "cancel"}).status_code == 404
+    invalid_cancel = api.patch("/native-orders", headers=passenger,
+                     json={"order_id": order_id, "action": "pay"})
+    assert invalid_cancel.status_code == 400
+    cancelled = api.patch("/native-orders", headers=passenger,
+                     json={"order_id": order_id, "action": "cancel"})
+    assert cancelled.status_code == 200, cancelled.json
+    assert cancelled.json == {"order_id": order_id, "status": "cancelled",
+                              "payment_mode": "disabled"}
+    assert api.patch("/native-orders", headers=passenger,
+                     json={"order_id": order_id, "action": "cancel"}).status_code == 200
+    assert api.get("/native-orders", headers=passenger).json["orders"][0]["status"] == "cancelled"
+    with psycopg.connect(api_dsn) as db:
+        assert db.execute("SELECT status FROM public.pd_dispatch_orders WHERE id=%s",
+                          (order_id,)).fetchone() == ("cancelled",)
 
     # Same database, distinct runtime users, as used by the two services.
     monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", dispatch_dsn)

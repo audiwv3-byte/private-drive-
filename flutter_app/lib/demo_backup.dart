@@ -40,6 +40,7 @@ class DemoBackupCodec {
     'passengerRatingByPilot', 'pilotChatMessages', 'passengerChatMessages',
     'dispatcherChatMessages', 'archivedChats',
     'stopStartedAt', 'completedStopMilliseconds',
+    'plannedDistanceMetres', 'plannedDurationSeconds',
   };
 
   // Exact local passenger-comfort fields; not native SMS / login preferences.

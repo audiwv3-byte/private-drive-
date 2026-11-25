@@ -58,6 +58,7 @@ class PrivateDriveApp extends StatelessWidget {
     final entry = PdNativeCabinEntry(
       signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
         allowGuestEntry: role == 'passenger',
+        autoStartTelegram: role == 'pilot' && !kIsWeb,
         legalAcknowledged: !pdLocalQaEntryEnabled,
         onAuthenticated: onAuthenticated,
       ),
@@ -101,6 +102,7 @@ class NativeSignInScreen extends StatefulWidget {
     this.httpClient,
     this.allowGuestEntry = true,
     this.legalAcknowledged = false,
+    this.autoStartTelegram = false,
     this.onAuthenticated,
     this.telegramLauncher,
   });
@@ -110,6 +112,7 @@ class NativeSignInScreen extends StatefulWidget {
   final http.Client? httpClient;
   final bool allowGuestEntry;
   final bool legalAcknowledged;
+  final bool autoStartTelegram;
   final ValueChanged<PdNativeSession>? onAuthenticated;
   final Future<bool> Function(Uri)? telegramLauncher;
 
@@ -124,6 +127,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen>
   bool busy = false;
   bool _guest = false;
   bool _acknowledgedLegal = false;
+  bool _showPilotSms = false;
   final _legalAcknowledgementAnchor = GlobalKey();
   String _language = 'RU';
   String tr(String ru, String lt, String en) => switch (_language) {
@@ -154,6 +158,11 @@ class _NativeSignInScreenState extends State<NativeSignInScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (widget.autoStartTelegram && widget.legalAcknowledged) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_startTelegram());
+      });
+    }
   }
 
   @override
@@ -162,6 +171,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen>
     _telegramPoll?.cancel();
     _telegramPoll = null;
     if (_appResumed && _telegramAutomatic) {
+      unawaited(_finishTelegram());
       _scheduleTelegramPoll();
     }
   }
@@ -682,7 +692,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen>
                     textAlign: TextAlign.center),
                 ],
                 const SizedBox(height: 20),
-                if (telegramAttempt == null) ...[
+                if (telegramAttempt == null && (!widget.autoStartTelegram || _showPilotSms)) ...[
                   TextField(
                     controller: destination,
                     enabled: !busy && challengeId == null,
@@ -775,12 +785,14 @@ class _NativeSignInScreenState extends State<NativeSignInScreen>
                         'Back to sign-in options')),
                   ),
                 ] else if (challengeId == null) ...[
-                  FilledButton(
-                    onPressed: busy || widget.authApiUrl.isEmpty
-                        ? null : requestCode,
-                    child: Text(tr('Получить код', 'Gauti kodą', 'Get code')),
-                  ),
-                  const SizedBox(height: 8),
+                  if (!widget.autoStartTelegram || _showPilotSms) ...[
+                    FilledButton(
+                      onPressed: busy || widget.authApiUrl.isEmpty
+                          ? null : requestCode,
+                      child: Text(tr('Получить код', 'Gauti kodą', 'Get code')),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   OutlinedButton.icon(
                     key: const Key('native-telegram-start'),
                     onPressed: busy || widget.authApiUrl.isEmpty
@@ -789,6 +801,11 @@ class _NativeSignInScreenState extends State<NativeSignInScreen>
                     label: Text(tr('Войти через Telegram', 'Prisijungti per „Telegram“',
                         'Sign in with Telegram')),
                   ),
+                  if (widget.autoStartTelegram && !_showPilotSms)
+                    TextButton(
+                      onPressed: busy ? null : () => setState(() => _showPilotSms = true),
+                      child: Text(tr('Войти по SMS', 'Prisijungti SMS žinute', 'Sign in with SMS')),
+                    ),
                 ] else ...[
                   TextField(
                     controller: code,

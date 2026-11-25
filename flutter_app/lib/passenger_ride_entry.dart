@@ -13,11 +13,13 @@ class PassengerRideEntry extends StatelessWidget {
     super.key,
     this.enableMapTiles = true,
     required this.tripStore,
+    this.storageScope = 'preview',
     this.onSignOut,
     this.onBackToCabinets,
   });
 
   final bool enableMapTiles;
+  final String storageScope;
   final DemoTripStore tripStore;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
@@ -28,6 +30,7 @@ class PassengerRideEntry extends StatelessWidget {
       builder: (_) => PdPassengerLanguageScope(
         child: PassengerDemo(
           enableMapTiles: enableMapTiles,
+          storageScope: storageScope,
           tripStore: tripStore,
           initialRideType: type,
           initialAdvanceBooking: advanceBooking,

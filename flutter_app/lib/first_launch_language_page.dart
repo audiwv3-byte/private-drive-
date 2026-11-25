@@ -17,7 +17,6 @@ class PdFirstLaunchLanguage extends StatefulWidget {
 }
 
 class _PdFirstLaunchLanguageState extends State<PdFirstLaunchLanguage> {
-  bool _acknowledged = false;
   bool _saving = false;
 
   @override
@@ -58,9 +57,6 @@ class _PdFirstLaunchLanguageState extends State<PdFirstLaunchLanguage> {
                               onPressed: _saving
                                   ? null
                                   : () {
-                                      if (language.value != code) {
-                                        setState(() => _acknowledged = false);
-                                      }
                                       language.set(code);
                                     },
                               style: OutlinedButton.styleFrom(
@@ -109,32 +105,9 @@ class _PdFirstLaunchLanguageState extends State<PdFirstLaunchLanguage> {
                                     ),
                                   ),
                                 ),
-                                CheckboxListTile(
-                                  key: const Key(
-                                    'first-launch-terms-acknowledgement',
-                                  ),
-                                  contentPadding: EdgeInsets.zero,
-                                  controlAffinity:
-                                      ListTileControlAffinity.leading,
-                                  value: _acknowledged,
-                                  onChanged: _saving
-                                      ? null
-                                      : (value) => setState(
-                                          () => _acknowledged = value ?? false,
-                                        ),
-                                  title: Text(
-                                    pdEntryTr(
-                                      context,
-                                      'Я ознакомился с условиями сервиса и политикой конфиденциальности',
-                                      'Susipažinau su paslaugos sąlygomis ir privatumo politika',
-                                      'I have read the terms of service and privacy policy',
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
                                 FilledButton(
                                   key: const Key('first-launch-continue'),
-                                  onPressed: !_acknowledged || _saving
+                                  onPressed: _saving
                                       ? null
                                       : () async {
                                           setState(() => _saving = true);
@@ -143,9 +116,9 @@ class _PdFirstLaunchLanguageState extends State<PdFirstLaunchLanguage> {
                                   child: Text(
                                     pdEntryTr(
                                       context,
-                                      'Продолжить',
-                                      'Tęsti',
-                                      'Continue',
+                                      'Ознакомился и продолжаю',
+                                      'Susipažinau ir tęsiu',
+                                      'I have read the terms · Continue',
                                     ),
                                   ),
                                 ),

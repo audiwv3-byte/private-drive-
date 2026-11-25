@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'permissions_onboarding.dart';
 import 'message_voice.dart';
@@ -15,6 +15,8 @@ import 'passenger_orders_demo.dart';
 import 'remote_sync_demo.dart';
 import 'pd_trip_route_editor.dart';
 import 'passenger_extra_services.dart';
+import 'passenger_profile_page.dart';
+import 'passenger_invoice_page.dart';
 import 'pd_pilot_assignment_waiting.dart';
 import 'passenger_preferences_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -29,15 +31,26 @@ import 'package:url_launcher/url_launcher.dart';
 /// Passenger preview: all trip, date, service and payment state stays in memory.
 /// The payment information link opens the website in an external browser.
 /// This screen does not collect payments or submit bookings.
+@visibleForTesting
+String normalizePassengerAddress(String query) => query.replaceFirst(
+  RegExp(r'^(?:улица|ул\.?)?\s*дубов(?=\s|,|$)', caseSensitive: false),
+  'Ąžuolų g.',
+);
+
+const _sendBookingsToQaDispatcher =
+    bool.fromEnvironment('PD_QA_SERVER_BOOKING') ||
+    bool.fromEnvironment('PD_INTERNAL_QA');
+
 class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
       this.preferencesStorage, this.initialRideType = 'Трансфер',
       this.initialAdvanceBooking = false,
       this.initialAdvanceDate, this.initialAdvanceTime,
       this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController,
-      this.onIncomingMessageVoice});
+      this.onIncomingMessageVoice, this.storageScope = 'preview'});
 
   final bool enableMapTiles;
+  final String storageScope;
   final String initialRideType;
   final bool initialAdvanceBooking;
   final DateTime? initialAdvanceDate;
@@ -64,7 +77,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
   double? _cabinTemperature;
   DateTime? _date;
   TimeOfDay? _time;
-  String _route = '';
   Future<void> _openPayseraPaymentInfo() async {
     try {
       final opened = await launchUrl(
@@ -91,6 +103,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _taxiOutsideCity = false;
   bool _taxiAdvanceBooking = false;
   int? _roadDistanceMetres;
+  int? _roadDurationSeconds;
   bool _meetSign = false;
   bool _pets = false;
   bool _soberDriver = false;
@@ -107,6 +120,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
   bool _followPassenger = false;
   LatLng? _passengerLocation;
   LatLng? _pickedPickup;
+  bool _pickDestination = false;
+  double? _sheetSizeBeforePoint;
   String? _locationMessage;
   bool _mapTilesFailed = false;
   bool _useBackupTiles = false;
@@ -314,8 +329,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
   }
 
 
-  LatLng? _resolve(String address) =>
-      _resolvedAddresses[address.trim()] ?? _places[address.trim()];
+  LatLng? _resolve(String address) {
+    final label = address.trim();
+    final known = _resolvedAddresses[label] ?? _places[label];
+    if (known != null) return known;
+    final coordinates = label.split(',');
+    if (coordinates.length != 2) return null;
+    final lat = double.tryParse(coordinates.first.trim());
+    final lon = double.tryParse(coordinates.last.trim());
+    if (lat == null || lon == null || !lat.isFinite || !lon.isFinite ||
+        lat.abs() > 90 || lon.abs() > 180) return null;
+    return LatLng(lat, lon);
+  }
 
   // Common Lithuanian/English names should work even when Photon is offline.
   static const _addressAliases = <String, String>{
@@ -351,9 +376,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final query = (side == 'from' ? _from.text : _to.text).trim();
     if (side == 'from') _pickedPickup = null;
     setState(() {
-      _route = '';
       _roadPoints = const [];
       _roadDistanceMetres = null;
+      _roadDurationSeconds = null;
       _routeInfo = '';
       _editingAddress = side;
       _addressSuggestions = _localAddressMatches(query);
@@ -367,7 +392,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _addressTimer = Timer(const Duration(milliseconds: 1100), () async {
       try {
         final uri = Uri.https('photon.komoot.io', '/api/', {
-          'q': query, 'limit': '5', 'lang': 'en',
+          'q': normalizePassengerAddress(query), 'limit': '5', 'lang': 'en',
           'lat': '54.6872', 'lon': '25.2797',
         });
         final payload = await const PdHttpApi().getJson(
@@ -382,6 +407,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
           final name = [p['name'],p['street'],p['housenumber'],p['city'],p['country']]
             .whereType<String>().where((v)=>v.trim().isNotEmpty).toSet().join(', ');
           if (name.isEmpty) continue;
+          if (!mounted || current != _addressGeneration) return;
           _resolvedAddresses[name] = LatLng((coords[1] as num).toDouble(),
             (coords[0] as num).toDouble());
           found.add(name);
@@ -390,7 +416,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
           setState(() {
             _addressSuggestions = {..._localAddressMatches(query), ...found}
                 .take(5).toList();
-            _addressSearchError = null;
+            _addressSearchError = _addressSuggestions.isEmpty
+                ? pdTr(context, 'Адрес не найден. Укажи улицу, номер и город.',
+                    'Adresas nerastas. Įrašyk gatvę, numerį ir miestą.',
+                    'Address not found. Enter the street, number and city.')
+                : null;
           });
         }
       } catch (error) {
@@ -525,23 +555,53 @@ class _PassengerDemoState extends State<PassengerDemo> {
     });
   }
 
-  void _usePickupPoint(LatLng point) {
+  void _choosePointOnMap({required bool destination}) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _addressTimer?.cancel();
+    ++_addressGeneration;
+    setState(() {
+      _pickDestination = destination;
+      _editingAddress = null;
+      _addressSuggestions = const [];
+      _addressSearchError = null;
+    });
+    if (_passengerSheetController.isAttached) {
+      _sheetSizeBeforePoint ??= _passengerSheetController.size;
+      unawaited(_passengerSheetController.animateTo(0.20,
+        duration: const Duration(milliseconds: 220), curve: Curves.easeOut));
+    }
+  }
+
+  void _useMapPoint(LatLng point, {required bool destination}) {
+    if (widget.tripStore?.isActive == true) return;
     if (!point.latitude.isFinite || !point.longitude.isFinite ||
         point.latitude.abs() > 90 || point.longitude.abs() > 180) return;
     final label = '${point.latitude.toStringAsFixed(6)}, ${point.longitude.toStringAsFixed(6)}';
     _addressTimer?.cancel();
     ++_addressGeneration;
     setState(() {
-      _pickedPickup = point;
       _resolvedAddresses[label] = point;
-      _from.text = label;
+      if (destination) {
+        _to.text = label;
+      } else {
+        _pickedPickup = point;
+        _from.text = label;
+        _pickDestination = true;
+      }
+      _followPassenger = false;
+      _followPilot = false;
       _editingAddress = null;
       _addressSuggestions = const [];
       _addressSearchError = null;
-      _route = '';
       _roadPoints = const [];
       _routeInfo = '';
     });
+    final previousSheetSize = _sheetSizeBeforePoint;
+    _sheetSizeBeforePoint = null;
+    if (previousSheetSize != null && _passengerSheetController.isAttached) {
+      unawaited(_passengerSheetController.animateTo(previousSheetSize,
+        duration: const Duration(milliseconds: 220), curve: Curves.easeOut));
+    }
     unawaited(_updateRoadPreview());
   }
 
@@ -551,7 +611,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
       if (side == 'from') _pickedPickup = null;
       _editingAddress = null;
       _addressSuggestions = const [];
-      _route = '';
       _roadPoints = const [];
       _routeInfo = '';
     });
@@ -560,8 +619,12 @@ class _PassengerDemoState extends State<PassengerDemo> {
     _updateRoadPreview();
   }
 
-  void _openPassengerSection(String section) {
-    Navigator.pop(context);
+  void _openCompanyInfo() => Navigator.push(context, MaterialPageRoute<void>(
+    builder: (_) => const CompanyInfoPage(),
+  ));
+
+  void _openPassengerSection(String section, {bool closeDrawer = true}) {
+    if (closeDrawer) Navigator.pop(context);
     setState(() => _menuSection = section);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_passengerSheetController.isAttached) return;
@@ -803,7 +866,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _addressSuggestions = const [];
       _addressSearchError = null;
       _pickedPickup = null;
-      _route = '';
     });
     unawaited(_updateRoadPreview());
   }
@@ -842,6 +904,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
       estimatedFareEur: _rideType == 'Такси' || _draftStops.isNotEmpty ? null : _pricePreview,
       estimatedFareCents: _draftStops.isEmpty ? _taxiPriceCents : null,
       extrasRequireQuote: _requiresCustomQuote,
+      plannedDistanceMetres: _roundTrip ? null : _roadDistanceMetres,
+      plannedDurationSeconds: _roundTrip ? null : _roadDurationSeconds,
       services: [
         if (_rideType == 'Такси' && _taxiAdvanceBooking)
           'Предварительное бронирование +3 €',
@@ -962,6 +1026,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final finish = _resolve(_to.text);
     final stops = _draftStops.map(_resolve).toList();
     _roadDistanceMetres = null;
+      _roadDurationSeconds = null;
     if (start == null || finish == null || stops.any((point) => point == null) || !widget.enableMapTiles) {
       if (mounted) setState(() {
         _roadPoints = const [];
@@ -999,6 +1064,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       setState(() {
         _roadPoints = points;
         _roadDistanceMetres = (route['distance'] as num).round();
+        _roadDurationSeconds = (route['duration'] as num?)?.round();
         _routeLoading = false;
         final km = ((route['distance'] as num).toDouble() / 1000).round();
         _routeInfo = 'Дорожный маршрут · около $km км · демо';
@@ -1008,15 +1074,22 @@ class _PassengerDemoState extends State<PassengerDemo> {
       setState(() {
         _roadPoints = const [];
         _roadDistanceMetres = null;
+        _roadDurationSeconds = null;
         _routeLoading = false;
         _routeInfo = 'Дорожный маршрут временно недоступен.';
       });
     }
   }
 
-  void _chooseRoute(String route, String from, String to) {
+  void _chooseRoute(String from, String to) {
+    if (widget.tripStore?.isActive == true) return;
+    _addressTimer?.cancel();
+    ++_addressGeneration;
     setState(() {
-      _route = route;
+      _pickedPickup = null;
+      _editingAddress = null;
+      _addressSuggestions = const [];
+      _addressSearchError = null;
       _from.text = from;
       _to.text = to;
     });
@@ -1239,7 +1312,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         key: const Key('passenger-map'),
                         mapController: _passengerMapController,
                         options: MapOptions(
-                          onTap: (_, point) => _usePickupPoint(point),
+                          onTap: (_, point) => _useMapPoint(point, destination: _pickDestination),
                           onPositionChanged: (_, hasGesture) {
                             if (hasGesture && _followPassenger) {
                               setState(() {
@@ -1394,6 +1467,31 @@ class _PassengerDemoState extends State<PassengerDemo> {
                         ),
                       ),
                     ),
+                    if (widget.enableMapTiles && widget.tripStore?.isActive != true)
+                      Align(
+                        alignment: const Alignment(0, -0.70),
+                        child: SegmentedButton<bool>(
+                          key: const Key('passenger-map-point-mode'),
+                          style: ButtonStyle(
+                            backgroundColor: WidgetStateProperty.resolveWith(
+                              (states) => states.contains(WidgetState.selected)
+                                  ? const Color(0xFF4B3C20) : const Color(0xFF172533),
+                            ),
+                            foregroundColor: const WidgetStatePropertyAll(Colors.white),
+                          ),
+                          segments: [
+                            ButtonSegment(value: false,
+                              icon: const Icon(Icons.trip_origin),
+                              label: Text(pdLabel(context, 'Откуда'))),
+                            ButtonSegment(value: true,
+                              icon: const Icon(Icons.location_on_outlined),
+                              label: Text(pdLabel(context, 'Куда'))),
+                          ],
+                          selected: {_pickDestination},
+                          onSelectionChanged: (value) =>
+                            setState(() => _pickDestination = value.single),
+                        ),
+                      ),
                     if (pilotPosition != null)
                       Positioned(
                         top: 64,
@@ -1448,6 +1546,56 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ),
             );
 
+    Widget transferRoutes() {
+      Widget routeChip(String id, String from, String to, String label, IconData icon) {
+        final fare = _transferFares['${from.toLowerCase()}|${to.toLowerCase()}'];
+        return ActionChip(
+          key: Key('route-$id'),
+          avatar: Icon(icon, size: 18),
+          label: Text(fare == null ? label : '$label · $fare €'),
+          onPressed: widget.tripStore?.isActive == true ? null : () => _chooseRoute(from, to),
+        );
+      }
+
+      const vilnius = 'Вильнюс';
+      const airport = 'Аэропорт Вильнюса';
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(pdTr(context, 'Трансферы по городам', 'Pervežimai tarp miestų', 'City transfers'),
+          style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text(pdLabel(context, 'В одну сторону')),
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          routeChip('airport', vilnius, airport, pdLabel(context, 'Аэропорт'), Icons.flight_takeoff),
+          routeChip('kaunas', vilnius, 'Каунас', pdLabel(context, 'Вильнюс — Каунас'),
+            Icons.location_city_outlined),
+          routeChip('klaipeda', vilnius, 'Клайпеда', pdLabel(context, 'Вильнюс — Клайпеда'),
+            Icons.sailing_outlined),
+          routeChip('warsaw', vilnius, 'Варшава', pdLabel(context, 'Вильнюс — Варшава'),
+            Icons.location_city_outlined),
+        ]),
+        ExpansionTile(
+          key: const Key('passenger-all-transfer-routes'),
+          title: Text(pdTr(context, 'Все направления', 'Visos kryptys', 'All destinations')),
+          initiallyExpanded: _menuSection == 'routes',
+          tilePadding: EdgeInsets.zero,
+          children: [
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              routeChip('airport-vilnius', airport, vilnius,
+                pdTr(context, 'Аэропорт → Вильнюс', 'Oro uostas → Vilnius', 'Airport → Vilnius'),
+                Icons.flight_land),
+              for (final destination in const [
+                'Паневежис', 'Кедайняй', 'Шяуляй', 'Мариямполе', 'Алитус',
+                'Друскининкай', 'Бирштонас', 'Утена', 'Кибартай', 'Панямуне', 'Рига',
+                'Тракай', 'Паланга',
+              ])
+                routeChip(destination.toLowerCase(), vilnius, destination,
+                  pdLabel(context, 'Вильнюс — $destination'), Icons.route_outlined),
+            ]),
+          ],
+        ),
+      ]);
+    }
+
     Widget bookingForm(ScrollController? panelScrollController) =>
       ListView(
                 controller: panelScrollController,
@@ -1469,14 +1617,29 @@ class _PassengerDemoState extends State<PassengerDemo> {
             Text(pdLabel(context, _rideType),
               key: const Key('passenger-selected-ride-type'),
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            if (_rideType == 'Трансфер')
-              SwitchListTile(
-                key: const Key('passenger-round-trip'),
-                title: Text(pdLabel(context, 'Туда и обратно')),
-                value: _roundTrip,
-                onChanged: widget.tripStore?.isActive == true ? null :
-                    (value) => setState(() => _roundTrip = value),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('passenger-date'),
+                    onPressed: widget.tripStore?.isActive == true ? null : _pickDate,
+                    icon: const Icon(Icons.calendar_today),
+                    label: Text(_date == null
+                        ? pdLabel(context, 'Дата')
+                        : '${_date!.day.toString().padLeft(2, '0')}.${_date!.month.toString().padLeft(2, '0')}.${_date!.year}'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('passenger-time'),
+                    onPressed: widget.tripStore?.isActive == true ? null : _pickTime,
+                    icon: const Icon(Icons.schedule),
+                    label: Text(_time == null ? pdLabel(context, 'Время') : _time!.format(context)),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             if (!widget.enableMapTiles)
               SizedBox(height: 285, child: passengerMap()),
@@ -1486,7 +1649,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             if (_passengerLocation != null)
               OutlinedButton.icon(
                 key: const Key('passenger-use-current-as-pickup'),
-                onPressed: () => _usePickupPoint(_passengerLocation!),
+                onPressed: () => _useMapPoint(_passengerLocation!, destination: false),
                 icon: const Icon(Icons.trip_origin),
                 label: Text(pdTr(context, 'Забрать меня здесь',
                   'Paimti mane čia', 'Pick me up here')),
@@ -1540,42 +1703,106 @@ class _PassengerDemoState extends State<PassengerDemo> {
             if (_routeLoading)
               const LinearProgressIndicator(key: Key('passenger-route-loading')),
             const SizedBox(height: 12),
-            if (!widget.enableMapTiles || _menuSection == 'routes') ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('passenger-payment-shortcut'),
+                  onPressed: () => _openPassengerSection('payments', closeDrawer: false),
+                  icon: const Icon(Icons.credit_card_outlined),
+                  label: Text(pdLabel(context, 'Способы оплаты')),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('passenger-contacts-shortcut'),
+                  onPressed: _openCompanyInfo,
+                  icon: const Icon(Icons.contact_support_outlined),
+                  label: Text(pdTr(context, 'Наши контакты', 'Mūsų kontaktai', 'Our contacts')),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('passenger-routes-shortcut'),
+                  onPressed: () => _openPassengerSection('routes', closeDrawer: false),
+                  icon: const Icon(Icons.route_outlined),
+                  label: Text(pdLabel(context, 'Популярные направления')),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (!widget.enableMapTiles || _menuSection == 'payments') ...[
+            Text(pdLabel(context, 'Способ оплаты · только выбор'), style: TextStyle(fontWeight: FontWeight.bold)),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final method in ['Карта', 'PayPal', 'Банковский перевод', 'Криптовалюта'])
+                  ChoiceChip(
+                    key: Key('payment-$method'),
+                    label: Text(method == 'Карта'
+                      ? pdTr(context, 'Карта', 'Kortelė', 'Card')
+                      : pdLabel(context, method)),
+                    selected: _payment == method,
+                    onSelected: widget.tripStore?.isActive == true ||
+                        (_isAdvanceBooking && method == 'Наличные') ? null
+                        : (_) => setState(() => _payment = method),
+                  ),
+              ],
+            ),
+            TextButton.icon(
+              key: const Key('passenger-paysera-info'),
+              onPressed: _openPayseraPaymentInfo,
+              icon: const Icon(Icons.open_in_new),
+              label: Text(pdTr(context, 'Оплата через Paysera',
+                  'Mokėjimas per „Paysera“', 'Paying with Paysera')),
+            ),
+            if (_cashBlockedForAdvance)
+              const Text(
+                'Предварительный заказ оплачивается только безналично. '
+                'Выбери карту, PayPal, банковский перевод или криптовалюту.',
+                key: Key('advance-cash-payment-blocked'),
+                style: TextStyle(color: Colors.orangeAccent),
+              ),
+            const SizedBox(height: 12),
+            ],
+            if (_rideType != 'Трансфер' && (!widget.enableMapTiles || _menuSection == 'routes')) ...[
             Text(pdLabel(context, 'Популярные направления')),
             Wrap(
               spacing: 6,
               children: [
                 ActionChip(
                   key: const Key('route-kaunas'),
+                  avatar: const Icon(Icons.location_city_outlined, size: 18),
                   label: Text(pdLabel(context, 'Вильнюс — Каунас')),
-                  onPressed: () => _chooseRoute('Вильнюс — Каунас', 'Вильнюс', 'Каунас'),
+                  onPressed: () => _chooseRoute('Вильнюс', 'Каунас'),
                 ),
                 ActionChip(
                   key: const Key('route-airport'),
+                  avatar: const Icon(Icons.flight_takeoff, size: 18),
                   label: Text(pdLabel(context, 'Аэропорт')),
-                  onPressed: () => _chooseRoute('Аэропорт', 'Вильнюс', 'Аэропорт Вильнюса'),
+                  onPressed: () => _chooseRoute('Вильнюс', 'Аэропорт Вильнюса'),
                 ),
                 ActionChip(
                   key: const Key('route-warsaw'),
+                  avatar: const Icon(Icons.location_city_outlined, size: 18),
                   label: Text(pdLabel(context, 'Вильнюс — Варшава')),
-                  onPressed: () => _chooseRoute('Вильнюс — Варшава', 'Вильнюс', 'Варшава'),
+                  onPressed: () => _chooseRoute('Вильнюс', 'Варшава'),
                 ),
                 ActionChip(
                   key: const Key('route-klaipeda'),
+                  avatar: const Icon(Icons.sailing_outlined, size: 18),
                   label: Text(pdLabel(context, 'Вильнюс — Клайпеда')),
                   onPressed: () => _chooseRoute(
-                    'Вильнюс — Клайпеда', 'Вильнюс', 'Клайпеда'),
+                    'Вильнюс', 'Клайпеда'),
                 ),
                 ActionChip(
                   key: const Key('route-trakai'),
+                  avatar: const Icon(Icons.castle_outlined, size: 18),
                   label: Text(pdLabel(context, 'Вильнюс — Тракай')),
                   onPressed: () => _chooseRoute(
-                    'Вильнюс — Тракай', 'Вильнюс', 'Тракай'),
+                    'Вильнюс', 'Тракай'),
                 ),
                 ActionChip(
                   key: const Key('route-palanga'),
                   label: Text(pdLabel(context, 'Вильнюс — Паланга')),
-                  onPressed: () => _chooseRoute('Вильнюс — Паланга', 'Вильнюс', 'Паланга'),
+                  onPressed: () => _chooseRoute('Вильнюс', 'Паланга'),
                 ),
               ],
             ),
@@ -1586,7 +1813,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
               readOnly: widget.tripStore?.isActive == true,
               onChanged: (_) { _addressChanged('from'); _updateRoadPreview(); },
               decoration: InputDecoration(
-                labelText: pdLabel(context, 'Откуда'), prefixIcon: Icon(Icons.trip_origin),
+                labelText: pdLabel(context, 'Откуда'), prefixIcon: const Icon(Icons.trip_origin),
+                suffixIcon: widget.enableMapTiles && widget.tripStore?.isActive != true
+                    ? IconButton(
+                        key: const Key('passenger-pick-origin-on-map'),
+                        tooltip: pdTr(context, 'Выбрать подачу на карте',
+                          'Pasirinkti paėmimo vietą žemėlapyje', 'Select pickup on map'),
+                        icon: const Icon(Icons.place_outlined),
+                        onPressed: () => _choosePointOnMap(destination: false))
+                    : null,
               ),
             ),
             _addressSuggestionsWidget('from'),
@@ -1599,7 +1834,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
                     readOnly: widget.tripStore?.isActive == true,
                     onChanged: (_) { _addressChanged('to'); _updateRoadPreview(); },
                     decoration: InputDecoration(
-                      labelText: pdLabel(context, 'Куда'), prefixIcon: Icon(Icons.location_on_outlined),
+                      labelText: pdLabel(context, 'Куда'), prefixIcon: const Icon(Icons.location_on_outlined),
+                      suffixIcon: widget.enableMapTiles && widget.tripStore?.isActive != true
+                          ? IconButton(
+                              key: const Key('passenger-pick-destination-on-map'),
+                              tooltip: pdTr(context, 'Выбрать назначение на карте',
+                                'Pasirinkti tikslą žemėlapyje', 'Select destination on map'),
+                              icon: const Icon(Icons.place_outlined),
+                              onPressed: () => _choosePointOnMap(destination: true))
+                          : null,
                     ),
                   ),
                 ),
@@ -1612,7 +1855,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       final previous = _from.text;
                       _from.text = _to.text;
                       _to.text = previous;
-                      _route = '';
                       _roadPoints = const [];
                       _routeInfo = '';
                     });
@@ -1632,66 +1874,29 @@ class _PassengerDemoState extends State<PassengerDemo> {
                     : 'Остановки: ${_draftStops.length}'),
               ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const Key('passenger-date'),
-                    onPressed: widget.tripStore?.isActive == true ? null : _pickDate,
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(_date == null
-                        ? pdLabel(context, 'Дата')
-                        : '${_date!.day.toString().padLeft(2, '0')}.${_date!.month.toString().padLeft(2, '0')}.${_date!.year}'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: const Key('passenger-time'),
-                    onPressed: widget.tripStore?.isActive == true ? null : _pickTime,
-                    icon: const Icon(Icons.schedule),
-                    label: Text(_time == null ? pdLabel(context, 'Время') : _time!.format(context)),
-                  ),
-                ),
-              ],
-            ),
+            if (_rideType == 'Трансфер')
+              SwitchListTile(
+                key: const Key('passenger-round-trip'),
+                title: Text(pdLabel(context, 'Туда и обратно')),
+                subtitle: !_roundTrip ? Text(pdLabel(context, 'В одну сторону')) : null,
+                value: _roundTrip,
+                onChanged: widget.tripStore?.isActive == true ? null :
+                    (value) => setState(() => _roundTrip = value),
+              ),
+            if (_rideType == 'Трансфер') transferRoutes(),
             const SizedBox(height: 16),
             if (widget.tripStore != null) ...[
-              Text(pdTr(context, 'Дополнительные услуги',
-                  'Papildomos paslaugos', 'Additional services'),
+              FilledButton.tonalIcon(
                 key: const Key('passenger-booking-extra-services-title'),
-                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              Card(child: ListTile(
-                key: const Key('passenger-booking-jumpstart'),
-                leading: const Icon(Icons.battery_charging_full, size: 32),
-                title: Text(pdTr(context, 'Запуск автомобиля · 20 €',
-                    'Automobilio užvedimas · 20 €', 'Car jump-start · €20')),
-                subtitle: Text(pdTr(context, 'Помощь с разряженным аккумулятором',
-                    'Pagalba išsikrovus akumuliatoriui',
-                    'Help with a flat car battery')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.push(context, MaterialPageRoute<void>(
+                icon: const Icon(Icons.room_service_outlined),
+                label: Text(pdTr(context, 'Дополнительные услуги',
+                  'Papildomos paslaugos', 'Additional services')),
+                onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
                   builder: (_) => PdPassengerLanguageScope(
-                    child: PassengerExtraServices(
-                      type: ExtraServiceType.jumpstart,
-                      tripStore: widget.tripStore!)))),
-              )),
-              Card(child: ListTile(
-                key: const Key('passenger-booking-delivery'),
-                leading: const Icon(Icons.shopping_bag_outlined, size: 32),
-                title: Text(pdTr(context, 'Доставка товаров · 20 €',
-                    'Prekių pristatymas · 20 €', 'Goods delivery · €20')),
-                subtitle: Text(pdTr(context, 'Заберём покупки из магазина и доставим',
-                    'Paimsime pirkinius iš parduotuvės ir pristatysime',
-                    'We will pick up and deliver your shopping')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.push(context, MaterialPageRoute<void>(
-                  builder: (_) => PdPassengerLanguageScope(
-                    child: PassengerExtraServices(
-                      type: ExtraServiceType.delivery,
-                      tripStore: widget.tripStore!)))),
-              )),
+                    child: PassengerExtraServiceList(tripStore: widget.tripStore!),
+                  ),
+                )),
+              ),
             ],
             const SizedBox(height: 16),
             if (!widget.enableMapTiles || _menuSection == 'preferences') ...[
@@ -1865,48 +2070,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ),
             const SizedBox(height: 12),
             ],
-            if (!widget.enableMapTiles || _menuSection == 'payments') ...[
-            Text(pdLabel(context, 'Способ оплаты · только выбор'), style: TextStyle(fontWeight: FontWeight.bold)),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final method in ['Карта', 'PayPal', 'Банковский перевод', 'Криптовалюта'])
-                  ChoiceChip(
-                    key: Key('payment-$method'),
-                    label: Text(method == 'Карта'
-                      ? pdTr(context, 'Карта', 'Kortelė', 'Card')
-                      : pdLabel(context, method)),
-                    selected: _payment == method,
-                    onSelected: widget.tripStore?.isActive == true ||
-                        (_isAdvanceBooking && method == 'Наличные') ? null
-                        : (_) => setState(() => _payment = method),
-                  ),
-              ],
-            ),
-            TextButton.icon(
-              key: const Key('passenger-paysera-info'),
-              onPressed: _openPayseraPaymentInfo,
-              icon: const Icon(Icons.open_in_new),
-              label: Text(pdTr(context, 'Оплата через Paysera',
-                  'Mokėjimas per „Paysera“', 'Paying with Paysera')),
-            ),
-            if (_cashBlockedForAdvance)
-              const Text(
-                'Предварительный заказ оплачивается только безналично. '
-                'Выбери карту, PayPal, банковский перевод или криптовалюту.',
-                key: Key('advance-cash-payment-blocked'),
-                style: TextStyle(color: Colors.orangeAccent),
-              ),
-            const SizedBox(height: 12),
-            ],
-            Text(
-              (_draftStops.isNotEmpty ||
-                  (_rideType == 'Такси' ? taxiPrice == null : price == null))
-                  ? pdTr(context,
-                      'Стоимость по запросу · фиксированная цена не установлена',
-                      'Kaina pagal užklausą · fiksuota kaina nenustatyta',
-                      'Price on request · no fixed fare available')
-                  : _rideType == 'Такси'
+            if (_draftStops.isEmpty &&
+                (_rideType == 'Такси' ? taxiPrice != null : price != null))
+              Text(
+                _rideType == 'Такси'
                       ? 'Такси: ${PdTaxiFare.euros(taxiPrice!)}' +
                           (_requiresCustomQuote
                             ? ' · доп. услуги требуют подтверждения' : '')
@@ -1924,30 +2091,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 color: gold, fontWeight: FontWeight.bold, fontSize: 16,
               ),
             ),
-            const Text(
-              'Дополнительные остановки и изменение маршрута после заказа '
-              'согласуются отдельно с диспетчером до выполнения. '
-              'Доплата возможна только безналично по согласованию. '
-              'Никаких автоматических списаний и изменений '
-              'исходного способ оплаты.',
-              key: Key('route-adjustment-payment-note'),
-              style: TextStyle(fontSize: 12),
-            ),
-            Text(pdTr(context,
-              'Предпросмотр согласованных тарифов. Окончательная цена назначается диспетчером до оплаты.',
-              'Suderintų tarifų peržiūra. Galutinę kainą dispečeris patvirtins prieš apmokėjimą.',
-              'Fare preview. Dispatcher confirms final price before payment.'),
-              style: const TextStyle(fontSize: 12)),
-            const SizedBox(height: 12),
-            Text(
-              pdTr(context, 'Выбрано', 'Pasirinkta', 'Selected') +
-                ': ${pdLabel(context, _rideType)} · ${_route.isNotEmpty ? _route : pdLabel(context, 'свой маршрут')} · ' +
-                (_payment == 'Карта' ? pdTr(context, 'Карта', 'Kortelė', 'Card') : pdLabel(context, _payment)),
-              key: const Key('passenger-summary'),
-            ),
-            const SizedBox(height: 12),
             if (widget.tripStore != null) ...[
-              Text(pdLabel(context, widget.tripStore!.statusLabel),
+              if (widget.tripStore!.isActive ||
+                  widget.tripStore!.status == DemoTripStatus.finished)
+                Text(pdLabel(context, widget.tripStore!.statusLabel),
                   key: const Key('passenger-trip-status')),
               if (widget.tripStore!.trip != null)
                 FilledButton.icon(
@@ -1964,14 +2111,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
             FilledButton(
               key: const Key('passenger-book-disabled'),
               onPressed: _canCreateLocalTrip
-                  ? (const bool.fromEnvironment('PD_INTERNAL_QA')
+                  ? (_sendBookingsToQaDispatcher
                       ? _openServerBookingQa : _createLocalTrip)
                   : null,
               child: Text(widget.tripStore == null
                   ? pdTr(context, 'Заказать поездку — недоступно в демоверсии',
                       'Užsakyti kelionę — demo versijoje nepasiekiama',
                       'Book ride — unavailable in demo')
-                  : const bool.fromEnvironment('PD_INTERNAL_QA')
+                  : _sendBookingsToQaDispatcher
                       ? pdTr(context, 'Отправить тестовый заказ диспетчеру',
                           'Siųsti bandomąjį užsakymą dispečeriui',
                           'Send test booking to dispatcher')
@@ -2050,9 +2197,26 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-drawer-profile'),
               leading: const Icon(Icons.account_circle_outlined),
               title: Text(pdTr(context, 'Профиль', 'Profilis', 'Profile')),
-              subtitle: Text(pdTr(context, 'После SMS-регистрации',
-                'Po SMS registracijos', 'After SMS registration')),
-              enabled: false,
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute<void>(
+                  builder: (_) => PdPassengerLanguageScope(child:
+                    PassengerProfilePage(storageScope: widget.storageScope)),
+                ));
+              },
+            ),
+            ListTile(
+              key: const Key('passenger-drawer-invoices'),
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: Text(pdTr(context, 'Фактуры за поездки',
+                'Kelionių sąskaitos', 'Trip invoices')),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute<void>(
+                  builder: (_) => PdPassengerLanguageScope(
+                    child: PassengerInvoicePage(tripStore: widget.tripStore)),
+                ));
+              },
             ),
             ListTile(
               leading: const Icon(Icons.card_giftcard_outlined),

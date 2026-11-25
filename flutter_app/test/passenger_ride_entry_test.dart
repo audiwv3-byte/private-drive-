@@ -87,12 +87,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<Text>(
       find.byKey(const Key('passenger-selected-ride-type'))).data, 'Pervežimas');
+    final form = find.descendant(of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-round-trip')),
+      160, scrollable: form);
     expect(find.text('Pirmyn ir atgal'), findsOneWidget);
     pdLanguage.set('EN', persist: false);
     await tester.pumpAndSettle();
+    expect(find.text('Round trip'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-selected-ride-type')),
+      -160, scrollable: form);
     expect(tester.widget<Text>(
       find.byKey(const Key('passenger-selected-ride-type'))).data, 'Transfer');
-    expect(find.text('Round trip'), findsOneWidget);
   });
 
   testWidgets('Language selection never translates pilot or dispatcher UI',
@@ -147,6 +153,9 @@ void main() {
     expect(tester.widget<Text>(
       find.byKey(const Key('passenger-selected-ride-type'))).data, 'Такси');
     expect(find.byKey(const Key('passenger-taxi-tariffs')), findsNothing);
+    expect(tester.getTopLeft(find.byKey(const Key('passenger-date'))).dy,
+      greaterThan(tester.getTopLeft(find.byKey(const Key('passenger-selected-ride-type'))).dy));
+    expect(find.byKey(const Key('passenger-time')), findsOneWidget);
     expect(find.byKey(const Key('passenger-round-trip')), findsNothing);
     expect(find.byKey(const Key('passenger-ride-type')), findsNothing);
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
@@ -170,6 +179,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<Text>(
       find.byKey(const Key('passenger-selected-ride-type'))).data, 'Трансфер');
+    expect(tester.getTopLeft(find.byKey(const Key('passenger-date'))).dy,
+      greaterThan(tester.getTopLeft(find.byKey(const Key('passenger-selected-ride-type'))).dy));
+    await tester.scrollUntilVisible(find.byKey(const Key('passenger-round-trip')), 160,
+      scrollable: find.descendant(of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable)).first);
     expect(find.byKey(const Key('passenger-round-trip')), findsOneWidget);
   });
 }

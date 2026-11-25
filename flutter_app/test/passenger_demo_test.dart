@@ -1,8 +1,33 @@
+import 'package:private_drive/remote_sync_demo.dart';
+import 'package:private_drive/demo_trip_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/passenger_demo.dart';
 
 void main() {
+  testWidgets('QA booking opens the dispatcher submission', (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+      enableMapTiles: false, tripStore: store,
+    )));
+    final form = find.descendant(of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable)).first;
+    final preset = find.byKey(const Key('route-kaunas'));
+    await tester.scrollUntilVisible(preset, 150, scrollable: form);
+    tester.widget<ActionChip>(preset).onPressed!();
+    await tester.pump();
+    final submit = find.byKey(const Key('passenger-book-disabled'));
+    await tester.scrollUntilVisible(submit, 160, scrollable: form);
+    tester.widget<FilledButton>(submit).onPressed!();
+    await tester.pumpAndSettle();
+    final booking = tester.widget<RemoteSyncDemo>(find.byType(RemoteSyncDemo));
+    expect(booking.stagingDispatcher, isTrue);
+    expect(booking.initialFrom, 'Вильнюс');
+    expect(booking.initialTo, 'Каунас');
+    expect(store.trip, isNull);
+  }, skip: !const bool.fromEnvironment('PD_QA_SERVER_BOOKING'));
+
   testWidgets('English airport alias suggests a selectable offline address',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(
@@ -47,7 +72,7 @@ void main() {
     await tester.pump();
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-to')),
-      180,
+      -160,
       scrollable: find.descendant(
         of: find.byKey(const Key('passenger-form')),
         matching: find.byType(Scrollable),
@@ -88,7 +113,13 @@ void main() {
       'Вильнюс',
     );
 
-    await tester.ensureVisible(find.byKey(const Key('passenger-date')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-date')), -160,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('passenger-form')),
+        matching: find.byType(Scrollable),
+      ).first,
+    );
     expect(
       tester.widget<OutlinedButton>(find.byKey(const Key('passenger-date')))
           .onPressed,
@@ -191,8 +222,7 @@ void main() {
         .onPressed!();
     await tester.pump();
     await tester.scrollUntilVisible(
-      // Round-trip switch is above the popular-route chips in the ListView.
-      find.byKey(const Key('passenger-round-trip')), -160, scrollable: list);
+      find.byKey(const Key('passenger-round-trip')), -100, scrollable: list);
     tester.widget<SwitchListTile>(find.byKey(const Key('passenger-round-trip')))
         .onChanged!(true);
     await tester.pump();
@@ -284,11 +314,8 @@ void main() {
       find.byKey(const Key('passenger-to')), -200, scrollable: list);
     await tester.enterText(find.byKey(const Key('passenger-to')), 'Тракай');
     await tester.pump();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('passenger-price-preview')),
-      220, scrollable: list);
     expect(find.text('Предварительная стоимость: 110 €'), findsNothing);
-    expect(find.textContaining('Стоимость по запросу'), findsOneWidget);
+    expect(find.textContaining('Стоимость по запросу'), findsNothing);
   });
 
   testWidgets('Services and payment change preview, never create a booking',
@@ -316,7 +343,7 @@ void main() {
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('payment-PayPal')),
-      220,
+      -220,
       scrollable: find.descendant(
         of: find.byKey(const Key('passenger-form')),
         matching: find.byType(Scrollable),

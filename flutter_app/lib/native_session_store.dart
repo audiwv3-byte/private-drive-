@@ -41,8 +41,7 @@ class PdNativeSessionStore {
       return null;
     }
     try {
-      final response = await _post('/native-auth/session', token);
-      final session = PdNativeSession.fromApi(response, savedToken: token);
+      final session = await validateToken(token);
       final cabin = switch (data is Map ? data['cabin'] : null) {
         'pilot' when session.canPilot => 'pilot',
         'dispatcher' when session.canDispatch => 'dispatcher',
@@ -54,6 +53,11 @@ class PdNativeSessionStore {
       await clear();
       return null;
     }
+  }
+
+  Future<PdNativeSession> validateToken(String token) async {
+    final response = await _post('/native-auth/session', token);
+    return PdNativeSession.fromApi(response, savedToken: token);
   }
 
   Future<void> clear() => _storage.delete(key: _key);

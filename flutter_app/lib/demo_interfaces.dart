@@ -282,6 +282,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
         child: PassengerRideEntry(
           enableMapTiles: widget.enableMapTiles,
           tripStore: _trip,
+          storageScope: widget.storageScope ?? 'preview',
           onSignOut: widget.onSignOut,
           onBackToCabinets: widget.onBackToCabinets,
         ),

@@ -18,6 +18,8 @@ class DemoTrip {
     this.estimatedFareEur,
     this.estimatedFareCents,
     this.extrasRequireQuote = false,
+    this.plannedDistanceMetres,
+    this.plannedDurationSeconds,
     this.stops = const [],
     required this.services,
   });
@@ -35,6 +37,8 @@ class DemoTrip {
   final int? estimatedFareCents;
   /// True when additional selected services still require dispatcher pricing.
   final bool extrasRequireQuote;
+  final int? plannedDistanceMetres;
+  final int? plannedDurationSeconds;
   final List<String> services;
   final List<String> stops;
   String get routeLabel => [from, ...stops, to].join(' → ');
@@ -318,6 +322,8 @@ class DemoTripStore extends ChangeNotifier {
     int? estimatedFareEur,
     int? estimatedFareCents,
     bool extrasRequireQuote = false,
+    int? plannedDistanceMetres,
+    int? plannedDurationSeconds,
     List<String> stops = const [],
   }) {
     final a = from.trim();
@@ -343,6 +349,8 @@ class DemoTripStore extends ChangeNotifier {
       estimatedFareEur: estimatedFareEur,
       estimatedFareCents: estimatedFareCents,
       extrasRequireQuote: extrasRequireQuote,
+      plannedDistanceMetres: plannedDistanceMetres,
+      plannedDurationSeconds: plannedDurationSeconds,
       stops: List.unmodifiable(stops.map((stop) => stop.trim())),
       services: List.unmodifiable(services),
     );
@@ -475,6 +483,8 @@ class DemoTripStore extends ChangeNotifier {
       'estimatedFareEur': trip.estimatedFareEur,
       'estimatedFareCents': trip.estimatedFareCents,
       'extrasRequireQuote': trip.extrasRequireQuote,
+      'plannedDistanceMetres': trip.plannedDistanceMetres,
+      'plannedDurationSeconds': trip.plannedDurationSeconds,
       'services': trip.services,
       'status': status.name,
       'paused': _paused,
@@ -515,6 +525,8 @@ class DemoTripStore extends ChangeNotifier {
       final estimatedFareEur = data['estimatedFareEur'];
       final estimatedFareCents = data['estimatedFareCents'];
       final extrasRequireQuote = data['extrasRequireQuote'];
+      final distance = data['plannedDistanceMetres'];
+      final duration = data['plannedDurationSeconds'];
       final statusName = data['status'];
       final arrivalAtRaw = data['arrivalAt'];
       final departAtRaw = data['departureFromPickupAt'];
@@ -617,6 +629,8 @@ class DemoTripStore extends ChangeNotifier {
         estimatedFareEur: estimatedFareEur as int?,
         estimatedFareCents: estimatedFareCents as int?,
         extrasRequireQuote: extrasRequireQuote == true,
+        plannedDistanceMetres: distance is int && distance >= 0 ? distance : null,
+        plannedDurationSeconds: duration is int && duration >= 0 ? duration : null,
         stops: List<String>.unmodifiable(routeStops.cast<String>()),
         services: List<String>.unmodifiable(services.cast<String>()));
       _status = status.first;

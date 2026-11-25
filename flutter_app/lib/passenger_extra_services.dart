@@ -1,10 +1,57 @@
 import 'package:flutter/material.dart';
+import 'app_language.dart';
 import 'demo_trip_store.dart';
 import 'passenger_orders_demo.dart';
 
 /// Optional standalone service bookings in the isolated, payment-free demo.
 /// No production API is contacted and no real vehicle assistance is dispatched.
 enum ExtraServiceType { jumpstart, delivery }
+
+class PassengerExtraServiceList extends StatelessWidget {
+  const PassengerExtraServiceList({super.key, required this.tripStore});
+
+  final DemoTripStore tripStore;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(pdTr(context,
+      'Дополнительные услуги', 'Papildomos paslaugos', 'Additional services'))),
+    body: SafeArea(child: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _service(
+          context, ExtraServiceType.jumpstart, Icons.battery_charging_full,
+          pdTr(context, 'Запуск автомобиля · 20 €',
+            'Automobilio užvedimas · 20 €', 'Car jump-start · €20'),
+          pdTr(context, 'Помощь с разряженным аккумулятором',
+            'Pagalba išsikrovus akumuliatoriui', 'Help with a flat car battery'),
+        ),
+        _service(
+          context, ExtraServiceType.delivery, Icons.shopping_bag_outlined,
+          pdTr(context, 'Доставка товаров · 20 €',
+            'Prekių pristatymas · 20 €', 'Goods delivery · €20'),
+          pdTr(context, 'Заберём покупки из магазина и доставим',
+            'Paimsime pirkinius iš parduotuvės ir pristatysime',
+            'We will pick up and deliver your shopping'),
+        ),
+      ],
+    )),
+  );
+
+  Widget _service(BuildContext context, ExtraServiceType type, IconData icon,
+      String title, String description) => Card(child: ListTile(
+    key: Key('passenger-booking-${type.name}'),
+    leading: Icon(icon, size: 32),
+    title: Text(title),
+    subtitle: Text(description),
+    trailing: const Icon(Icons.chevron_right),
+    onTap: () => Navigator.push(context, MaterialPageRoute<void>(
+      builder: (_) => PdPassengerLanguageScope(
+        child: PassengerExtraServices(type: type, tripStore: tripStore),
+      ),
+    )),
+  ));
+}
 
 class PassengerExtraServices extends StatefulWidget {
   const PassengerExtraServices({

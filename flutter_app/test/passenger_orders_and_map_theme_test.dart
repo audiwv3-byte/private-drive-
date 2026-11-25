@@ -219,11 +219,52 @@ void main() {
     expect(find.byKey(const Key('passenger-drawer-history')), findsOneWidget);
     expect(find.byKey(const Key('passenger-drawer-language')), findsOneWidget);
     expect(tester.widget<ListTile>(
-      find.byKey(const Key('passenger-drawer-profile'))).enabled, isFalse);
+      find.byKey(const Key('passenger-drawer-profile'))).onTap, isNotNull);
     await tester.tap(find.byKey(const Key('passenger-drawer-history')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 450));
     expect(find.byKey(const Key('passenger-order-card')), findsOneWidget);
+  });
+
+  testWidgets('Passenger can select both route points on the map', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+      mapConnectivityCheck: () async => null,
+    )));
+    final map = find.byKey(const Key('passenger-map'));
+    final selector = find.byKey(const Key('passenger-map-point-mode'));
+    final form = find.byKey(const Key('passenger-form'));
+    final scrollable = find.descendant(of: form, matching: find.byType(Scrollable)).first;
+    final pickup = find.byKey(const Key('passenger-pick-origin-on-map'));
+    final destination = find.byKey(const Key('passenger-pick-destination-on-map'));
+    await tester.scrollUntilVisible(pickup, 80, scrollable: scrollable);
+    tester.widget<IconButton>(pickup).onPressed!();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(tester.widget<SegmentedButton<bool>>(selector).selected, {false});
+    tester.widget<FlutterMap>(map).options.onTap!(
+      const TapPosition(Offset.zero, Offset.zero), const LatLng(54.70, 25.30));
+    await tester.pump();
+    await tester.scrollUntilVisible(destination, 80, scrollable: scrollable);
+    tester.widget<IconButton>(destination).onPressed!();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(tester.widget<SegmentedButton<bool>>(selector).selected, {true});
+    tester.widget<FlutterMap>(map).options.onTap!(
+      const TapPosition(Offset.zero, Offset.zero), const LatLng(54.69, 25.27));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 260));
+    final sheet = tester.widget<DraggableScrollableSheet>(
+      find.byKey(const Key('passenger-trip-bottom-sheet')));
+    sheet.controller!.jumpTo(0.94);
+    tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+    await tester.pump();
+    for (final (key, expected) in [
+      ('passenger-from', '54.700000, 25.300000'),
+      ('passenger-to', '54.690000, 25.270000'),
+    ]) {
+      final field = find.byKey(Key(key));
+      await tester.scrollUntilVisible(field, 100, scrollable: scrollable);
+      expect(tester.widget<TextField>(field).controller!.text, expected);
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('Passenger can switch map day and night in offline preview',

@@ -41,6 +41,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   bool _localPilotOpened = false;
   bool _restoring = false;
   bool _restoreFailed = false;
+  bool _checkingPilotAccess = false;
   Future<void> _storageOperation = Future.value();
   PdNativeSession? get _activeSession => _session?.active == true ? _session : null;
 
@@ -115,10 +116,24 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       });
       return;
     }
+    final session = _activeSession;
+    final store = widget.sessionStore;
+    if (role == 'pilot' && session != null && !session.canPilot) {
+      setState(() {
+        _requestedRole = role;
+        _message = store == null ? _pilotAccessRequired : null;
+      });
+      if (store != null && !_checkingPilotAccess) {
+        unawaited(_refreshPilotAccess(store, session));
+      }
+      return;
+    }
+    if (role == 'pilot' && session?.canPilot == true && store != null) {
+      _changeSavedSession(() => store.save(session!, role));
+    }
     setState(() {
       _requestedRole = role;
       _message = null;
-      final session = _activeSession;
       _page = switch (role) {
         'pilot' => session?.canPilot == true ? 'pilot' : 'signin',
         'dispatcher' => session?.canDispatch == true ? 'dispatcher' : 'signin',
@@ -127,11 +142,33 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       };
     });
   }
+  Future<void> _refreshPilotAccess(PdNativeSessionStore store, PdNativeSession session) async {
+    setState(() => _checkingPilotAccess = true);
+    try {
+      final validated = await store.validateToken(session.token);
+      if (!mounted || _session != session || _requestedRole != 'pilot' || _page != 'entry') return;
+      if (validated.canPilot) {
+        _authenticated(validated);
+      } else {
+        setState(() => _message = _pilotAccessRequired);
+      }
+    } catch (_) {
+      if (mounted && _session == session && _requestedRole == 'pilot' && _page == 'entry') {
+        setState(() => _message = 'Не удалось проверить доступ пилота. Повтори попытку.');
+      }
+    } finally {
+      if (mounted) setState(() => _checkingPilotAccess = false);
+    }
+  }
+
+  static const _pilotAccessRequired = 'Для этого аккаунта ещё нет доступа в кабину пилота.';
+
   void _authenticated(PdNativeSession session) {
     if (!mounted || !session.active) return;
     final store = widget.sessionStore;
     if (store != null) {
-      final cabin = _requestedRole;
+      final cabin = _requestedRole == 'pilot' && !session.canPilot
+          ? 'passenger' : _requestedRole;
       _changeSavedSession(() => store.save(session, cabin));
     }
     _openSession(session);
@@ -153,7 +190,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
         _page = 'passenger';
       } else {
         _page = 'entry';
-        _message = 'У аккаунта нет серверных прав для выбранного кабинета.';
+        _message = _requestedRole == 'pilot' ? _pilotAccessRequired
+            : 'У аккаунта нет серверных прав для выбранного кабинета.';
       }
     });
   }
@@ -334,7 +372,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
               label: Text(tr('Пассажир', 'Keleivis', 'Passenger'))),
             const SizedBox(height: 12),
             FilledButton.icon(key: const Key('entry-pilot'),
-              onPressed: () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
+              onPressed: _checkingPilotAccess ? null : () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
               label: Text(tr('Пилот', 'Vairuotojas', 'Driver'))),
             if (session?.canDispatch == true) ...[
               const SizedBox(height: 12),
@@ -354,7 +392,20 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
                 label: const Text('Тестовая связь с диспетчерской'),
               ),
             ],
+            if (_checkingPilotAccess)
+              Text(tr('Проверяем доступ пилота…', 'Tikrinama vairuotojo prieiga…',
+                  'Checking driver access…')),
             if (_message != null) Text(_message!, key: const Key('entry-role-message')),
+            if (_message == _pilotAccessRequired)
+              TextButton(
+                key: const Key('entry-pilot-other-account'),
+                onPressed: () {
+                  _signOut();
+                  _select('pilot');
+                },
+                child: Text(tr('Войти другим аккаунтом', 'Prisijungti kita paskyra',
+                    'Sign in with another account')),
+              ),
             const SizedBox(height: 16),
             Text(pdLocalQaEntryEnabled
               ? 'Оба кабинета используют локальные тестовые данные.'

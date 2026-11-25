@@ -116,6 +116,7 @@ jobs:
           flutter pub get
           flutter analyze --no-fatal-infos
           flutter test
+          flutter test --dart-define=PD_QA_SERVER_BOOKING=true test/passenger_demo_test.dart --name "QA booking opens the dispatcher submission"
           flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_check_page_test.dart
           flutter test --dart-define=PD_INTERNAL_QA=true test/pilot_identity_notice_page_test.dart test/offline_auth_test.dart test/internal_guest_sign_in_test.dart test/native_cabin_entry_test.dart
           flutter test --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN" test/local_qa_entry_test.dart
@@ -154,9 +155,10 @@ jobs:
           # Stable TEST signing key: never use this public development key for release.
           mkdir -p "$HOME/.android"
           base64 --decode ../flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
-          QA_VERSION=0.2.42
-          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112506 \
+          QA_VERSION=0.2.43
+          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112507 \
             --dart-define="PD_QA_BUILD_LABEL=Версия $QA_VERSION · внутренняя сборка" \
+            --dart-define=PD_QA_SERVER_BOOKING=true \
             --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN" \
             --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com
           APK=build/app/outputs/flutter-apk/app-debug.apk
@@ -165,7 +167,7 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
           grep "name='lt.privatedrive.private_drive.photo_qa'" ../full-qa-apk-badging.txt
-          grep "versionCode='2026112506'" ../full-qa-apk-badging.txt
+          grep "versionCode='2026112507'" ../full-qa-apk-badging.txt
           grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt
@@ -213,11 +215,11 @@ jobs:
         with:
           name: private-drive-full-native-qa-apk
           path: apk
-      - name: Download the published Android QA 0.2.41 baseline
+      - name: Download the published Android QA 0.2.42 baseline
         uses: actions/download-artifact@v4
         with:
           name: private-drive-full-native-qa-apk
-          run-id: 45671715822
+          run-id: 45682419679
           github-token: ${{ github.token }}
           path: previous-apk
       - name: Verify both APK signing certificates and versions
@@ -231,8 +233,8 @@ jobs:
             "$BUILD_TOOLS/apksigner" verify --print-certs "$file" | grep -F 'certificate SHA-256 digest:' > "$path/certificates.txt"
           done
           diff -u previous-apk/certificates.txt apk/certificates.txt
-          "$BUILD_TOOLS/aapt" dump badging previous-apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112505' versionName='0.2.41'"
-          "$BUILD_TOOLS/aapt" dump badging apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112506' versionName='0.2.42'"
+          "$BUILD_TOOLS/aapt" dump badging previous-apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112506' versionName='0.2.42'"
+          "$BUILD_TOOLS/aapt" dump badging apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112507' versionName='0.2.43'"
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -247,9 +249,9 @@ jobs:
           script: |
             set -e
             adb install previous-apk/PRIVATE-DRIVE-full-qa-debug.apk
-            adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.41'
-            adb install -r apk/PRIVATE-DRIVE-full-qa-debug.apk
             adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.42'
+            adb install -r apk/PRIVATE-DRIVE-full-qa-debug.apk
+            adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.43'
             adb logcat -c
             adb shell am start -W -n lt.privatedrive.private_drive.photo_qa/lt.privatedrive.private_drive.MainActivity
             sleep 12

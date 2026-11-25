@@ -17,12 +17,7 @@ import 'package:private_drive/native_session.dart';
 import 'package:private_drive/native_session_store.dart';
 
 Future<void> acceptFirstLaunchTerms(WidgetTester tester) async {
-  final checkbox = find.byKey(const Key('first-launch-terms-acknowledgement'));
   final next = find.byKey(const Key('first-launch-continue'));
-  expect(tester.widget<FilledButton>(next).onPressed, isNull);
-  await tester.ensureVisible(checkbox);
-  await tester.tap(checkbox);
-  await tester.pumpAndSettle();
   await tester.ensureVisible(next);
   await tester.tap(next);
   await tester.pumpAndSettle();
@@ -80,7 +75,7 @@ void main() {
     await tester.tap(find.byKey(const Key('first-language-EN')));
     await tester.pumpAndSettle();
     expect(find.text('Choose your account'), findsNothing);
-    expect(find.text('I have read the terms of service and privacy policy'),
+    expect(find.text('I have read the terms · Continue'),
         findsOneWidget);
     await acceptFirstLaunchTerms(tester);
     expect(language.hasAcknowledgedTerms, isTrue);
@@ -206,7 +201,7 @@ void main() {
     expect(authenticated?.token, token);
   });
 
-  testWidgets('Telegram approval completes automatically without a browser code',
+  testWidgets('Pilot starts Telegram once and checks approval immediately on return',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(430, 1050);
@@ -217,18 +212,19 @@ void main() {
     String? proof;
     PdNativeSession? authenticated;
     var checks = 0;
+    var launches = 0;
     final client = MockClient((request) async {
       final data = jsonDecode(request.body) as Map<String, dynamic>;
       if (request.url.path.endsWith('/start')) {
-        expect(data['mode'], 'automatic');
+        expectSync(data['mode'], 'automatic');
         proof = data['app_secret'] as String;
         return http.Response(jsonEncode({
           'state': state, 'automatic': true,
           'authorization_url': 'https://oauth.telegram.org/auth?state=$state',
         }), 201);
       }
-      expect(request.url.path, '/native-auth/telegram/finish');
-      expect(data, {'state': state, 'app_secret': proof});
+      expectSync(request.url.path, '/native-auth/telegram/finish');
+      expectSync(data, {'state': state, 'app_secret': proof});
       if (++checks == 1) return http.Response('{"pending":true}', 202);
       return http.Response(jsonEncode({
         'verified': true, 'role': 'pilot', 'user_id': 'pilot-1',
@@ -239,20 +235,26 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: NativeSignInScreen(
       authApiUrl: 'https://example.test',
       legalAcknowledged: true,
+      autoStartTelegram: true,
       httpClient: client,
       onAuthenticated: (session) => authenticated = session,
-      telegramLauncher: (_) async => true,
+      telegramLauncher: (_) async {
+        launches++;
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        return true;
+      },
     )));
-    final start = find.byKey(const Key('native-telegram-start'));
-    await tester.scrollUntilVisible(start, 100,
-      scrollable: find.byType(Scrollable).first);
-    await tester.ensureVisible(start);
     await tester.pumpAndSettle();
-    await tester.tap(start);
-    await tester.pumpAndSettle();
+    expect(launches, 1);
+    expect(checks, 0);
     expect(find.byKey(const Key('native-telegram-code')), findsNothing);
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(checks, 1);
     expect(authenticated, isNull);
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();

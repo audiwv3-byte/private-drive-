@@ -184,7 +184,7 @@ def auth_page(app, registration=False, ready=False, status=200, recovery=False, 
     }))
 
 
-def register(app, core):
+def register(app, core, *, owner_passwords=None):
     secret = os.environ.get("PD_DISPATCH_SESSION_SECRET", "")
     password_hash = os.environ.get("PD_DISPATCH_PASSWORD_HASH", "")
     raw_admin = os.environ.get("PD_DISPATCH_ADMIN_ID", "")
@@ -198,7 +198,7 @@ def register(app, core):
     recovery_hash = os.environ.get("PD_DISPATCH_RECOVERY_SHA256", "")
     recovery_expiry = os.environ.get("PD_DISPATCH_RECOVERY_EXPIRES", "")
     recovery_deadline = int(recovery_expiry) if re.fullmatch(r"[0-9]{1,12}", recovery_expiry) else 0
-    passwords = DispatcherPasswords(dsn) if dsn else None
+    passwords = owner_passwords if owner_passwords is not None else (DispatcherPasswords(dsn) if dsn else None)
     require_mfa = os.environ.get("PD_DISPATCH_REQUIRE_MFA", "") == "1"
     totp_key = decode_totp_key(os.environ.get("PD_DISPATCH_TOTP_BASE32", "")) if require_mfa else b""
     mfa_version = hmac.digest(secret.encode(), totp_key, "sha256").hex() if totp_key else ""

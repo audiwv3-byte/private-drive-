@@ -29,18 +29,28 @@ def publish_telegram_order(order, *, open_url=urlopen, now=time.time):
         return None
     secret = os.getenv("PD_DISPATCH_ORDERS_INGEST_SECRET", "")
     endpoint = os.getenv("PD_MINIAPP_DISPATCH_IMPORT_URL", "")
-    url = urlsplit(endpoint)
+    try:
+        url = urlsplit(endpoint)
+        valid_port = url.port in (None, 443)
+    except ValueError as exc:
+        raise DispatchBridgeUnavailable("bridge_not_configured") from exc
     if (len(secret) < 32 or url.scheme != "https" or not url.hostname
-            or url.username or url.password or url.port not in (None, 443)
+            or url.username or url.password or not valid_port
             or url.path != "/v1/dispatch/orders/import" or url.query
             or url.fragment):
         raise DispatchBridgeUnavailable("bridge_not_configured")
+    try:
+        departure = str(order["trip_date"])
+        if "." in departure:
+            departure = datetime.strptime(departure, "%d.%m.%Y").strftime("%Y-%m-%d")
+    except (ValueError, TypeError, KeyError) as exc:
+        raise DispatchBridgeUnavailable("invalid_local_order") from exc
     payload = {
         "source": "telegram_miniapp",
         "source_order_id": str(order["id"]),
         "from": str(order["origin"]),
         "to": str(order["destination"]),
-        "trip_date": datetime.strptime(str(order["trip_date"]), "%d.%m.%Y").strftime("%Y-%m-%d") if "." in str(order["trip_date"]) else str(order["trip_date"]),
+        "trip_date": departure,
         "trip_time": str(order["trip_time"]),
     }
     raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")

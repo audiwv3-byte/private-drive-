@@ -68,6 +68,44 @@ class BridgeTests(unittest.TestCase):
                           now=lambda: 1800000000), "central-123")
         self.assertEqual(requests[0], requests[1])
 
+    def test_bot_source_delivers_once_with_idempotent_central_id(self):
+        received = []
+        def send(req, timeout):
+            payload = json.loads(req.data)
+            self.assertEqual(payload["source"], "telegram_bot")
+            self.assertEqual(payload["source_order_id"], "42")
+            self.assertNotIn("payment_method", payload)
+            headers = {k.lower(): v for k, v in req.header_items()}
+            self.assertTrue(verified_request(req.data, {
+                "X-PD-Order-Timestamp": headers["x-pd-order-timestamp"],
+                "X-PD-Order-Signature": headers["x-pd-order-signature"],
+            }, SECRET, now=1800000000))
+            received.append(payload)
+            return FakeResponse({
+                "source": "telegram_bot", "source_order_id": "42",
+                "order_id": "same-central-order", "payment_mode": "disabled",
+            })
+        first = publish_telegram_order(ORDER, source="telegram_bot",
+                                       open_url=send, now=lambda: 1800000000)
+        replay = publish_telegram_order(ORDER, source="telegram_bot",
+                                        open_url=send, now=lambda: 1800000000)
+        self.assertEqual(first, replay)
+        self.assertEqual(received[0], received[1])
+
+    def test_bot_mismatched_ack_fails_closed(self):
+        def send(req, timeout):
+            return FakeResponse({
+                "source": "telegram_miniapp", "source_order_id": "42",
+                "order_id": "wrong-source", "payment_mode": "disabled",
+            })
+        with self.assertRaises(DispatchBridgeUnavailable):
+            publish_telegram_order(ORDER, source="telegram_bot", open_url=send)
+
+    def test_reject_client_defined_sources(self):
+        with self.assertRaises(DispatchBridgeUnavailable):
+            publish_telegram_order(ORDER, source="android",
+                                   open_url=lambda *_: self.fail("network"))
+
     def test_legacy_date_converted_to_iso(self):
         def send(req, timeout):
             self.assertEqual(json.loads(req.data)["trip_date"], "2026-12-02")

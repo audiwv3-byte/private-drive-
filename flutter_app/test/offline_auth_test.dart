@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:private_drive/main.dart';
 import 'package:private_drive/demo_interfaces.dart';
 import 'package:private_drive/brand_logo.dart';
+import 'package:private_drive/app_language.dart';
+import 'package:private_drive/native_cabin_entry.dart';
 
 void main() {
   // These tests cover sign-in, not the separately tested first-run prompts.
@@ -31,14 +33,37 @@ void main() {
     expect(width, 1254);
     expect(height, 1254);
 
-    await tester.pumpWidget(const PrivateDriveApp());
+    final language = PdLanguage();
+    await tester.pumpWidget(PrivateDriveApp(language: language));
     await tester.pumpAndSettle();
     expect(find.byType(PrivateDriveBrandLogo), findsOneWidget);
     expect(find.byKey(const Key('private-drive-brand-logo')), findsOneWidget);
+    if (!pdLocalQaEntryEnabled) {
+      for (final flag in ['🇷🇺 RU', '🇬🇧 EN', '🇱🇹 LT']) {
+        expect(find.text(flag), findsOneWidget);
+      }
+      await tester.tap(find.byKey(const Key('first-language-RU')));
+      await tester.pumpAndSettle();
+      expect(language.hasSelection, isTrue);
+    }
     expect(find.textContaining('0.2.27'), findsOneWidget);
     expect(find.textContaining('2026112103'), findsOneWidget);
     expect(find.byIcon(Icons.local_taxi_outlined), findsNothing);
   });
+
+  testWidgets('First language selection localizes the passenger sign-in', (tester) async {
+    final language = PdLanguage();
+    await tester.pumpWidget(PrivateDriveApp(language: language));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('first-language-EN')));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose your account'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('entry-passenger')));
+    await tester.pumpAndSettle();
+    expect(find.text('Passenger sign-in'), findsOneWidget);
+    expect(find.text('Phone number +370...'), findsOneWidget);
+  }, skip: pdLocalQaEntryEnabled || const bool.fromEnvironment('PD_INTERNAL_QA'));
 
   testWidgets('Offline preview blocks real OTP requests', (tester) async {
     expect(apiBaseUrl, isEmpty,

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
-import 'app_language.dart' show pdLabel;
+import 'app_language.dart' show pdEntryTr;
 import 'company_info.dart' show openPrivateDriveLink;
 import 'private_drive_bright_backdrop.dart';
 import 'demo_interfaces.dart';
@@ -190,6 +190,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
   }
 
   Widget _buildCabin(BuildContext context) {
+    String tr(String ru, String lt, String en) => pdEntryTr(context, ru, lt, en);
+
     if (pdLocalQaEntryEnabled) {
       if (!_qaUnlocked) {
         return _LocalQaSignIn(
@@ -209,7 +211,9 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
       return PopScope(canPop: false,
         onPopInvokedWithResult: (didPop, result) { if (!didPop) _entry(); },
         child: Scaffold(
-          appBar: AppBar(title: Text(_requestedRole == 'pilot' ? 'Вход пилота' : 'Вход пассажира'),
+          appBar: AppBar(title: Text(_requestedRole == 'pilot'
+              ? tr('Вход пилота', 'Vairuotojo prisijungimas', 'Driver sign-in')
+              : tr('Вход пассажира', 'Keleivio prisijungimas', 'Passenger sign-in')),
             leading: BackButton(onPressed: _entry)),
           body: widget.signInBuilder(context, _requestedRole, _authenticated),
         ),
@@ -233,7 +237,8 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     return Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE'), actions: [
         if (session != null || _qaUnlocked) IconButton(onPressed: _signOut,
-          icon: const Icon(Icons.logout), tooltip: 'Выйти'),
+          icon: const Icon(Icons.logout),
+          tooltip: tr('Выйти', 'Atsijungti', 'Sign out')),
       ]),
       body: Stack(children: [
         const Positioned.fill(child: PrivateDriveBrightBackdrop()),
@@ -242,16 +247,17 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
           child: ListView(shrinkWrap: true, padding: const EdgeInsets.all(24), children: [
             const PrivateDriveBrandLogo(size: 156, transparentBackground: true),
             const SizedBox(height: 16),
-            const Text('Выбери кабинет', key: Key('entry-cabin-selection'),
-              textAlign: TextAlign.center, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+            Text(tr('Выбери кабинет', 'Pasirink paskyrą', 'Choose your account'),
+              key: const Key('entry-cabin-selection'),
+              textAlign: TextAlign.center, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             FilledButton.icon(key: const Key('entry-passenger'),
               onPressed: () => _select('passenger'), icon: const Icon(Icons.person_outline),
-              label: const Text('Пассажир')),
+              label: Text(tr('Пассажир', 'Keleivis', 'Passenger'))),
             const SizedBox(height: 12),
             FilledButton.icon(key: const Key('entry-pilot'),
               onPressed: () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
-              label: const Text('Пилот')),
+              label: Text(tr('Пилот', 'Vairuotojas', 'Driver'))),
             const SizedBox(height: 12),
             OutlinedButton(
               key: const Key('entry-apply-pilot'),
@@ -259,7 +265,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
                 context,
                 Uri.https('wilsonpark.pythonanywhere.com', '/pilot-registration'),
               ),
-              child: Text(pdLabel(context, 'Стать пилотом')),
+              child: Text(tr('Стать пилотом', 'Tapti vairuotoju', 'Become a driver')),
             ),
             if (pdLocalQaEntryEnabled) ...[
               const SizedBox(height: 12),
@@ -272,10 +278,13 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             ],
             if (_message != null) Text(_message!, key: const Key('entry-role-message')),
             const SizedBox(height: 16),
-            const Text(pdLocalQaEntryEnabled
+            Text(pdLocalQaEntryEnabled
               ? 'Оба кабинета используют локальные тестовые данные.'
-              : 'Фотопроверка требуется только пилоту. '
-                'Доступ пилота подтверждается сервером.',
+              : tr(
+                  'Фотопроверка требуется только пилоту. Доступ пилота подтверждается сервером.',
+                  'Nuotrauką turi patvirtinti tik vairuotojai. Vairuotojo prieigą patvirtina serveris.',
+                  'Only drivers need photo verification. Driver access is verified by the server.',
+                ),
               textAlign: TextAlign.center),
             const SizedBox(height: 12),
             const Text(pdLocalQaEntryEnabled

@@ -8,6 +8,7 @@ import 'demo_backup_page.dart';
 import 'brand_logo.dart';
 import 'private_drive_bright_backdrop.dart';
 import 'app_language.dart';
+import 'first_launch_language_page.dart';
 import 'permissions_onboarding.dart';
 import 'company_info.dart';
 import 'pd_http_api.dart';
@@ -31,41 +32,50 @@ Future<void> main() async {
 }
 
 class PrivateDriveApp extends StatelessWidget {
-  const PrivateDriveApp({super.key, this.enableOfflinePreview = false});
+  const PrivateDriveApp({
+    super.key,
+    this.enableOfflinePreview = false,
+    this.language,
+  });
 
   final bool enableOfflinePreview;
+  final PdLanguage? language;
+
+  Widget _home() {
+    if (kIsWeb && isolatedWebPreview) return const RemoteSyncDemo();
+    if (enableOfflinePreview) {
+      return const PdPermissionsFirstLaunch(
+        child: NativeSignInScreen(enableOfflinePreview: true),
+      );
+    }
+    final entry = PdNativeCabinEntry(
+      signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
+        allowGuestEntry: role == 'passenger',
+        onAuthenticated: onAuthenticated,
+      ),
+      identityApiBuilder: (session) =>
+          PdIdentityApi(baseUrl: apiBaseUrl, token: session.token),
+    );
+    if (pdLocalQaEntryEnabled) return entry;
+    return PdFirstLaunchLanguage(child: entry);
+  }
 
   @override
   Widget build(BuildContext context) {
     return PdLanguageScope(
-      language: pdLanguage,
+      language: language ?? pdLanguage,
       child: MaterialApp(
-      title: 'PRIVATE DRIVE',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFB99954),
-          brightness: Brightness.dark,
+        title: 'PRIVATE DRIVE',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFB99954),
+            brightness: Brightness.dark,
+          ),
+          scaffoldBackgroundColor: const Color(0xFF111111),
         ),
-        scaffoldBackgroundColor: const Color(0xFF111111),
-      ),
-      home: kIsWeb && isolatedWebPreview
-          ? const RemoteSyncDemo()
-          : enableOfflinePreview
-          // Explicit developer harness only. Normal launch starts with cabins.
-          ? const PdPermissionsFirstLaunch(
-              child: NativeSignInScreen(enableOfflinePreview: true),
-            )
-          : PdNativeCabinEntry(
-              signInBuilder: (_, role, onAuthenticated) => NativeSignInScreen(
-                enableOfflinePreview: enableOfflinePreview,
-                allowGuestEntry: role == 'passenger',
-                onAuthenticated: onAuthenticated,
-              ),
-              identityApiBuilder: (session) => PdIdentityApi(
-                baseUrl: apiBaseUrl, token: session.token),
-            ),
+        home: _home(),
       ),
     );
   }
@@ -97,9 +107,18 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   bool busy = false;
   bool _guest = false;
   bool _acknowledgedLegal = false;
-  // Authentication belongs to the Russian-only shared/native shell.
-  // Passenger language selection is available inside the passenger cabin.
-  String tr(String ru, String lt, String en) => ru;
+  String _language = 'RU';
+  String tr(String ru, String lt, String en) => switch (_language) {
+    'LT' => lt,
+    'EN' => en,
+    _ => ru,
+  };
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _language = PdLanguageScope.of(context).value;
+  }
   String? challengeId;
   String message = '';
   String? sessionToken;
@@ -139,20 +158,43 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
       if (!mounted) return;
       setState(() {
         challengeId = id;
-        message = 'Код запрошен. Введи полученный код подтверждения.';
+        message = tr('Код запрошен. Введи полученный код подтверждения.',
+            'Kodas išsiųstas. Įvesk gautą patvirtinimo kodą.',
+            'Code requested. Enter the verification code you received.');
       });
     } on PdHttpStatusException catch (error) {
       if (mounted) setState(() => message = switch (error.errorCode) {
-        'sms_disabled' => 'Вход по SMS сейчас отключён на тестовом сервере. '
-            'Код не отправлен. Во внутренней сборке можно продолжить как гость.',
-        'sms_unavailable' => 'Сервис SMS временно недоступен. Код не отправлен. Повтори позже.',
-        'invalid_phone' => 'Проверь номер: укажи код страны, например +370, и номер телефона.',
-        'try_later' => 'Слишком частые запросы. Подожди минуту и повтори.',
-        _ => 'Сервер входа временно недоступен. Повтори позже.',
+        'sms_disabled' => tr(
+            'Вход по SMS сейчас отключён на тестовом сервере. '
+                'Код не отправлен. Во внутренней сборке можно продолжить как гость.',
+            'Bandomajame serveryje prisijungimas SMS žinute išjungtas. '
+                'Kodas neišsiųstas. Vidinėje versijoje galima tęsti kaip svečiui.',
+            'SMS sign-in is disabled on the test server. The code was not sent. '
+                'Guest access is available in the internal build.'),
+        'sms_unavailable' => tr(
+            'Сервис SMS временно недоступен. Код не отправлен. Повтори позже.',
+            'SMS paslauga laikinai nepasiekiama. Kodas neišsiųstas. Bandyk vėliau.',
+            'SMS service is temporarily unavailable. The code was not sent. Try again later.'),
+        'invalid_phone' => tr(
+            'Проверь номер: укажи код страны, например +370, и номер телефона.',
+            'Patikrink numerį. Įvesk šalies kodą, pavyzdžiui, +370, ir telefono numerį.',
+            'Check your number. Include the country code, such as +370.'),
+        'try_later' => tr(
+            'Слишком частые запросы. Подожди минуту и повтори.',
+            'Per daug užklausų. Palauk minutę ir bandyk dar kartą.',
+            'Too many requests. Wait a minute and try again.'),
+        _ => tr('Сервер входа временно недоступен. Повтори позже.',
+            'Prisijungimo serveris laikinai nepasiekiamas. Bandyk vėliau.',
+            'The sign-in server is temporarily unavailable. Try again later.'),
       });
     } catch (_) {
-      if (mounted) setState(() => message = 'Сервер входа не ответил вовремя. '
-          'Повтори запрос позже или продолжи как гость во внутренней сборке.');
+      if (mounted) setState(() => message = tr(
+          'Сервер входа не ответил вовремя. Повтори запрос позже или продолжи '
+              'как гость во внутренней сборке.',
+          'Prisijungimo serveris neatsakė laiku. Bandyk vėliau arba tęsk '
+              'kaip svečias vidinėje versijoje.',
+          'The sign-in server did not respond in time. Try again later or '
+              'continue as a guest in the internal build.'));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -202,7 +244,10 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         code.clear();
       });
     } catch (_) {
-      if (mounted) setState(() => message = 'Код не подтверждён. Проверь код или срок действия.');
+      if (mounted) setState(() => message = tr(
+          'Код не подтверждён. Проверь код или срок действия.',
+          'Kodas nepatvirtintas. Patikrink kodą ir jo galiojimo laiką.',
+          'The code could not be verified. Check the code and its expiry.'));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -385,7 +430,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
           actions: [
             IconButton(
               key: const Key('native-permission-settings'),
-              tooltip: 'Разрешения приложения',
+              tooltip: tr('Разрешения приложения', 'Programėlės leidimai',
+                  'App permissions'),
               icon: const Icon(Icons.settings_outlined),
               onPressed: () => Navigator.push(
                 context,
@@ -418,11 +464,13 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     'Independent sign-in without Telegram'),
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
-                const Text(
-                  'Версия 0.2.27 · сборка 2026112103',
-                  key: Key('app-demo-version'),
+                Text(
+                  tr('Версия 0.2.27 · сборка 2026112103',
+                      'Versija 0.2.27 · 2026112103 leidimas',
+                      'Version 0.2.27 · build 2026112103'),
+                  key: const Key('app-demo-version'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: gold),
+                  style: const TextStyle(fontSize: 12, color: gold),
                 ),
                 if (widget.enableOfflinePreview && widget.authApiUrl.isEmpty)
                   Padding(
@@ -470,11 +518,17 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     value: _acknowledgedLegal,
                     onChanged: busy ? null : (v) =>
                         setState(() => _acknowledgedLegal = v ?? false),
-                    title: const Text('Я ознакомился с условиями сервиса '
-                      'и политикой конфиденциальности'),
-                    subtitle: const Text(
+                    title: Text(tr(
+                      'Я ознакомился с условиями сервиса и политикой конфиденциальности',
+                      'Susipažinau su paslaugos sąlygomis ir privatumo politika',
+                      'I have read the terms of service and privacy policy')),
+                    subtitle: Text(tr(
                       'Это подтверждение ознакомления, не согласие '
-                      'на рекламу или необязательное отслеживание.'),
+                          'на рекламу или необязательное отслеживание.',
+                      'Taip patvirtini, kad susipažinai su dokumentais. '
+                          'Tai nėra sutikimas gauti reklamą ar būti sekamam.',
+                      'This confirms that you have read the documents. It does '
+                          'not opt you in to advertising or optional tracking.')),
                   ),
                   TextButton.icon(
                     key: const Key('native-open-legal-documents'),
@@ -482,7 +536,10 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                       MaterialPageRoute<void>(
                         builder: (_) => const CompanyInfoPage())),
                     icon: const Icon(Icons.gavel_outlined),
-                    label: const Text('Условия, конфиденциальность, отмена и возврат'),
+                    label: Text(tr(
+                      'Условия, конфиденциальность, отмена и возврат',
+                      'Sąlygos, privatumas, atšaukimas ir pinigų grąžinimas',
+                      'Terms, privacy, cancellations and refunds')),
                   ),
                 ],
                 const SizedBox(height: 8),
@@ -526,12 +583,14 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
                     child: Text(message, textAlign: TextAlign.center),
                   ),
                 if (widget.authApiUrl.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 20),
-                    child: Text(
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: Text(tr(
                       'В этой сборке сервер авторизации не подключён.',
+                      'Šioje versijoje prisijungimo serveris neprijungtas.',
+                      'The sign-in server is not connected in this build.'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: gold),
+                      style: const TextStyle(color: gold),
                     ),
                   ),
                 if (!kIsWeb && widget.enableOfflinePreview && widget.authApiUrl.isEmpty)

@@ -5,14 +5,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// A missing translation stays visible in Russian rather than disappearing.
 class PdLanguage extends ChangeNotifier {
   String _value = 'RU';
+  bool _hasSelection = false;
   String get value => _value;
+  bool get hasSelection => _hasSelection;
   static const _storageKey = 'pd_native_language_v1';
 
   Future<void> restore() async {
     try {
       final stored = await SharedPreferencesAsync().getString(_storageKey);
       if (stored != null && (stored == 'RU' || stored == 'LT' || stored == 'EN')) {
-        set(stored, persist: false);
+        if (_hasSelection && _value == stored) return;
+        _value = stored;
+        _hasSelection = true;
+        notifyListeners();
       }
     } catch (_) {
       // Offline preview also runs in widget tests without platform storage.
@@ -21,8 +26,10 @@ class PdLanguage extends ChangeNotifier {
 
   void set(String language, {bool persist = true}) {
     if (language != 'RU' && language != 'LT' && language != 'EN') return;
-    if (_value == language) return;
+    final changed = _value != language || (persist && !_hasSelection);
+    if (!changed) return;
     _value = language;
+    if (persist) _hasSelection = true;
     notifyListeners();
     if (persist) {
       try {
@@ -54,7 +61,8 @@ class PdLanguageMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = PdLanguageScope.of(context).value;
+    final language = PdLanguageScope.of(context);
+    final selected = language.value;
     return PopupMenuButton<String>(
       key: const Key('passenger-global-language-menu'),
       tooltip: pdTr(context, 'Язык приложения', 'Programėlės kalba', 'App language'),
@@ -71,7 +79,7 @@ class PdLanguageMenu extends StatelessWidget {
         ),
       ),
       initialValue: selected,
-      onSelected: pdLanguage.set,
+      onSelected: language.set,
       itemBuilder: (context) => const [
         PopupMenuItem<String>(
           key: Key('passenger-select-language-RU'),
@@ -101,9 +109,15 @@ class PdPassengerLanguageScope extends InheritedWidget {
 
 String pdTr(BuildContext context, String ru, String lt, String en) {
   if (!PdPassengerLanguageScope.enabled(context)) return ru;
-  final language = PdLanguageScope.of(context).value;
-  return language == 'LT' ? lt : language == 'EN' ? en : ru;
+  return pdEntryTr(context, ru, lt, en);
 }
+
+String pdEntryTr(BuildContext context, String ru, String lt, String en) =>
+    switch (PdLanguageScope.of(context).value) {
+      'LT' => lt,
+      'EN' => en,
+      _ => ru,
+    };
 
 /// Common UI labels used across pilot, passenger and dispatcher routes.
 /// The business identifiers and fare-routing strings remain in Russian.

@@ -191,6 +191,10 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
             'Проверь номер: укажи код страны, например +370, и номер телефона.',
             'Patikrink numerį. Įvesk šalies kodą, pavyzdžiui, +370, ir telefono numerį.',
             'Check your number. Include the country code, such as +370.'),
+        'sms_number_not_enabled' => tr(
+            'Этот номер не включён в SMS-тест. Можно войти через Telegram.',
+            'Šis numeris neįtrauktas į SMS testą. Gali prisijungti per „Telegram“.',
+            'This number is not enabled for SMS testing. You can sign in with Telegram.'),
         'try_later' => tr(
             'Слишком частые запросы. Подожди минуту и повтори.',
             'Per daug užklausų. Palauk minutę ir bandyk dar kartą.',

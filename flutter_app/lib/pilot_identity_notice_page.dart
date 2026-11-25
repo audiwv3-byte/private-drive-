@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_language.dart';
 import 'pilot_identity_check_page.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_photo_capture.dart';
@@ -20,16 +21,20 @@ class PdPilotIdentityNoticePage extends StatefulWidget {
   State<PdPilotIdentityNoticePage> createState() => _PdPilotIdentityNoticePageState();
 }
 class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
-  String _language = 'RU';
+  String? _language;
   bool _acknowledged = false;
-  String tr(String ru, String lt, String en) => _language == 'LT' ? lt : _language == 'EN' ? en : ru;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('PRIVATE DRIVE · Фотоконтроль'),
+  Widget build(BuildContext context) {
+    final language = _language ?? PdLanguageScope.of(context).value;
+    String tr(String ru, String lt, String en) =>
+        language == 'LT' ? lt : language == 'EN' ? en : ru;
+    return Scaffold(
+    appBar: AppBar(title: Text(tr('PRIVATE DRIVE · Фотоконтроль',
+      'PRIVATE DRIVE · Nuotraukos patikra', 'PRIVATE DRIVE · Photo verification')),
       leading: widget.onBack == null ? null : BackButton(onPressed: widget.onBack), actions: [
       DropdownButton<String>(
         key: const Key('pilot-identity-notice-language'),
-        value: _language,
+        value: language,
         items: [for (final code in ['RU', 'LT', 'EN']) DropdownMenuItem(value: code, child: Text(code))],
         onChanged: (value) { if (value != null) setState(() { _language = value; _acknowledged = false; }); },
       ),
@@ -53,7 +58,9 @@ class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
         if (widget.api == null && widget.onRequestSignIn != null)
           OutlinedButton(key: const Key('pilot-identity-notice-sign-in'),
             onPressed: widget.onRequestSignIn,
-            child: const Text('Войти в аккаунт пилота для отправки фото')),
+            child: Text(tr('Войти в аккаунт пилота для отправки фото',
+              'Prisijunk prie vairuotojo paskyros ir pateik nuotrauką',
+              'Sign in to your driver account to submit a photo'))),
         Text(tr('Цель — подтвердить, что поездку выполняет одобренный пилот. '
           'Решение принимает диспетчер. Проверка действует 7 дней и не назначает роли.',
           'Tikslas – patvirtinti vairuotojo tapatybę. Sprendžia dispečeris. Patikra galioja 7 dienas ir nekeičia teisių.',
@@ -105,6 +112,7 @@ class _PdPilotIdentityNoticePageState extends State<PdPilotIdentityNoticePage> {
           child: Text(tr('Вернуться к выбору кабинета', 'Grįžti', 'Return to cabin selection'))),
       ],
     )),
-  );
+    );
+  }
 }
 

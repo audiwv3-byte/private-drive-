@@ -45,6 +45,32 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  test('cancel sends PATCH with bearer and requires server acknowledgement', () async {
+    const orderId = '05cdbc84-0930-4c52-baa1-149a03190d78';
+    final api = NativeOrdersApi('https://example.invalid', 'test-token',
+      client: MockClient((request) async {
+        expect(request.method, 'PATCH');
+        expect(request.url.path, '/native-orders');
+        expect(request.followRedirects, isFalse);
+        expect(request.headers['authorization'], 'Bearer test-token');
+        expect(request.body, contains('"action":"cancel"'));
+        return http.Response(
+          '{"order_id":"05cdbc84-0930-4c52-baa1-149a03190d78",'
+          '"status":"cancelled","payment_mode":"disabled"}', 200);
+      }));
+    expect((await api.cancel(orderId))['status'], 'cancelled');
+    await expectLater(api.cancel('invalid'), throwsFormatException);
+  });
+
+  test('cancel refuses unconfirmed server status', () async {
+    const orderId = '05cdbc84-0930-4c52-baa1-149a03190d78';
+    final api = NativeOrdersApi('https://example.invalid', 'test-token',
+      client: MockClient((_) async =>
+        http.Response('{"status":"requested","payment_mode":"disabled",'
+          '"order_id":"05cdbc84-0930-4c52-baa1-149a03190d78"}', 200)));
+    await expectLater(api.cancel(orderId), throwsFormatException);
+  });
+
   test('GET rejects unsafe payment mode', () async {
     final api = NativeOrdersApi('https://example.invalid', 'test-token',
       client: MockClient((request) async {

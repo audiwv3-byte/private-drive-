@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex,nofollow,noarchive"><meta name="theme-color" content="#100e0c">
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
 <title>PRIVATE DRIVE — Диспетчерская</title>
-<link rel="icon" href="assets/pd-logo.webp" type="image/webp">
+<link rel="icon" href="{{ dispatch_asset_prefix|default('') }}/pd-logo-transparent.png" type="image/png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" integrity="sha384-WR3U1V0+1MbG/yqoN2/UUbE92aMWypbO0XZyEPFDxl2zZgg3ppqJGUq3gqgaEZbX" crossorigin="anonymous">
 <style>
@@ -41,7 +41,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 </style></head>
 <body>
 <header>
-<a class="brand" href="/dispatch"><img src="/pd-logo-transparent.png" alt=""><span>PRIVATE DRIVE<small>{{ 'Диспетчерская' if live_orders_enabled else 'Диспетчерская · тестовый интерфейс' }}</small></span></a>
+<a class="brand" href="/dispatch"><img src="{{ dispatch_asset_prefix|default('') }}/pd-logo-transparent.png" alt=""><span>PRIVATE DRIVE<small>{{ 'Диспетчерская' if live_orders_enabled else 'Диспетчерская · тестовый интерфейс' }}</small></span></a>
 <div class="toolbar">
 {% if test_sync_enabled or persistent_queue_enabled %}
 <a href="#ordersTitle">Заказы</a>

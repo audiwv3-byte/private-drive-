@@ -236,6 +236,25 @@ class DispatcherBrowserTests(unittest.TestCase):
             self.assertEqual(login(other_browser, "123456").status_code, 401)
             self.assertEqual(other_browser.get("/dispatch/map").status_code, 302)
 
+    def test_shared_wsgi_routes_only_dispatch_paths_to_owner_app(self):
+        from pd_dispatcher_production_wsgi import mount_dispatcher
+        from werkzeug.test import Client
+
+        miniapp = Flask("synthetic_miniapp")
+        owner = Flask("synthetic_dispatcher")
+        miniapp.add_url_rule("/", "home", lambda: "miniapp")
+        miniapp.add_url_rule("/api/orders", "orders", lambda: "miniapp API")
+        miniapp.add_url_rule("/dispatch-test", "other", lambda: "miniapp route")
+        owner.add_url_rule("/dispatch", "home", lambda: "owner")
+        owner.add_url_rule("/dispatch/login", "login", lambda: "owner login")
+
+        client = Client(mount_dispatcher(miniapp, owner))
+        self.assertEqual(client.get("/").data, b"miniapp")
+        self.assertEqual(client.get("/api/orders").data, b"miniapp API")
+        self.assertEqual(client.get("/dispatch-test").data, b"miniapp route")
+        self.assertEqual(client.get("/dispatch").data, b"owner")
+        self.assertEqual(client.get("/dispatch/login").data, b"owner login")
+
     def test_mapbox_public_token_configuration_diagnostic(self):
         """Report only token presence and validity, never the token itself."""
         import re

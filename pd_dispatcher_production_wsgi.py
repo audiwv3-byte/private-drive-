@@ -83,6 +83,10 @@ def create_app():
 
     app = Flask(__name__, static_folder=None)
     app.config.update(SESSION_COOKIE_NAME="pd_dispatch_owner_session", SESSION_COOKIE_PATH="/dispatch")
+
+    @app.context_processor
+    def dispatch_assets():
+        return {"dispatch_asset_prefix": "/dispatch"}
     core = SimpleNamespace(ADMIN_IDS=frozenset({admin_id}), is_admin=lambda uid: uid == admin_id,
                            ORDERS_DB=orders, db=read_orders)
     if not register(app, core, owner_passwords=OwnerCredentials(state, password_hash)):
@@ -92,12 +96,26 @@ def create_app():
     def home():
         return redirect(url_for("pd_dispatch_home"))
 
-    @app.get("/pd-logo-transparent.png")
+    @app.get("/dispatch/pd-logo-transparent.png")
     def brand_logo():
-        return send_from_directory(base, "pd-logo-transparent.png")
+        return send_from_directory(base / "assets", "pd-logo-transparent.png")
 
-    @app.get("/assets/pd-black-gold.css")
+    @app.get("/dispatch/assets/pd-black-gold.css")
     def brand_styles():
         return send_from_directory(base / "assets", "pd-black-gold.css")
 
     return app
+
+
+def mount_dispatcher(miniapp, dispatcher=None):
+    """Host the owner-only dispatcher and the Telegram Mini App in one WSGI slot."""
+    if dispatcher is None:
+        dispatcher = create_app()
+
+    def application(environ, start_response):
+        path = environ.get("PATH_INFO", "")
+        if path == "/dispatch" or path.startswith("/dispatch/"):
+            return dispatcher(environ, start_response)
+        return miniapp(environ, start_response)
+
+    return application

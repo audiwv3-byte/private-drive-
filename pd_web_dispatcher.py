@@ -20,7 +20,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 AUTH_PAGE = """<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PRIVATE DRIVE — {{ title }}</title>
-<link rel="stylesheet" href="/assets/pd-black-gold.css">
+<link rel="stylesheet" href="{{ dispatch_asset_prefix|default('') }}/assets/pd-black-gold.css">
 <style>
 *{box-sizing:border-box}
 body{background:var(--pd-black,#100e0b);color:var(--pd-ink,#f7efe1);font:16px/1.5 system-ui;margin:0;display:grid;min-height:100vh;place-items:center;padding:16px}
@@ -33,7 +33,7 @@ input:focus-visible,button:focus-visible{outline:2px solid var(--pd-gold-strong,
 a{color:var(--pd-gold,#edca82)}
 small{color:var(--pd-muted,#c7b79e)}
 </style>
-<main><img src="/pd-logo-transparent.png" alt="PRIVATE DRIVE — логотип PD с автомобилем" width="112" height="112" style="display:block;width:112px;height:112px;max-width:100%;aspect-ratio:1;object-fit:contain;margin:0 auto 14px;border-radius:14px"><h1 style="text-align:center">PRIVATE DRIVE</h1><h2>{{ title }}</h2>
+<main><img src="{{ dispatch_asset_prefix|default('') }}/pd-logo-transparent.png" alt="PRIVATE DRIVE — логотип PD с автомобилем" width="112" height="112" style="display:block;width:112px;height:112px;max-width:100%;aspect-ratio:1;object-fit:contain;margin:0 auto 14px;border-radius:14px"><h1 style="text-align:center">PRIVATE DRIVE</h1><h2>{{ title }}</h2>
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 {% if registered %}<p role="status">Пароль создан. Теперь войди в диспетчерскую.</p>{% endif %}
 {% if ready %}

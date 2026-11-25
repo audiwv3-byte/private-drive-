@@ -17,28 +17,10 @@
   let blocked = false;
 
   const dispatcherSection = document.getElementById('step10');
-  const website = document.createElement('a');
-  website.href = 'https://wilsonpark.pythonanywhere.com/dispatch';
-  website.target = '_blank';
-  website.rel = 'noopener noreferrer';
-  website.className = 'secondary';
-  website.style.cssText = 'display:inline-block;margin:12px 0 0;padding:10px 13px';
-  website.textContent = 'Открыть рабочую диспетчерскую на сайте';
-  if (typeof window.Telegram?.WebApp?.openLink === 'function' && window.Telegram.WebApp.initData) {
-    website.addEventListener('click', (event) => {
-      try {
-        window.Telegram.WebApp.openLink(website.href);
-        event.preventDefault();
-      } catch (_) {
-        // Let the ordinary link open if Telegram cannot open it.
-      }
-    });
-  }
-  panel.before(website);
   function mountInDispatcherDashboard() {
     const dashboard = document.getElementById('pdAdminDashboardV4');
     const heading = dashboard?.querySelector('.pda-heading');
-    if (heading && panel.parentElement !== dashboard) heading.after(website, panel);
+    if (heading && panel.parentElement !== dashboard) heading.after(panel);
   }
   new MutationObserver(mountInDispatcherDashboard).observe(dispatcherSection, {childList: true});
   mountInDispatcherDashboard();

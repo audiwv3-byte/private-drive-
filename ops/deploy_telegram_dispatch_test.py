@@ -15,7 +15,7 @@ SITE = "https://wilsonpark.pythonanywhere.com"
 SOURCE = "/home/wilsonpark/euro_baltic_transfer/PRIVATE_DRIVE_MiniApp_2026_10_18/miniapp/templates/index.html"
 STAGING = "https://private-drive-dispatcher-staging.onrender.com/preview/telegram-miniapp"
 MARKER = 'id="pdTelegramDispatchTest"'
-PREVIOUS_FRAGMENT_SHA = "55931ec084fbe1d8c59f6ab4c02e8ecec0061a7ea2eee6ceeedbe6a2777a4e44"
+PREVIOUS_FRAGMENT_SHA = "2890b0068bf5bfb0cf1ee85821131e9b834a79976141d77710c7e32f56e67d6d"
 PREVIOUS_FRAGMENT = re.compile(
     r'<details id="pdTelegramDispatchTest"[^>]*>[\s\S]*?'
     r'<script id="pdTelegramDispatchTestScript">[\s\S]*?</script>'
@@ -63,10 +63,6 @@ def main():
         time.sleep(5)
     else:
         raise RuntimeError("Staging API did not approve the Mini App origin")
-    login = requests.get(SITE + "/dispatch", timeout=20)
-    login.raise_for_status()
-    if login.url != SITE + "/dispatch/login" or 'type="password"' not in login.text:
-        raise RuntimeError("Working dispatcher login is unavailable")
     baseline = requests.get(SITE, timeout=20)
     baseline.raise_for_status()
     if not HEADING.search(baseline.text):
@@ -93,7 +89,7 @@ def main():
         updated = with_fragment(original_text, fragment)
         Environment().parse(updated)
         if updated == original_text:
-            if MARKER not in baseline.text or 'Открыть рабочую диспетчерскую на сайте' not in baseline.text:
+            if MARKER not in baseline.text or 'Открыть рабочую диспетчерскую на сайте' in baseline.text:
                 raise RuntimeError("Saved template and public Mini App differ")
             print("Already live")
             return
@@ -113,7 +109,7 @@ def main():
                         and "id=\"pdObPassenger\"" in published.text
                         and "id=\"pdPilotWork\"" in published.text
                         and STAGING in published.text
-                        and 'Открыть рабочую диспетчерскую на сайте' in published.text):
+                        and 'Открыть рабочую диспетчерскую на сайте' not in published.text):
                     print("Mini App entry verified. Original SHA-256:", hashlib.sha256(original).hexdigest())
                     return
                 time.sleep(3)

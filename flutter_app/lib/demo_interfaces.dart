@@ -319,7 +319,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
                               key: const Key('shared-trip-status'),
                               textAlign: TextAlign.center),
                           if (_trip.trip != null)
-                            Text('${_trip.trip!.from} → ${_trip.trip!.to}',
+                            Text(_trip.trip!.routeLabel,
                                 key: const Key('shared-trip-route'),
                                 textAlign: TextAlign.center),
 
@@ -467,17 +467,25 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (!mounted || !_navigatingActiveTrip || _pickupRouteAttempted) return;
     final from = _position;
     final to = _pickupPreviewPoint;
+    final stops = _isUnderway
+        ? (widget.tripStore?.trip?.stops ?? const <String>[]).map(_resolvePilotPoint).toList()
+        : const <LatLng?>[];
     if (from == null || to == null || !widget.enableMapTiles ||
         !widget.loadMapTiles) return;
+    if (stops.any((point) => point == null)) {
+      setState(() => _pickupRoutingInfo = 'Для построения маршрута уточни адреса остановок.');
+      return;
+    }
     _pickupRouteAttempted = true;
     final generation = ++_pickupRouteGeneration;
     setState(() {
       _pickupRoutingInfo = 'Построение маршрута по дорогам…';
     });
     try {
+      final coordinatesText = [from, ...stops.cast<LatLng>(), to]
+          .map((point) => '${point.longitude},${point.latitude}').join(';');
       final uri = Uri.https('router.project-osrm.org',
-        '/route/v1/driving/${from.longitude},${from.latitude};'
-        '${to.longitude},${to.latitude}',
+        '/route/v1/driving/$coordinatesText',
         {'overview': 'full', 'geometries': 'geojson'});
       final decoded = await const PdHttpApi().getJson(uri);
       final routes = decoded['routes'] as List<dynamic>?;
@@ -499,7 +507,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         _pickupRoutingInfo = 'Дорожный маршрут · демонстрационный сервис';
       });
       _map.fitCamera(CameraFit.bounds(
-        bounds: LatLngBounds.fromPoints([from, to]),
+        bounds: LatLngBounds.fromPoints(points),
         padding: const EdgeInsets.all(72),
       ));
     } catch (_) {
@@ -689,9 +697,22 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
           : widget.tripStore?.trip?.to)
       : null;
 
-  LatLng? get _pickupPreviewPoint {
-    final place = _pickupAddress?.trim().toLowerCase();
-    return place == null ? null : _demoCityCenters[place];
+  LatLng? get _pickupPreviewPoint => _resolvePilotPoint(_pickupAddress);
+
+  LatLng? _resolvePilotPoint(String? address) {
+    final place = address?.trim().toLowerCase();
+    if (place == null) return null;
+    final parts = place.split(',');
+    if (parts.length == 2) {
+      final latitude = double.tryParse(parts[0].trim());
+      final longitude = double.tryParse(parts[1].trim());
+      if (latitude != null && longitude != null &&
+          latitude.isFinite && longitude.isFinite &&
+          latitude.abs() <= 90 && longitude.abs() <= 180) {
+        return LatLng(latitude, longitude);
+      }
+    }
+    return _demoCityCenters[place];
   }
 
   void _focusPickupPreview() {
@@ -715,6 +736,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
+    _waitingTripId = widget.tripStore?.trip;
     _seenPassengerMessageCount =
         widget.tripStore?.passengerChatMessages.length ?? 0;
     widget.tripStore?.addListener(_onTripChanged);
@@ -777,6 +799,11 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
     if (tripId != _waitingTripId) {
       _finishTripMode = false;
       _waitingTripId = tripId;
+      ++_pickupRouteGeneration;
+      _pickupRouteAttempted = false;
+      _pickupRoadPoints = const [];
+      _pickupRoutingInfo = '';
+      if (_navigatingActiveTrip) unawaited(_loadPickupRoadRoute());
       _waitingElapsed = Duration.zero;
       _waitingStartedAt = null;
       _waitingTicker?.cancel();
@@ -1457,6 +1484,12 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                               ),
                             ),
                             if (!_tripPanelCollapsed) ...[
+                            if (widget.tripStore?.trip case final DemoTrip currentTrip)
+                              Text(
+                                'Оплата: ${pdLabel(context, currentTrip.paymentMethod)} · без списания',
+                                key: const Key('pilot-payment-status'),
+                                textAlign: TextAlign.center,
+                              ),
                             if (_navigatingActiveTrip) ...[
                               if (_pickupRoutingInfo.isNotEmpty)
                                 Text(_pickupRoutingInfo,
@@ -1507,7 +1540,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                                       )),
                                     const SizedBox(height: 6),
                                     Text(
-                                      '${widget.tripStore!.trip!.from} → ${widget.tripStore!.trip!.to}',
+                                      widget.tripStore!.trip!.routeLabel,
                                       key: const Key('pilot-assigned-route'),
                                       textAlign: TextAlign.center,
                                     ),

@@ -69,13 +69,17 @@ jobs:
           permissions = '''<uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+              <uses-permission android:name="android.permission.WAKE_LOCK"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <uses-permission android:name="android.permission.CAMERA"/>
+              <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
               <uses-feature android:name="android.hardware.camera" android:required="false"/>
               <queries><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>
               '''
           text = text.replace('<application', permissions + '<application', 1)
-          assert 'android.permission.RECORD_AUDIO' not in text
           manifest.write_text(text)
           drawable = manifest.parent / 'res/drawable-nodpi'
           drawable.mkdir(parents=True, exist_ok=True)
@@ -150,8 +154,8 @@ jobs:
           # Stable TEST signing key: never use this public development key for release.
           mkdir -p "$HOME/.android"
           base64 --decode ../flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
-          QA_VERSION=0.2.41
-          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112505 \
+          QA_VERSION=0.2.42
+          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112506 \
             --dart-define="PD_QA_BUILD_LABEL=Версия $QA_VERSION · внутренняя сборка" \
             --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN" \
             --dart-define=PD_NATIVE_AUTH_API_URL=https://private-drive-drbd.onrender.com
@@ -161,14 +165,12 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
           grep "name='lt.privatedrive.private_drive.photo_qa'" ../full-qa-apk-badging.txt
-          grep "versionCode='2026112505'" ../full-qa-apk-badging.txt
+          grep "versionCode='2026112506'" ../full-qa-apk-badging.txt
           grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt
-          if grep -q "android.permission.RECORD_AUDIO" ../full-qa-apk-permissions.txt; then
-            echo "::error::Unexpected RECORD_AUDIO permission"
-            exit 1
-          fi
+          grep "android.permission.FOREGROUND_SERVICE_LOCATION" ../full-qa-apk-permissions.txt
+          grep "android.permission.RECORD_AUDIO" ../full-qa-apk-permissions.txt
           mkdir -p ../full_native_qa_apk
           cp "$APK" ../full_native_qa_apk/PRIVATE-DRIVE-full-qa-debug.apk
           cp ../full-qa-apk-signature.txt ../full-qa-apk-badging.txt ../full-qa-apk-permissions.txt ../full_native_qa_apk/
@@ -211,11 +213,11 @@ jobs:
         with:
           name: private-drive-full-native-qa-apk
           path: apk
-      - name: Download the published Android QA 0.2.40 baseline
+      - name: Download the published Android QA 0.2.41 baseline
         uses: actions/download-artifact@v4
         with:
           name: private-drive-full-native-qa-apk
-          run-id: 45657635992
+          run-id: 45671715822
           github-token: ${{ github.token }}
           path: previous-apk
       - name: Verify both APK signing certificates and versions
@@ -229,8 +231,8 @@ jobs:
             "$BUILD_TOOLS/apksigner" verify --print-certs "$file" | grep -F 'certificate SHA-256 digest:' > "$path/certificates.txt"
           done
           diff -u previous-apk/certificates.txt apk/certificates.txt
-          "$BUILD_TOOLS/aapt" dump badging previous-apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112504' versionName='0.2.40'"
-          "$BUILD_TOOLS/aapt" dump badging apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112505' versionName='0.2.41'"
+          "$BUILD_TOOLS/aapt" dump badging previous-apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112505' versionName='0.2.41'"
+          "$BUILD_TOOLS/aapt" dump badging apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112506' versionName='0.2.42'"
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -245,9 +247,9 @@ jobs:
           script: |
             set -e
             adb install previous-apk/PRIVATE-DRIVE-full-qa-debug.apk
-            adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.40'
-            adb install -r apk/PRIVATE-DRIVE-full-qa-debug.apk
             adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.41'
+            adb install -r apk/PRIVATE-DRIVE-full-qa-debug.apk
+            adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.42'
             adb logcat -c
             adb shell am start -W -n lt.privatedrive.private_drive.photo_qa/lt.privatedrive.private_drive.MainActivity
             sleep 12

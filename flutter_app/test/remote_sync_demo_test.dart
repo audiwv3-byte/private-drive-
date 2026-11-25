@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart' show AndroidSettings;
 // The plugin's platform interface is used to test location without real GPS.
 // ignore: depend_on_referenced_packages
 import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
@@ -106,49 +109,138 @@ class FakeGateway extends RemoteTripGateway {
 }
 
 class StationaryLocation extends GeolocatorPlatform {
-  @override
-  Future<bool> isLocationServiceEnabled() async => true;
+  final status = StreamController<ServiceStatus>.broadcast();
+  final positions = StreamController<Position>.broadcast();
+  LocationSettings? streamSettings;
+  bool _enabled = true;
+  int permissionRequests = 0;
+
+  void setServiceEnabled(bool enabled) {
+    _enabled = enabled;
+    status.add(enabled ? ServiceStatus.enabled : ServiceStatus.disabled);
+  }
 
   @override
-  Future<LocationPermission> checkPermission() async => LocationPermission.whileInUse;
+  Future<bool> isLocationServiceEnabled() async => _enabled;
 
   @override
-  Stream<Position> getPositionStream({LocationSettings? locationSettings}) =>
-    const Stream<Position>.empty();
+  Future<LocationPermission> checkPermission() async => permissionRequests == 0
+      ? LocationPermission.denied : LocationPermission.whileInUse;
 
   @override
-  Stream<ServiceStatus> getServiceStatusStream() => const Stream.empty();
+  Future<LocationPermission> requestPermission() async {
+    permissionRequests++;
+    return LocationPermission.whileInUse;
+  }
+
+  @override
+  Stream<Position> getPositionStream({LocationSettings? locationSettings}) {
+    streamSettings = locationSettings;
+    return positions.stream;
+  }
+
+  @override
+  Stream<ServiceStatus> getServiceStatusStream() => status.stream;
+
+  Position fix(double latitude, double longitude) =>
+      Position(latitude: latitude, longitude: longitude, timestamp: DateTime(2026, 11, 23),
+        accuracy: 5, altitude: 0, altitudeAccuracy: 0, heading: 0, headingAccuracy: 0,
+        speed: 0, speedAccuracy: 0);
 
   @override
   Future<Position> getCurrentPosition({LocationSettings? locationSettings}) async =>
-    Position(latitude: 54.69, longitude: 25.28, timestamp: DateTime(2026, 11, 23),
-      accuracy: 5, altitude: 0, altitudeAccuracy: 0, heading: 0, headingAccuracy: 0,
-      speed: 0, speedAccuracy: 0);
+      fix(54.69, 25.28);
 }
 
 void main() {
-  for (final role in ['pilot', 'passenger']) {
-    testWidgets('$role GPS sends a stationary fix and clears on stop',
-        (tester) async {
-      final savedPlatform = GeolocatorPlatform.instance;
-      GeolocatorPlatform.instance = StationaryLocation();
-      addTearDown(() => GeolocatorPlatform.instance = savedPlatform);
-      final server = FakeDemoServer();
+  testWidgets('pilot GPS updates while minimized until manually switched off', (tester) async {
+    final savedPlatform = GeolocatorPlatform.instance;
+    final platform = StationaryLocation();
+    GeolocatorPlatform.instance = platform;
+    addTearDown(() => GeolocatorPlatform.instance = savedPlatform);
+    final server = FakeDemoServer();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
+      gateway: server.actor('pilot'), enableMapTiles: false,
+      stagingDispatcher: true, pollInterval: const Duration(hours: 1),
+    )));
+    await tester.pumpAndSettle();
+    expect(server.positions, isEmpty);
+    await tester.tap(find.byKey(const Key('remote-enable-gps')));
+    await tester.pumpAndSettle();
+    expect(server.positions.single, {'latitude': 54.69, 'longitude': 25.28});
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    platform.positions.add(platform.fix(54.71, 25.32));
+    await tester.pump();
+    expect(server.positions.last, {'latitude': 54.71, 'longitude': 25.32});
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('remote-disable-gps')));
+    await tester.pumpAndSettle();
+    expect(server.positions.last, {'latitude': null, 'longitude': null});
+    await tester.pumpWidget(const SizedBox.shrink());
+    await platform.status.close();
+    await platform.positions.close();
+  });
+
+  testWidgets('online Android passenger sends GPS while the app is minimized',
+      (tester) async {
+    final savedPlatform = GeolocatorPlatform.instance;
+    final platform = StationaryLocation();
+    GeolocatorPlatform.instance = platform;
+    addTearDown(() async {
+      GeolocatorPlatform.instance = savedPlatform;
+      await platform.status.close();
+      await platform.positions.close();
+    });
+    final server = FakeDemoServer();
+    final gateway = server.actor('passenger');
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+
+    Future<void> show({required bool active}) async {
       await tester.pumpWidget(MaterialApp(home: RemoteSyncDemo(
-        gateway: server.actor(role), enableMapTiles: false,
+        gateway: gateway, enableMapTiles: false, active: active,
         stagingDispatcher: true, pollInterval: const Duration(hours: 1),
       )));
       await tester.pumpAndSettle();
-      expect(server.positions, isEmpty);
-      await tester.tap(find.byKey(const Key('remote-enable-gps')));
-      await tester.pumpAndSettle();
-      expect(server.positions.single, {'latitude': 54.69, 'longitude': 25.28});
-      expect(find.text('GPS передаётся в тестовую диспетчерскую'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('remote-disable-gps')));
-      await tester.pumpAndSettle();
-      expect(server.positions.last, {'latitude': null, 'longitude': null});
-    });
-  }
+    }
+
+    await show(active: true);
+    expect(platform.permissionRequests, 1);
+    expect((platform.streamSettings as AndroidSettings).foregroundNotificationConfig,
+        isNotNull);
+    expect(server.positions.last, {'latitude': 54.69, 'longitude': 25.28});
+    expect(find.byKey(const Key('remote-enable-gps')), findsNothing);
+    expect(find.byKey(const Key('remote-disable-gps')), findsNothing);
+
+    await show(active: false);
+    expect(server.positions.last, {'latitude': null, 'longitude': null});
+    await show(active: true);
+    expect(server.positions.last, {'latitude': 54.69, 'longitude': 25.28});
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(server.positions.last, {'latitude': 54.69, 'longitude': 25.28});
+    platform.positions.add(platform.fix(54.70, 25.31));
+    await tester.pump();
+    expect(server.positions.last, {'latitude': 54.70, 'longitude': 25.31});
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(server.positions.last, {'latitude': 54.70, 'longitude': 25.31});
+
+    platform.setServiceEnabled(false);
+    await tester.pumpAndSettle();
+    expect(server.positions.last, {'latitude': null, 'longitude': null});
+    platform.setServiceEnabled(true);
+    await tester.pumpAndSettle();
+    expect(server.positions.last, {'latitude': 54.69, 'longitude': 25.28});
+    expect(platform.permissionRequests, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    expect(server.positions.last, {'latitude': null, 'longitude': null});
+  });
 
   test('Safari map tiles have public HTTPS primary and fallback hosts', () {
     expect(remoteDemoTileTemplate(false),

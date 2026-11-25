@@ -48,13 +48,13 @@ void main() {
     await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
-    expect(find.text('Bandomasis kelionės užsakymas'), findsOneWidget);
+    expect(find.widgetWithText(Text, 'Pervežimas'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('passenger-global-language-menu')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('passenger-select-language-EN')));
     await tester.pumpAndSettle();
-    expect(find.text('Demo trip booking'), findsOneWidget);
+    expect(find.widgetWithText(Text, 'Transfer'), findsOneWidget);
     expect(pdLanguage.value, 'EN');
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -83,11 +83,11 @@ void main() {
     expect(find.text('Pervežimas'), findsOneWidget);
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
-    expect(find.text('Bandomasis kelionės užsakymas'), findsOneWidget);
+    expect(find.widgetWithText(Text, 'Pervežimas'), findsOneWidget);
     expect(find.text('Pirmyn ir atgal'), findsOneWidget);
     pdLanguage.set('EN', persist: false);
     await tester.pumpAndSettle();
-    expect(find.text('Demo trip booking'), findsOneWidget);
+    expect(find.widgetWithText(Text, 'Transfer'), findsOneWidget);
     expect(find.text('Round trip'), findsOneWidget);
   });
 
@@ -140,11 +140,18 @@ void main() {
     await tester.tap(find.byKey(const Key('passenger-entry-taxi')));
     await tester.pumpAndSettle();
     expect(find.byType(PassengerDemo), findsOneWidget);
-    expect(find.text('Такси · выбранный тип поездки'), findsOneWidget);
+    expect(find.widgetWithText(Text, 'Такси'), findsOneWidget);
+    expect(find.byKey(const Key('passenger-taxi-tariffs')), findsNothing);
     expect(find.byKey(const Key('passenger-round-trip')), findsNothing);
     expect(find.byKey(const Key('passenger-ride-type')), findsNothing);
     expect(find.byKey(const Key('passenger-map')), findsOneWidget);
     expect(find.byKey(const Key('passenger-map-day-night')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('passenger-open-drawer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('passenger-drawer-fares')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('passenger-taxi-tariffs')), findsOneWidget);
+    expect(find.byKey(const Key('passenger-transfer-tariffs')), findsOneWidget);
   });
 
   testWidgets('Passenger chooses transfer on dedicated entry screen', (tester) async {
@@ -156,7 +163,7 @@ void main() {
     await tester.scrollUntilVisible(find.byKey(const Key('passenger-entry-transfer')), 180);
     await tester.tap(find.byKey(const Key('passenger-entry-transfer')));
     await tester.pumpAndSettle();
-    expect(find.text('Трансфер · выбранный тип поездки'), findsOneWidget);
+    expect(find.widgetWithText(Text, 'Трансфер'), findsOneWidget);
     expect(find.byKey(const Key('passenger-round-trip')), findsOneWidget);
   });
 }

@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'remote_sync_client.dart';
+import 'pd_trip_voice.dart';
+import 'pd_trip_route_editor.dart';
 import 'demo_map_tile_provider.dart';
 import 'message_voice.dart';
 
@@ -36,21 +38,24 @@ class RemoteSyncDemo extends StatefulWidget {
   const RemoteSyncDemo({super.key, this.gateway, this.enableMapTiles = true,
     this.pollInterval = const Duration(seconds: 3),
     this.onIncomingMessageVoice, this.stagingDispatcher = false,
-    this.onReturnHome, this.initialFrom = '', this.initialTo = ''});
+    this.onReturnHome, this.active = true, this.initialFrom = '', this.initialTo = '', this.initialStops = const []});
   final RemoteTripGateway? gateway;
   final bool enableMapTiles;
   final Duration pollInterval;
   final VoidCallback? onIncomingMessageVoice;
   final bool stagingDispatcher;
   final VoidCallback? onReturnHome;
+  final bool active;
   /// Pre-populated route from the main passenger booking screen (QA only).
   final String initialFrom, initialTo;
+  final List<String> initialStops;
 
   @override
   State<RemoteSyncDemo> createState() => _RemoteSyncDemoState();
 }
 
-class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
+class _RemoteSyncDemoState extends State<RemoteSyncDemo>
+    with WidgetsBindingObserver {
   static const stagingUrl = 'https://private-drive-dispatcher-staging.onrender.com';
   final url = TextEditingController();
   final token = TextEditingController();
@@ -61,12 +66,16 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   final map = MapController();
   RemoteTripGateway? api;
   Timer? timer;
+  Timer? _offerTicker;
+  Map<String, dynamic>? _offer;
+  int _offerSeconds = 0;
   StreamSubscription<Position>? gps;
   StreamSubscription<ServiceStatus>? _gpsStatus;
   bool owned = false, busy = false, refreshing = false, gpsOn = false;
   String? role, lastTripId;
   String error = '', gpsLabel = 'GPS выключен';
   String orderError = '';
+  List<String> _draftStops = const [];
   int seq = 0;
   int chatSeq = 0;
   bool _loadedChatForTrip = false;
@@ -75,6 +84,23 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       (role == 'pilot' || role == 'passenger');
   bool _refreshRequested = false;
   bool _requestingGpsPermission = false;
+  bool _passengerPermissionRequested = false;
+  bool _pilotGpsRequested = false;
+  AppLifecycleState? _lifecycle;
+  bool get _foreground => _lifecycle == null ||
+      _lifecycle == AppLifecycleState.resumed ||
+      _lifecycle == AppLifecycleState.inactive;
+  bool get _androidBackgroundGps =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool _closed = false;
+  bool _voiceReady = false;
+  bool get _autoPassengerGps => widget.stagingDispatcher && role == 'passenger';
+  bool get _positionOnline => !_closed && (!_autoPassengerGps || widget.active) &&
+      _lifecycle != AppLifecycleState.detached &&
+      (_foreground || _androidBackgroundGps);
+  bool get _canStartSharedGps => _positionOnline && _foreground;
+  bool _sharedPositionSent = false;
+  Future<Map<String, dynamic>>? _positionRequest;
   int _gpsGeneration = 0;
   bool _backupTiles = false;
   int _tileErrors = 0;
@@ -100,14 +126,55 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   @override
   void initState() {
     super.initState();
+    _lifecycle = WidgetsBinding.instance.lifecycleState;
+    WidgetsBinding.instance.addObserver(this);
     if (widget.stagingDispatcher) url.text = stagingUrl;
     origin.text = widget.initialFrom;
     destination.text = widget.initialTo;
+    _draftStops = widget.initialStops;
     if (widget.gateway != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) connect(widget.gateway!, isOwned: false);
       });
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant RemoteSyncDemo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active != oldWidget.active) _syncSharedGps();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lifecycle = state;
+    _syncSharedGps();
+  }
+
+  void _syncSharedGps() {
+    if (!_canShareGps || (!_autoPassengerGps && !_pilotGpsRequested)) return;
+    if (!_positionOnline) {
+      if (gpsOn) unawaited(_stopGps('Геолокация приостановлена'));
+      return;
+    }
+    if (!_canStartSharedGps) return;
+    if (!kIsWeb) {
+      try {
+        _gpsStatus ??= Geolocator.getServiceStatusStream().listen((status) {
+          if (!_positionOnline || (!_autoPassengerGps && !_pilotGpsRequested)) return;
+          if (status == ServiceStatus.enabled) {
+            unawaited(_startGps());
+          } else {
+            unawaited(_stopGps('Геолокация устройства выключена'));
+          }
+        }, onError: (Object _) {
+          // The position stream also reports a disabled provider.
+        });
+      } catch (_) {
+        // Some platforms do not support a service status stream.
+      }
+    }
+    unawaited(_startGps());
   }
 
   Future<void> connectPressed() async {
@@ -134,6 +201,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       api = candidate;
       owned = isOwned;
       role = value;
+      _voiceReady = widget.stagingDispatcher && profile['voice_ready'] == true;
       timer?.cancel();
       timer = Timer.periodic(widget.pollInterval, (_) => refresh());
     } on Exception catch (e) {
@@ -142,12 +210,14 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     } finally {
       if (mounted) setState(() => busy = false);
     }
+    if (!mounted) return;
+    _syncSharedGps();
     if (role != null) await refresh();
   }
 
   Future<void> refresh({bool immediately = false}) async {
     final client = api;
-    if (client == null) return;
+    if (client == null || _closed) return;
     if (refreshing) {
       _refreshRequested = _refreshRequested || immediately;
       return;
@@ -155,18 +225,36 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     refreshing = true;
     try {
       final response = await client.get('/v1/current');
+      if (_closed) return;
       final raw = response['trip'];
       if (raw != null && raw is! Map<String, dynamic>) {
         throw const RemoteDemoException('Неверный формат поездки');
       }
       final current = raw as Map<String, dynamic>?;
+      final offer = response['offer'];
+      if (mounted && role == 'pilot') {
+        _setOffer(offer is Map<String, dynamic> ? offer : null);
+      }
       if (_canShareGps) {
-        final point = gpsOn ? location : null;
+        final point = gpsOn && _positionOnline
+            ? location : null;
         if (point != null || _clearLocation) {
           try {
-            await client.post('/v1/position', {'latitude': point?.latitude,
-              'longitude': point?.longitude});
-            if (point == null) _clearLocation = false;
+            if (point != null) _sharedPositionSent = true;
+            final request = client.post('/v1/position', {
+              'latitude': point?.latitude, 'longitude': point?.longitude,
+            });
+            _positionRequest = request;
+            try {
+              await request;
+            } finally {
+              _positionRequest = null;
+            }
+            if (_closed) return;
+            if (point == null) {
+              _clearLocation = false;
+              _sharedPositionSent = false;
+            }
             if (mounted && gpsOn && point != null) {
               setState(() => gpsLabel = 'GPS передаётся в тестовую диспетчерскую');
             }
@@ -251,6 +339,50 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     }
   }
 
+  void _setOffer(Map<String, dynamic>? offer) {
+    final seconds = offer?['seconds_left'];
+    final remaining = seconds is int ? seconds : 0;
+    final next = remaining > 0 ? offer : null;
+    _offerTicker?.cancel();
+    _offerTicker = null;
+    setState(() {
+      _offer = next;
+      _offerSeconds = remaining;
+    });
+    if (next == null) return;
+    _offerTicker = Timer.periodic(const Duration(seconds: 1), (ticker) {
+      setState(() => _offerSeconds--);
+      if (_offerSeconds <= 0) {
+        ticker.cancel();
+        unawaited(refresh(immediately: true));
+      }
+    });
+  }
+
+  Future<void> _respondToOffer(String decision) async {
+    final offer = _offer;
+    final client = api;
+    if (busy || _offerSeconds <= 0 || offer == null || client == null) return;
+    setState(() => busy = true);
+    try {
+      await client.post('/v1/trips/${offer['trip_id']}/offer', {
+        'offer_id': offer['id'], 'decision': decision,
+      });
+      if (mounted) _setOffer(null);
+    } on RemoteDemoException catch (e) {
+      if (!mounted) return;
+      final message = e.status == 409
+          ? 'Предложение заказа уже недоступно.'
+          : 'Не удалось отправить ответ. Проверь связь.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) {
+        setState(() => busy = false);
+        unawaited(refresh(immediately: true));
+      }
+    }
+  }
+
   Future<void> send(String path, Map<String, dynamic> body) async {
     final client = api;
     if (client == null || busy) return;
@@ -263,6 +395,54 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       if (mounted) setState(() => busy = false);
     }
     await refresh();
+  }
+
+  List<String> _routeStops(Map<String, dynamic>? order) =>
+      (order?['stops'] as List?)?.whereType<String>().toList() ?? const [];
+
+  String _routeLabel(Map<String, dynamic> order) =>
+      [order['origin'], ..._routeStops(order), order['destination']].join(' → ');
+
+  Future<void> _editRoute({required bool draft}) async {
+    final order = trip;
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => PdTripRouteEditor(
+        origin: draft ? origin.text : order!['origin'] as String,
+        destination: draft ? destination.text : order!['destination'] as String,
+        stops: draft ? _draftStops : _routeStops(order),
+        pickupLocked: !draft && order?['status'] == 'underway',
+      ),
+    );
+    if (!mounted || result == null) return;
+    if (draft) {
+      setState(() {
+        origin.text = result['from'] as String;
+        destination.text = result['to'] as String;
+        _draftStops = result['stops'] as List<String>;
+      });
+      return;
+    }
+    final client = api;
+    if (client == null || busy || order == null) return;
+    setState(() => busy = true);
+    try {
+      await client.post('/v1/trips/${order['id']}/route', {
+        ...result, 'version': order['version'],
+      });
+    } on RemoteDemoException catch (error) {
+      if (mounted) {
+        final message = error.status == 409
+            ? 'Заказ изменился. Проверь маршрут и повтори.'
+            : 'Не удалось сохранить маршрут. Проверь адреса и связь.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => busy = false);
+        unawaited(refresh(immediately: true));
+      }
+    }
   }
 
   Future<void> createOrder() async {
@@ -278,6 +458,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     try {
       final response = await client.post('/v1/trips', {
         'from': from, 'to': to, 'payment': 'Карта',
+        if (_draftStops.isNotEmpty) 'stops': _draftStops,
       });
       final created = response['trip'];
       if (created is! Map<String, dynamic> || created['id'] is! String) {
@@ -328,6 +509,16 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     mainAxisSize: MainAxisSize.min,
     children: [
       const Text('Сообщения поездки · тестовый сервер'),
+      if (_voiceReady && _androidBackgroundGps && widget.active &&
+          (role == 'pilot' || role == 'passenger') &&
+          ['assigned', 'approaching', 'underway'].contains(status) &&
+          trip?['pilot'] != null)
+        PdTripVoice(
+          key: ValueKey(trip!['id']),
+          gateway: api!,
+          tripId: trip!['id'] as String,
+          role: role!,
+        ),
       for (final item in chatMessages)
         Text('${switch (item['role']) { 'pilot' => 'Пилот', 'dispatcher' => 'Диспетчер', _ => 'Пассажир' }}: ${item['body']}',
           key: Key('remote-chat-message-${item['seq']}')),
@@ -353,10 +544,25 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
 
   Future<void> toggleGps() async {
     if (_requestingGpsPermission) return;
+    if (_canShareGps && role == 'pilot') {
+      _pilotGpsRequested = !_pilotGpsRequested;
+      if (!_pilotGpsRequested) {
+        await _stopGps('GPS выключен');
+      } else {
+        _syncSharedGps();
+      }
+      return;
+    }
     if (gpsOn) {
       await _stopGps('GPS выключен');
       return;
     }
+    await _startGps();
+  }
+
+  Future<void> _startGps() async {
+    if (!mounted || gpsOn || _requestingGpsPermission ||
+        (_canShareGps && !_canStartSharedGps)) return;
     _requestingGpsPermission = true;
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
@@ -364,7 +570,10 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         return;
       }
       var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
+      if (permission == LocationPermission.denied &&
+          (!_autoPassengerGps || !_passengerPermissionRequested) &&
+          (!_canShareGps || _canStartSharedGps) && mounted) {
+        if (_autoPassengerGps) _passengerPermissionRequested = true;
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.denied ||
@@ -372,7 +581,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         if (mounted) setState(() => gpsLabel = 'Нет разрешения GPS');
         return;
       }
-      if (!mounted) return;
+      if (!mounted || (_canShareGps && !_canStartSharedGps)) return;
       final generation = ++_gpsGeneration;
       setState(() { gpsOn = true; gpsLabel = 'Ожидание GPS…'; });
       void updatePosition(Position position) {
@@ -384,27 +593,38 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
               ? 'Координаты получены · отправляем…'
               : 'GPS активен · только на устройстве';
         });
-        if (widget.enableMapTiles) map.move(point, map.camera.zoom);
+        if (widget.enableMapTiles) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || !_foreground || !gpsOn || _gpsGeneration != generation ||
+                location != point) return;
+            map.move(point, map.camera.zoom);
+          });
+        }
         if (_canShareGps) unawaited(refresh(immediately: true));
       }
-      gps = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high, distanceFilter: 5,
-        ),
-      ).listen(updatePosition, onError: (Object _) {
+      final settings = _canShareGps && _androidBackgroundGps
+          ? AndroidSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 5,
+              intervalDuration: const Duration(seconds: 3),
+              foregroundNotificationConfig: const ForegroundNotificationConfig(
+                notificationTitle: 'PRIVATE DRIVE · Геолокация',
+                notificationText: 'Тестовый диспетчер видит твоё местоположение, пока ты онлайн.',
+                notificationChannelName: 'Геолокация поездки',
+                enableWakeLock: true,
+                setOngoing: true,
+              ),
+            )
+          : const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 5,
+            );
+      gps = Geolocator.getPositionStream(locationSettings: settings)
+          .listen(updatePosition, onError: (Object _) {
         if (mounted && _gpsGeneration == generation) {
           unawaited(_stopGps('GPS недоступен'));
         }
       });
-      if (!kIsWeb && _canShareGps) {
-        _gpsStatus = Geolocator.getServiceStatusStream().listen((status) {
-          if (status == ServiceStatus.disabled && _gpsGeneration == generation) {
-            unawaited(_stopGps('Геолокация устройства выключена'));
-          }
-        }, onError: (Object _) {
-          // Failures of the position stream are handled separately.
-        });
-      }
       unawaited(_getInitialFix(generation, updatePosition));
     } catch (_) {
       if (mounted) await _stopGps('GPS недоступен');
@@ -416,10 +636,8 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
   Future<void> _stopGps(String label) async {
     _gpsGeneration++;
     final stopped = gps;
-    final stoppedStatus = _gpsStatus;
     gps = null;
-    _gpsStatus = null;
-    _clearLocation = _canShareGps;
+    _clearLocation = _canShareGps && _sharedPositionSent;
     setState(() {
       gpsOn = false;
       location = null;
@@ -427,7 +645,6 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     });
     if (_clearLocation) unawaited(refresh(immediately: true));
     await stopped?.cancel();
-    await stoppedStatus?.cancel();
   }
 
   Future<void> _getInitialFix(int generation, ValueChanged<Position> updatePosition) async {
@@ -445,12 +662,36 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
     }
   }
 
+  Future<void> _closeSharedGpsConnection(RemoteTripGateway client,
+      Future<Map<String, dynamic>>? pending) async {
+    try {
+      try {
+        await pending;
+      } catch (_) {
+        // A lost response does not mean the previous position did not arrive.
+      }
+      await client.post('/v1/position', {'latitude': null, 'longitude': null});
+    } catch (_) {
+      // The dispatcher drops stale positions when the client cannot clear them.
+    } finally {
+      if (owned) client.close();
+    }
+  }
+
   @override
   void dispose() {
+    _closed = true;
+    WidgetsBinding.instance.removeObserver(this);
     timer?.cancel();
+    _offerTicker?.cancel();
     gps?.cancel();
     _gpsStatus?.cancel();
-    if (owned) api?.close();
+    final client = api;
+    if (_canShareGps && _sharedPositionSent && client != null) {
+      unawaited(_closeSharedGpsConnection(client, _positionRequest));
+    } else if (owned) {
+      client?.close();
+    }
     url.dispose(); token.dispose(); origin.dispose(); destination.dispose();
     chatDraft.dispose();
     map.dispose();
@@ -466,6 +707,9 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       const Text('Подключение только к изолированному тестовому серверу. '
           'Используй HTTPS и временный токен своей роли. '
           'Токен не сохраняется на устройстве.'),
+      if (widget.stagingDispatcher)
+        const Text('В режиме пассажира разрешённая геолокация автоматически '
+            'видна тестовому диспетчеру, пока ты онлайн, в том числе при свёрнутом приложении на Android.'),
       TextField(key: const Key('remote-server-url'), controller: url,
         readOnly: widget.stagingDispatcher,
         decoration: const InputDecoration(labelText: 'HTTPS-адрес')),
@@ -558,19 +802,18 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
           Text(statusText, key: const Key('remote-trip-status')),
           if (isPassenger && widget.enableMapTiles)
             SizedBox(height: 240, child: _sharedMap()),
-          if (isPassenger && _canShareGps) ...[
-            OutlinedButton.icon(
-              key: Key(gpsOn ? 'remote-disable-gps' : 'remote-enable-gps'),
-              onPressed: toggleGps,
-              icon: Icon(gpsOn ? Icons.location_off : Icons.my_location),
-              label: Text(gpsOn ? 'Остановить передачу GPS' : 'Поделиться GPS с диспетчером'),
-            ),
-            Text(gpsLabel),
-          ],
+          if (_autoPassengerGps)
+            Text(gpsLabel, key: const Key('remote-passenger-gps-status')),
           if (trip != null)
-            Text(trip!['origin'].toString() + ' → ' +
-                trip!['destination'].toString(),
-              key: const Key('remote-trip-route')),
+            Text(_routeLabel(trip!), key: const Key('remote-trip-route')),
+          if (isPassenger && widget.stagingDispatcher &&
+              ['requested','assigned','approaching','underway'].contains(status))
+            OutlinedButton.icon(
+              key: const Key('remote-edit-route'),
+              onPressed: busy ? null : () => _editRoute(draft: false),
+              icon: const Icon(Icons.route_outlined),
+              label: const Text('Изменить маршрут'),
+            ),
           if (isPassenger && (trip == null || status == 'finished')) ...[
             TextField(key: const Key('remote-from'), controller: origin,
               maxLength: 200,
@@ -578,6 +821,14 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
             TextField(key: const Key('remote-to'), controller: destination,
               maxLength: 200,
               decoration: const InputDecoration(labelText: 'Куда')),
+            if (widget.stagingDispatcher)
+              OutlinedButton.icon(
+                key: const Key('remote-edit-draft-route'),
+                onPressed: busy ? null : () => _editRoute(draft: true),
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: Text(_draftStops.isEmpty ? 'Добавить остановки'
+                    : 'Остановки: ${_draftStops.length}'),
+              ),
             FilledButton(key: const Key('remote-create'),
               onPressed: busy ? null : createOrder,
               child: Text(busy ? 'Отправляем заявку…' : 'Создать тестовую заявку')),
@@ -613,6 +864,7 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
       'underway' => 'Завершить',
       _ => 'Нет назначенной поездки',
     };
+    final gpsRequested = _canShareGps ? _pilotGpsRequested : gpsOn;
     return Scaffold(body: Stack(fit: StackFit.expand, children: [
       if (widget.enableMapTiles)
         KeyedSubtree(key: const Key('remote-pilot-map'), child: _sharedMap())
@@ -630,11 +882,11 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
         Positioned(top: 8, right: 8,
           child: Column(children: [
             FilledButton.tonalIcon(
-              key: Key(gpsOn ? 'remote-disable-gps' : 'remote-enable-gps'),
+              key: Key(gpsRequested ? 'remote-disable-gps' : 'remote-enable-gps'),
               onPressed: toggleGps,
-              label: Text(gpsOn ? 'Выключить GPS' : _canShareGps
+              label: Text(gpsRequested ? 'Выключить GPS' : _canShareGps
                   ? 'Поделиться GPS' : 'Включить GPS'),
-              icon: Icon(gpsOn ? Icons.location_off : Icons.my_location)),
+              icon: Icon(gpsRequested ? Icons.location_off : Icons.my_location)),
             Text(gpsLabel, style: const TextStyle(fontSize: 11)),
           ])),
         Align(alignment: Alignment.bottomCenter,
@@ -645,10 +897,37 @@ class _RemoteSyncDemoState extends State<RemoteSyncDemo> {
                   Text(statusText, key: const Key('remote-trip-status')),
                   if (error.isNotEmpty)
                     Text(error, key: const Key('remote-error')),
+                  if (_offer case final Map<String, dynamic> offer)
+                    Column(key: const Key('remote-pilot-offer'), children: [
+                      Text('Новый заказ · $_offerSeconds с'),
+                      Text('${offer['origin']} → ${offer['destination']}'),
+                      Row(children: [
+                        Expanded(child: OutlinedButton(
+                          key: const Key('remote-offer-decline'),
+                          onPressed: busy || _offerSeconds <= 0
+                              ? null : () => _respondToOffer('decline'),
+                          child: const Text('Отклонить'),
+                        )),
+                        const SizedBox(width: 8),
+                        Expanded(child: FilledButton(
+                          key: const Key('remote-offer-accept'),
+                          onPressed: busy || _offerSeconds <= 0
+                              ? null : () => _respondToOffer('accept'),
+                          child: const Text('Принять'),
+                        )),
+                      ]),
+                    ]),
+                  if (moving)
+                    Text('Оплата: ${trip!['payment'] ?? 'способ не указан'} · без списания',
+                      key: const Key('remote-pilot-payment-status')),
+                  if (moving)
+                    Text(_routeLabel(trip!), key: const Key('remote-pilot-route'),
+                      maxLines: 3, overflow: TextOverflow.ellipsis),
                   if (moving)
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 170),
                       child: SingleChildScrollView(child: chatPanel())),
+                  if (_offer == null)
                   Row(children: [
                     Expanded(child: FilledButton(
                       key: const Key('remote-pilot-next'),

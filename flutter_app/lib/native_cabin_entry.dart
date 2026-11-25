@@ -231,6 +231,7 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             },
             child: RemoteSyncDemo(
               stagingDispatcher: true,
+              active: _showTestSync,
               onReturnHome: () => setState(() => _showTestSync = false),
             ),
           ),

@@ -4,6 +4,7 @@ import 'demo_trip_store.dart';
 import 'demo_rating_panel.dart';
 import 'app_language.dart';
 import 'isolated_trip_chat.dart';
+import 'pd_trip_route_editor.dart';
 
 /// Passenger order controls remain available while navigating between screens.
 /// All data is in-memory and disappears on process restart; production persistence
@@ -33,6 +34,25 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
     _waitingRefresh?.cancel();
     _draft.dispose();
     super.dispose();
+  }
+
+  Future<void> _editOrder(DemoTrip trip) async {
+    final store = widget.tripStore;
+    final changes = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => PdTripRouteEditor(
+        origin: trip.from, destination: trip.to, stops: trip.stops,
+        pickupLocked: store.arrivalAt != null || store.status == DemoTripStatus.underway,
+      ),
+    );
+    if (!mounted || changes == null) return;
+    if (!identical(trip, store.trip) || !store.updateRoute(
+      changes['from'] as String, changes['to'] as String, changes['stops'] as List<String>,
+    )) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Не удалось изменить маршрут. Проверь адреса и статус заказа.'),
+      ));
+    }
   }
 
   @override
@@ -70,7 +90,14 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                   children: [
                     Text(pdLabel(context, trip.rideType), style: const TextStyle(
                       fontWeight: FontWeight.bold)),
-                    Text('${trip.from} → ${trip.to}'),
+                    Text(trip.routeLabel),
+                    if (store.isActive)
+                      OutlinedButton.icon(
+                        key: const Key('passenger-edit-order-route'),
+                        icon: const Icon(Icons.route_outlined),
+                        label: const Text('Изменить маршрут'),
+                        onPressed: () => _editOrder(trip),
+                      ),
                     Text(pdLabel(context, store.statusLabel),
                       key: const Key('passenger-order-status')),
                     Text('${pdLabel(context, 'Оплата')}: ${pdLabel(context, trip.paymentMethod)}'),
@@ -99,7 +126,7 @@ class _PassengerOrdersDemoState extends State<PassengerOrdersDemo> {
                                 DemoTripStore.freePickupWaiting
                                 ? 'Пилот прибыл · бесплатное ожидание '
                                   'до 3 минут · 0,00 €'
-                                : 'Платное ожидание · 0,30 €/мин · '
+                                : 'Платное ожидание · 0,25 €/мин · '
                                   'сейчас ${store.pickupWaitingFeeLabel()}'
                             : 'Ожидание при посадке · итог '
                               '${store.pickupWaitingFeeLabel()}',

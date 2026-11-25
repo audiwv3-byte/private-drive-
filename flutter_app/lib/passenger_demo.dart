@@ -13,6 +13,7 @@ import 'demo_rating_panel.dart';
 import 'company_info.dart';
 import 'passenger_orders_demo.dart';
 import 'remote_sync_demo.dart';
+import 'pd_trip_route_editor.dart';
 import 'passenger_extra_services.dart';
 import 'pd_pilot_assignment_waiting.dart';
 import 'passenger_preferences_storage.dart';
@@ -86,6 +87,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   String _payment = 'Карта';
   late String _rideType;
   bool _roundTrip = false;
+  List<String> _draftStops = const [];
   bool _taxiOutsideCity = false;
   bool _taxiAdvanceBooking = false;
   int? _roadDistanceMetres;
@@ -568,9 +570,103 @@ class _PassengerDemoState extends State<PassengerDemo> {
     });
   }
 
+  void _showTariffs() {
+    Navigator.pop(context);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(pdTr(context, 'Тарифы', 'Tarifai', 'Fares'),
+                style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              const Text(
+                'Такси: посадка 0,99 € · город 0,66 €/км · '
+                'за городом 0,79 €/км · минимум 4 €. '
+                'Расчёт только по подтверждённому дорожному маршруту.',
+                key: Key('passenger-taxi-tariffs'),
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                pdTr(context,
+                  'Фиксированные тарифы Sedan без скидки: '
+                  'Вильнюс → Каунас 110 €, '
+                  'Вильнюс ↔ аэропорт Вильнюса: 40 € в одну сторону. '
+                  'Вильнюс — Каунас туда и обратно 200 €. '
+                  'Другие маршруты — по тарифной таблице или по запросу.',
+                  'Fiksuotos Sedan kainos be nuolaidos: Vilnius → Kaunas 110 €, '
+                  'Vilnius ↔ Vilniaus oro uostas: 40 € į vieną pusę. '
+                  'Vilnius–Kaunas į abi puses 200 €. Kiti maršrutai pagal kainoraštį arba užklausą.',
+                  'Fixed Sedan fares with no discount: Vilnius → Kaunas €110, '
+                  'Vilnius ↔ Vilnius Airport: €40 one way. '
+                  'Vilnius–Kaunas round trip €200. Other routes per price list or on request.'),
+                key: const Key('passenger-transfer-tariffs'),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTaxiOptions() {
+    Navigator.pop(context);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: StatefulBuilder(
+          builder: (_, updateSheet) => SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              SwitchListTile(
+                key: const Key('taxi-outside-city'),
+                title: const Text('Тариф поездки за городом · 0,79 €/км'),
+                subtitle: const Text('Весь рассчитанный маршрут по ставке за городом. '
+                    'Для смешанного маршрута стоимость уточняет диспетчер.'),
+                value: _taxiOutsideCity,
+                onChanged: widget.tripStore?.isActive == true ? null : (value) {
+                  setState(() => _taxiOutsideCity = value);
+                  updateSheet(() {});
+                },
+              ),
+              CheckboxListTile(
+                key: const Key('taxi-advance-booking'),
+                title: const Text('Предварительное бронирование · +3 €'),
+                value: _taxiAdvanceBooking,
+                onChanged: widget.tripStore?.isActive == true ? null : (value) {
+                  setState(() {
+                    _taxiAdvanceBooking = value ?? false;
+                    if (_cashBlockedForAdvance) _payment = 'Карта';
+                  });
+                  updateSheet(() {});
+                },
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _addressSuggestionsWidget(String side) {
     if (_editingAddress != side) return const SizedBox.shrink();
     return Column(children: [
+      if (_addressSuggestions.isNotEmpty)
+            Text(pdTr(context,
+              'Адресные подсказки запрашиваются у внешнего сервиса Photon. '
+              'Не вводи конфиденциальные адреса в демоверсии.',
+              'Adreso pasiūlymai gaunami iš išorinės Photon paslaugos. '
+              'Demo versijoje neįveskite konfidencialių adresų.',
+              'Address suggestions come from the external Photon service. '
+              'Do not enter confidential addresses in the demo.'),
+              style: const TextStyle(fontSize: 11)),
       for (var i = 0; i < _addressSuggestions.length; i++)
         ListTile(
           key: Key('passenger-$side-suggestion-$i'),
@@ -689,6 +785,29 @@ class _PassengerDemoState extends State<PassengerDemo> {
         child: PassengerOrdersDemo(tripStore: store))));
   }
 
+  Future<void> _editDraftRoute() async {
+    final route = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => PdTripRouteEditor(
+        origin: _from.text, destination: _to.text, stops: _draftStops,
+      ),
+    );
+    if (!mounted || route == null || widget.tripStore?.isActive == true) return;
+    _addressTimer?.cancel();
+    ++_addressGeneration;
+    setState(() {
+      _from.text = route['from'] as String;
+      _to.text = route['to'] as String;
+      _draftStops = route['stops'] as List<String>;
+      _editingAddress = null;
+      _addressSuggestions = const [];
+      _addressSearchError = null;
+      _pickedPickup = null;
+      _route = '';
+    });
+    unawaited(_updateRoadPreview());
+  }
+
   void _openServerBookingQa() {
     // Never silently create a local order and report it to the dispatcher.
     // Server creation is explicit, authorized with a temporary QA credential,
@@ -699,6 +818,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
         stagingDispatcher: true,
         initialFrom: _from.text.trim(),
         initialTo: _to.text.trim(),
+        initialStops: _draftStops,
       ),
     ));
   }
@@ -713,13 +833,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
     store.create(
       from: _from.text,
       to: _to.text,
+      stops: _draftStops,
       paymentMethod: _payment,
       advanceBooking: _isAdvanceBooking,
       departure: departure,
       rideType: _rideType,
       roundTrip: _roundTrip,
-      estimatedFareEur: _rideType == 'Такси' ? null : _pricePreview,
-      estimatedFareCents: _taxiPriceCents,
+      estimatedFareEur: _rideType == 'Такси' || _draftStops.isNotEmpty ? null : _pricePreview,
+      estimatedFareCents: _draftStops.isEmpty ? _taxiPriceCents : null,
       extrasRequireQuote: _requiresCustomQuote,
       services: [
         if (_rideType == 'Такси' && _taxiAdvanceBooking)
@@ -839,12 +960,13 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final request = ++_routeRequest;
     final start = _resolve(_from.text);
     final finish = _resolve(_to.text);
+    final stops = _draftStops.map(_resolve).toList();
     _roadDistanceMetres = null;
-    if (start == null || finish == null || !widget.enableMapTiles) {
+    if (start == null || finish == null || stops.any((point) => point == null) || !widget.enableMapTiles) {
       if (mounted) setState(() {
         _roadPoints = const [];
         _routeLoading = false;
-        _routeInfo = start == null || finish == null
+        _routeInfo = start == null || finish == null || stops.any((point) => point == null)
             ? 'Для своего адреса требуется подключение поиска адресов.'
             : '';
       });
@@ -856,8 +978,10 @@ class _PassengerDemoState extends State<PassengerDemo> {
       _routeInfo = 'Построение дорожного маршрута · демо…';
     });
     try {
+      final roadCoordinates = [start, ...stops.cast<LatLng>(), finish]
+          .map((point) => '${point.longitude},${point.latitude}').join(';');
       final uri = Uri.https('router.project-osrm.org',
-          '/route/v1/driving/${start.longitude},${start.latitude};${finish.longitude},${finish.latitude}',
+          '/route/v1/driving/$roadCoordinates',
           {'overview': 'full', 'geometries': 'geojson'});
       final decoded = await const PdHttpApi().getJson(
           uri, timeout: const Duration(seconds: 8));
@@ -1342,82 +1466,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   onTap: _openOrders,
                 ),
               ),
-            if (widget.initialAdvanceBooking) ...[
-              Card(
-                key: const Key('passenger-advance-booking-banner'),
-                color: const Color(0xFF46371A),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(children: [
-                    const Icon(Icons.event_available_outlined, color: Color(0xFFE5C57B)),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(pdTr(context,
-                        'Предварительный заказ: укажи адрес, дату и время',
-                        'Išankstinis užsakymas: nurodyk adresą, datą ir laiką',
-                        'Advance booking: choose address, date and time'),
-                      style: const TextStyle(fontWeight: FontWeight.bold))),
-                  ]),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            Text(pdLabel(context, 'Тестовый заказ поездки'), style: TextStyle(fontSize: 22)),
-            const SizedBox(height: 6),
-            Text(pdLabel(context, 'Демонстрация. Не отправляет заказы и не списывает деньги.')),
-            const SizedBox(height: 12),
-            Text('${pdLabel(context, _rideType)} · ${pdLabel(context, 'выбранный тип поездки')}',
+            Text(pdLabel(context, _rideType),
               key: const Key('passenger-selected-ride-type'),
-              style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (_rideType == 'Трансфер') ...[
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            if (_rideType == 'Трансфер')
               SwitchListTile(
                 key: const Key('passenger-round-trip'),
                 title: Text(pdLabel(context, 'Туда и обратно')),
                 value: _roundTrip,
-                onChanged: widget.tripStore?.isActive == true ? null : (v) => setState(() => _roundTrip = v),
+                onChanged: widget.tripStore?.isActive == true ? null :
+                    (value) => setState(() => _roundTrip = value),
               ),
-              Text(
-                pdTr(context,
-                  'Фиксированные тарифы Sedan без скидки: '
-                  'Вильнюс → Каунас 110 €, '
-                  'Вильнюс ↔ аэропорт Вильнюса: 40 € в одну сторону. '
-                  'Вильнюс — Каунас туда и обратно 200 €. '
-                  'Другие маршруты — по тарифной таблице или по запросу.',
-                  'Fiksuotos Sedan kainos be nuolaidos: Vilnius → Kaunas 110 €, '
-                  'Vilnius ↔ Vilniaus oro uostas: 40 € į vieną pusę. '
-                  'Vilnius–Kaunas į abi puses 200 €. Kiti maršrutai pagal kainoraštį arba užklausą.',
-                  'Fixed Sedan fares with no discount: Vilnius → Kaunas €110, '
-                  'Vilnius ↔ Vilnius Airport: €40 one way. '
-                  'Vilnius–Kaunas round trip €200. Other routes per price list or on request.'),
-                key: const Key('passenger-transfer-tariffs'),
-                style: const TextStyle(fontSize: 12),
-              ),
-            ] else ...[
-              const Text(
-                'Такси: посадка 0,99 € · город 0,66 €/км · '
-                'за городом 0,79 €/км · минимум 4 €. '
-                'Расчёт только по подтверждённому дорожному маршруту.',
-                key: Key('passenger-taxi-tariffs'),
-                style: TextStyle(fontSize: 12),
-              ),
-              SwitchListTile(
-                key: const Key('taxi-outside-city'),
-                title: const Text('Тариф поездки за городом · 0,79 €/км'),
-                subtitle: const Text('Весь рассчитанный маршрут по ставке за городом. '
-                    'Для смешанного маршрута стоимость уточняет диспетчер.'),
-                value: _taxiOutsideCity,
-                onChanged: widget.tripStore?.isActive == true ? null : (v) => setState(() => _taxiOutsideCity = v),
-              ),
-              CheckboxListTile(
-                key: const Key('taxi-advance-booking'),
-                title: const Text('Предварительное бронирование · +3 €'),
-                value: _taxiAdvanceBooking,
-                onChanged: widget.tripStore?.isActive == true ? null : (v) => setState(() {
-                  _taxiAdvanceBooking = v ?? false;
-                  if (_cashBlockedForAdvance) _payment = 'Карта';
-                }),
-              ),
-            ],
             const SizedBox(height: 12),
             if (!widget.enableMapTiles)
               SizedBox(height: 285, child: passengerMap()),
@@ -1432,11 +1491,6 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 label: Text(pdTr(context, 'Забрать меня здесь',
                   'Paimti mane čia', 'Pick me up here')),
               ),
-            Text(pdTr(context, 'Нажми на карту, чтобы выбрать точку посадки.',
-              'Paliesk žemėlapį, kad pasirinktum paėmimo vietą.',
-              'Tap the map to choose your pickup point.'),
-              key: const Key('passenger-pickup-map-instruction'),
-              style: const TextStyle(fontSize: 12)),
             if (store != null && store.isActive)
               Text(
                 store.status == DemoTripStatus.requested
@@ -1569,14 +1623,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ],
             ),
             _addressSuggestionsWidget('to'),
-            Text(pdTr(context,
-              'Адресные подсказки запрашиваются у внешнего сервиса Photon. '
-              'Не вводи конфиденциальные адреса в демоверсии.',
-              'Adreso pasiūlymai gaunami iš išorinės Photon paslaugos. '
-              'Demo versijoje neįveskite konfidencialių adresų.',
-              'Address suggestions come from the external Photon service. '
-              'Do not enter confidential addresses in the demo.'),
-              style: const TextStyle(fontSize: 11)),
+            if (widget.tripStore?.isActive != true)
+              TextButton.icon(
+                key: const Key('passenger-edit-draft-route'),
+                onPressed: _editDraftRoute,
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: Text(_draftStops.isEmpty ? 'Добавить остановку'
+                    : 'Остановки: ${_draftStops.length}'),
+              ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -1846,7 +1900,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
             const SizedBox(height: 12),
             ],
             Text(
-              ( _rideType == 'Такси' ? taxiPrice == null : price == null )
+              (_draftStops.isNotEmpty ||
+                  (_rideType == 'Такси' ? taxiPrice == null : price == null))
                   ? pdTr(context,
                       'Стоимость по запросу · фиксированная цена не установлена',
                       'Kaina pagal užklausą · fiksuota kaina nenustatyta',
@@ -1950,6 +2005,19 @@ class _PassengerDemoState extends State<PassengerDemo> {
               title: Text(pdLabel(context, 'Карта и заказ')),
               onTap: () => _openPassengerSection('booking'),
             ),
+            ListTile(
+              key: const Key('passenger-drawer-fares'),
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: Text(pdTr(context, 'Тарифы', 'Tarifai', 'Fares')),
+              onTap: _showTariffs,
+            ),
+            if (_rideType == 'Такси')
+              ListTile(
+                key: const Key('passenger-drawer-taxi-options'),
+                leading: const Icon(Icons.tune_outlined),
+                title: Text(pdTr(context, 'Параметры такси', 'Taksi nustatymai', 'Taxi options')),
+                onTap: _showTaxiOptions,
+              ),
             ListTile(
               key: const Key('passenger-drawer-routes'),
               leading: const Icon(Icons.route_outlined),

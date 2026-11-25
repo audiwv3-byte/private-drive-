@@ -33,7 +33,7 @@ class DemoBackupCodec {
 
   // Exact fields persisted by DemoTripStore v1. No arbitrary credentials or GPS.
   static const _orderFields = <String>{
-    'version', 'from', 'to', 'paymentMethod', 'departure', 'rideType',
+    'version', 'from', 'to', 'stops', 'paymentMethod', 'departure', 'rideType',
     'roundTrip', 'advanceBooking', 'estimatedFareEur', 'estimatedFareCents',
     'extrasRequireQuote', 'services', 'status', 'paused', 'pilotAccepted',
     'arrivalAt', 'departureFromPickupAt', 'tripRating', 'serviceRating',

@@ -18,6 +18,7 @@ class DemoTrip {
     this.estimatedFareEur,
     this.estimatedFareCents,
     this.extrasRequireQuote = false,
+    this.stops = const [],
     required this.services,
   });
 
@@ -35,6 +36,8 @@ class DemoTrip {
   /// True when additional selected services still require dispatcher pricing.
   final bool extrasRequireQuote;
   final List<String> services;
+  final List<String> stops;
+  String get routeLabel => [from, ...stops, to].join(' → ');
 }
 
 /// Read-only snapshot of one completed demo order's correspondence.
@@ -275,6 +278,34 @@ class DemoTripStore extends ChangeNotifier {
     DemoTripStatus.cancelled => 'Заказ отменён пассажиром · демо',
   };
 
+  bool _validStops(List<String> stops) => stops.length <= 3 &&
+      stops.every((stop) => stop.trim().isNotEmpty && stop.trim().length <= 200);
+
+  bool updateRoute(String from, String to, List<String> stops) {
+    final trip = _trip;
+    final origin = from.trim();
+    final destination = to.trim();
+    if (_disposed || !isActive || trip == null ||
+        origin.isEmpty || destination.isEmpty ||
+        origin.toLowerCase() == destination.toLowerCase() || !_validStops(stops) ||
+        ((_arrivalAt != null || _status == DemoTripStatus.underway) && origin != trip.from)) {
+      return false;
+    }
+    final points = stops.map((stop) => stop.trim()).toList();
+    if (origin == trip.from && destination == trip.to && listEquals(points, trip.stops)) {
+      return true;
+    }
+    _trip = DemoTrip(
+      from: origin, to: destination, stops: List.unmodifiable(points),
+      paymentMethod: trip.paymentMethod, departure: trip.departure,
+      rideType: trip.rideType, roundTrip: trip.roundTrip,
+      advanceBooking: trip.advanceBooking, extrasRequireQuote: true,
+      services: trip.services,
+    );
+    notifyListeners();
+    return true;
+  }
+
   bool create({
     required String from,
     required String to,
@@ -287,6 +318,7 @@ class DemoTripStore extends ChangeNotifier {
     int? estimatedFareEur,
     int? estimatedFareCents,
     bool extrasRequireQuote = false,
+    List<String> stops = const [],
   }) {
     final a = from.trim();
     final b = to.trim();
@@ -297,7 +329,7 @@ class DemoTripStore extends ChangeNotifier {
     // Never create a new cash order. Legacy cash snapshots remain readable.
     if (!['Карта', 'PayPal', 'Банковский перевод',
       'Криптовалюта'].contains(paymentMethod)) return false;
-    if (_disposed || isActive || a.isEmpty || b.isEmpty ||
+    if (_disposed || isActive || a.isEmpty || b.isEmpty || !_validStops(stops) ||
         a.toLowerCase() == b.toLowerCase()) return false;
     _archivePreviousChat();
     _trip = DemoTrip(
@@ -311,6 +343,7 @@ class DemoTripStore extends ChangeNotifier {
       estimatedFareEur: estimatedFareEur,
       estimatedFareCents: estimatedFareCents,
       extrasRequireQuote: extrasRequireQuote,
+      stops: List.unmodifiable(stops.map((stop) => stop.trim())),
       services: List.unmodifiable(services),
     );
     _status = DemoTripStatus.requested;
@@ -433,6 +466,7 @@ class DemoTripStore extends ChangeNotifier {
       'version': 1,
       'from': trip.from,
       'to': trip.to,
+      if (trip.stops.isNotEmpty) 'stops': trip.stops,
       'paymentMethod': trip.paymentMethod,
       'departure': trip.departure.toIso8601String(),
       'rideType': trip.rideType,
@@ -475,6 +509,9 @@ class DemoTripStore extends ChangeNotifier {
       final roundTrip = data['roundTrip'];
       final advanceBooking = data['advanceBooking'] ?? false;
       final services = data['services'];
+      final routeStops = data['stops'] ?? const [];
+      if (routeStops is! List || routeStops.any((stop) => stop is! String) ||
+          !_validStops(routeStops.cast<String>())) return false;
       final estimatedFareEur = data['estimatedFareEur'];
       final estimatedFareCents = data['estimatedFareCents'];
       final extrasRequireQuote = data['extrasRequireQuote'];
@@ -580,6 +617,7 @@ class DemoTripStore extends ChangeNotifier {
         estimatedFareEur: estimatedFareEur as int?,
         estimatedFareCents: estimatedFareCents as int?,
         extrasRequireQuote: extrasRequireQuote == true,
+        stops: List<String>.unmodifiable(routeStops.cast<String>()),
         services: List<String>.unmodifiable(services.cast<String>()));
       _status = status.first;
       _paused = data['paused'] == true &&

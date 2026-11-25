@@ -18,6 +18,7 @@ register_request_guard(app)
 import pd_languages
 import pd_stops
 import pd_fixed_prices
+from pd_miniapp_dispatch_bridge import (bridge_enabled, publish_telegram_order, DispatchBridgeUnavailable)
 TIMEZONE = ZoneInfo('Europe/Vilnius')
 MAX_AGE = 86400
 
@@ -234,6 +235,23 @@ def route():
         return jsonify(result)
 
 
+def acknowledge_central_dispatch(oid, *, replayed=False):
+    """Only confirm central delivery after PostgreSQL acknowledges it."""
+    row = core.order_find(oid)
+    if bridge_enabled():
+        try:
+            central_id = publish_telegram_order(row)
+        except DispatchBridgeUnavailable:
+            core.LOG.warning('Central dispatch acknowledgement pending for Mini App order %s', oid)
+            return jsonify(ok=False, order_id=oid, dispatch_received=False,
+                           error='Заявка сохранена, но диспетчер ещё не подтвердил получение. Повторите отправку.'), 503
+        return jsonify(ok=True, order_id=oid, dispatch_order_id=central_id,
+                       dispatch_received=True, status=row['status'],
+                       price=row['price'], replayed=replayed)
+    return jsonify(ok=True, order_id=oid, status=row['status'],
+                   price=row['price'], replayed=replayed)
+
+
 @app.post('/api/order')
 def create_order():
     uid, _ = auth()
@@ -242,6 +260,8 @@ def create_order():
     if not isinstance(d,dict):raise ValueError('Некорректная заявка')
     validate_route_data(d)
     request_key=d.get('request_key')
+    if bridge_enabled() and request_key is None:
+        return jsonify(error='Для повторной отправки заявки нужен request_key.'), 400
     fingerprint=''
     if request_key is not None:
         import re
@@ -254,7 +274,7 @@ def create_order():
         if previous:
             if previous['request_fingerprint']!=fingerprint:
                 raise ValueError('Состав заявки изменился. Начните новую заявку.')
-            return jsonify(ok=True,order_id=previous['id'],status=previous['status'],price=previous['price'],replayed=True)
+            return acknowledge_central_dispatch(previous['id'], replayed=True)
     origin, dest = str(d.get('origin','')).strip(),str(d.get('destination','')).strip()
     if not (2 <= len(origin) <= 200 and 2 <= len(dest) <= 200) or origin.casefold() == dest.casefold():
         raise ValueError('Укажите корректный маршрут')
@@ -303,17 +323,20 @@ def create_order():
         oid,created=core.order_save(uid,st,request_key,fingerprint)
         if not created:
             previous=core.order_find(oid)
-            return jsonify(ok=True,order_id=oid,status=previous['status'],price=previous['price'],replayed=True)
+            return acknowledge_central_dispatch(oid, replayed=True)
     else:
         oid=core.order_save(uid,st)
     with core.db(core.ORDERS_DB) as conn:
         conn.execute('UPDATE orders SET stop_address=? WHERE id=? AND telegram_id=?',(stop_address,oid,uid))
     r=core.order_find(oid)
+    central_response = acknowledge_central_dispatch(oid)
+    if bridge_enabled():
+        return central_response
     try:
         core.say(uid, '✅ Заявка №%s получена. Ожидайте подтверждения пилотом.\n%s'%(oid,core.order_text(r)))
     except Exception: core.LOG.exception('Client notify failed')
     core.notify_admins('🆕 Заявка из Mini App\n'+core.order_text(r,True)+'\nДля принятия: /order '+str(oid))
-    return jsonify(ok=True,order_id=oid,status='Новая',price=price)
+    return central_response
 
 
 def pd_refund_labels(rows):

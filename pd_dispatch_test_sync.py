@@ -310,6 +310,19 @@ def register(app, authorized, valid_csrf, *, csrf=None):
             ).fetchone()
             return store.get(row["trip_id"], "dispatcher", "dispatcher_test") if row else None
 
+    @app.after_request
+    def allow_live_miniapp_for_telegram_test(response):
+        if request.path not in ("/preview/telegram-miniapp", "/preview/telegram-miniapp/status"):
+            return response
+        response.vary.add("Origin")
+        origin = "https://wilsonpark.pythonanywhere.com"
+        if telegram_test_enabled() and request.headers.get("Origin") == origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            if request.method == "OPTIONS":
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+                response.headers["Access-Control-Allow-Headers"] = "X-Telegram-Init-Data"
+        return response
+
     @app.get("/preview/telegram-miniapp/client.js")
     def pd_test_telegram_miniapp_script():
         return app.response_class(

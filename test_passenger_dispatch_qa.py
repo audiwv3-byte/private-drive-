@@ -146,6 +146,19 @@ class PassengerToDispatcherTests(unittest.TestCase):
                 "PD_QA_TELEGRAM_BOT_ID": bot, "PD_DISPATCH_ADMIN_ID": tester,
                 "PD_DISPATCH_PERSISTENT_QUEUE": "1",
             }):
+                origin = "https://wilsonpark.pythonanywhere.com"
+                preflight = c.options(path, headers={"Origin": origin,
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "x-telegram-init-data"})
+                self.assertEqual(preflight.headers["Access-Control-Allow-Origin"], origin)
+                self.assertIn("X-Telegram-Init-Data", preflight.headers["Access-Control-Allow-Headers"])
+                self.assertIn("Origin", preflight.headers["Vary"])
+                self.assertNotIn("Access-Control-Allow-Origin", c.options(path,
+                    headers={"Origin": "https://example.test"}).headers)
+                self.assertEqual(c.get(path + "/status", headers={"Origin": origin})
+                    .headers["Access-Control-Allow-Origin"], origin)
+                self.assertNotIn("Access-Control-Allow-Origin", c.get(
+                    "/dispatch/test-miniapp", headers={"Origin": origin}).headers)
                 self.assertEqual(c.get(path).status_code, 200)
                 self.assertEqual(c.get(path + "/client.js").status_code, 200)
                 self.assertEqual(c.post(path).status_code, 401)

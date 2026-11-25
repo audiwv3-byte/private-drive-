@@ -153,7 +153,7 @@ CREATE OR REPLACE FUNCTION public.pd_native_pilot_trip_action(
     supplied_digest text, target_order uuid, requested_action text, observed_at bigint
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp
-AS $
+AS $pd_trip$
 DECLARE
     principal record;
     current_status text;
@@ -226,7 +226,7 @@ BEGIN
         'waiting_billable_minutes',ceil(wait_seconds::numeric/60)::int,
         'payment_mode','disabled');
 END
-$;
+$pd_trip$;
 
 REVOKE ALL ON TABLE public.pd_native_trip_waiting FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.pd_native_pilot_trip_action(text,uuid,text,bigint) FROM PUBLIC;

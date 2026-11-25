@@ -156,7 +156,7 @@ jobs:
           mkdir -p "$HOME/.android"
           base64 --decode ../flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
           QA_VERSION=0.2.43
-          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112507 \
+          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112508 \
             --dart-define="PD_QA_BUILD_LABEL=Версия $QA_VERSION · внутренняя сборка" \
             --dart-define=PD_QA_SERVER_BOOKING=true \
             --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN" \
@@ -167,7 +167,7 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
           grep "name='lt.privatedrive.private_drive.photo_qa'" ../full-qa-apk-badging.txt
-          grep "versionCode='2026112507'" ../full-qa-apk-badging.txt
+          grep "versionCode='2026112508'" ../full-qa-apk-badging.txt
           grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt
@@ -234,7 +234,7 @@ jobs:
           done
           diff -u previous-apk/certificates.txt apk/certificates.txt
           "$BUILD_TOOLS/aapt" dump badging previous-apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112506' versionName='0.2.42'"
-          "$BUILD_TOOLS/aapt" dump badging apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112507' versionName='0.2.43'"
+          "$BUILD_TOOLS/aapt" dump badging apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112508' versionName='0.2.43'"
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

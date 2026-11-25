@@ -870,17 +870,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
     unawaited(_updateRoadPreview());
   }
 
-  void _openServerBookingQa() {
+  void _openServerBookingQa({bool includeDraft = true}) {
     // Never silently create a local order and report it to the dispatcher.
     // Server creation is explicit, authorized with a temporary QA credential,
     // and confirmed by the isolated HTTPS API before showing success.
-    if (!_canCreateLocalTrip) return;
+    if (includeDraft && !_canCreateLocalTrip) return;
     Navigator.push(context, MaterialPageRoute<void>(
       builder: (_) => RemoteSyncDemo(
         stagingDispatcher: true,
-        initialFrom: _from.text.trim(),
-        initialTo: _to.text.trim(),
-        initialStops: _draftStops,
+        initialFrom: includeDraft ? _from.text.trim() : '',
+        initialTo: includeDraft ? _to.text.trim() : '',
+        initialStops: includeDraft ? _draftStops : const [],
       ),
     ));
   }
@@ -2108,6 +2108,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
                 ),
               DemoRatingPanel(tripStore: widget.tripStore!),
             ],
+            if (_sendBookingsToQaDispatcher && widget.tripStore?.isActive == true)
+              OutlinedButton.icon(
+                key: const Key('passenger-open-qa-with-local-order'),
+                onPressed: () => _openServerBookingQa(includeDraft: false),
+                icon: const Icon(Icons.support_agent),
+                label: Text(pdTr(context, 'Открыть тестовую диспетчерскую',
+                  'Atidaryti bandomąją dispečerinę', 'Open test dispatch')),
+              ),
             FilledButton(
               key: const Key('passenger-book-disabled'),
               onPressed: _canCreateLocalTrip

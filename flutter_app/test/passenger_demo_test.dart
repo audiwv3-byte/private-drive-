@@ -28,6 +28,30 @@ void main() {
     expect(store.trip, isNull);
   }, skip: !const bool.fromEnvironment('PD_QA_SERVER_BOOKING'));
 
+  testWidgets('QA booking opens the dispatcher submission with an older local order',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    expect(store.create(from: 'Старая подача', to: 'Старый пункт', services: const [],
+      paymentMethod: 'Карта', departure: DateTime(2026, 11, 25)), isTrue);
+    await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+      enableMapTiles: false, tripStore: store,
+    )));
+    final form = find.descendant(of: find.byKey(const Key('passenger-form')),
+      matching: find.byType(Scrollable)).first;
+    final open = find.byKey(const Key('passenger-open-qa-with-local-order'));
+    await tester.scrollUntilVisible(open, 180, scrollable: form);
+    tester.widget<OutlinedButton>(open).onPressed!();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    final booking = tester.widget<RemoteSyncDemo>(find.byType(RemoteSyncDemo));
+    expect(booking.stagingDispatcher, isTrue);
+    expect(booking.initialFrom, isEmpty);
+    expect(booking.initialTo, isEmpty);
+    expect(store.trip?.from, 'Старая подача');
+    expect(store.isActive, isTrue);
+  }, skip: !const bool.fromEnvironment('PD_QA_SERVER_BOOKING'));
+
   testWidgets('English airport alias suggests a selectable offline address',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(

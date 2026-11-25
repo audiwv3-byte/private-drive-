@@ -16,8 +16,9 @@ from collections import defaultdict, deque
 from flask import Response, abort, jsonify, request
 
 FILE_FIELDS = ("portrait", "license_front", "car_front", "car_rear")
+REQUIRED_PHOTOS = ("license_front", "car_front")
 MAX_FILE = 10 * 1024 * 1024
-MAX_REQUEST = 4 * MAX_FILE + 1024 * 1024
+MAX_REQUEST = 2 * MAX_FILE + 1024 * 1024
 RATE_LIMIT = 3
 
 
@@ -71,6 +72,7 @@ def init_schema(conn):
             CHECK (status IN ('pending','approved','rejected')),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )""")
+        cur.execute("ALTER TABLE pd_qa_pilot_applications ADD COLUMN IF NOT EXISTS email BYTEA")
         cur.execute("""CREATE TABLE IF NOT EXISTS pd_qa_pilot_documents (
             application_id TEXT NOT NULL REFERENCES pd_qa_pilot_applications(id)
                 ON DELETE CASCADE,
@@ -115,15 +117,22 @@ def register(app, authorized):
                 hashlib.sha256(supplied.encode()).digest(),
                 hashlib.sha256(secret.encode()).digest()):
             return jsonify(error="invalid_invitation"), 403
-        name, phone = (request.form.get("full_name", "").strip(),
-                       request.form.get("phone", "").strip())
-        if (not 2 <= len(name) <= 160 or not re.fullmatch(r"\+?[0-9 -]{8,32}", phone)):
+        first = request.form.get("first_name", "").strip()
+        last = request.form.get("last_name", "").strip()
+        name = f"{first} {last}"
+        phone = request.form.get("phone", "").strip()
+        email = request.form.get("email", "").strip()
+        if (not 1 <= len(first) <= 80 or not 1 <= len(last) <= 80
+                or not re.fullmatch(r"\+?[0-9 -]{8,32}", phone)
+                or not 8 <= sum(ch.isdigit() for ch in phone) <= 15
+                or len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email)):
             return jsonify(error="invalid_contact"), 400
-        if set(request.files) != set(FILE_FIELDS):
+        if set(request.files) != set(REQUIRED_PHOTOS) or any(
+                len(request.files.getlist(kind)) != 1 for kind in REQUIRED_PHOTOS):
             return jsonify(error="required_photos_missing"), 400
         try:
             images = {}
-            for kind in FILE_FIELDS:
+            for kind in REQUIRED_PHOTOS:
                 upload = request.files[kind]
                 # Never trust client-reported MIME or filename extensions.
                 data = upload.stream.read(MAX_FILE + 1)
@@ -134,9 +143,9 @@ def register(app, authorized):
                 init_schema(conn)
                 with conn.cursor() as cur:
                     cur.execute("""INSERT INTO pd_qa_pilot_applications
-                        (id,full_name,phone,status) VALUES (%s,%s,%s,'pending')""",
+                        (id,full_name,phone,email,status) VALUES (%s,%s,%s,%s,'pending')""",
                         (app_id, key.encrypt(name.encode()),
-                         key.encrypt(phone.encode())))
+                         key.encrypt(phone.encode()), key.encrypt(email.encode())))
                     for kind, data in images.items():
                         cur.execute("""INSERT INTO pd_qa_pilot_documents
                             (application_id,kind,encrypted_bytes) VALUES (%s,%s,%s)""",
@@ -179,10 +188,12 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
    status.textContent="Анкет: "+data.applications.length;
    for(const app of data.applications){
      const card=document.createElement("article");
-     for(const text of [app.full_name,app.phone,app.label,"Подана: "+app.created_at]){
+     for(const text of [app.full_name,app.phone,app.email,app.label,"Подана: "+app.created_at]){
+       if(!text)continue;
        const p=document.createElement("p");p.textContent=text;card.append(p);
      }
-     for(const [kind,label] of [["portrait","Фото пилота"],["license_front","Права"],["car_front","Автомобиль спереди"],["car_rear","Автомобиль сзади"]]){
+     for(const [kind,label] of [["portrait","Фото пилота"],["license_front","Права"],["car_front","Фото автомобиля"],["car_rear","Автомобиль сзади"]]){
+       if(!app.documents.includes(kind))continue;
        const link=document.createElement("a");
        link.href="/dispatch/qa-pilot-applications/"+encodeURIComponent(app.id)+"/documents/"+kind;
        link.textContent=label;link.rel="noreferrer";card.append(link);
@@ -213,13 +224,16 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
             with db() as conn:
                 init_schema(conn)
                 with conn.cursor() as cur:
-                    cur.execute("""SELECT id,full_name,phone,status,created_at
-                        FROM pd_qa_pilot_applications ORDER BY created_at DESC LIMIT 50""")
+                    cur.execute("""SELECT id,full_name,phone,status,created_at,email,
+                        ARRAY(SELECT kind FROM pd_qa_pilot_documents WHERE application_id=a.id)
+                        FROM pd_qa_pilot_applications a ORDER BY created_at DESC LIMIT 50""")
                     data = [
                         {"id":row[0], "full_name":key.decrypt(bytes(row[1])).decode(),
                          "phone":key.decrypt(bytes(row[2])).decode(),
                          "status":row[3], "label":"На проверке" if row[3]=="pending" else row[3],
-                         "created_at":row[4].isoformat()}
+                         "created_at":row[4].isoformat(),
+                         "email":key.decrypt(bytes(row[5])).decode() if row[5] else "",
+                         "documents":row[6]}
                         for row in cur.fetchall()
                     ]
             return jsonify(applications=data), 200, {"Cache-Control":"private, no-store"}

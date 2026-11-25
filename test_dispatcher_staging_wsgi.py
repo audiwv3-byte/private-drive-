@@ -366,12 +366,12 @@ class DispatcherStagingTests(unittest.TestCase):
         client = app.test_client()
         page = client.get("/pilot-registration")
         self.assertEqual(page.status_code, 200)
-        for expected in ("Регистрация пилота", "ФИО", "Телефон", "Своё фото",
-                         "Фото водительских прав", "Машина спереди", "Машина сзади", "ТЕСТОВЫЙ МАКЕТ"):
+        for expected in ("Регистрация пилота", "Имя", "Фамилия", "Телефон", "Электронная почта",
+                         "Фото водительских прав", "Фото автомобиля", "ТЕСТОВЫЙ МАКЕТ"):
             self.assertIn(expected.encode("utf-8"), page.data)
         self.assertIn(b"form-action 'none'", page.headers["Content-Security-Policy"].encode())
         self.assertEqual(client.post("/pilot-registration", data={"full_name": "synthetic"}).status_code, 503)
-        self.assertEqual(page.data.count(b'type="file" accept='), 4)
+        self.assertEqual(page.data.count(b'type="file" accept='), 2)
         self.assertNotIn("submit", app.view_functions)
 
     def test_login_and_logout(self):

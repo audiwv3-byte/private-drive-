@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
+import 'app_language.dart' show pdLabel;
+import 'company_info.dart' show openPrivateDriveLink;
 import 'private_drive_bright_backdrop.dart';
 import 'demo_interfaces.dart';
 import 'permissions_onboarding.dart';
@@ -250,6 +252,15 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             FilledButton.icon(key: const Key('entry-pilot'),
               onPressed: () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
               label: const Text('Пилот')),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              key: const Key('entry-apply-pilot'),
+              onPressed: () => openPrivateDriveLink(
+                context,
+                Uri.https('wilsonpark.pythonanywhere.com', '/pilot-registration'),
+              ),
+              child: Text(pdLabel(context, 'Стать пилотом')),
+            ),
             if (pdLocalQaEntryEnabled) ...[
               const SizedBox(height: 12),
               OutlinedButton.icon(

@@ -29,12 +29,17 @@ import 'package:latlong2/latlong.dart' show LatLng;
 class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
       this.preferencesStorage, this.initialRideType = 'Трансфер',
+      this.initialAdvanceBooking = false,
+      this.initialAdvanceDate, this.initialAdvanceTime,
       this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController,
       this.onIncomingMessageVoice, this.ordersApi});
   final NativeOrdersApi? ordersApi;
 
   final bool enableMapTiles;
   final String initialRideType;
+  final bool initialAdvanceBooking;
+  final DateTime? initialAdvanceDate;
+  final TimeOfDay? initialAdvanceTime;
   /// Test injection: null uses a real HTTPS tile request on Android.
   final Future<String?> Function()? mapConnectivityCheck;
   final DemoTripStore? tripStore;
@@ -498,6 +503,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
   void initState() {
     super.initState();
     _rideType = widget.initialRideType == 'Такси' ? 'Такси' : 'Трансфер';
+    _taxiAdvanceBooking = widget.initialAdvanceBooking && _rideType == 'Такси';
+    _date = widget.initialAdvanceDate;
+    _time = widget.initialAdvanceTime;
     if (widget.enableMapTiles) {
       unawaited(_checkMapNetwork());
     }

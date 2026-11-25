@@ -15,6 +15,11 @@ SITE = "https://wilsonpark.pythonanywhere.com"
 SOURCE = "/home/wilsonpark/euro_baltic_transfer/PRIVATE_DRIVE_MiniApp_2026_10_18/miniapp/templates/index.html"
 STAGING = "https://private-drive-dispatcher-staging.onrender.com/preview/telegram-miniapp"
 MARKER = 'id="pdTelegramDispatchTest"'
+PREVIOUS_FRAGMENT_SHA = "c440e7e196955dd5619424c4eae3a2fb0a81a59fff089dbff919ee044beeaf38"
+PREVIOUS_FRAGMENT = re.compile(
+    r'<details id="pdTelegramDispatchTest"[^>]*>[\s\S]*?'
+    r'<script id="pdTelegramDispatchTestScript">[\s\S]*?</script>'
+)
 HEADING = re.compile(r'<section\b[^>]+\bid=["\']step10["\'][^>]*>\s*<h2\b[^>]*>[^<]*Диспетчерская[^<]*</h2>')
 
 
@@ -22,7 +27,11 @@ def with_fragment(source, fragment):
     if source.count(MARKER) == 1 and fragment in source:
         return source
     if MARKER in source:
-        raise RuntimeError("Telegram dispatcher fragment already exists in an unexpected form")
+        existing = list(PREVIOUS_FRAGMENT.finditer(source))
+        if (source.count(MARKER) != 1 or len(existing) != 1
+                or hashlib.sha256(existing[0].group().encode()).hexdigest() != PREVIOUS_FRAGMENT_SHA):
+            raise RuntimeError("Telegram dispatcher fragment already exists in an unexpected form")
+        return source[:existing[0].start()] + fragment.rstrip("\n") + source[existing[0].end():]
     matches = list(HEADING.finditer(source))
     if len(matches) != 1:
         raise RuntimeError("Dispatcher heading changed")
@@ -80,7 +89,7 @@ def main():
         updated = with_fragment(original_text, fragment)
         Environment().parse(updated)
         if updated == original_text:
-            if MARKER not in baseline.text:
+            if MARKER not in baseline.text or 'mountInDispatcherDashboard' not in baseline.text:
                 raise RuntimeError("Saved template and public Mini App differ")
             print("Already live")
             return
@@ -99,7 +108,8 @@ def main():
                 if (published.ok and published.text.count(MARKER) == 1
                         and "id=\"pdObPassenger\"" in published.text
                         and "id=\"pdPilotWork\"" in published.text
-                        and STAGING in published.text):
+                        and STAGING in published.text
+                        and 'mountInDispatcherDashboard' in published.text):
                     print("Mini App entry verified. Original SHA-256:", hashlib.sha256(original).hexdigest())
                     return
                 time.sleep(3)

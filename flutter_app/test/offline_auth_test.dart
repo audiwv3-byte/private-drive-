@@ -116,6 +116,10 @@ void main() {
 
   testWidgets('Telegram sign-in binds the browser code to the app attempt',
       (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(430, 1050);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final state = List.filled(43, 's').join();
     final token = List.filled(64, 't').join();
     String? proof;
@@ -150,6 +154,7 @@ void main() {
     final legal = find.byKey(const Key('native-legal-acknowledgement'));
     await tester.scrollUntilVisible(legal, 100,
       scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(legal);
     await tester.tap(legal);
     await tester.pumpAndSettle();
     final start = find.byKey(const Key('native-telegram-start'));

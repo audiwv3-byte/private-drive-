@@ -11,9 +11,12 @@ import os
 import re
 import secrets
 import time
+import sqlite3
+from contextlib import closing, contextmanager
+from pathlib import Path
 from collections import defaultdict, deque
 
-from flask import Response, abort, jsonify, request
+from flask import Response, abort, jsonify, render_template_string, request
 
 FILE_FIELDS = ("portrait", "license_front", "car_front", "car_rear")
 REQUIRED_PHOTOS = ("license_front", "car_front")
@@ -30,6 +33,57 @@ def configured():
                 ("postgresql://", "postgres://"))
             and len(os.environ.get("PD_PILOT_QA_INVITE_SECRET", "")) >= 32
             and len(os.environ.get("PD_PILOT_QA_FERNET_KEY", "")) >= 40)
+
+
+def register_production_form(app, directory):
+    """Keep production intake disabled until owner-only configuration exists."""
+    key_path = directory / "pilot-intake.key"
+    invite_path = directory / "pilot-intake.invite"
+    if not key_path.is_file() or not invite_path.is_file():
+        return None
+    from cryptography.fernet import Fernet
+    key = Fernet(key_path.read_bytes().strip())
+    invitation = invite_path.read_text().strip()
+    if len(invitation) < 32:
+        raise ValueError("Pilot invitation must have at least 32 characters")
+
+    @contextmanager
+    def db():
+        with closing(sqlite3.connect(directory / "pilot-intake.sqlite3", timeout=10)) as conn:
+            conn.execute("PRAGMA foreign_keys=ON")
+            with conn:
+                yield conn
+
+    with db() as conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS pd_qa_pilot_applications (
+                id TEXT PRIMARY KEY, full_name BLOB NOT NULL, phone BLOB NOT NULL,
+                email BLOB NOT NULL, plate BLOB NOT NULL, status TEXT NOT NULL,
+                terms_version TEXT NOT NULL, accepted_at TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                pilot_number INTEGER UNIQUE
+            );
+            CREATE TABLE IF NOT EXISTS pd_qa_pilot_documents (
+                application_id TEXT NOT NULL REFERENCES pd_qa_pilot_applications(id),
+                kind TEXT NOT NULL, encrypted_bytes BLOB NOT NULL,
+                PRIMARY KEY(application_id,kind)
+            );
+        """)
+
+    @app.get("/pilot-registration")
+    def pilot_registration():
+        template = Path(__file__).with_name("pd_pilot_registration.html").read_text(encoding="utf-8")
+        return Response(render_template_string(template, enabled=True, production=True),
+                        mimetype="text/html", headers={
+                            "Cache-Control": "no-store",
+                            "Content-Security-Policy": "default-src 'none'; img-src 'self'; "
+                            "style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; "
+                            "connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+                            "Referrer-Policy": "no-referrer",
+                            "X-Content-Type-Options": "nosniff",
+                        })
+
+    return db, key, invitation
 
 
 def image_as_private_webp(raw):
@@ -88,21 +142,36 @@ def init_schema(conn):
         )""")
 
 
-def register(app, authorized, csrf, valid_csrf):
+def register(app, authorized, csrf, valid_csrf, *, production=None):
     """Mount fail-closed endpoints only on isolated staging app."""
     attempts = defaultdict(deque)
 
+    def ready():
+        return production is not None or configured()
+
     def db():
+        if production:
+            return production[0]()
         import psycopg
         return psycopg.connect(os.environ["PD_PILOT_QA_DATABASE_URL"])
 
     def cipher():
+        if production:
+            return production[1]
         from cryptography.fernet import Fernet
         return Fernet(os.environ["PD_PILOT_QA_FERNET_KEY"].encode("ascii"))
 
+    def cursor(conn):
+        return closing(conn.cursor()) if production else conn.cursor()
+
+    def execute(cur, sql, args=()):
+        if production:
+            sql = sql.replace("%s", "?").replace("NOW()", "CURRENT_TIMESTAMP")
+        return cur.execute(sql, args)
+
     @app.post("/pilot-registration")
     def qa_submit_pilot():
-        if not configured():
+        if not ready():
             return jsonify(error="pilot_intake_disabled"), 503
         if (request.headers.get("Origin") not in
                 (request.host_url.rstrip("/"), "https://" + request.host)):
@@ -119,7 +188,7 @@ def register(app, authorized, csrf, valid_csrf):
             return jsonify(error="rate_limited"), 429
         history.append(now)
         supplied = request.form.get("qa_invitation", "")
-        secret = os.environ["PD_PILOT_QA_INVITE_SECRET"]
+        secret = production[2] if production else os.environ["PD_PILOT_QA_INVITE_SECRET"]
         if not isinstance(supplied, str) or not hmac.compare_digest(
                 hashlib.sha256(supplied.encode()).digest(),
                 hashlib.sha256(secret.encode()).digest()):
@@ -152,20 +221,21 @@ def register(app, authorized, csrf, valid_csrf):
             key = cipher()
             app_id = secrets.token_hex(16)
             with db() as conn:
-                init_schema(conn)
-                with conn.cursor() as cur:
-                    cur.execute("""INSERT INTO pd_qa_pilot_applications
+                if not production:
+                    init_schema(conn)
+                with cursor(conn) as cur:
+                    execute(cur, """INSERT INTO pd_qa_pilot_applications
                         (id,full_name,phone,email,status,plate,terms_version,accepted_at)
                         VALUES (%s,%s,%s,%s,'pending',%s,%s,NOW())""",
                         (app_id, key.encrypt(name.encode()),
                          key.encrypt(phone.encode()), key.encrypt(email.encode()),
                          key.encrypt(plate.encode()), TERMS_VERSION))
                     for kind, data in images.items():
-                        cur.execute("""INSERT INTO pd_qa_pilot_documents
+                        execute(cur, """INSERT INTO pd_qa_pilot_documents
                             (application_id,kind,encrypted_bytes) VALUES (%s,%s,%s)""",
                             (app_id,kind,key.encrypt(data)))
             return jsonify(ok=True, application_id=app_id,
-                           status="pending", label="На проверке", qa_only=True), 201
+                           status="pending", label="На проверке", qa_only=production is None), 201
         except ValueError as exc:
             return jsonify(error=str(exc)), 400
         except Exception:
@@ -176,16 +246,19 @@ def register(app, authorized, csrf, valid_csrf):
     def approve_application(app_id):
         if not authorized() or not valid_csrf():
             abort(403)
-        if not configured():
+        if not ready():
             abort(503)
-        with db() as conn, conn.cursor() as cur:
-            cur.execute("""UPDATE pd_qa_pilot_applications
-                SET status='approved', pilot_number=nextval('pd_qa_pilot_numbers')
+        with db() as conn, cursor(conn) as cur:
+            if production:
+                execute(cur, "BEGIN IMMEDIATE")
+            next_number = "(SELECT COALESCE(MAX(pilot_number), 0) + 1 FROM pd_qa_pilot_applications)" if production else "nextval('pd_qa_pilot_numbers')"
+            execute(cur, f"""UPDATE pd_qa_pilot_applications
+                SET status='approved', pilot_number={next_number}
                 WHERE id=%s AND status='pending' AND terms_version=%s
                 AND plate IS NOT NULL RETURNING pilot_number""", (app_id, TERMS_VERSION))
             result = cur.fetchone()
             if result is None:
-                cur.execute("""SELECT pilot_number FROM pd_qa_pilot_applications
+                execute(cur, """SELECT pilot_number FROM pd_qa_pilot_applications
                     WHERE id=%s AND status='approved'""", (app_id,))
                 result = cur.fetchone()
             if result is None:
@@ -257,6 +330,8 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
  }catch(error){status.textContent=error.message}
 })();
 </script></body></html>"""
+        if production:
+            page = page.replace("анкеты пилотов QA", "анкеты пилотов").replace(" — тестовая модерация", "")
         return Response(page, mimetype="text/html", headers={
             "Cache-Control":"private, no-store",
             "X-Content-Type-Options":"nosniff",
@@ -270,23 +345,26 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
     def qa_pilots_for_dispatcher():
         if not authorized():
             return jsonify(error="unauthorized"), 401
-        if not configured():
+        if not ready():
             return jsonify(error="pilot_intake_disabled"), 503
         try:
             key = cipher()
             with db() as conn:
-                init_schema(conn)
-                with conn.cursor() as cur:
-                    cur.execute("""SELECT id,full_name,phone,status,created_at,email,
-                        ARRAY(SELECT kind FROM pd_qa_pilot_documents WHERE application_id=a.id), plate,terms_version,pilot_number
+                if not production:
+                    init_schema(conn)
+                with cursor(conn) as cur:
+                    document_list = ("(SELECT group_concat(kind) FROM pd_qa_pilot_documents WHERE application_id=a.id)"
+                                     if production else "ARRAY(SELECT kind FROM pd_qa_pilot_documents WHERE application_id=a.id)")
+                    execute(cur, f"""SELECT id,full_name,phone,status,created_at,email,
+                        {document_list}, plate,terms_version,pilot_number
                         FROM pd_qa_pilot_applications a ORDER BY created_at DESC LIMIT 50""")
                     data = [
                         {"id":row[0], "full_name":key.decrypt(bytes(row[1])).decode(),
                          "phone":key.decrypt(bytes(row[2])).decode(),
                          "status":row[3], "label":"На проверке" if row[3]=="pending" else {"approved":"Одобрена","rejected":"Отклонена"}.get(row[3],row[3]),
-                         "created_at":row[4].isoformat(),
+                         "created_at":row[4] if production else row[4].isoformat(),
                          "email":key.decrypt(bytes(row[5])).decode() if row[5] else "",
-                         "documents":row[6], "plate":key.decrypt(bytes(row[7])).decode() if row[7] else "",
+                         "documents":(row[6] or "").split(",") if production else row[6], "plate":key.decrypt(bytes(row[7])).decode() if row[7] else "",
                          "terms_version":row[8], "pilot_number":row[9]}
                         for row in cur.fetchall()
                     ]
@@ -299,14 +377,14 @@ a:focus-visible{outline:3px solid #e8c581}#status{color:#e8c581}</style></head>
     def qa_pilot_private_image(app_id, kind):
         if not authorized():
             return jsonify(error="unauthorized"), 401
-        if not configured():
+        if not ready():
             return jsonify(error="pilot_intake_disabled"), 503
         if not re.fullmatch(r"[a-f0-9]{32}", app_id) or kind not in FILE_FIELDS:
             abort(404)
         try:
             with db() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""SELECT encrypted_bytes FROM pd_qa_pilot_documents
+                with cursor(conn) as cur:
+                    execute(cur, """SELECT encrypted_bytes FROM pd_qa_pilot_documents
                         WHERE application_id=%s AND kind=%s""", (app_id,kind))
                     result = cur.fetchone()
             if not result:

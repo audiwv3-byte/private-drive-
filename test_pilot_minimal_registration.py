@@ -2,35 +2,47 @@ import unittest
 from unittest.mock import patch
 from io import BytesIO
 import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from cryptography.fernet import Fernet
 from PIL import Image
 from flask import Flask, session, request
-from pd_pilot_qa_intake import register
+from pd_pilot_qa_intake import register, register_production_form
 
 
-@unittest.skipUnless(
-    os.getenv("PD_TEST_FRESH_POSTGRES"), "requires disposable PostgreSQL"
-)
 class PilotIntakeIntegration(unittest.TestCase):
+    def test_production_sqlite(self):
+        with TemporaryDirectory() as folder:
+            directory = Path(folder)
+            (directory / "pilot-intake.key").write_bytes(Fernet.generate_key())
+            (directory / "pilot-intake.invite").write_text("x" * 40)
+            self.check_enrollment(directory)
+
+    @unittest.skipUnless(os.getenv("PD_TEST_FRESH_POSTGRES"), "requires disposable PostgreSQL")
     def test_enrollment(self):
+        self.check_enrollment()
+
+    def check_enrollment(self, directory=None):
         environment = patch.dict(os.environ)
         environment.start()
         self.addCleanup(environment.stop)
         os.environ.update(
             PD_DISPATCH_STAGING_ONLY="1",
             PD_PILOT_QA_INTAKE_ENABLED="1",
-            PD_PILOT_QA_DATABASE_URL=os.environ["PD_TEST_FRESH_POSTGRES"],
+            PD_PILOT_QA_DATABASE_URL=os.getenv("PD_TEST_FRESH_POSTGRES", ""),
             PD_PILOT_QA_INVITE_SECRET="x" * 40,
             PD_PILOT_QA_FERNET_KEY=Fernet.generate_key().decode(),
         )
         app = Flask(__name__)
         app.secret_key = os.urandom(32)
+        intake = register_production_form(app, directory) if directory else None
         register(
             app,
             lambda: session.get("owner"),
             lambda: "test-csrf",
             lambda: request.form.get("csrf") == "test-csrf",
+            production=intake,
         )
         client = app.test_client()
 
@@ -56,6 +68,8 @@ class PilotIntakeIntegration(unittest.TestCase):
                 headers={"Origin": "http://localhost"},
             )
 
+        if directory:
+            self.assertIn(b"pilot-shift-v1", client.get("/pilot-registration").data)
         assert submit().status_code == 400
         response = submit(terms_version="pilot-shift-v1")
         assert response.status_code == 201, (response.status_code, response.data)

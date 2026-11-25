@@ -52,6 +52,9 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <a href="/dispatch/pilot-applications">Анкеты пилотов (QA)</a>
 {% if test_sync_enabled %}<a class="btn" href="/dispatch/test-sync">Тестовая связь</a>{% endif %}
 <form method="post" action="/dispatch/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Выйти</button></form>
+{% elif live_orders_enabled %}
+{% if pilot_intake_enabled %}<a href="/dispatch/pilot-applications">Анкеты пилотов</a>{% endif %}
+<form method="post" action="/dispatch/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Выйти</button></form>
 {% else %}<span class="label">Доступ к заказам закрыт</span><a class="btn" href="/dispatch">В панель управления</a>{% endif %}
 </div>
 </header>

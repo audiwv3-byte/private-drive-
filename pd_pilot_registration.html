@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>PRIVATE DRIVE — Регистрация пилота (тест)</title>
-<link rel="stylesheet" href="/assets/pd-black-gold.css"><style>
+<title>PRIVATE DRIVE — Регистрация пилота{% if not production %} (тест){% endif %}</title>
+<link rel="stylesheet" href="{{ "/dispatch" if production else "" }}/assets/pd-black-gold.css"><style>
 :root{color-scheme:dark;--bg:var(--pd-black);--b:var(--pd-border);--g:var(--pd-gold);--t:var(--pd-ink);--m:var(--pd-muted)}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#392a17,var(--bg) 55%);color:var(--t);font:14px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}
 header{border-bottom:1px solid var(--b);background:var(--pd-deep);padding:18px max(18px,calc((100vw - 1100px)/2));display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
@@ -21,10 +21,10 @@ input[type=file]{padding:10px;font-size:12px}input::placeholder{color:#889099}in
 #demo-result{color:var(--g);margin-top:12px}footer{border-top:1px solid var(--b);color:#aaa;text-align:center;padding:20px}
 @media(max-width:650px){.grid{grid-template-columns:1fr}fieldset{padding:15px}.submit{width:100%}main{margin-top:20px}}
 </style></head>
-<body><header><a href="/" aria-label="PRIVATE DRIVE — главная" style="border:0;padding:0"><img src="/pd-logo-transparent.png" alt="PRIVATE DRIVE — золотой логотип PD с автомобилем" width="66" height="66" style="max-width:100%;aspect-ratio:1;object-fit:contain;border-radius:11px;vertical-align:middle"></a><a href="/dispatch/login">Диспетчерская</a></header>
+<body><header><a href="/" aria-label="PRIVATE DRIVE — главная" style="border:0;padding:0"><img src="{{ "/dispatch" if production else "" }}/pd-logo-transparent.png" alt="PRIVATE DRIVE — золотой логотип PD с автомобилем" width="66" height="66" style="max-width:100%;aspect-ratio:1;object-fit:contain;border-radius:11px;vertical-align:middle"></a><a href="/dispatch/login">Диспетчерская</a></header>
 <main><h1>Регистрация пилота</h1>
 <p class="lead">Укажи контакты и приложи два фото для проверки диспетчером.</p>
-{% if enabled %}<div class="notice" role="status"><strong>ЗАКРЫТЫЙ ТЕСТ.</strong> Используй только согласованные тестовые данные. Доступ по приглашению; документы сохраняются в защищённом хранилище.</div>{% else %}<div class="notice" role="status"><strong>ТЕСТОВЫЙ МАКЕТ.</strong> Приём документов не включён: защищённое постоянное хранилище пока не готово. Не загружай настоящие документы.</div>{% endif %}
+{% if production %}<p><a href="https://privatedrive.lt/pilot-privacy.html">Обработка данных пилота</a></p>{% elif enabled %}<div class="notice" role="status"><strong>ЗАКРЫТЫЙ ТЕСТ.</strong> Используй только согласованные тестовые данные. Доступ по приглашению; документы сохраняются в защищённом хранилище.</div>{% else %}<div class="notice" role="status"><strong>ТЕСТОВЫЙ МАКЕТ.</strong> Приём документов не включён: защищённое постоянное хранилище пока не готово. Не загружай настоящие документы.</div>{% endif %}
 <form id="pilot-form" autocomplete="off" method="post" action="/pilot-registration" enctype="multipart/form-data">
 <fieldset><legend>Контакты</legend><div class="grid">
 <div class="field"><label for="first-name">Имя</label><input id="first-name" name="first_name" maxlength="80" required></div>
@@ -39,7 +39,7 @@ input[type=file]{padding:10px;font-size:12px}input::placeholder{color:#889099}in
 </div><p class="help">JPG, PNG или WebP. До 10 МБ на фотографию.</p></fieldset>
 <details><summary>Условия работы пилота</summary><p>Во время смены диспетчер видит местоположение автомобиля, в том числе при заблокированном экране. После завершения смены передача координат прекращается.</p></details>
 <label class="choice"><input type="checkbox" name="terms_version" value="pilot-shift-v1" required>Принимаю условия работы пилота</label>
-<div class="actions">{% if enabled %}<label for="qa-invitation">Код приглашения для закрытого теста</label><input id="qa-invitation" name="qa_invitation" type="password" autocomplete="off" required maxlength="128"><button class="submit" type="submit" style="opacity:1;cursor:pointer">Отправить на модерацию</button><p id="demo-result" aria-live="polite">Анкета будет отправлена на проверку диспетчеру.</p>{% else %}<button class="submit" type="submit" disabled>Отправить на модерацию</button><p id="demo-result" aria-live="polite">Приём анкет пока закрыт.</p>{% endif %}</div>
+<div class="actions">{% if enabled %}<label for="qa-invitation">Код приглашения</label><input id="qa-invitation" name="qa_invitation" type="password" autocomplete="off" required maxlength="128"><button class="submit" type="submit" style="opacity:1;cursor:pointer">Отправить на модерацию</button><p id="demo-result" aria-live="polite">Анкета будет отправлена на проверку диспетчеру.</p>{% else %}<button class="submit" type="submit" disabled>Отправить на модерацию</button><p id="demo-result" aria-live="polite">Приём анкет пока закрыт.</p>{% endif %}</div>
 </form></main>
 <script>
 const result=document.getElementById('demo-result');
@@ -58,7 +58,7 @@ document.getElementById('pilot-form').addEventListener('submit',async event=>{
  try{
    const response=await fetch('/pilot-registration',{method:'POST',body:new FormData(form),credentials:'same-origin'});
    const data=await response.json();
-   if(!response.ok||!data.qa_only||!data.application_id)throw Error(response.status===413?'Слишком большие файлы. Не больше 10 МБ на фото.':(data.error||'Не удалось подтвердить анкету.'));
+   if(!response.ok||!data.ok||!data.application_id)throw Error(response.status===413?'Слишком большие файлы. Не больше 10 МБ на фото.':(data.error||'Не удалось подтвердить анкету.'));
    result.textContent='Анкета №'+data.application_id.slice(0,8)+' принята. Статус: На проверке.';
    form.reset();
  }catch(error){result.textContent=error.message||'Ошибка отправки.'}

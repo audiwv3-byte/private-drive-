@@ -184,7 +184,7 @@ def auth_page(app, registration=False, ready=False, status=200, recovery=False, 
     }))
 
 
-def register(app, core, *, owner_passwords=None):
+def register(app, core, *, owner_passwords=None, pilot_intake=None):
     secret = os.environ.get("PD_DISPATCH_SESSION_SECRET", "")
     password_hash = os.environ.get("PD_DISPATCH_PASSWORD_HASH", "")
     raw_admin = os.environ.get("PD_DISPATCH_ADMIN_ID", "")
@@ -433,9 +433,9 @@ def register(app, core, *, owner_passwords=None):
         register_dispatch_accounts(app, authorized, passwords.connect if passwords else None)
 
     # Separate, fail-closed pilot intake shares the existing dispatcher session.
-    if os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
+    if pilot_intake or os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1":
         from pd_pilot_qa_intake import register as register_qa_pilots
-        register_qa_pilots(app, authorized, csrf, valid_csrf)
+        register_qa_pilots(app, authorized, csrf, valid_csrf, production=pilot_intake)
 
     @app.get("/dispatch")
     def pd_dispatch_home():
@@ -463,7 +463,8 @@ def register(app, core, *, owner_passwords=None):
             test_sync_enabled=test_sync_enabled and not persistent_queue_enabled,
             persistent_queue_enabled=persistent_queue_enabled,
             analytics_enabled="pd_site_analytics" in app.view_functions,
-            csrf=csrf() if test_sync_enabled else "",
+            csrf=csrf() if test_sync_enabled or live_orders_enabled else "",
+            pilot_intake_enabled=bool(pilot_intake),
         ))
         response.headers.update({
             "Cache-Control": "private, no-store",

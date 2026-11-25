@@ -89,7 +89,11 @@ def create_app():
         return {"dispatch_asset_prefix": "/dispatch"}
     core = SimpleNamespace(ADMIN_IDS=frozenset({admin_id}), is_admin=lambda uid: uid == admin_id,
                            ORDERS_DB=orders, USERS_DB=Path(os.environ.get("PD_DISPATCH_USERS_SQLITE", orders.with_name("users.db"))), db=read_orders)
-    if not register(app, core, owner_passwords=OwnerCredentials(state, password_hash)):
+    from pd_pilot_qa_intake import register_production_form
+
+    pilot_intake = register_production_form(app, state)
+    if not register(app, core, owner_passwords=OwnerCredentials(state, password_hash),
+                    pilot_intake=pilot_intake):
         raise RuntimeError("Dispatcher could not enable owner authentication")
 
     @app.get("/")
@@ -114,7 +118,9 @@ def mount_dispatcher(miniapp, dispatcher=None):
 
     def application(environ, start_response):
         path = environ.get("PATH_INFO", "")
-        if path == "/dispatch" or path.startswith("/dispatch/"):
+        if (path == "/dispatch" or path.startswith("/dispatch/")
+                or (path == "/pilot-registration" and hasattr(dispatcher, "view_functions")
+                    and "pilot_registration" in dispatcher.view_functions)):
             return dispatcher(environ, start_response)
         return miniapp(environ, start_response)
 

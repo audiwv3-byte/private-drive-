@@ -136,12 +136,53 @@ jobs:
           manifest = android / "AndroidManifest.xml"
           text = manifest.read_text()
           assert 'android:icon="@mipmap/ic_launcher"' in text
-          text = text.replace('android:icon="@mipmap/ic_launcher"',
-                              'android:icon="@drawable/private_drive_logo"')
-          label = ("PRIVATE DRIVE PILOT" if os.environ.get("PD_CONNECTED_PILOT_APK") == "true"
-                   else "PRIVATE DRIVE OFFLINE QA")
-          text = text.replace('android:label="private_drive"', f'android:label="{label}"')
+          # Keep the agreed customer-facing name in every isolated build.
+          # Adaptive launcher artwork is generated from the approved source,
+          # with Android's circular launcher mask safe area respected.
+          assert 'android:label="private_drive"' in text
+          text = text.replace('android:label="private_drive"',
+                              'android:label="PRIVATE DRIVE"')
           manifest.write_text(text)
+          from PIL import Image, ImageOps
+          with Image.open(source) as approved:
+              art = approved.convert("RGBA")
+              assert art.width == art.height, "approved launcher art must be square"
+              for density, dimension in (("mdpi", 48), ("hdpi", 72),
+                                         ("xhdpi", 96), ("xxhdpi", 144),
+                                         ("xxxhdpi", 192)):
+                  folder = android / f"res/mipmap-{density}"
+                  folder.mkdir(parents=True, exist_ok=True)
+                  # Legacy round launchers crop corners; keep the artwork
+                  # inside a safe centered square instead of crop-to-fill.
+                  canvas = Image.new("RGBA", (dimension, dimension), (0, 0, 0, 255))
+                  inset = int(dimension * 0.14)
+                  content = ImageOps.contain(
+                      art, (dimension - 2 * inset, dimension - 2 * inset),
+                      method=Image.Resampling.LANCZOS)
+                  canvas.alpha_composite(content, ((dimension-content.width)//2,
+                                                   (dimension-content.height)//2))
+                  canvas.convert("RGB").save(folder / "ic_launcher.png")
+              foreground = Image.new("RGBA", (432, 432), (0, 0, 0, 0))
+              # Adaptive icon visible mask is the central 2/3: artwork
+              # stays within it with extra clearance from the perimeter.
+              fitted = ImageOps.contain(art, (264, 264),
+                                       method=Image.Resampling.LANCZOS)
+              foreground.alpha_composite(fitted, ((432-fitted.width)//2,
+                                                  (432-fitted.height)//2))
+              foreground.save(drawable / "private_drive_adaptive_foreground.png")
+          values = android / "res/values"
+          values.mkdir(parents=True, exist_ok=True)
+          (values / "private_drive_launcher_colors.xml").write_text(
+              '<resources><color name="pd_launcher_background">#000000</color></resources>')
+          adaptive = android / "res/mipmap-anydpi-v26"
+          adaptive.mkdir(parents=True, exist_ok=True)
+          (adaptive / "ic_launcher.xml").write_text(
+              '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">'
+              '<background android:drawable="@color/pd_launcher_background"/>'
+              '<foreground android:drawable="@drawable/private_drive_adaptive_foreground"/>'
+              '</adaptive-icon>')
+          assert 'android:icon="@mipmap/ic_launcher"' in manifest.read_text()
+          assert 'android:label="PRIVATE DRIVE"' in manifest.read_text()
           if os.environ.get("PD_CONNECTED_PILOT_APK") == "true":
               # Stay installable beside the existing app, without touching
               # its package or device storage.
@@ -153,8 +194,8 @@ jobs:
               )
               assert replacements == 1, "could not safely set separate pilot app ID"
               gradle.write_text(data)
-          assert '@drawable/private_drive_logo' in manifest.read_text()
-          print(f"Brand asset verified ({len(data)} bytes), Android icon and splash replaced")
+          assert '@mipmap/ic_launcher' in manifest.read_text()
+          print(f"Approved brand verified ({len(data)} bytes), adaptive launcher and splash installed")
           PY
           python3 flutter_app/tool/apply_native_brand_splash.py
           cp -R flutter_app/test/. private_drive_build/test/

@@ -8,6 +8,7 @@ import hmac
 import json
 import os
 import time
+from datetime import datetime
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
@@ -39,7 +40,7 @@ def publish_telegram_order(order, *, open_url=urlopen, now=time.time):
         "source_order_id": str(order["id"]),
         "from": str(order["origin"]),
         "to": str(order["destination"]),
-        "trip_date": str(order["trip_date"]),
+        "trip_date": datetime.strptime(str(order["trip_date"]), "%d.%m.%Y").strftime("%Y-%m-%d") if "." in str(order["trip_date"]) else str(order["trip_date"]),
         "trip_time": str(order["trip_time"]),
     }
     raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")

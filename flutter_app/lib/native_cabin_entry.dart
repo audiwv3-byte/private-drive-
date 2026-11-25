@@ -311,6 +311,11 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             FilledButton.icon(key: const Key('entry-pilot'),
               onPressed: () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
               label: const Text('Пилот')),
+            if (!const bool.fromEnvironment('PD_WEB_DISPATCH_ONLY'))
+              FilledButton.icon(key: const Key('entry-dispatcher'),
+                onPressed: () => _select('dispatcher'),
+                icon: const Icon(Icons.support_agent_outlined),
+                label: const Text('Диспетчер')),
             if (_message != null) Text(_message!, key: const Key('entry-role-message')),
             const SizedBox(height: 16),
             const Text('Фотопроверка требуется только пилоту. '

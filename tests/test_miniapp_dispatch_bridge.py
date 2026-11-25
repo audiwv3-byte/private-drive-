@@ -68,6 +68,15 @@ class BridgeTests(unittest.TestCase):
                           now=lambda: 1800000000), "central-123")
         self.assertEqual(requests[0], requests[1])
 
+    def test_legacy_date_converted_to_iso(self):
+        def send(req, timeout):
+            self.assertEqual(json.loads(req.data)["trip_date"], "2026-12-02")
+            return FakeResponse({
+                "source": "telegram_miniapp", "source_order_id": "42",
+                "order_id": "central-123", "payment_mode": "disabled",
+            })
+        publish_telegram_order(dict(ORDER, trip_date="02.12.2026"), open_url=send)
+
     def test_disabled_is_no_network(self):
         os.environ["PD_PAYMENT_MODE"] = "live"
         self.assertFalse(bridge_enabled())

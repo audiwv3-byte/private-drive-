@@ -2,7 +2,7 @@ name: PRIVATE DRIVE complete Android internal QA APK
 
 on:
   push:
-    branches: [feature/flutter-independent-auth]
+    branches: [fix/android-qa-update-0-2-37]
     paths:
       - 'flutter_app/**'
       - '.github/workflows/full-native-android-qa-apk.yml'
@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   # Local fixture only. It does not authorize requests to any service.
@@ -148,8 +149,8 @@ jobs:
           # Stable TEST signing key: never use this public development key for release.
           mkdir -p "$HOME/.android"
           base64 --decode ../flutter_app/demo_debug_signing_key.b64 > "$HOME/.android/debug.keystore"
-          QA_VERSION=0.2.35
-          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112308 \
+          QA_VERSION=0.2.37
+          flutter build apk --debug --target lib/main.dart --build-name="$QA_VERSION" --build-number=2026112501 \
             --dart-define="PD_QA_BUILD_LABEL=Версия $QA_VERSION · внутренняя сборка" \
             --dart-define=PD_MAPBOX_QA=true --dart-define=MAPBOX_PUBLIC_TOKEN="$MAPBOX_PUBLIC_TOKEN" \
             --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA_LOCAL_PIN="$PD_QA_LOCAL_PIN" \
@@ -160,7 +161,7 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > ../full-qa-apk-signature.txt
           "$BUILD_TOOLS/aapt" dump badging "$APK" > ../full-qa-apk-badging.txt
           grep "name='lt.privatedrive.private_drive.photo_qa'" ../full-qa-apk-badging.txt
-          grep "versionCode='2026112308'" ../full-qa-apk-badging.txt
+          grep "versionCode='2026112501'" ../full-qa-apk-badging.txt
           grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt
@@ -191,6 +192,26 @@ jobs:
         with:
           name: private-drive-full-native-qa-apk
           path: apk
+      - name: Download the published Android QA 0.2.34 baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: private-drive-full-native-qa-apk
+          run-id: 45177253388
+          github-token: ${{ github.token }}
+          path: previous-apk
+      - name: Verify both APK signing certificates and versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n 1)"
+          for path in previous-apk apk; do
+            file="$path/PRIVATE-DRIVE-full-qa-debug.apk"
+            (cd "$path" && sha256sum --check SHA256SUMS)
+            "$BUILD_TOOLS/apksigner" verify --print-certs "$file" | grep -F 'certificate SHA-256 digest:' > "$path/certificates.txt"
+          done
+          diff -u previous-apk/certificates.txt apk/certificates.txt
+          "$BUILD_TOOLS/aapt" dump badging previous-apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112307' versionName='0.2.34'"
+          "$BUILD_TOOLS/aapt" dump badging apk/PRIVATE-DRIVE-full-qa-debug.apk | grep -F "name='lt.privatedrive.private_drive.photo_qa' versionCode='2026112501' versionName='0.2.37'"
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -203,7 +224,11 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
+            set -e
+            adb install previous-apk/PRIVATE-DRIVE-full-qa-debug.apk
+            adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.34'
             adb install -r apk/PRIVATE-DRIVE-full-qa-debug.apk
+            adb shell dumpsys package lt.privatedrive.private_drive.photo_qa | grep -F 'versionName=0.2.37'
             adb logcat -c
             adb shell am start -W -n lt.privatedrive.private_drive.photo_qa/lt.privatedrive.private_drive.MainActivity
             sleep 12

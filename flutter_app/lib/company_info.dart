@@ -2,27 +2,27 @@ import 'package:flutter/material.dart';
 import 'app_language.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+Future<void> openPrivateDriveLink(BuildContext context, Uri target) async {
+  try {
+    if (await launchUrl(target, mode: LaunchMode.externalApplication)) {
+      return;
+    }
+  } catch (_) {
+    // If a handler isn't installed, show a visible error instead.
+  }
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Не удалось открыть ссылку: $target'),
+    ));
+  }
+}
+
 /// Informational preview. Legal texts require owner and legal review
 /// before real bookings, payments or tracking are launched.
 class CompanyInfoPage extends StatelessWidget {
   const CompanyInfoPage({super.key});
 
   static const gold = Color(0xFFDDC184);
-
-  Future<void> _launch(BuildContext context, Uri target) async {
-    try {
-      if (await launchUrl(target, mode: LaunchMode.externalApplication)) {
-        return;
-      }
-    } catch (_) {
-      // If a handler isn't installed, show a visible error instead.
-    }
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Не удалось открыть ссылку: $target'),
-      ));
-    }
-  }
 
   Widget _paragraph(String value) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
@@ -64,7 +64,7 @@ class CompanyInfoPage extends StatelessWidget {
               leading: const Icon(Icons.email_outlined),
               title: const Text('eurobaltictransfer@gmail.com'),
               subtitle: Text(pdLabel(context, 'Электронная почта')),
-              onTap: () => _launch(context, Uri(
+              onTap: () => openPrivateDriveLink(context, Uri(
                 scheme: 'mailto', path: 'eurobaltictransfer@gmail.com')),
             ),
             ListTile(
@@ -72,7 +72,7 @@ class CompanyInfoPage extends StatelessWidget {
               leading: const Icon(Icons.forum_outlined),
               title: Text(pdLabel(context, 'Чат поддержки PRIVATE DRIVE')),
               subtitle: const Text('Telegram @PrivatDraiv · контакт из прежнего Mini App'),
-              onTap: () => _launch(context,
+              onTap: () => openPrivateDriveLink(context,
                 Uri.parse('https://t.me/PrivatDraiv')),
             ),
             ListTile(
@@ -80,7 +80,7 @@ class CompanyInfoPage extends StatelessWidget {
               leading: const Icon(Icons.campaign_outlined),
               title: const Text('@PrivateDriveTransfer'),
               subtitle: Text(pdLabel(context, 'Официальный Telegram-канал')),
-              onTap: () => _launch(context,
+              onTap: () => openPrivateDriveLink(context,
                 Uri.parse('https://t.me/PrivateDriveTransfer')),
             ),
 
@@ -89,7 +89,7 @@ class CompanyInfoPage extends StatelessWidget {
               leading: const Icon(Icons.language),
               title: Text(pdLabel(context, 'Сайт PRIVATE DRIVE')),
               subtitle: const Text('wilsonpark.pythonanywhere.com'),
-              onTap: () => _launch(context,
+              onTap: () => openPrivateDriveLink(context,
                 Uri.parse('https://wilsonpark.pythonanywhere.com/')),
             ),
             _paragraph('Для официального запуска потребуется уточнить '

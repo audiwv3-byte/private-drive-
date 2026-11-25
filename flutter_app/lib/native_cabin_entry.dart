@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'brand_logo.dart';
+import 'company_info.dart' show openPrivateDriveLink;
 import 'private_drive_bright_backdrop.dart';
 import 'demo_interfaces.dart';
 import 'permissions_onboarding.dart';
@@ -263,6 +264,13 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
             FilledButton.icon(key: const Key('entry-pilot'),
               onPressed: () => _select('pilot'), icon: const Icon(Icons.directions_car_outlined),
               label: const Text('Пилот')),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              key: const Key('entry-apply-pilot'),
+              onPressed: () => openPrivateDriveLink(context,
+                  Uri.parse('https://private-drive-dispatcher-staging.onrender.com/pilot-registration')),
+              child: const Text('Стать пилотом'),
+            ),
             const SizedBox(height: 12),
             FilledButton.icon(key: const Key('entry-dispatcher'),
               onPressed: () => _select('dispatcher'), icon: const Icon(Icons.support_agent_outlined),

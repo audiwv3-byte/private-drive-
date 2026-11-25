@@ -360,9 +360,16 @@ def register(app, core):
         if not re.fullmatch(r"pk\.[A-Za-z0-9_.-]{1,512}", token):
             token = ""
         page = Path(__file__).with_name("pd_dispatcher_mapbox.html").read_text(encoding="utf-8")
+        use_test_queue = test_sync_enabled and (
+            not persistent_queue_enabled or request.args.get("queue") == "test"
+        )
         response = app.make_response(render_template_string(
-            page, mapbox_token=token, test_sync_enabled=test_sync_enabled and not persistent_queue_enabled,
-            persistent_queue_enabled=persistent_queue_enabled, telegram_test_enabled=telegram_test_ready,
+            page, mapbox_token=token, test_sync_enabled=use_test_queue,
+            persistent_queue_enabled=persistent_queue_enabled and not use_test_queue,
+            gps_sync_enabled=test_sync_enabled,
+            test_queue_link=url_for("pd_dispatch_map", queue="test")
+                if test_sync_enabled and not use_test_queue else None,
+            telegram_test_enabled=telegram_test_ready,
             analytics_enabled="pd_site_analytics" in app.view_functions,
             csrf=csrf() if test_sync_enabled else "",
         ))

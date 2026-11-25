@@ -47,7 +47,10 @@ class DemoStore:
                 id TEXT PRIMARY KEY, owner TEXT NOT NULL, pilot TEXT,
                 origin TEXT NOT NULL, destination TEXT NOT NULL,
                 payment TEXT NOT NULL, status TEXT NOT NULL, paused INTEGER NOT NULL,
-                version INTEGER NOT NULL, created TEXT NOT NULL)""")
+                version INTEGER NOT NULL, created TEXT NOT NULL,
+                stops TEXT NOT NULL DEFAULT '[]')""")
+            if not any(c["name"] == "stops" for c in self.db.execute("PRAGMA table_info(trips)")):
+                self.db.execute("ALTER TABLE trips ADD COLUMN stops TEXT NOT NULL DEFAULT '[]'")
             self.db.execute("""CREATE TABLE IF NOT EXISTS events (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT, trip_id TEXT NOT NULL,
                 actor TEXT NOT NULL, status TEXT NOT NULL, event TEXT NOT NULL,
@@ -107,7 +110,7 @@ class DemoStore:
         row = self.db.execute("SELECT * FROM trips WHERE id=?", (trip_id,)).fetchone()
         if row is None:
             raise TripError("not_found", 404)
-        return dict(row)
+        return dict(row, stops=json.loads(row["stops"]))
 
     def _allowed(self, row, role, actor):
         if role == "passenger" and row["owner"] != actor:
@@ -131,14 +134,25 @@ class DemoStore:
                 "SELECT actor FROM native_pilot_presence WHERE seen_at>=? ORDER BY actor LIMIT 100",
                 (time.time()-300,))]
 
-    def create(self, actor, data):
+    @staticmethod
+    def route_input(data):
         origin, destination = data.get("from"), data.get("to")
+        stops = data.get("stops", [])
+        if not isinstance(stops, list) or len(stops) > 3:
+            raise TripError("invalid_stops")
+        points = [origin, *stops, destination]
+        if any(not isinstance(point, str) or not 1 <= len(point.strip()) <= 200 for point in points):
+            raise TripError("invalid_route")
+        points = [point.strip() for point in points]
+        if points[0].casefold() == points[-1].casefold() or any(
+            left.casefold() == right.casefold() for left, right in zip(points, points[1:])
+        ):
+            raise TripError("invalid_route")
+        return points[0], points[-1], points[1:-1]
+
+    def create(self, actor, data):
+        origin, destination, stops = self.route_input(data)
         payment = data.get("payment", "Карта")
-        if not isinstance(origin, str) or not isinstance(destination, str):
-            raise TripError("invalid_route")
-        origin, destination = origin.strip(), destination.strip()
-        if not 1 <= len(origin) <= 200 or not 1 <= len(destination) <= 200 or origin.casefold() == destination.casefold():
-            raise TripError("invalid_route")
         if payment not in ("Карта", "PayPal", "Банковский перевод", "Криптовалюта"):
             raise TripError("invalid_payment")
         with DB_LOCK, self.db:
@@ -147,8 +161,11 @@ class DemoStore:
                 raise TripError("active_trip_exists", 409)
             trip_id = uuid.uuid4().hex
             now = datetime.now(timezone.utc).isoformat()
-            self.db.execute("INSERT INTO trips VALUES (?,?,?,?,?,?,?,?,?,?)",
-                            (trip_id, actor, None, origin, destination, payment, "requested", 0, 1, now))
+            self.db.execute("""INSERT INTO trips
+                (id,owner,pilot,origin,destination,payment,status,paused,version,created,stops)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (trip_id, actor, None, origin, destination, payment, "requested", 0, 1, now,
+                 json.dumps(stops, ensure_ascii=False)))
             self._event(trip_id, actor, "requested", "created", 1)
             return self._get(trip_id)
 

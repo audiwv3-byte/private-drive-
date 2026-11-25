@@ -14,13 +14,14 @@ from tempfile import TemporaryDirectory
 
 from flask import jsonify, redirect, render_template, render_template_string, request, url_for
 
+from pd_dispatch_qa_store import PILOT, PILOTS, StagingTripStore
+from pd_dispatch_voice import StagingVoiceCalls
 from pd_telegram_test import VALID_ID, verify_init_data
-from test_sync_server.pd_demo_server import DB_LOCK, MAX_BODY, DemoStore, TripError
+from test_sync_server.pd_demo_server import DB_LOCK, MAX_BODY, TripError
 
 
-PILOT = "pilot_test"
-ROLES = {"passenger": "passenger_test", "pilot": PILOT}
-ONLINE_SECONDS = 15
+ROLES = {"passenger": ("passenger", "passenger_test"), "pilot": ("pilot", PILOT),
+         "pilot_2": ("pilot", PILOTS[1])}
 TRIP_ID = re.compile(r"[a-f0-9]{32}")
 TELEGRAM_TEST_ORDER = {
     "source": "telegram_miniapp", "source_order_id": "9900000000000000001",
@@ -36,55 +37,11 @@ def telegram_test_enabled():
             and bool(VALID_ID.fullmatch(os.environ.get("PD_DISPATCH_ADMIN_ID", ""))))
 
 
-class StagingTripStore(DemoStore):
-    last_pilot_poll = float("-inf")
-    pilot_position = None
-    last_pilot_fix = float("-inf")
-
-    def ping_pilot(self):
-        with DB_LOCK:
-            self.last_pilot_poll = time.monotonic()
-
-    def set_pilot_position(self, position):
-        with DB_LOCK:
-            self.pilot_position = position
-            self.last_pilot_fix = time.monotonic()
-
-    def snapshot(self):
-        with DB_LOCK:
-            now = time.monotonic()
-            online = now - self.last_pilot_poll < ONLINE_SECONDS
-            position = self.pilot_position if online and now - self.last_pilot_fix < ONLINE_SECONDS else None
-            trips = self.db.execute("""
-                SELECT t.id, t.origin, t.destination, t.pilot, t.status,
-                       t.paused, t.version, i.source, i.source_order_id,
-                       i.trip_date, i.trip_time
-                FROM trips t LEFT JOIN qa_source_imports i ON i.trip_id=t.id
-                ORDER BY t.created DESC LIMIT 50
-            """)
-            return {
-                "pilot_online": online,
-                "pilot_position": position,
-                "trips": [dict(row) for row in trips],
-            }
-
-
 def register(app, authorized, valid_csrf, *, csrf=None):
     directory = TemporaryDirectory(prefix="pd-test-trips-")
     store = StagingTripStore(Path(directory.name) / "trips.sqlite")
     app.extensions["pd_dispatch_test_sync"] = (directory, store)
-    with DB_LOCK, store.db:
-        store.db.execute("""CREATE TABLE IF NOT EXISTS qa_source_imports (
-            source TEXT NOT NULL,
-            source_order_id TEXT NOT NULL,
-            trip_id TEXT NOT NULL UNIQUE,
-            payload_hash TEXT NOT NULL,
-            trip_date TEXT,
-            trip_time TEXT,
-            PRIMARY KEY(source, source_order_id),
-            FOREIGN KEY(trip_id) REFERENCES trips(id)
-        )""")
-
+    voice = StagingVoiceCalls.from_environment(store)
     def token(role, day):
         purpose = f"pd-dispatch-staging-mobile-test:v1:{role}:{day}".encode("ascii")
         return hmac.new(app.secret_key.encode(), purpose, hashlib.sha256).hexdigest()
@@ -94,10 +51,10 @@ def register(app, authorized, valid_csrf, *, csrf=None):
         if not re.fullmatch(r"Bearer [a-f0-9]{64}", bearer):
             raise TripError("unauthorized", 401)
         day = int(time.time()) // 86400
-        for role, actor in ROLES.items():
+        for credential, identity in ROLES.items():
             for issued in (day, day - 1):
-                if hmac.compare_digest(bearer[7:], token(role, issued)):
-                    return role, actor
+                if hmac.compare_digest(bearer[7:], token(credential, issued)):
+                    return identity
         raise TripError("unauthorized", 401)
 
     def reply(data, status=200):
@@ -124,50 +81,76 @@ def register(app, authorized, valid_csrf, *, csrf=None):
 
     def mobile_response(role, actor, path):
         if request.method == "GET" and path == "me":
-            return reply({"role": role, "actor": actor, "demo": True})
+            return reply({"role": role, "actor": actor, "demo": True, "voice_ready": voice is not None})
         if request.method == "GET" and path == "current":
             if role == "pilot":
-                store.ping_pilot()
+                store.ping_pilot(actor)
+                return reply({"trip": store.current(role, actor), "offer": store.pilot_offer(actor)})
             return reply({"trip": store.current(role, actor)})
         if request.method == "POST" and path == "trips":
             if role != "passenger":
                 raise TripError("forbidden", 403)
-            return reply({"trip": store.create(actor, payload())}, 201)
+            trip = store.create(actor, payload())
+            store.dispatch_waiting()
+            return reply({"trip": store.get(trip["id"], role, actor)}, 201)
         if request.method == "POST" and path == "position":
-            if role != "pilot":
+            if role not in ("pilot", "passenger"):
                 raise TripError("forbidden", 403)
             body = payload()
             if set(body) != {"latitude", "longitude"}:
                 raise TripError("invalid_position")
             latitude, longitude = body["latitude"], body["longitude"]
             if latitude is None and longitude is None:
-                store.set_pilot_position(None)
+                position = None
             elif (type(latitude) in (int, float) and -90 <= latitude <= 90
                   and type(longitude) in (int, float) and -180 <= longitude <= 180):
-                store.set_pilot_position([round(latitude, 5), round(longitude, 5)])
+                position = [round(latitude, 5), round(longitude, 5)]
             else:
                 raise TripError("invalid_position")
+            if role == "pilot":
+                store.set_pilot_position(actor, position)
+            else:
+                store.set_passenger_position(position)
             return reply({"ok": True})
         parts = path.split("/")
         if len(parts) < 2 or parts[0] != "trips" or not TRIP_ID.fullmatch(parts[1]):
             raise TripError("not_found", 404)
         trip_id = parts[1]
         action = parts[2:]
+        if action == ["voice"]:
+            if voice is None:
+                raise TripError("voice_unavailable", 503)
+            return reply(voice.handle(
+                trip_id, role, actor, payload() if request.method == "POST" else None
+            ))
         if request.method == "GET":
             if not action:
                 return reply({"trip": store.get(trip_id, role, actor)})
             if action == ["events"]:
-                return reply({"events": store.events(trip_id, role, actor, cursor())})
+                return reply({"events": store.mobile_events(trip_id, role, actor, cursor())})
             if action == ["messages"]:
                 return reply({"messages": store.messages(trip_id, role, actor, cursor())})
         if request.method == "POST":
+            if action == ["route"]:
+                if role != "passenger":
+                    raise TripError("forbidden", 403)
+                return reply({"trip": store.update_route(trip_id, actor, payload())})
+            if action == ["offer"]:
+                if role != "pilot":
+                    raise TripError("forbidden", 403)
+                body = payload()
+                return reply({"trip": store.respond_offer(
+                    trip_id, actor, body.get("offer_id"), body.get("decision")
+                )})
             if action == ["messages"]:
                 return reply({"message": store.send_message(trip_id, role, actor, payload())}, 201)
             if action == ["action"]:
                 if role != "pilot":
                     raise TripError("forbidden", 403)
                 body = payload()
-                return reply({"trip": store.advance(trip_id, actor, body.get("version"), body.get("action"))})
+                trip = store.advance(trip_id, actor, body.get("version"), body.get("action"))
+                store.dispatch_waiting()
+                return reply({"trip": trip})
         raise TripError("not_found", 404)
 
     @app.route("/v1/<path:path>", methods=["GET", "POST"])
@@ -397,11 +380,13 @@ button{margin-top:.4rem;padding:.55rem .8rem;cursor:pointer}
 <label>Адрес сервера<input readonly value="https://private-drive-dispatcher-staging.onrender.com"></label>
 <label>Токен пилота<input id="pilot-token" readonly spellcheck="false" value="{{ pilot }}"></label>
 <button type="button" data-copy="pilot-token">Скопировать токен пилота</button>
+<label>Токен второго пилота<input id="pilot-2-token" readonly spellcheck="false" value="{{ pilot_2 }}"></label>
+<button type="button" data-copy="pilot-2-token">Скопировать токен второго пилота</button>
 <label>Токен пассажира<input id="passenger-token" readonly spellcheck="false" value="{{ passenger }}"></label>
 <button type="button" data-copy="passenger-token">Скопировать токен пассажира</button>
 <p id="copy-status" role="status"></p>
 <p>Токен состоит из 64 символов. На экране «Тестовый вход» используй пароль QA-сборки.</p>
-<p>Используй тестовые адреса. Статус пилота отображается, пока открыт экран тестовой связи. На карте видно последнее местоположение, если пилот включил передачу GPS. Оплата выключена.</p>
+<p>Используй тестовые адреса. Статус пилота отображается, пока открыт экран тестовой связи. Карта показывает местоположение тех, кто включил передачу GPS. Синяя метка обозначает пассажира. Оплата выключена.</p>
 <a href="/dispatch/map">Открыть карту диспетчерской</a>
 <script nonce="{{ nonce }}">
 document.querySelectorAll('[data-copy]').forEach((button) => {
@@ -420,7 +405,8 @@ document.querySelectorAll('[data-copy]').forEach((button) => {
     });
 });
 </script></html>""",
-            pilot=token("pilot", day), passenger=token("passenger", day), nonce=nonce)
+            pilot=token("pilot", day), pilot_2=token("pilot_2", day),
+            passenger=token("passenger", day), nonce=nonce)
         return page, {
             "Cache-Control": "private, no-store",
             "Referrer-Policy": "no-referrer",
@@ -437,6 +423,18 @@ document.querySelectorAll('[data-copy]').forEach((button) => {
             return reply({"error": "unauthorized"}, 401)
         return reply(store.snapshot())
 
+    @app.post("/dispatch/test-sync/autopilot")
+    def pd_test_sync_autopilot():
+        if not authorized():
+            return reply({"error": "unauthorized"}, 401)
+        if request.content_length is None or request.content_length > MAX_BODY or not valid_csrf():
+            return reply({"error": "forbidden"}, 403)
+        enabled = request.form.get("enabled")
+        if enabled not in ("0", "1"):
+            return reply({"error": "invalid_mode"}, 400)
+        store.set_autopilot(enabled == "1")
+        return reply(store.snapshot())
+
     @app.post("/dispatch/test-sync/assign")
     def pd_test_sync_assign():
         if not authorized():
@@ -448,6 +446,7 @@ document.querySelectorAll('[data-copy]').forEach((button) => {
             version = request.form.get("version", "")
             if not TRIP_ID.fullmatch(trip_id) or not re.fullmatch(r"[0-9]{1,9}", version):
                 raise TripError("invalid_trip")
-            return reply({"trip": store.assign(trip_id, PILOT, int(version), "dispatcher_test")})
+            pilot = request.form.get("pilot", PILOT)
+            return reply({"trip": store.assign_manually(trip_id, pilot, int(version))})
         except TripError as exc:
             return reply({"error": exc.code}, exc.status)

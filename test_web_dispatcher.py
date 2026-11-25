@@ -100,8 +100,8 @@ class DispatcherBrowserTests(unittest.TestCase):
             "csrf": csrf, "password": "test-only-password",
         }).status_code, 302)
         setup = dispatcher.get("/dispatch/test-sync")
-        pilot_token, passenger_token = re.findall(rb'value="([a-f0-9]{64})"', setup.data)
-        self.assertNotEqual(pilot_token, passenger_token)
+        pilot_token, second_pilot_token, passenger_token = re.findall(rb'value="([a-f0-9]{64})"', setup.data)
+        self.assertEqual(len({pilot_token, second_pilot_token, passenger_token}), 3)
         pilot = {"Authorization": "Bearer " + pilot_token.decode()}
         passenger = {"Authorization": "Bearer " + passenger_token.decode()}
         with dispatcher.session_transaction() as session:
@@ -118,7 +118,17 @@ class DispatcherBrowserTests(unittest.TestCase):
         self.assertTrue(snapshot["pilot_online"])
         self.assertIsNone(snapshot["pilot_position"])
         position = {"latitude": 54.68725, "longitude": 25.27975}
-        self.assertEqual(mobile.post("/v1/position", headers=passenger, json=position).status_code, 403)
+        self.assertEqual(mobile.post("/v1/position", json=position).status_code, 401)
+        self.assertEqual(mobile.post("/v1/position", headers=passenger, json=position).status_code, 200)
+        shared = dispatcher.get("/dispatch/test-sync/state").json
+        self.assertEqual(shared["passenger_position"], list(position.values()))
+        self.assertIsNone(shared["pilot_position"])
+        self.assertEqual(mobile.get("/dispatch/test-sync/state").status_code, 401)
+        self.assertEqual(mobile.post("/v1/position", headers=passenger, json={
+            "latitude": None, "longitude": None,
+        }).status_code, 200)
+        self.assertIsNone(dispatcher.get("/dispatch/test-sync/state").json["passenger_position"])
+        self.assertEqual(mobile.post("/v1/position", headers=passenger, json=position).status_code, 200)
         self.assertEqual(mobile.post("/v1/position", headers=pilot, json={
             **position, "latitude": 180,
         }).status_code, 400)
@@ -145,8 +155,10 @@ class DispatcherBrowserTests(unittest.TestCase):
             json={"action": "advance", "version": 2})
         self.assertEqual(advanced.json["trip"]["status"], "approaching")
         self.assertEqual(dispatcher.get("/dispatch/test-sync/state").json["trips"][0]["status"], "approaching")
-        with patch("pd_dispatch_test_sync.time.monotonic", return_value=store.last_pilot_poll + 16):
-            self.assertFalse(dispatcher.get("/dispatch/test-sync/state").json["pilot_online"])
+        with patch("pd_dispatch_test_sync.time.monotonic", return_value=max(store.last_passenger_fix, store.last_pilot_poll) + 16):
+            last = dispatcher.get("/dispatch/test-sync/state").json
+            self.assertFalse(last["pilot_online"])
+            self.assertIsNone(last["passenger_position"])
 
     def test_disabled_without_secret(self):
         app, active = self.make_app(False)

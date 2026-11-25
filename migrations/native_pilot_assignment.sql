@@ -135,6 +135,97 @@ BEGIN
 END
 $$;
 
+-- Native pilot trip controller. Waiting uses server time and persists even if
+-- the pilot closes the app. Minutes are counted from the first started minute,
+-- but no monetary charge is calculated or collected here.
+CREATE TABLE IF NOT EXISTS public.pd_native_trip_waiting (
+    order_id uuid PRIMARY KEY REFERENCES public.pd_dispatch_orders(id),
+    started_at bigint,
+    accrued_seconds bigint NOT NULL DEFAULT 0 CHECK (accrued_seconds >= 0)
+);
+
+CREATE OR REPLACE FUNCTION public.pd_native_pilot_trip_action(
+    supplied_digest text, target_order uuid, requested_action text, observed_at bigint
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp
+AS $
+DECLARE
+    principal record;
+    current_status text;
+    current_owner text;
+    wait_started bigint;
+    wait_seconds bigint;
+    next_status text;
+BEGIN
+    SELECT * INTO principal
+      FROM public.pd_validate_native_session(supplied_digest, observed_at);
+    IF NOT FOUND THEN RETURN jsonb_build_object('error','invalid_session'); END IF;
+    IF principal.server_role NOT IN ('pilot','pilot_dispatcher') OR
+       NOT public.pd_pilot_assignment_is_eligible(principal.user_id, observed_at) THEN
+        RETURN jsonb_build_object('error','pilot_required');
+    END IF;
+    IF requested_action NOT IN ('approach','start','finish','stop_start','stop_end') THEN
+        RETURN jsonb_build_object('error','invalid_action');
+    END IF;
+    SELECT o.status,a.pilot_user_id INTO current_status,current_owner
+      FROM public.pd_dispatch_orders o
+      JOIN public.pd_native_order_assignments a ON a.order_id=o.id
+      WHERE o.id=target_order FOR UPDATE OF o;
+    IF NOT FOUND OR current_owner <> principal.user_id THEN
+        RETURN jsonb_build_object('error','order_not_found');
+    END IF;
+
+    INSERT INTO public.pd_native_trip_waiting(order_id)
+        VALUES(target_order) ON CONFLICT DO NOTHING;
+    SELECT started_at, accrued_seconds INTO wait_started,wait_seconds
+      FROM public.pd_native_trip_waiting WHERE order_id=target_order FOR UPDATE;
+
+    next_status := current_status;
+    IF requested_action='approach' AND current_status='assigned' THEN
+        next_status := 'approaching';
+    ELSIF requested_action='start' AND current_status='approaching' THEN
+        next_status := 'underway';
+    ELSIF requested_action='stop_start' AND current_status='underway'
+          AND wait_started IS NULL THEN
+        UPDATE public.pd_native_trip_waiting SET started_at=observed_at
+        WHERE order_id=target_order;
+        wait_started := observed_at;
+    ELSIF requested_action='stop_end' AND current_status='underway'
+          AND wait_started IS NOT NULL THEN
+        wait_seconds := wait_seconds + greatest(0, observed_at-wait_started);
+        UPDATE public.pd_native_trip_waiting
+           SET started_at=NULL, accrued_seconds=wait_seconds
+         WHERE order_id=target_order;
+        wait_started := NULL;
+    ELSIF requested_action='finish' AND current_status='underway' THEN
+        IF wait_started IS NOT NULL THEN
+            wait_seconds := wait_seconds + greatest(0, observed_at-wait_started);
+            UPDATE public.pd_native_trip_waiting
+               SET started_at=NULL, accrued_seconds=wait_seconds
+             WHERE order_id=target_order;
+            wait_started := NULL;
+        END IF;
+        next_status := 'finished';
+    ELSE
+        RETURN jsonb_build_object('error','invalid_transition');
+    END IF;
+
+    IF next_status <> current_status THEN
+        UPDATE public.pd_dispatch_orders SET status=next_status
+        WHERE id=target_order;
+    END IF;
+    RETURN jsonb_build_object('order_id',target_order, 'status',next_status,
+        'waiting_active',wait_started IS NOT NULL,
+        'waiting_started_at',wait_started,
+        'waiting_seconds',wait_seconds,
+        'waiting_billable_minutes',ceil(wait_seconds::numeric/60)::int,
+        'payment_mode','disabled');
+END
+$;
+
+REVOKE ALL ON TABLE public.pd_native_trip_waiting FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.pd_native_pilot_trip_action(text,uuid,text,bigint) FROM PUBLIC;
+
 REVOKE ALL ON TABLE public.pd_native_order_assignments FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.pd_pilot_assignment_is_eligible(text,bigint) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.pd_pilot_assignment_candidates(bigint) FROM PUBLIC;

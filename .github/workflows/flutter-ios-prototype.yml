@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/flutter-independent-auth
+      - feature/mobile-sms-telegram-login
     paths:
       - 'flutter_app/**'
       - '.github/workflows/flutter-ios-prototype.yml'

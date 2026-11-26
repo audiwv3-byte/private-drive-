@@ -1,7 +1,8 @@
 """QA staging readiness tests; all external DB traffic targets synthetic localhost."""
 import os
 import unittest
-from pd_qa_staging_preflight import check, REQUIRED, BASE_RELATIONS, QA26_RELATIONS
+from pd_qa_staging_preflight import (check, REQUIRED, BASE_RELATIONS, QA26_RELATIONS,
+    QA26_FUNCTIONS, QA27_FUNCTIONS)
 
 URL = "postgresql://qa:qa@127.0.0.1:5432/private_drive_test"
 ENV = {**REQUIRED, "PD_DISPATCH_ORDERS_DATABASE_URL": URL}
@@ -73,7 +74,9 @@ class PreflightTests(unittest.TestCase):
                                  "database_schema_missing")
 
     def test_qa26_requires_additional_schema(self):
-        env = {**ENV, "PD_QA26_ASSIGNMENT": "1"}
+        env = {**ENV, "PD_QA26_ASSIGNMENT": "1",
+               "PD_NATIVE_PILOT_ASSIGNMENT": "1",
+               "PD_PILOT_ASSIGNMENT_DATABASE_URL": URL}
         for relation in QA26_RELATIONS:
             with self.subTest(relation=relation):
                 self.assertEqual(check(environment=env, connect=fake(FakeDatabase(missing=(relation,))))["reason"],
@@ -86,6 +89,48 @@ class PreflightTests(unittest.TestCase):
                 self.assertEqual(check(environment=ENV,
                     connect=fake(FakeDatabase(denied=(obj,))))["reason"],
                     "database_permissions_missing")
+
+    def test_qa26_and_gps_function_contracts(self):
+        assignment = {**ENV, "PD_QA26_ASSIGNMENT": "1",
+                      "PD_NATIVE_PILOT_ASSIGNMENT": "1",
+                      "PD_PILOT_ASSIGNMENT_DATABASE_URL": URL}
+        gps = {**assignment, "PD_QA27_GPS": "1"}
+        for signature in QA26_FUNCTIONS:
+            with self.subTest(kind="missing", signature=signature):
+                self.assertEqual(check(environment=assignment,
+                    connect=fake(FakeDatabase(missing=(signature,))))["reason"],
+                    "database_schema_missing")
+            with self.subTest(kind="permission", signature=signature):
+                self.assertEqual(check(environment=assignment,
+                    connect=fake(FakeDatabase(denied=(signature,))))["reason"],
+                    "database_permissions_missing")
+        for signature in QA27_FUNCTIONS:
+            with self.subTest(kind="missing", signature=signature):
+                self.assertEqual(check(environment=gps,
+                    connect=fake(FakeDatabase(missing=(signature,))))["reason"],
+                    "database_schema_missing")
+            with self.subTest(kind="permission", signature=signature):
+                self.assertEqual(check(environment=gps,
+                    connect=fake(FakeDatabase(denied=(signature,))))["reason"],
+                    "database_permissions_missing")
+        self.assertEqual(check(environment=gps,
+            connect=fake(FakeDatabase()))["reason"], "ok")
+
+    def test_incomplete_gps_assignment_configuration(self):
+        cases = (
+            {**ENV, "PD_QA27_GPS": "1"},
+            {**ENV, "PD_QA26_ASSIGNMENT": "1"},
+        )
+        for env in cases:
+            with self.subTest(env=env):
+                self.assertEqual(check(environment=env)["reason"],
+                                 "staging_flags_invalid")
+        mismatched = {**ENV, "PD_QA26_ASSIGNMENT": "1",
+                      "PD_NATIVE_PILOT_ASSIGNMENT": "1",
+                      "PD_PILOT_ASSIGNMENT_DATABASE_URL":
+                          "postgresql://qa:qa@127.0.0.1:5432/wrong_db"}
+        self.assertEqual(check(environment=mismatched)["reason"],
+                         "assignment_database_mismatch")
 
     def test_real_synthetic_postgres_if_configured(self):
         url = os.getenv("PD_QA_SYNTHETIC_POSTGRES_URL")

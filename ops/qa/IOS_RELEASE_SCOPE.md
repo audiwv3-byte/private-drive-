@@ -1,0 +1,5 @@
+# iOS QA release scope
+This branch is an isolated unsigned device build, not an installable IPA or an App Store submission.
+The app manifest is a preliminary declaration of the observed booking, identity and location flows, not a verified production data inventory. Verify retention, deletion, third-party SDK/map disclosures, tracking, and App Store Connect privacy answers before distribution.
+GPS publishing for assigned trips currently has an Android-only QA gate; iOS background operation is not implemented or validated. Do not request Always authorization or enable background location until the iOS lifecycle implementation and a physical-device consent/start/stop test are ready. No gallery or microphone permission is requested by the camera-only capture flow. Check any SDK references and OS prompts on a signed physical device.
+HTTPS API and secure storage are present in source; no claim of full security audit or production network isolation at runtime. No production credentials, signing identities, deployment, SMS or payments in this CI.

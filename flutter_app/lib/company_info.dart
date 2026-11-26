@@ -3,6 +3,14 @@ import 'app_language.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 Future<void> openPrivateDriveLink(BuildContext context, Uri target) async {
+  if (const bool.fromEnvironment('PD_ISOLATED_DEVICE_QA')) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Внешние ссылки отключены в изолированной QA-сборке.'),
+      ));
+    }
+    return;
+  }
   try {
     if (await launchUrl(target, mode: LaunchMode.externalApplication)) {
       return;

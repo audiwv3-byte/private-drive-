@@ -305,9 +305,20 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     assert trip("pilotA", "start").json["status"] == "underway"
     assert trip("pilotA", "stop_start").json["waiting_active"] is True
     assert trip("pilotA", "stop_start").status_code == 409
+    shown = next(o for o in assignments("pilotA").json["orders"]
+                 if o["order_id"] == order_id)
+    assert shown["waiting_active"] is True
+    assert shown["waiting_seconds"] >= 0
+    end_after_61_seconds = owner.execute(
+        "SELECT public.pd_native_pilot_trip_action(%s,%s,%s,%s)",
+        (sha256(tokens["pilotA"].encode()).hexdigest(), order_id,
+         "stop_end", int(time.time()) + 61)).fetchone()[0]
+    assert end_after_61_seconds["waiting_active"] is False
+    assert end_after_61_seconds["waiting_seconds"] >= 61
+    assert end_after_61_seconds["waiting_billable_minutes"] >= 2
+    assert trip("pilotA", "stop_start").status_code == 200
     end = trip("pilotA", "stop_end")
     assert end.status_code == 200 and end.json["waiting_active"] is False
-    assert end.json["waiting_billable_minutes"] >= 0
     assert trip("pilotA", "finish").json["status"] == "finished"
     assert trip("pilotA", "finish").status_code == 409
     assert next(o for o in orders() if o["order_id"] == order_id)["status"] == "finished"

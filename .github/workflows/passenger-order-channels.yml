@@ -47,3 +47,43 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter test --no-pub test/passenger_channel_test.dart test/native_orders_api_test.dart test/native_pilot_orders_test.dart test/passenger_ride_entry_test.dart
+  android-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Compile the normal application entry for an isolated debug package
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive.qa --project-name=private_drive qa_android
+          cp -R flutter_app/lib/. qa_android/lib
+          cp -R flutter_app/assets qa_android/assets
+          cp flutter_app/pubspec.yaml qa_android/
+          cd qa_android
+          flutter pub get
+          flutter build apk --debug --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+  ios-build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Compile the normal application entry for the iPhone simulator
+        working-directory: flutter_app
+        run: |
+          flutter pub get
+          flutter build ios --simulator --debug --no-codesign --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid
+          test -d build/ios/iphonesimulator/Runner.app

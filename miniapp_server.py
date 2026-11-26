@@ -413,6 +413,10 @@ def pd_refund_labels(rows):
 
 @app.after_request
 def pd_label_refunded_orders(response):
+    if (qa_shared_orders_enabled() and request.path == '/api/orders'):
+        # Unified PostgreSQL orders use UUID IDs and have no legacy SQLite
+        # refunds. Do not pass their history through the old SQLite after-hook.
+        return response
     if (request.method == 'GET' and response.status_code == 200 and response.is_json
             and request.path in ('/api/orders', '/api/admin/orders')):
         payload = response.get_json(silent=True)

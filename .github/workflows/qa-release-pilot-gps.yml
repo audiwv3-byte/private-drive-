@@ -1,0 +1,113 @@
+name: PRIVATE DRIVE release-mode pilot GPS QA (no production)
+on:
+  push:
+    branches:
+      - qa/release-pilot-gps-android-ios-20261127
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gps-release-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Test release GPS without any internal QA flags
+        working-directory: flutter_app
+        run: |
+          flutter pub get
+          flutter test test/release_pilot_gps_test.dart test/native_pilot_orders_test.dart test/qa28_pilot_gps_test.dart test/native_orders_api_test.dart
+      - name: Verify iOS privacy declarations and no QA permission string
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          from pathlib import Path
+          plist=plistlib.loads(Path('flutter_app/ios/Runner/Info.plist').read_bytes())
+          assert 'location' in plist['UIBackgroundModes']
+          assert 'NSLocationAlwaysAndWhenInUseUsageDescription' in plist
+          assert 'NSLocationWhenInUseUsageDescription' in plist
+          assert 'демоверсии' not in plist['NSLocationWhenInUseUsageDescription']
+          code=Path('flutter_app/lib/native_pilot_orders.dart').read_text()
+          assert "qaGpsEnabled = true" in code
+          assert "PD_QA29_LOOPBACK" in code
+          assert "QA29" not in plist['NSLocationAlwaysAndWhenInUseUsageDescription']
+          PY
+
+  isolated-android-gps-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Generate isolated Android build folder with separate package name
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive release_gps_qa
+          cp -R flutter_app/lib/. release_gps_qa/lib/
+          cp -R flutter_app/assets release_gps_qa/assets
+          cp flutter_app/pubspec.yaml release_gps_qa/pubspec.yaml
+          cp flutter_app/analysis_options.yaml release_gps_qa/analysis_options.yaml
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle=Path('release_gps_qa/android/app/build.gradle.kts')
+          source=gradle.read_text()
+          assert 'applicationId = "lt.privatedrive.private_drive"' in source
+          gradle.write_text(source.replace('applicationId = "lt.privatedrive.private_drive"',
+            'applicationId = "lt.privatedrive.private_drive.gps_release_qa"'))
+          manifest=Path('release_gps_qa/android/app/src/main/AndroidManifest.xml')
+          source=manifest.read_text()
+          permissions=('INTERNET','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION',
+            'FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','POST_NOTIFICATIONS')
+          source=source.replace('<application',
+            ''.join('<uses-permission android:name="android.permission.'+p+'"/>\n'
+            for p in permissions)+'<application',1)
+          manifest.write_text(source)
+          PY
+      - name: Compile real entrypoint without internal GPS QA flags
+        working-directory: release_gps_qa
+        run: |
+          flutter pub get
+          flutter build apk --debug --target lib/main.dart --build-name=0.2.44 --build-number=2026112701 --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          mkdir -p ../gps_release_qa_output
+          cp build/app/outputs/flutter-apk/app-debug.apk ../gps_release_qa_output/PRIVATE-DRIVE-GPS-RELEASE-QA.apk
+          cd ../gps_release_qa_output && sha256sum PRIVATE-DRIVE-GPS-RELEASE-QA.apk > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-gps-release-qa-debug-only
+          path: gps_release_qa_output
+          retention-days: 3
+
+  unsigned-ios-gps-build:
+    runs-on: macos-15-intel
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Resolve Flutter and test platform GPS source on iOS
+        run: |
+          flutter pub get
+          flutter build ios --debug --no-codesign --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid
+          test -d build/ios/iphoneos/Runner.app
+          /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes:0' ios/Runner/Info.plist | grep '^location$'

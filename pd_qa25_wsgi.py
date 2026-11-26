@@ -41,4 +41,50 @@ def create_application():
             return False
 
     register(app, authorized)
-    return make_orders_app(app, os.environ["PD_DISPATCH_ORDERS_DATABASE_URL"])
+    database_url = os.environ["PD_DISPATCH_ORDERS_DATABASE_URL"]
+    native = make_orders_app(app, database_url)
+    if os.getenv("PD_QA26_ASSIGNMENT") != "1":
+        return native
+
+    import hmac
+    import psycopg
+    from psycopg.conninfo import conninfo_to_dict
+    from pd_native_pilot_assignment import register_dispatch_assignment, make_native_pilot_orders_app
+    for url in (database_url, os.environ["PD_PILOT_ASSIGNMENT_DATABASE_URL"]):
+        fields = conninfo_to_dict(url)
+        if fields.get("host") != "127.0.0.1" or fields.get("dbname") != "private_drive_test" or any(k in fields for k in ("hostaddr","service")):
+            raise RuntimeError("QA26 requires local isolated PostgreSQL")
+    csrf = os.environ["PD_QA26_CSRF"]
+    if not csrf.startswith("qa26-synthetic-"):
+        raise RuntimeError("QA26 requires synthetic CSRF token")
+    register_dispatch_assignment(app, authorized,
+        lambda: hmac.compare_digest(request.form.get("csrf",""), csrf), uid)
+
+    @app.get("/api/orders")
+    def telegram_orders():
+        user = uid()
+        if user not in passengers:
+            return jsonify(error="passenger_required"), 403
+        if not safe():
+            return jsonify(error="orders_disabled"), 503
+        try:
+            with psycopg.connect(database_url, connect_timeout=4, options="-c statement_timeout=4000") as db:
+                rows = db.execute("""SELECT o.id,o.origin,o.destination,o.trip_date,o.trip_time,o.status
+                    FROM public.pd_dispatch_orders o JOIN public.pd_telegram_order_owners t ON t.order_id=o.id
+                    WHERE t.telegram_id=%s ORDER BY o.created_at DESC LIMIT 100""",(user,)).fetchall()
+            response = jsonify(orders=[dict(zip(("order_id","origin","destination","trip_date","trip_time","status"),(str(r[0]),*r[1:]))) for r in rows])
+            response.headers["Cache-Control"] = "private, no-store"
+            return response
+        except psycopg.Error:
+            return jsonify(error="storage_unavailable"), 503
+
+    pilot = make_native_pilot_orders_app(native, database_url)
+    def qa26_application(environ, start_response):
+        if environ.get("PATH_INFO") == "/native-pilot-orders":
+            if not safe():
+                return app.response_class('{"error":"assignment_disabled"}',status=503,mimetype="application/json")(environ,start_response)
+            return pilot(environ, start_response)
+        if environ.get("PATH_INFO","").startswith("/dispatch/orders/") and not safe():
+            return app.response_class('{"error":"assignment_disabled"}',status=503,mimetype="application/json")(environ,start_response)
+        return native(environ, start_response)
+    return qa26_application

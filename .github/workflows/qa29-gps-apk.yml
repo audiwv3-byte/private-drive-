@@ -1,0 +1,145 @@
+name: QA29 Android APK and emulator GPS
+on:
+  push:
+    branches: [qa/pilot-background-gps-0.2.43]
+    paths: ['.github/workflows/qa29-gps-apk.yml','flutter_app/lib/qa29_gps_main.dart','flutter_app/lib/qa_pilot_gps.dart','flutter_app/lib/native_pilot_orders.dart','flutter_app/tool/qa29_gps_integration.py','flutter_app/test/qa29_loopback_test.dart']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: qa29-gps-apk
+  cancel-in-progress: true
+jobs:
+  apk:
+    if: github.ref == 'refs/heads/qa/pilot-background-gps-0.2.43'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Prepare separate debug Android project
+        run: |
+          set -euo pipefail
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive qa29_build
+          cp -R flutter_app/lib/. qa29_build/lib/
+          cp -R flutter_app/assets qa29_build/assets
+          cp -R flutter_app/test/. qa29_build/test/
+          cp flutter_app/pubspec.yaml qa29_build/pubspec.yaml
+          cp flutter_app/analysis_options.yaml qa29_build/analysis_options.yaml
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle=Path('qa29_build/android/app/build.gradle.kts')
+          s=gradle.read_text()
+          assert 'applicationId = "lt.privatedrive.private_drive"' in s
+          gradle.write_text(s.replace('applicationId = "lt.privatedrive.private_drive"', 'applicationId = "lt.privatedrive.private_drive.gps_qa29"'))
+          manifest=Path('qa29_build/android/app/src/main/AndroidManifest.xml')
+          s=manifest.read_text().replace('android:label="private_drive"','android:label="PRIVATE DRIVE GPS QA29"')
+          s=s.replace('<application','<application android:networkSecurityConfig="@xml/qa29_network_security"',1)
+          permissions=('INTERNET','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION','FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','WAKE_LOCK','POST_NOTIFICATIONS')
+          s=s.replace('<application',''.join('<uses-permission android:name="android.permission.'+p+'"/>\n' for p in permissions)+'<application',1)
+          manifest.write_text(s)
+          xml=manifest.parent/'res/xml/qa29_network_security.xml'
+          xml.parent.mkdir(parents=True,exist_ok=True)
+          xml.write_text('<network-security-config><base-config cleartextTrafficPermitted="false"/><domain-config cleartextTrafficPermitted="true"><domain includeSubdomains="false">127.0.0.1</domain></domain-config></network-security-config>')
+          PY
+      - name: Test GPS regression and loopback guard
+        working-directory: qa29_build
+        run: |
+          flutter pub get
+          flutter test --no-pub --reporter expanded --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true test/qa28_pilot_gps_test.dart
+          flutter test --no-pub --reporter expanded --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true --dart-define=PD_QA29_LOOPBACK=true test/qa29_loopback_test.dart
+      - name: Build and verify GPS QA debug APK
+        working-directory: qa29_build
+        run: |
+          set -euo pipefail
+          flutter build apk --debug --target lib/qa29_gps_main.dart --build-name=0.2.43 --build-number=2026112601 --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true --dart-define=PD_QA29_LOOPBACK=true
+          APK=build/app/outputs/flutter-apk/app-debug.apk
+          test -s "$APK"
+          B="$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -n1)"
+          mkdir -p ../qa29_apk
+          "$B/apksigner" verify --verbose --print-certs "$APK" > ../qa29_apk/signature.txt
+          "$B/aapt" dump badging "$APK" > ../qa29_apk/badging.txt
+          "$B/aapt" dump permissions "$APK" > ../qa29_apk/permissions.txt
+          "$B/aapt" dump xmltree "$APK" AndroidManifest.xml > ../qa29_apk/manifest.txt
+          grep "name='lt.privatedrive.private_drive.gps_qa29'" ../qa29_apk/badging.txt
+          grep "versionName='0.2.43'" ../qa29_apk/badging.txt
+          for p in INTERNET ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION FOREGROUND_SERVICE FOREGROUND_SERVICE_LOCATION WAKE_LOCK POST_NOTIFICATIONS; do
+            grep -F "android.permission.$p'" ../qa29_apk/permissions.txt
+          done
+          grep -F 'GeolocatorLocationService' ../qa29_apk/manifest.txt
+          grep -F 'foregroundServiceType' ../qa29_apk/manifest.txt
+          if grep -E 'android.permission.(RECORD_AUDIO|ACCESS_BACKGROUND_LOCATION)' ../qa29_apk/permissions.txt; then exit 1; fi
+          cp "$APK" ../qa29_apk/PRIVATE-DRIVE-GPS-QA29.apk
+          (cd ../qa29_apk && sha256sum PRIVATE-DRIVE-GPS-QA29.apk > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-gps-qa29-apk
+          path: qa29_apk/
+          if-no-files-found: error
+          retention-days: 7
+  gps-e2e:
+    if: github.ref == 'refs/heads/qa/pilot-background-gps-0.2.43'
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres -d private_drive_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+      PD_PAYMENT_MODE: disabled
+      PD_NATIVE_SMS_LIVE: 'NO'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: b3158cd9510262b5694d8cd7073fa23c70d85b18
+          path: qa27_server
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r qa27_server/requirements-sms-render.txt flask
+      - uses: actions/download-artifact@v4
+        with:
+          name: private-drive-gps-qa29-apk
+          path: qa29_apk
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            python -u flutter_app/tool/qa29_gps_integration.py serve qa27_server > qa29-server.log 2>&1 &
+            SERVER_PID=$!
+            trap 'kill "$SERVER_PID" 2>/dev/null || true; adb logcat -d > qa29-android.log' EXIT
+            for i in $(seq 1 40); do test -s /tmp/qa29-order-id && break; sleep 1; done
+            test -s /tmp/qa29-order-id
+            python -u flutter_app/tool/qa29_gps_integration.py emulator qa29_apk/PRIVATE-DRIVE-GPS-QA29.apk | tee qa29-e2e.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: private-drive-gps-qa29-logs
+          path: qa29-*.log
+          if-no-files-found: warn
+          retention-days: 7

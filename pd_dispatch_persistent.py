@@ -136,7 +136,6 @@ def register(app, authorized):
             app.logger.exception("Persistent dispatcher order store unavailable")
             return reply({"error":"storage_unavailable"},503)
 
-    @app.get("/dispatch/orders/<uuid:order_id>/gps")
     def dispatch_order_gps(order_id):
         if not authorized():
             return reply({"error": "unauthorized"}, 401)
@@ -155,6 +154,12 @@ def register(app, authorized):
         except Exception as exc:
             app.logger.warning("Dispatcher GPS read unavailable (%s)", type(exc).__name__)
             return reply({"error": "storage_unavailable"}, 503)
+
+    # QA25 already registers its authenticated GPS route. The standalone
+    # browser dispatcher owns a different, cookie-session protected route.
+    if app.name != "pd_qa25_wsgi":
+        app.add_url_rule("/dispatch/orders/<uuid:order_id>/gps",
+            endpoint="dispatch_order_gps", view_func=dispatch_order_gps, methods=["GET"])
 
     @app.get("/dispatch/orders/state")
     def order_state():

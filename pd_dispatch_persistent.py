@@ -180,12 +180,13 @@ def register(app, authorized):
         try:
             with connect() as db:
                 rows = db.execute("""SELECT id,source,source_order_id,origin,destination,
-                     trip_date,trip_time,status,created_at
+                     trip_date,trip_time,status,created_at,booking_details
                      FROM public.pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()
             orders = [{"id":str(row[0]),"source":row[1],"source_order_id":row[2],
                        "origin":row[3],"destination":row[4],
                        "trip_date":row[5],"trip_time":row[6],
-                       "status":row[7],"created_at":row[8].isoformat()} for row in rows]
+                       "status":row[7],"created_at":row[8].isoformat(),
+                       "booking_details":row[9]} for row in rows]
             return reply({"orders":orders,"persistent":True})
         except Exception:
             app.logger.exception("Persistent dispatcher order read unavailable")

@@ -313,7 +313,7 @@ def create_order():
         quote_status='Предварительная' if price else 'Не рассчитано')
     core.initialize()
     if request_key:
-        oid,created=core.order_save(uid,st,request_key,fingerprint)
+        oid,created=core.order_save(uid,st,request_key,fingerprint,dispatch_outbox=bridge.enabled())
         if not created:
             previous=core.order_find(oid)
             delivered=deliver_saved(previous)

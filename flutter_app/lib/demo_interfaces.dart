@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'native_orders_api.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'passenger_ride_entry.dart';
@@ -39,6 +40,7 @@ class PrivateDriveDemo extends StatefulWidget {
     super.key,
     this.enableMapTiles = true,
     this.passengerOnly = false,
+    this.ordersApi,
     this.adminOnly = false,
     this.pilotOnly = false,
     this.showPilotIdentityCheck = true,
@@ -51,6 +53,7 @@ class PrivateDriveDemo extends StatefulWidget {
   final bool enableMapTiles;
   /// Only the passenger cabin is reachable after a verified public SMS login.
   /// The multi-role demo hub stays exclusive to offline development preview.
+  final NativeOrdersApi? ordersApi;
   final bool passengerOnly;
   /// Accessible only when a trusted SMS server returns an administrator role.
   /// This is a local demo console; real admin API authorization is separate.
@@ -278,6 +281,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
         child: PassengerRideEntry(
           enableMapTiles: widget.enableMapTiles,
           tripStore: _trip,
+          ordersApi: widget.ordersApi,
           onSignOut: widget.onSignOut,
           onBackToCabinets: widget.onBackToCabinets,
         ),

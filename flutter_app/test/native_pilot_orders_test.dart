@@ -44,6 +44,9 @@ class WidgetOrdersApi extends NativePilotOrdersApi {
 
   @override
   Future<List<PilotAssignedOrder>> load() => _read();
+
+  @override
+  Future<bool> availability([bool? desiredOnline]) async => false;
 }
 
 void main() {
@@ -100,6 +103,42 @@ void main() {
     expect((await api.action(orderId, 'approach'))['status'], 'approaching');
     await expectLater(api.action(orderId, 'pay'), throwsFormatException);
     await expectLater(api.action('bad-order', 'approach'), throwsFormatException);
+  });
+
+  test('server availability is never inferred from local toggle', () async {
+    final methods = <String>[];
+    final api = NativePilotOrdersApi(
+      baseUrl: NativePilotOrdersApi.stage,
+      token: token,
+      client: MockClient((request) async {
+        methods.add(request.method);
+        expect(request.url.path, '/native-pilot-availability');
+        expect(request.followRedirects, isFalse);
+        expect(request.headers['authorization'], 'Bearer $token');
+        if (request.method == 'PATCH') {
+          expect(jsonDecode(request.body), {'online': true});
+          return http.Response('{"online":true,"payment_mode":"disabled"}', 200);
+        }
+        return http.Response('{"online":false,"payment_mode":"disabled"}', 200);
+      }),
+    );
+    expect(await api.availability(), false);
+    expect(await api.availability(true), true);
+    expect(methods, ['GET', 'PATCH']);
+    final unconfirmed = NativePilotOrdersApi(
+      baseUrl: NativePilotOrdersApi.stage, token: token,
+      client: MockClient((_) async =>
+        http.Response('{"online":false,"payment_mode":"disabled"}', 200)),
+    );
+    await expectLater(unconfirmed.availability(true), throwsFormatException);
+    await expectLater(unconfirmed.availability(false), completes);
+    final forbidden = NativePilotOrdersApi(
+      baseUrl: 'https://elsewhere.invalid', token: token,
+      client: MockClient((_) async {
+        fail('Bearer must not reach untrusted server');
+      }),
+    );
+    await expectLater(forbidden.availability(), throwsFormatException);
   });
 
   test('refuses other hosts and data outside the no-payment contract', () async {

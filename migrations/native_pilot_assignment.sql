@@ -58,6 +58,7 @@ AS $pd_avail$
 DECLARE
     principal record;
     current_online boolean;
+    last_seen bigint;
 BEGIN
     SELECT * INTO principal
       FROM public.pd_validate_native_session(supplied_digest, observed_at);
@@ -76,10 +77,14 @@ BEGIN
         ON CONFLICT(pilot_user_id) DO UPDATE
           SET online=EXCLUDED.online,changed_at=EXCLUDED.changed_at;
     END IF;
-    SELECT a.online INTO current_online
+    SELECT a.online, a.changed_at INTO current_online,last_seen
       FROM public.pd_native_pilot_availability a
       WHERE a.pilot_user_id=principal.user_id;
-    RETURN jsonb_build_object('online',coalesce(current_online,false),
+    -- No indefinite availability after connectivity loss or app shutdown.
+    RETURN jsonb_build_object(
+      'online',coalesce(current_online,false)
+          AND coalesce(last_seen >= observed_at - 120
+                       AND last_seen <= observed_at + 10,false),
       'payment_mode','disabled');
 END
 $pd_avail$;
@@ -92,7 +97,9 @@ AS $$
     WHERE r.role IN ('pilot','pilot_dispatcher')
       AND public.pd_pilot_assignment_is_eligible(r.user_id, observed_at)
       AND EXISTS (SELECT 1 FROM public.pd_native_pilot_availability a
-                  WHERE a.pilot_user_id=r.user_id AND a.online)
+                  WHERE a.pilot_user_id=r.user_id AND a.online
+                    AND a.changed_at >= observed_at - 120
+                    AND a.changed_at <= observed_at + 10)
     ORDER BY r.user_id LIMIT 100
 $$;
 
@@ -123,7 +130,9 @@ BEGIN
 
     IF NOT public.pd_pilot_assignment_is_eligible(target_pilot, observed_at)
        OR NOT EXISTS (SELECT 1 FROM public.pd_native_pilot_availability a
-                      WHERE a.pilot_user_id=target_pilot AND a.online) THEN
+                      WHERE a.pilot_user_id=target_pilot AND a.online
+                        AND a.changed_at >= observed_at - 120
+                        AND a.changed_at <= observed_at + 10) THEN
         RETURN QUERY SELECT 'pilot_not_eligible'::text, NULL::text;
         RETURN;
     END IF;

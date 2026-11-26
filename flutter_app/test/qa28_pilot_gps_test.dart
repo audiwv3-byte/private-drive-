@@ -48,48 +48,53 @@ void main() {
     await expectLater(api.publishGps(order,null,100),throwsFormatException);
   }, skip: NativePilotOrdersApi.qaGpsEnabled);
 
-  testWidgets('consented publisher keeps sending on simulated pause and stops when assignment ends',
-    (tester) async {
+  test('consented publisher sends sensor fixes while paused and automatically opts out',
+    () async {
+    final binding = TestWidgetsFlutterBinding.ensureInitialized();
     final positions = StreamController<QaGpsFix>(sync: true);
     final sent = <QaGpsFix?>[];
+    final stopped = Completer<void>();
     var assigned = false;
     var now = 100;
     final publisher = QaPilotGpsPublisher(
       send:(id,fix,stamp) async {expect(id,order);sent.add(fix);},
       isAssigned:(id) async => assigned && id == order,
       positions:() => positions.stream,
+      checkInterval: const Duration(milliseconds: 20),
+      onStopped: () { if (!stopped.isCompleted) stopped.complete(); },
       clock:() => DateTime.fromMillisecondsSinceEpoch(now*1000));
-    expect(await publisher.start(order),isFalse);
-    expect(sent,isEmpty);
-    assigned = true;
-    expect(await publisher.start(order),isTrue);
-    positions.add(const QaGpsFix(1.25,2.5,100));
-    await tester.pump(Duration.zero);
-    expect(sent.whereType<QaGpsFix>().length,1);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    now = 105;
-    positions.add(const QaGpsFix(1.5,2.5,105));
-    await tester.pump(Duration.zero);
-    expect(sent.whereType<QaGpsFix>().length,2);
-    positions.add(const QaGpsFix(1.0,2.5,100));
-    await tester.pump(Duration.zero);
-    expect(sent.whereType<QaGpsFix>().length,2);
-    assigned = false;
-    now = 115;
-    await tester.pump(const Duration(seconds:11));
-    await tester.pump(Duration.zero);
-    // The timer must initiate shutdown without any explicit stop call.
-    expect(publisher.orderId,isNull);
-    // Join the already initiated asynchronous cancellation/opt-out.
-    await publisher.stop();
-    expect(sent.last,isNull);
-    final count=sent.length;
-    positions.add(const QaGpsFix(2,3,115));
-    await tester.pump(Duration.zero);
-    expect(sent.length,count);
-    await publisher.stop();
-    await positions.close();
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    try {
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(await publisher.start(order),isFalse);
+      expect(sent,isEmpty);
+      assigned = true;
+      expect(await publisher.start(order),isTrue);
+      positions.add(const QaGpsFix(1.25,2.5,100));
+      await Future<void>.delayed(Duration.zero);
+      expect(sent.whereType<QaGpsFix>().length,1);
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      now = 105;
+      positions.add(const QaGpsFix(1.5,2.5,105));
+      await Future<void>.delayed(Duration.zero);
+      expect(sent.whereType<QaGpsFix>().length,2);
+      positions.add(const QaGpsFix(1.0,2.5,100));
+      await Future<void>.delayed(Duration.zero);
+      expect(sent.whereType<QaGpsFix>().length,2);
+      assigned = false;
+      now = 115;
+      // No manual stop: wait for the periodic assignment check to finish.
+      await stopped.future.timeout(const Duration(seconds: 3));
+      expect(publisher.orderId,isNull);
+      expect(sent.last,isNull);
+      final count=sent.length;
+      positions.add(const QaGpsFix(2,3,115));
+      await Future<void>.delayed(Duration.zero);
+      expect(sent.length,count);
+    } finally {
+      await publisher.stop();
+      await positions.close();
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    }
   });
 
   test('stop serializes opt-out after the in-flight fix and drops subsequent fixes', () async {

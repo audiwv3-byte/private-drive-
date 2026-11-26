@@ -228,11 +228,41 @@ class _PilotServerAvailabilityButtonState
   bool _busy = false;
   String? _error;
   int _generation = 0;
+  bool _foreground = true;
+  Timer? _heartbeatTimer;
+
+  Future<void> _heartbeat() async {
+    if (!mounted || !_foreground || _online != true || _busy) return;
+    final generation = ++_generation;
+    setState(() => _busy = true);
+    try {
+      final confirmed = await widget.api.availability(true);
+      if (mounted && generation == _generation) {
+        setState(() => _online = confirmed);
+      }
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _online = null;
+          _error = 'Связь потеряна. Статус линии не подтверждён.';
+        });
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _busy = false);
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    _foreground = lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (_foreground) _heartbeat();
+    });
     _read();
   }
 
@@ -252,8 +282,10 @@ class _PilotServerAvailabilityButtonState
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _foreground = true;
       _read();
     } else if (mounted) {
+      _foreground = false;
       _generation++;
       setState(() => _online = null);
     }
@@ -297,6 +329,7 @@ class _PilotServerAvailabilityButtonState
   @override
   void dispose() {
     _generation++;
+    _heartbeatTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

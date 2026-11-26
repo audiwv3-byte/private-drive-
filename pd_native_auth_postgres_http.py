@@ -229,14 +229,22 @@ def session_request(database_url, environ, start_response, route, now):
     digest = hashlib.sha256(auth[7:].encode("utf-8")).hexdigest()
     try:
         with psycopg.connect(database_url) as conn:
-            if route == "/native-auth/sign-out":
-                conn.execute("""UPDATE native_auth_sessions SET revoked_at=%s
-                    WHERE token_hash=%s AND revoked_at IS NULL""", (now, digest))
-                return reply(start_response, "200 OK", {"signed_out": True})
-            row = conn.execute("""SELECT s.user_id, COALESCE(r.role,'passenger'), s.expires_at
-                FROM native_auth_sessions s LEFT JOIN native_auth_roles r ON r.user_id=s.user_id
-                WHERE s.token_hash=%s AND s.expires_at>%s AND s.revoked_at IS NULL""",
-                (digest, now)).fetchone()
+            if os.getenv("PD_NATIVE_SESSION_FUNCTIONS") == "1":
+                if os.getenv("PD_DISPATCH_STAGING_ONLY") != "1" or os.getenv("PD_PAYMENT_MODE") != "disabled":
+                    return reply(start_response, "503 Service Unavailable", {"error": "session_functions_disabled"})
+                if route == "/native-auth/sign-out":
+                    conn.execute("SELECT public.pd_revoke_current_session(%s,%s)", (digest, now))
+                    return reply(start_response, "200 OK", {"signed_out": True})
+                row = conn.execute("SELECT user_id,server_role,expires_at FROM public.pd_validate_native_session(%s,%s)", (digest, now)).fetchone()
+            else:
+                if route == "/native-auth/sign-out":
+                    conn.execute("""UPDATE native_auth_sessions SET revoked_at=%s
+                        WHERE token_hash=%s AND revoked_at IS NULL""", (now, digest))
+                    return reply(start_response, "200 OK", {"signed_out": True})
+                row = conn.execute("""SELECT s.user_id, COALESCE(r.role,'passenger'), s.expires_at
+                    FROM native_auth_sessions s LEFT JOIN native_auth_roles r ON r.user_id=s.user_id
+                    WHERE s.token_hash=%s AND s.expires_at>%s AND s.revoked_at IS NULL""",
+                    (digest, now)).fetchone()
             if row is None:
                 return reply(start_response, "401 Unauthorized", {"error": "invalid_session"})
             return reply(start_response, "200 OK", {

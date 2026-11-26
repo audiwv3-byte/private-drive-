@@ -163,7 +163,8 @@ def register(app, authorized):
             return reply({"error":"persistent_queue_disabled"},503)
         try:
             with connect() as db:
-                db.execute(SCHEMA)
+                if not db.execute("SELECT to_regclass('pd_dispatch_orders')").fetchone()[0]:
+                    db.execute(SCHEMA)
                 rows = db.execute("""SELECT id,source,source_order_id,origin,destination,
                      trip_date,trip_time,status,created_at
                      FROM pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()

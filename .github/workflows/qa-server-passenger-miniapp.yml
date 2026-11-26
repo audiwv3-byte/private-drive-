@@ -1,0 +1,58 @@
+name: PRIVATE DRIVE QA passenger and Telegram PostgreSQL orders
+on:
+  push:
+    branches:
+      - qa/server-passenger-telegram-orders-20261126
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  miniapp-real-wsgi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install synthetic-only Mini App and PostgreSQL dependencies
+        run: python -m pip install -r requirements-miniapp.txt -r requirements-sms-render.txt 'stripe>=11,<15' pytest
+      - name: Verify real Mini App WSGI and shared queue (no order SQLite)
+        run: python -m pytest -v -s tests/test_qa_actual_miniapp_postgres.py
+        env:
+          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+          PD_NATIVE_SMS_LIVE: 'NO'
+          PD_PAYMENT_MODE: disabled
+
+  flutter-passenger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Validate main passenger booking with native order API
+        working-directory: flutter_app
+        run: |
+          flutter pub get
+          flutter test test/passenger_demo_test.dart test/passenger_ride_entry_test.dart test/native_orders_api_test.dart
+          flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings

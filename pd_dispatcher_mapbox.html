@@ -192,11 +192,25 @@ function renderPersistentOrders(){
      const details=document.createElement('p');
      const chosen=Array.isArray(order.details.extras)?
        order.details.extras.filter(x=>typeof x==='string'):[];
-     const selected=chosen.length?'Услуги: '+chosen.join(', '):'Без дополнительных платных услуг';
+     const names={meet_sign:'Встреча с табличкой',sober_driver:'Трезвый водитель',
+       pets:'Животные',music:'Музыка',flowers:'Цветы',coffee:'Кофе',water:'Вода',
+       quiet_ride:'Тихая поездка',luggage_help:'Помощь с багажом',
+       jumpstart:'Запуск автомобиля',delivery:'Доставка'};
+     const selected=chosen.length?'Услуги: '+chosen.map(x=>names[x]||x).join(', '):
+       'Без дополнительных платных услуг';
      const prefs=order.details.preferences;
-     const notes=prefs&&typeof prefs==='object'&&typeof prefs.wishes==='string'
-       ?prefs.wishes:'';
-     details.textContent=selected+(notes?' · Пожелания: '+notes:'');
+     const personal=[];
+     if(prefs&&typeof prefs==='object'){
+       if(typeof prefs.radio==='string'&&prefs.radio!=='Без радио')
+         personal.push('Радио: '+prefs.radio);
+       if(Array.isArray(prefs.tracks))
+         personal.push(...prefs.tracks.filter(x=>typeof x==='string'&&x).map(x=>'Трек: '+x));
+       if(Number.isFinite(prefs.temperature))
+         personal.push('Температура: '+prefs.temperature+'°C');
+       if(typeof prefs.wishes==='string'&&prefs.wishes)
+         personal.push('Пожелания: '+prefs.wishes);
+     }
+     details.textContent=selected+(personal.length?' · '+personal.join(' · '):'');
      card.append(details);
    }
    {% if pilot_assignment_enabled %}appendAssignmentControl(card,order);{% endif %}

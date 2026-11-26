@@ -1,10 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:private_drive/demo_interfaces.dart';
+import 'package:private_drive/passenger_demo.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:private_drive/company_info.dart';
 import 'package:private_drive/main.dart';
 
 void main() {
+  for (final pilot in [true, false]) {
+    testWidgets('QA blocks ${pilot ? "Waze" : "Paysera"} launcher', (tester) async {
+      expect(const bool.fromEnvironment('PD_ISOLATED_DEVICE_QA'), isTrue);
+      var launches = 0;
+      final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        launches++;
+        return true;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      await tester.pumpWidget(MaterialApp(home: pilot
+          ? const PilotDemo(enableMapTiles: false)
+          : const PassengerDemo(enableMapTiles: false)));
+      final finder = find.byKey(Key(pilot ? 'pilot-open-waze' : 'passenger-paysera-info'));
+      if (!pilot) {
+        await tester.scrollUntilVisible(finder, 250, maxScrolls: 100,
+            scrollable: find.byType(Scrollable).first);
+      }
+      expect(finder, findsOneWidget);
+      await tester.ensureVisible(finder);
+      await tester.tap(finder);
+      await tester.pump();
+      expect(launches, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('QA blocks company external link before invoking launcher', (tester) async {
     expect(const bool.fromEnvironment('PD_ISOLATED_DEVICE_QA'), isTrue);
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: Builder(

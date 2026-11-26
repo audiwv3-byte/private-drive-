@@ -1,0 +1,111 @@
+name: PRIVATE DRIVE staging manual orders migration
+
+on:
+  push:
+    branches: [qa/render-pg-access-20261126]
+    paths: [.github/workflows/pd-staging-manual-orders-migration.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-drive-staging-database-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.repository == 'audiwv3-byte/private-drive-' && github.ref == 'refs/heads/qa/render-pg-access-20261126'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Apply the two reviewed functions in one staging transaction
+        env:
+          MIGRATION_DSN: ${{ secrets.PD_STAGING_MIGRATION_DSN }}
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          python3 -I - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+          from urllib.parse import parse_qsl, unquote, urlsplit
+
+          try:
+              target = urlsplit(os.environ.pop("MIGRATION_DSN", "").strip())
+              target_valid = (
+                  target.scheme in {"postgresql", "postgres"}
+                  and target.hostname == "dpg-dc00pubm8hqs7397rblg-a.frankfurt-postgres.render.com"
+                  and target.port in (None, 5432)
+                  and target.path == "/private_drive_test"
+                  and target.username == "private_drive_test_user"
+                  and bool(target.password)
+                  and not target.fragment
+                  and all(key == "sslmode" and value in {"require", "verify-ca", "verify-full"}
+                          for key, value in parse_qsl(target.query, strict_parsing=True))
+              )
+          except ValueError:
+              target_valid = False
+          if not target_valid:
+              raise SystemExit("Only the isolated private_drive_test owner connection is permitted")
+          postgres = {
+              **{key: val for key, val in os.environ.items() if not key.startswith("PG")},
+              "PGHOST": target.hostname, "PGPORT": "5432",
+              "PGDATABASE": "private_drive_test", "PGUSER": "private_drive_test_user",
+              "PGPASSWORD": unquote(target.password), "PGSSLMODE": "verify-full",
+              "PGSSLROOTCERT": "/etc/ssl/certs/ca-certificates.crt",
+              "PGCONNECT_TIMEOUT": "12", "PGAPPNAME": "pd-staging-manual-orders-migration",
+          }
+          migration = Path("migrations/native_pilot_assignment.sql").read_text()
+          manual = migration[migration.index("CREATE OR REPLACE FUNCTION public.pd_create_dispatch_order(")
+                             :migration.index("CREATE TABLE IF NOT EXISTS public.pd_native_order_assignments")]
+          assignment = migration[migration.index("CREATE OR REPLACE FUNCTION public.pd_assign_native_order(")
+                                 :migration.index("-- The native API role passes")]
+          guard = """
+          SET LOCAL lock_timeout = '5s';
+          SET LOCAL statement_timeout = '10s';
+          DO $guard$
+          BEGIN
+              IF current_database() <> 'private_drive_test'
+                 OR current_user <> 'private_drive_test_user'
+                 OR NOT EXISTS (SELECT FROM pg_database WHERE datname=current_database()
+                                AND pg_get_userbyid(datdba)=current_user)
+                 OR NOT EXISTS (
+                     SELECT FROM pg_proc
+                      WHERE oid=to_regprocedure('public.pd_assign_native_order(uuid,text,text,bigint)')
+                        AND pg_get_userbyid(proowner)=current_user
+                        AND (position('JOIN public.pd_native_order_owners n ON n.order_id = o.id' in prosrc)>0
+                             OR position('o.source = ''dispatcher'' OR EXISTS' in prosrc)>0)
+                 ) THEN
+                  RAISE EXCEPTION 'Unexpected staging database or assignment function';
+              END IF;
+          END
+          $guard$;
+          """
+          verify = """
+          DO $verify$
+          BEGIN
+              IF to_regprocedure('public.pd_create_dispatch_order(uuid,text,text,text,text,text)') IS NULL
+                 OR NOT EXISTS (
+                     SELECT FROM pg_proc
+                      WHERE oid=to_regprocedure('public.pd_assign_native_order(uuid,text,text,bigint)')
+                        AND position('o.source = ''dispatcher'' OR EXISTS' in prosrc)>0
+                 ) THEN
+                  RAISE EXCEPTION 'Staging order functions did not verify';
+              END IF;
+          END
+          $verify$;
+          """
+          result = subprocess.run(
+              ["psql", "-Xqw", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-f", "-"],
+              input=guard + manual + assignment + verify, env=postgres,
+              capture_output=True, text=True, timeout=45,
+          )
+          if result.returncode != 0:
+              phase = ("database preflight" if "Unexpected staging" in result.stderr
+                       else "post-migration verification" if "did not verify" in result.stderr
+                       else "PostgreSQL transaction")
+              raise SystemExit(phase + " failed; transaction not committed")
+          print("Staging manual order and assignment functions committed")
+          PY

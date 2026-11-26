@@ -230,12 +230,12 @@ class NativePilotOrdersApi {
   }
 
   Future<List<PilotAssignedOrder>> load() async {
-    final endpoint = endpoint('/native-pilot-orders');
+    final uri = endpoint('/native-pilot-orders');
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
       throw const PdHttpStatusException(401);
     }
     final request = http.Request(
-      'GET', endpoint,
+      'GET', uri,
     )
       ..followRedirects = false
       ..headers['Authorization'] = 'Bearer $token'

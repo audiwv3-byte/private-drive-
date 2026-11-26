@@ -7,16 +7,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import '../lib/main.dart' as app;
 import '../lib/native_pilot_orders.dart';
 import '../lib/pd_http_api.dart';
 import '../lib/qa_pilot_gps.dart';
 
 const orderId = '05cdbc84-0930-4c52-baa1-149a03190d78';
-const token = 'qa39-synthetic-session-for-isolated-tests-only';
+const sessionToken = 'qa39-synthetic-session-for-isolated-tests-only';
 const origin = 'https://qa.invalid';
 
 class AssignedOrderApi extends NativePilotOrdersApi {
-  AssignedOrderApi() : super(baseUrl: origin, token: token);
+  AssignedOrderApi() : super(baseUrl: origin, token: sessionToken);
   int reads = 0;
 
   @override
@@ -52,12 +53,13 @@ void main() {
   }
 
   test('one HTTPS origin and valid session before any GPS request', () async {
+    expect(app.apiBaseUrl, origin);
     expect(PdHttpApi.configuredOrigin, origin);
     final transport = MockClient((_) async => fail('unexpected HTTP request'));
     for (final base in ['', 'http://qa.invalid', 'https://other.invalid',
         'https://qa.invalid:8080', 'https://user@qa.invalid',
         'https://qa.invalid/path', 'https://qa.invalid?x', 'https://qa.invalid/#x']) {
-      final api = NativePilotOrdersApi(baseUrl: base, token: token, client: transport);
+      final api = NativePilotOrdersApi(baseUrl: base, token: sessionToken, client: transport);
       expect(api.gpsEnabled, false);
       await expectLater(api.publishGps(orderId, null, 101), throwsFormatException);
     }
@@ -68,11 +70,11 @@ void main() {
 
   test('consent and assignment before first fix, opt out after final fix', () async {
     final bodies = <Map<String, dynamic>>[];
-    final api = NativePilotOrdersApi(baseUrl: origin, token: token,
+    final api = NativePilotOrdersApi(baseUrl: origin, token: sessionToken,
         client: MockClient((req) async {
           expect(req.url.toString(), '$origin/native-pilot-orders/$orderId/gps');
           expect(req.followRedirects, false);
-          expect(req.headers['Authorization'], 'Bearer $token');
+          expect(req.headers['Authorization'], 'Bearer $sessionToken');
           final body = jsonDecode(req.body) as Map<String, dynamic>;
           bodies.add(body);
           return http.Response(jsonEncode({'available': body['enabled']}), 200);

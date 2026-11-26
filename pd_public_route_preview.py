@@ -16,6 +16,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from flask import jsonify, request
 import pd_fixed_prices
+import pd_dispatch_persistent as dispatch
 
 _DIRECTIONS_BASE_URL = "https://api.heigit.org/openrouteservice"
 _GEOCODE_BASE_URL = "https://api.heigit.org/pelias/v1"
@@ -259,6 +260,35 @@ def estimate(km, minutes, route_data):
 
 
 def register(app):
+    @app.post("/preview/api/qa-booking")
+    def website_booking():
+        if not dispatch.enabled():
+            return jsonify(error="booking_disabled"), 503
+        if request.mimetype != "application/json" or not 0 < (request.content_length or 0) <= dispatch.MAX_BYTES:
+            return jsonify(error="invalid_body"), 400
+        if not _rate_limit("booking"):
+            return jsonify(error="rate_limited"), 429
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or not re.fullmatch(r"[a-f0-9]{32}", str(data.get("reference", ""))):
+            return jsonify(error="invalid_reference"), 400
+        try:
+            values = dispatch.validated_order({
+                "source": "website", "source_order_id": data["reference"],
+                "from": data.get("from"), "to": data.get("to"),
+                "trip_date": data.get("trip_date"), "trip_time": data.get("trip_time"),
+            })
+        except (TypeError, ValueError):
+            return jsonify(error="invalid_order"), 400
+        try:
+            order = dispatch.store_order(values)
+        except ValueError:
+            return jsonify(error="source_order_conflict"), 409
+        except Exception:
+            app.logger.exception("Website booking queue unavailable")
+            return jsonify(error="storage_unavailable"), 503
+        return jsonify(qa_only=True, trip={"id": order["order_id"]}), 201 if order["created"] else 200
+
+
     @app.get("/preview/api/suggest")
     def suggest():
         if not _rate_limit("suggest", 15):

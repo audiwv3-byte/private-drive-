@@ -1,5 +1,6 @@
 """Service feedback, voluntary passenger profiles and administrator driver view."""
 import re
+import pd_dispatch_persistent as dispatch
 from flask import request, jsonify
 
 
@@ -100,7 +101,22 @@ def register(app, core, auth):
                 r.comment AS review_comment,r.updated_at AS review_updated_at
                 FROM orders o LEFT JOIN pd_service_reviews r ON r.order_id=o.id
                 WHERE ''' + where + ' ORDER BY o.id DESC LIMIT 31', args).fetchall()
-        return jsonify(orders=[dict(r) for r in rows[:30]], next_before=rows[29]['id'] if len(rows) > 30 else None)
+        orders = [dict(r) for r in rows[:30]]
+        if orders and dispatch.enabled():
+            refs = {dispatch.telegram_reference(uid, item['id']): item for item in orders}
+            try:
+                with dispatch.connect() as db:
+                    statuses = db.execute("""SELECT source_order_id,status FROM public.pd_dispatch_orders
+                        WHERE source='telegram_miniapp' AND source_order_id=ANY(%s)""",
+                        (list(refs),)).fetchall()
+            except Exception:
+                app.logger.exception("Passenger dispatch status unavailable")
+                return jsonify(error='Статус поездки временно недоступен'), 503
+            labels = {'requested': 'Новая', 'assigned': 'Пилот назначен', 'approaching': 'Пилот едет к вам',
+                      'underway': 'В пути', 'finished': 'Выполнена', 'cancelled': 'Отменена'}
+            for ref, status in statuses:
+                refs[ref]['dispatch_status'] = labels.get(status, status)
+        return jsonify(orders=orders, next_before=rows[29]['id'] if len(rows) > 30 else None)
     app.view_functions['orders'] = reviewed_orders
 
     @app.post('/api/orders/<int:order_id>/review')

@@ -1,3 +1,4 @@
+import 'native_orders_api.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -25,16 +26,16 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:url_launcher/url_launcher.dart';
 
-/// Passenger preview: all trip, date, service and payment state stays in memory.
-/// The payment information link opens the website in an external browser.
-/// This screen does not collect payments or submit bookings.
+/// Passenger booking screen shared by authenticated accounts and the offline preview.
 class PassengerDemo extends StatefulWidget {
   const PassengerDemo({super.key, this.enableMapTiles = true, this.tripStore,
       this.preferencesStorage, this.initialRideType = 'Трансфер',
       this.initialAdvanceBooking = false,
       this.initialAdvanceDate, this.initialAdvanceTime,
       this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController,
-      this.onIncomingMessageVoice});
+      this.onIncomingMessageVoice, this.ordersApi});
+
+  final NativeOrdersApi? ordersApi;
 
   final bool enableMapTiles;
   final String initialRideType;
@@ -612,12 +613,76 @@ class _PassengerDemoState extends State<PassengerDemo> {
     });
   }
 
+  bool get _canSendServerOrder {
+    if (_sendingOrder) return false;
+    if (_pendingOrder != null) return true;
+    final origin = _from.text.trim();
+    final destination = _to.text.trim();
+    return origin.length >= 2 && destination.length >= 2 &&
+        origin.toLowerCase() != destination.toLowerCase();
+  }
+
+  bool _sendingOrder = false;
+  Map<String,dynamic>? _pendingOrder;
   void _openOrders() {
+    final api = widget.ordersApi;
+    if (api != null) {
+      Navigator.push(context, MaterialPageRoute<void>(builder: (_) => NativeOrdersHistory(api: api)));
+      return;
+    }
     final store = widget.tripStore;
     if (store == null) return;
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => PdPassengerLanguageScope(
         child: PassengerOrdersDemo(tripStore: store))));
+  }
+
+  Future<void> _sendServerOrder() async {
+    if (_sendingOrder) return;
+    final date = _date ?? DateTime.now();
+    final time = _time ?? TimeOfDay.now();
+    String two(int n) => n.toString().padLeft(2, '0');
+    final payload = _pendingOrder ??= {
+      'request_id': NativeOrdersApi.requestId(),
+      'from': _from.text.trim(), 'to': _to.text.trim(),
+      'trip_date': '${date.year}-${two(date.month)}-${two(date.day)}',
+      'trip_time': '${two(time.hour)}:${two(time.minute)}',
+      // Only approved tariff rules are evaluated on the server. Never send
+      // a client-calculated amount or any payment instruction.
+      'details': {
+        'ride_type': _rideType == 'Такси' ? 'taxi' : 'transfer',
+        'round_trip': _roundTrip,
+        'extras': <String>[
+          if (_meetSign) 'meet_sign',
+          if (_soberDriver) 'sober_driver',
+          if (_pets) 'pets',
+          if (_music) 'music',
+          if (_flowers) 'flowers',
+          if (_coffee) 'coffee',
+          if (_water) 'water',
+          if (_quietRide) 'quiet_ride',
+          if (_luggageHelp) 'luggage_help',
+        ],
+        'preferences': {
+          'radio': _radioStation,
+          'tracks': _favoriteTracks.map((x) => x.text.trim()).where(
+            (x) => x.isNotEmpty).toList(),
+          if (_cabinTemperature != null) 'temperature': _cabinTemperature!.round(),
+          'wishes': _tripWishes.text.trim(),
+        },
+      },
+    };
+    setState(() => _sendingOrder = true);
+    try {
+      final result = await widget.ordersApi!.call(payload);
+      if (result['order_id'] is! String) throw const FormatException('Missing order ID');
+      _pendingOrder = null;
+      if (mounted) _openOrders();
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Заказ не подтверждён. Повтор отправит ту же заявку.')));
+    } finally {
+      if (mounted) setState(() => _sendingOrder = false);
+    }
   }
 
   void _openServerBookingQa() {
@@ -1813,7 +1878,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-summary'),
             ),
             const SizedBox(height: 12),
-            if (widget.tripStore != null) ...[
+            if (widget.ordersApi == null && widget.tripStore != null) ...[
               Text(pdLabel(context, widget.tripStore!.statusLabel),
                   key: const Key('passenger-trip-status')),
               if (widget.tripStore!.trip != null)
@@ -1830,11 +1895,15 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ],
             FilledButton(
               key: const Key('passenger-book-disabled'),
-              onPressed: _canCreateLocalTrip
+              onPressed: widget.ordersApi != null
+                  ? (_canSendServerOrder ? _sendServerOrder : null)
+                  : _canCreateLocalTrip
                   ? (const bool.fromEnvironment('PD_INTERNAL_QA')
                       ? _openServerBookingQa : _createLocalTrip)
                   : null,
-              child: Text(widget.tripStore == null
+              child: Text(widget.ordersApi != null
+                  ? (_sendingOrder ? 'Отправка…' : _pendingOrder != null ? 'Повторить прежнюю заявку' : 'Заказать поездку')
+                  : widget.tripStore == null
                   ? pdTr(context, 'Заказать поездку — недоступно в демоверсии',
                       'Užsakyti kelionę — demo versijoje nepasiekiama',
                       'Book ride — unavailable in demo')

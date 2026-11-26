@@ -1,3 +1,4 @@
+import 'native_orders_api.dart';
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'passenger_demo.dart';
@@ -12,11 +13,13 @@ class PassengerRideEntry extends StatelessWidget {
   const PassengerRideEntry({
     super.key,
     this.enableMapTiles = true,
+    this.ordersApi,
     required this.tripStore,
     this.onSignOut,
     this.onBackToCabinets,
   });
 
+  final NativeOrdersApi? ordersApi;
   final bool enableMapTiles;
   final DemoTripStore tripStore;
   final VoidCallback? onSignOut;
@@ -27,6 +30,7 @@ class PassengerRideEntry extends StatelessWidget {
     Navigator.push(context, MaterialPageRoute<void>(
       builder: (_) => PdPassengerLanguageScope(
         child: PassengerDemo(
+          ordersApi: ordersApi,
           enableMapTiles: enableMapTiles,
           tripStore: tripStore,
           initialRideType: type,

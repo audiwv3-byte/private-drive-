@@ -83,17 +83,42 @@ def fingerprint(values):
                                      separators=(",", ":")).encode()).hexdigest()
 
 
+def telegram_reference(uid, oid):
+    return hashlib.sha256(f"miniapp:{uid}:{oid}".encode()).hexdigest()
+
+
+def connect():
+    import psycopg
+    return psycopg.connect(os.environ["PD_DISPATCH_ORDERS_DATABASE_URL"],
+                           connect_timeout=4, options="-c statement_timeout=4000")
+
+
+def store_order(values):
+    """Insert a validated booking or return the matching earlier submission."""
+    source, original, *route = values
+    digest = fingerprint(values)
+    with connect() as db:
+        row = db.execute("""INSERT INTO public.pd_dispatch_orders
+            (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT(source,source_order_id) DO NOTHING RETURNING id,status""",
+            (uuid.uuid4(), source, original, digest, *route)).fetchone()
+        created = row is not None
+        if not created:
+            row = db.execute("""SELECT id,status,fingerprint FROM public.pd_dispatch_orders
+                WHERE source=%s AND source_order_id=%s""", (source, original)).fetchone()
+            if not row or row[2] != digest:
+                raise ValueError("source_order_conflict")
+    return dict(order_id=str(row[0]), source=source, source_order_id=original,
+                status=row[1], created=created, payment_mode="disabled")
+
+
 def register(app, authorized):
     def reply(body, status=200):
         response = jsonify(body)
         response.status_code = status
         response.headers["Cache-Control"] = "private, no-store"
         return response
-
-    def connect():
-        import psycopg
-        return psycopg.connect(os.environ["PD_DISPATCH_ORDERS_DATABASE_URL"],
-                               connect_timeout=4, options="-c statement_timeout=4000")
 
     @app.post("/v1/dispatch/orders/import")
     def import_order():
@@ -108,33 +133,14 @@ def register(app, authorized):
             values = validated_order(json.loads(raw))
         except (ValueError, TypeError, UnicodeError) as exc:
             return reply({"error":"invalid_order"}, 400)
-        source, original, origin, destination, date, clock = values
-        digest = fingerprint(values)
-        order_id = str(uuid.uuid4())
-        status = "requested"
         try:
-            with connect() as db:
-                # The insert either wins once or retrieves an existing record.
-                with db.cursor() as cur:
-                    cur.execute("""INSERT INTO public.pd_dispatch_orders
-                        (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-                        ON CONFLICT(source,source_order_id) DO NOTHING
-                        RETURNING id""", (order_id,source,original,digest,origin,destination,date,clock))
-                    inserted = cur.fetchone()
-                    if not inserted:
-                        cur.execute("""SELECT id,fingerprint,status FROM public.pd_dispatch_orders
-                            WHERE source=%s AND source_order_id=%s""", (source,original))
-                        existing = cur.fetchone()
-                        if not existing or existing[1] != digest:
-                            return reply({"error":"source_order_conflict"}, 409)
-                        order_id = str(existing[0])
-                        status = existing[2]
-            return reply({"order_id":order_id,"source":source,"source_order_id":original,
-                          "status":status,"created":bool(inserted),"payment_mode":"disabled"}, 201 if inserted else 200)
+            result = store_order(values)
+        except ValueError:
+            return reply({"error":"source_order_conflict"}, 409)
         except Exception:
             app.logger.exception("Persistent dispatcher order store unavailable")
-            return reply({"error":"storage_unavailable"},503)
+            return reply({"error":"storage_unavailable"}, 503)
+        return reply(result, 201 if result["created"] else 200)
 
     def dispatch_order_gps(order_id):
         if not authorized():

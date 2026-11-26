@@ -18,6 +18,7 @@ register_request_guard(app)
 import pd_languages
 import pd_stops
 import pd_fixed_prices
+import pd_dispatch_persistent as dispatch
 TIMEZONE = ZoneInfo('Europe/Vilnius')
 MAX_AGE = 86400
 
@@ -234,6 +235,29 @@ def route():
         return jsonify(result)
 
 
+def acknowledge_order(uid, row, replayed=False):
+    response = dict(ok=True, order_id=row['id'], price=row['price'],
+                    status=row['status'], replayed=replayed)
+    if os.environ.get('PD_DISPATCH_STAGING_ONLY') == '1':
+        if not dispatch.enabled():
+            return jsonify(error='Диспетчерская недоступна. Повторите отправку.'), 503
+        try:
+            values = dispatch.validated_order({
+                'source': 'telegram_miniapp', 'source_order_id': dispatch.telegram_reference(uid, row['id']),
+                'from': row['origin'], 'to': row['destination'],
+                'trip_date': datetime.strptime(row['trip_date'], '%d.%m.%Y').date().isoformat(),
+                'trip_time': row['trip_time'],
+            })
+            result = dispatch.store_order(values)
+        except ValueError:
+            return jsonify(error='Данные заказа расходятся с записью диспетчерской.'), 409
+        except Exception:
+            app.logger.exception('Mini App dispatch queue unavailable')
+            return jsonify(error='Получение заявки не подтверждено. Повторите отправку.'), 503
+        response['dispatch_order_id'] = result['order_id']
+    return jsonify(response)
+
+
 @app.post('/api/order')
 def create_order():
     uid, _ = auth()
@@ -242,6 +266,8 @@ def create_order():
     if not isinstance(d,dict):raise ValueError('Некорректная заявка')
     validate_route_data(d)
     request_key=d.get('request_key')
+    if os.environ.get('PD_DISPATCH_STAGING_ONLY') == '1' and not request_key:
+        raise ValueError('Для отправки нужен идентификатор заявки')
     fingerprint=''
     if request_key is not None:
         import re
@@ -250,11 +276,11 @@ def create_order():
         fingerprint=hashlib.sha256(json.dumps({k:v for k,v in d.items() if k!='request_key'},ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         core.initialize()
         with core.db(core.ORDERS_DB) as conn:
-            previous=conn.execute('SELECT id,status,price,request_fingerprint FROM orders WHERE telegram_id=? AND request_key=?',(uid,request_key)).fetchone()
+            previous=conn.execute('SELECT * FROM orders WHERE telegram_id=? AND request_key=?',(uid,request_key)).fetchone()
         if previous:
             if previous['request_fingerprint']!=fingerprint:
                 raise ValueError('Состав заявки изменился. Начните новую заявку.')
-            return jsonify(ok=True,order_id=previous['id'],status=previous['status'],price=previous['price'],replayed=True)
+            return acknowledge_order(uid, previous, replayed=True)
     origin, dest = str(d.get('origin','')).strip(),str(d.get('destination','')).strip()
     if not (2 <= len(origin) <= 200 and 2 <= len(dest) <= 200) or origin.casefold() == dest.casefold():
         raise ValueError('Укажите корректный маршрут')
@@ -303,12 +329,14 @@ def create_order():
         oid,created=core.order_save(uid,st,request_key,fingerprint)
         if not created:
             previous=core.order_find(oid)
-            return jsonify(ok=True,order_id=oid,status=previous['status'],price=previous['price'],replayed=True)
+            return acknowledge_order(uid, previous, replayed=True)
     else:
         oid=core.order_save(uid,st)
     with core.db(core.ORDERS_DB) as conn:
         conn.execute('UPDATE orders SET stop_address=? WHERE id=? AND telegram_id=?',(stop_address,oid,uid))
     r=core.order_find(oid)
+    if os.environ.get('PD_DISPATCH_STAGING_ONLY') == '1':
+        return acknowledge_order(uid, r)
     try:
         core.say(uid, '✅ Заявка №%s получена. Ожидайте подтверждения пилотом.\n%s'%(oid,core.order_text(r)))
     except Exception: core.LOG.exception('Client notify failed')

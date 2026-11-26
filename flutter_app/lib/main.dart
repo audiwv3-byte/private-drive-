@@ -1,3 +1,5 @@
+import 'native_pilot_orders.dart';
+import 'native_orders_api.dart';
 import 'dart:convert';
 import 'dart:math';
 
@@ -513,6 +515,12 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
         api: PdIdentityApi(baseUrl: widget.authApiUrl, token: sessionToken!, client: widget.httpClient),
         child: PrivateDriveDemo(
         key: ValueKey('$role-${signedInUserId!}'),
+        pilotApi: role == 'pilot'
+            ? NativePilotOrdersApi(baseUrl: widget.authApiUrl, token: sessionToken!, client: widget.httpClient)
+            : null,
+        ordersApi: role == 'passenger'
+            ? NativeOrdersApi(widget.authApiUrl, sessionToken!, client: widget.httpClient)
+            : null,
         storageScope: signedInUserId,
         pilotOnly: role == 'pilot',
         passengerOnly: role == 'passenger',

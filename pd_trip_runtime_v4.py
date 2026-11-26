@@ -104,19 +104,21 @@ def register(app, core, auth, provider=None, clock=None):
         except Exception:
             core.LOG.exception('Trip notification delivery failed; event remains persisted')
 
-    def view(oid, uid):
+    def view(oid, uid, *, passenger_only=False):
         with core.db(core.ORDERS_DB) as c:
             r = row(c, oid)
+            if passenger_only and uid != r['telegram_id']:
+                raise PermissionError('Нет доступа к поездке')
             if uid not in (r['telegram_id'], r['pilot_id']) and not core.is_admin(uid):
                 raise PermissionError('Нет доступа к поездке')
-            if uid == r['pilot_id'] and not core.is_admin(uid):
+            if not passenger_only and uid == r['pilot_id'] and not core.is_admin(uid):
                 attach(c)
                 pilot(c, r, uid)
             t = c.execute('SELECT * FROM pd_trip_runtime_v4 WHERE order_id=?', (oid,)).fetchone()
             extras = [dict(x) for x in c.execute('SELECT id,reason,amount_cents,state FROM pd_trip_extras_v4 WHERE order_id=? ORDER BY id', (oid,))]
             cap = c.execute('SELECT state,amount_cents FROM pd_booking_capture_v4 WHERE order_id=?', (oid,)).fetchone()
             data = dict(t) if t else {'order_id': oid}
-            data.update(status=r['status'], server_now=clock(), role='admin' if core.is_admin(uid) else 'pilot' if uid == r['pilot_id'] else 'passenger',
+            data.update(status=r['status'], server_now=clock(), role='passenger' if passenger_only else 'admin' if core.is_admin(uid) else 'pilot' if uid == r['pilot_id'] else 'passenger',
                         free_seconds=FREE_SECONDS, wait_cents_per_minute=WAIT_CENTS_PER_MINUTE,
                         rounding='started_minute', extras=extras, capture=dict(cap) if cap else None,
                         base_cents=data.get('base_cents') or (money(r['price']) if r['price'] else 0))
@@ -160,7 +162,7 @@ def register(app, core, auth, provider=None, clock=None):
 
     @app.get('/api/trip/<int:oid>')
     def pd_v4_trip(oid):
-        return jsonify(view(oid, identity()))
+        return jsonify(view(oid, identity(), passenger_only=request.args.get('view') == 'passenger'))
 
     @app.post('/api/trip/<int:oid>/waiting-consent')
     def pd_v4_wait_consent(oid):

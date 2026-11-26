@@ -834,19 +834,6 @@ def pd_tips_miniapp_entry(message):
     say(message.chat.id, 'Чаевые PRIVATE DRIVE. Откройте приложение кнопкой ниже. Заказывать поездку не нужно.', kb)
 
 
-def pd_driver_miniapp_entry(message):
-    mini_url = os.getenv('MINIAPP_URL', 'https://wilsonpark.pythonanywhere.com').strip()
-    if not mini_url.startswith('https://'):
-        raise ValueError('MINIAPP_URL must be HTTPS')
-    parsed = urllib.parse.urlsplit(mini_url)
-    query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-    query = [(k,v) for k,v in query if k != 'start'] + [('start','driver_taxi_lt')]
-    url = urllib.parse.urlunsplit((parsed.scheme,parsed.netloc,parsed.path,urllib.parse.urlencode(query),''))
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton('🚖 Кабинет и регистрация пилота', web_app=types.WebAppInfo(url)))
-    say(message.chat.id,'PRIVATE DRIVE — регистрация пилота и личный кабинет. Откройте приложение:',kb)
-
-
 @bot.message_handler(commands=['start'])
 def start(message):
     if message.chat.type != 'private':
@@ -856,7 +843,7 @@ def start(message):
         pd_tips_miniapp_entry(message)
         return
     if len(parts) > 1 and parts[1].strip() == 'driver_taxi_lt':
-        pd_driver_miniapp_entry(message)
+        miniapp_launcher(message.chat.id)
         return
     linked=referral_touch(message.from_user.id, parts[1] if len(parts)>1 else '')
     if linked:

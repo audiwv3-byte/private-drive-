@@ -2,53 +2,29 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const html = fs.readFileSync('miniapp/templates/index.html', 'utf8');
-for (const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) {
-  if (match[1].trim()) new vm.Script(match[1].replace(/\{\{[\s\S]*?\}\}/g, 'null'));
+for (const id of ['pdObRole','pdObDriver','pdRoleBar','adminNav','pdPilotWork','step10','step13']) {
+  assert.ok(!html.includes('id="' + id + '"'), id);
 }
-const elements = new Map();
-function element() {
-  const names = new Set();
-  return {hidden: false, classList: {
-    add: value => names.add(value),
-    contains: value => names.has(value),
-    toggle(value, enabled) { if (enabled) names.add(value); else names.delete(value); },
-  }};
+for (const id of ['pdObLanguage','pdObPassenger','pdbSend','step8','step9','step14']) {
+  assert.ok(html.includes('id="' + id + '"'), id);
 }
-for (const id of ['pdRoleBar', 'adminNav', 'pdPilotBack']) elements.set(id, element());
-const body = element(); body.dataset = {};
-const context = {window: {}, document: {body}, $: id => elements.get(id)};
+assert.doesNotMatch(html, /<script src="[^"]*(?:pilot-cabinet|admin-console)/);
+const storage = new Map();
+const context = {
+  window: {PD_LANG:'ru'}, localStorage: {getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},
+  pdShowOnboarding(stage){context.screen=stage}, pdHideOnboarding(){context.screen='booking'},
+};
 vm.createContext(context);
-vm.runInContext(html.slice(html.indexOf('function pdRoleVisibility('), html.indexOf('function pdShowOnboarding(')), context);
-const passenger = {registered: true, admin: false, pilot_access: false};
-const pilot = {registered: true, admin: false, pilot_access: true};
-const owner = {registered: true, admin: true, pilot_access: false};
-const applicant = {registered: false, admin: false, driver_application: {status: 'pending'}};
-function check(user, view, expected) {
-  const role = context.pdApplyRoleAccess(user, view);
-  assert.deepEqual(JSON.parse(JSON.stringify(role)), expected);
-  assert.equal(elements.get('pdRoleBar').hidden, !expected.adminControls);
-  assert.equal(elements.get('adminNav').hidden, !expected.adminControls);
-  assert.equal(body.classList.contains('pd-passenger-view'), expected.passengerView);
-  assert.equal(body.classList.contains('pd-role-pilot'), expected.pilotControls);
+vm.runInContext(html.slice(html.indexOf('function pdChooseInitialLanguage('),
+  html.indexOf('async function pdCompletePassengerRegistration(')), context);
+context.pdOnboardingStart(null);
+assert.equal(context.screen,'language');
+context.pdChooseInitialLanguage('ru');
+assert.equal(context.screen,'passenger');
+for (const flags of [{},{admin:true},{pilot_access:true},{driver_application:{status:'pending'}}]) {
+  context.pdOnboardingStart({...flags,registered:true,phone:'5551234',name:'QA'});
+  assert.equal(context.screen,'booking');
+  context.pdOnboardingStart(flags);
+  assert.equal(context.screen,'passenger');
 }
-check(null, '', {passengerView: false, adminControls: false, pilotControls: false});
-check(passenger, '', {passengerView: true, adminControls: false, pilotControls: false});
-check(owner, 'admin', {passengerView: false, adminControls: true, pilotControls: false});
-check(owner, 'client', {passengerView: true, adminControls: false, pilotControls: false});
-check(pilot, 'driver', {passengerView: false, adminControls: false, pilotControls: true});
-check(pilot, 'client', {passengerView: true, adminControls: false, pilotControls: false});
-assert.equal(elements.get('pdPilotBack').hidden, true);
-check(applicant, '', {passengerView: false, adminControls: false, pilotControls: true});
-// Changing to an ordinary passenger cannot retain another role's controls.
-check(passenger, '', {passengerView: true, adminControls: false, pilotControls: false});
-assert.ok(!html.includes('onclick="pdStartDriverRegistration()">Регистрация водителя</button>'));
-const languagePanel=html.match(/<div id="pdObLanguage"[\s\S]*?<\/div><\/div>/)?.[0]||'';
-for (const [lang,flag,name] of [['en','🇬🇧','English'],['lt','🇱🇹','Lietuvių'],['ru','🇷🇺','Русский']]) {
-  assert.ok(languagePanel.includes(`pdChooseInitialLanguage('${lang}')`),lang);
-  assert.ok(languagePanel.includes(flag),flag);
-  assert.ok(languagePanel.includes(name),name);
-}
-assert.ok(!/<div id="pdObRole"[^>]*>[\s\S]*?onclick="pdShowOnboarding\('language'\)"/.test(html.slice(html.indexOf('<div id="pdObRole"'), html.indexOf('<form id="pdObPassenger"'))));
-assert.ok(html.includes('.pd-onboarding-active .pd-language-switch{display:flex!important}'));
-assert.ok(html.includes('body:not(.pd-role-admin) #pdRoleBar'));
-console.log('PASS: passenger, administrator, pilot and applicant roles; passenger mode hides work controls; stale role controls cleared; inline scripts compile');
+console.log('PASS passenger entry for new, returning, admin, pilot and applicant accounts');

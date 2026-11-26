@@ -1,6 +1,7 @@
 /* Draft integration: append after the existing Mini App script, after approval. */
 (()=>{
 'use strict';
+const passengerOnly=Boolean(document.currentScript?.hasAttribute('data-passenger-only'));
 const POLICY='pd-trip-v4-20261028';
 const label=(ru,en,lt)=>window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru;
 const eur=c=>(Number(c||0)/100).toFixed(2)+' €';
@@ -45,7 +46,7 @@ async function offerExtra(){
 async function refresh(){
  if(!active||!body||polling)return;polling=true;
  try{
-  const id=active,r=await requestTrip(id);if(active!==id||!body)return;
+  const id=active,r=await requestTrip(id,passengerOnly?'?view=passenger':'');if(active!==id||!body)return;
   if(map)map.remove();map=null;marker=null;body.replaceChildren();
   p(label('Заказ №','Order #','Užsakymas Nr. ')+id+' · '+r.status);
   const live=['Подтверждена','В пути'].includes(r.status);closing(live);
@@ -94,7 +95,7 @@ async function refresh(){
 async function hubs(){
  if(hubBusy||!initData||!pdRegistered||document.hidden)return;hubBusy=true;
  try{
-  const containers=[['step8','/api/orders'],['pdPilotWork','/api/driver/work'],['step13','/api/driver/work']];
+  const containers=passengerOnly?[['step8','/api/orders']]:[['step8','/api/orders'],['pdPilotWork','/api/driver/work'],['step13','/api/driver/work']];
   for(const [parentId,path]of containers){
    const parent=document.getElementById(parentId);if(!parent||parent.classList.contains('hidden'))continue;
    let box=document.getElementById('pdTripHubV4-'+parentId);if(!box){box=document.createElement('div');box.id='pdTripHubV4-'+parentId;parent.append(box)}

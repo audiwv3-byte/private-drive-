@@ -1,3 +1,5 @@
+import 'native_pilot_orders.dart';
+import 'native_orders_api.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -38,6 +40,8 @@ class PrivateDriveDemo extends StatefulWidget {
   const PrivateDriveDemo({
     super.key,
     this.enableMapTiles = true,
+    this.ordersApi,
+    this.pilotApi,
     this.passengerOnly = false,
     this.adminOnly = false,
     this.pilotOnly = false,
@@ -48,6 +52,8 @@ class PrivateDriveDemo extends StatefulWidget {
     this.onBackToCabinets,
   });
 
+  final NativeOrdersApi? ordersApi;
+  final NativePilotOrdersApi? pilotApi;
   final bool enableMapTiles;
   /// Only the passenger cabin is reachable after a verified public SMS login.
   /// The multi-role demo hub stays exclusive to offline development preview.
@@ -231,6 +237,31 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
       return const Scaffold(body: Center(child: CircularProgressIndicator(
         key: Key('demo-order-restoring'))));
     }
+    final pilotApi = widget.pilotApi;
+    if (widget.pilotOnly && pilotApi != null) {
+      return Scaffold(
+        body: PilotDemo(enableMapTiles: widget.enableMapTiles, showAssignedOffer: false),
+        floatingActionButton: FloatingActionButton.extended(
+          icon: const Icon(Icons.directions_car),
+          label: const Text('Мои поездки'),
+          onPressed: () => showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            builder: (sheet) => SafeArea(child: FractionallySizedBox(
+              heightFactor: 0.72,
+              child: Column(children: [
+                Expanded(child: PilotAssignedOrdersPanel(api: pilotApi)),
+                if (widget.onSignOut != null)
+                  TextButton(onPressed: () {
+                    Navigator.pop(sheet);
+                    widget.onSignOut!();
+                  }, child: const Text('Выйти')),
+              ]),
+            )),
+          ),
+        ),
+      );
+    }
     if (widget.pilotOnly) {
       return PilotCabin(
         showCockpit: widget.showPilotCockpit,
@@ -276,6 +307,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
     if (widget.passengerOnly) {
       return PdPassengerLanguageScope(
         child: PassengerRideEntry(
+          ordersApi: widget.ordersApi,
           enableMapTiles: widget.enableMapTiles,
           tripStore: _trip,
           onSignOut: widget.onSignOut,

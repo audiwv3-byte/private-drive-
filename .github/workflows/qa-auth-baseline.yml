@@ -14,9 +14,9 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_PASSWORD: isolated-test
-          POSTGRES_DB: native_auth_test
+          POSTGRES_DB: private_drive_test
         ports: ["5432:5432"]
-        options: --health-cmd "pg_isready -U postgres -d native_auth_test" --health-interval 5s --health-timeout 5s --health-retries 10
+        options: --health-cmd "pg_isready -U postgres -d private_drive_test" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,5 +27,14 @@ jobs:
       - run: python -m pip install -r requirements-sms-render.txt
       - name: Test mocked authentication and isolated sessions
         env:
-          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/native_auth_test
+          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
         run: python -m unittest -v test_native_auth_postgres_flow.py test_native_auth_roles.py test_native_auth_sessions.py
+      - name: Install isolated session functions and rerun authentication
+        env:
+          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+          PD_NATIVE_SESSION_FUNCTIONS: '1'
+          PD_DISPATCH_STAGING_ONLY: '1'
+          PD_PAYMENT_MODE: disabled
+        run: |
+          python -c "import os, psycopg; from pathlib import Path; c=psycopg.connect(os.environ['PD_AUTH_TEST_DATABASE_URL'],autocommit=True); c.execute(Path('migrations/native_auth_session_functions.sql').read_text()); c.close()"
+          python -m unittest -v test_native_auth_postgres_flow.py test_native_auth_roles.py test_native_auth_sessions.py

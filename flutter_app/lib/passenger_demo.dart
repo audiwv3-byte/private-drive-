@@ -1278,12 +1278,22 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   onTap: _openOrders,
                 ),
               ),
-            Text(pdLabel(context, 'Тестовый заказ поездки'), style: TextStyle(fontSize: 22)),
+            Text(widget.ordersApi != null
+                ? widget.initialExtraService == 'jumpstart'
+                    ? 'Заказ услуги · Запуск автомобиля'
+                    : widget.initialExtraService == 'delivery'
+                        ? 'Заказ услуги · Доставка товаров'
+                        : 'Оформление поездки'
+                : pdLabel(context, 'Тестовый заказ поездки'),
+                style: const TextStyle(fontSize: 22)),
             const SizedBox(height: 6),
-            Text(pdLabel(context, 'Демонстрация. Не отправляет заказы и не списывает деньги.')),
+            Text(widget.ordersApi != null
+                ? 'Заявка поступает диспетчеру после подтверждения сервера. Без списания денег.'
+                : pdLabel(context, 'Демонстрация. Не отправляет заказы и не списывает деньги.')),
             const SizedBox(height: 12),
-            Text('${pdLabel(context, _rideType)} · ${pdLabel(context, 'выбранный тип поездки')}',
-              key: const Key('passenger-selected-ride-type'),
+            if (widget.initialExtraService == null)
+              Text('${pdLabel(context, _rideType)} · ${pdLabel(context, 'выбранный тип поездки')}',
+                key: const Key('passenger-selected-ride-type')),
               style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             if (_rideType == 'Трансфер') ...[

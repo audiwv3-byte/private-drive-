@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'pd_http_api.dart';
 import 'qa_pilot_gps.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, kDebugMode, TargetPlatform;
 
 class PilotAssignedOrder {
   const PilotAssignedOrder({
@@ -94,7 +94,7 @@ class NativePilotOrdersApi {
   // QA29 is a separate debug-only APK. It can never send a real session
   // to plaintext HTTP, or reach the existing staging/production service.
   static const qa29Loopback = bool.fromEnvironment('PD_QA29_LOOPBACK') &&
-      qaGpsEnabled;
+      qaGpsEnabled && kDebugMode;
   static const qa29Base = 'http://127.0.0.1:18729';
   bool get _qa29Allowed => qa29Loopback && baseUrl == qa29Base &&
       token.startsWith('qa29-synthetic-') && token.length >= 40;

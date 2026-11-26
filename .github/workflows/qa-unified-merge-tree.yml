@@ -1,0 +1,38 @@
+name: Isolated integration merge audit
+on:
+  push:
+    branches: [qa/unified-staging-integration]
+    paths: [.github/workflows/qa-unified-merge-tree.yml]
+permissions:
+  contents: read
+jobs:
+  merge-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Inspect pinned merge pairs without changing refs
+        shell: bash
+        run: |
+          git --version
+          audit() {
+            local label="$1" base="$2" head="$3" rc=0
+            echo "=== $label ==="
+            git merge-tree --write-tree --name-only "$base" "$head" > "$RUNNER_TEMP/merge-$label.txt" || rc=$?
+            cat "$RUNNER_TEMP/merge-$label.txt"
+            echo "MERGE_RESULT $label exit=$rc"
+            if [ "$rc" -gt 1 ]; then return "$rc"; fi
+          }
+          android=0ed1e60482f30aa5039d7f0ef170144949a4e2ec
+          orders=0a17bef4f494834c0e61d402d3ed3f3373ea808b
+          dispatcher=44795f496ed05760cfc09474c506c6d7916c86fb
+          telegram=d5ef3ec94fbd7f17db4f1a6ab92f48c0362f56ba
+          audit android-orders "$android" "$orders"
+          audit android-dispatcher "$android" "$dispatcher"
+          audit android-telegram "$android" "$telegram"
+          audit orders-dispatcher "$orders" "$dispatcher"
+          audit orders-telegram "$orders" "$telegram"
+          audit dispatcher-telegram "$dispatcher" "$telegram"

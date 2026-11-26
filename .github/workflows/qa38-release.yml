@@ -55,7 +55,7 @@ jobs:
           cp qa_android/build/app/outputs/bundle/release/app-release.aab qa_aab/PRIVATE-DRIVE-QA-ONLY.aab
           cp "$RUNNER_TEMP/manifest.xml" qa_aab/manifest.xml
           cp "$RUNNER_TEMP/qa38-deps.json" qa_aab/dependencies.json
-          (cd qa_aab && sha256sum PRIVATE-DRIVE-QA-ONLY.aab > SHA256SUMS)
+          (cd qa_aab && sha256sum PRIVATE-DRIVE-QA-ONLY.aab > SHA256SUMS && cat SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
           name: private-drive-isolated-release-aab-not-for-store
@@ -84,6 +84,8 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version
           python3 -c 'from pathlib import Path; p=Path("pubspec.yaml"); s=p.read_text(); old="  integration_test:\n    sdk: flutter\n"; assert s.count(old)==1; p.write_text(s.replace(old,""))'
           flutter pub get
+          flutter pub deps --json > "$RUNNER_TEMP/qa38-deps.json"
+          test -s "$RUNNER_TEMP/qa38-deps.json"
           flutter build ios --release --no-codesign --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false
       - name: Validate device binary and packaged privacy configuration
         run: |

@@ -130,7 +130,9 @@ void main() {
       tripStore: store,
       ordersApi: NativeOrdersApi('https://example.invalid', 'synthetic-token'),
     )));
-    await tester.ensureVisible(find.byKey(const Key('passenger-entry-jumpstart')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('passenger-entry-jumpstart')), 250,
+      scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const Key('passenger-entry-jumpstart')));
     await tester.pumpAndSettle();
     expect(find.byType(PassengerDemo), findsOneWidget);

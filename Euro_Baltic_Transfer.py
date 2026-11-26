@@ -347,7 +347,15 @@ def estimate_costs(distance_km, is_roundtrip):
     return euro(driven), euro(cost)
 
 
-def order_save(uid, st, request_key=None, request_fingerprint=''):
+def order_save(uid, st, request_key=None, request_fingerprint='', *, dispatch_outbox=False):
+    if dispatch_outbox:
+        from pd_dispatch_outbox import enqueue, enabled
+        if not enabled():
+            raise RuntimeError("staging outbox disabled")
+    def enqueue_saved(conn, oid):
+        if dispatch_outbox:
+            row = conn.execute("SELECT id,origin,destination,trip_date,trip_time FROM orders WHERE id=?", (oid,)).fetchone()
+            enqueue(conn, dict(row))
     with db(ORDERS_DB) as conn:
         conn.execute('BEGIN IMMEDIATE')
         if request_key:
@@ -355,6 +363,7 @@ def order_save(uid, st, request_key=None, request_fingerprint=''):
             if existing:
                 if existing['request_fingerprint']!=request_fingerprint:
                     raise ValueError('Состав заявки изменился. Начните новую заявку.')
+                enqueue_saved(conn, existing['id'])
                 return existing['id'],False
         cur = conn.execute('''INSERT INTO orders
           (telegram_id,order_type,origin,destination,trip_date,trip_time,passengers,luggage,
@@ -366,6 +375,7 @@ def order_save(uid, st, request_key=None, request_fingerprint=''):
           st['payment_method'], st.get('distance_km'), st.get('duration_min'),
           st.get('route_source',''), st.get('quote_status','Не рассчитано'), now().isoformat(),
           st.get('roundtrip_wait',''), int(st.get('passenger_count_confirmed', 1)), request_key, request_fingerprint))
+        enqueue_saved(conn, cur.lastrowid)
         return (cur.lastrowid,True) if request_key else cur.lastrowid
 
 

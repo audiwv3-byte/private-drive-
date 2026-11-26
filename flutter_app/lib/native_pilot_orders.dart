@@ -455,6 +455,7 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
         send: api.publishGps,
         isAssigned: (id) async => (await api.load()).any((row) => row.orderId == id),
         positions: qaAndroidPositions,
+        canStart: () => mounted && _foreground && widget.visible && identical(api, widget.api),
         onStopped: () { if (mounted) setState(() {}); },
       );
       _gpsPublisher = publisher;

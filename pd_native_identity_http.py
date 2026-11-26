@@ -99,7 +99,7 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
         endpoint = route.removeprefix("/native-identity/")
         now = int(clock())
         auth = environ.get("HTTP_AUTHORIZATION", "")
-        if not auth.startswith("Bearer ") or not 40 <= len(auth[7:]) <= 256:
+        if not auth.startswith("Bearer ") or not 40 <= len(auth[7:]) <= 256 or any(c.isspace() for c in auth[7:]):
             return reply(start_response, "401 Unauthorized", {"error": "invalid_session"})
         digest = hashlib.sha256(auth[7:].encode()).hexdigest()
         try:
@@ -107,8 +107,8 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
             with psycopg.connect(database_url) as conn:
                 row = conn.execute("""SELECT s.user_id,COALESCE(r.role,'passenger')
                     FROM native_auth_sessions s LEFT JOIN native_auth_roles r ON r.user_id=s.user_id
-                    WHERE s.token_hash=%s AND s.expires_at>%s AND s.revoked_at IS NULL""",
-                    (digest, now)).fetchone()
+                    WHERE s.token_hash=%s AND s.created_at<=%s AND s.expires_at>%s AND s.revoked_at IS NULL""",
+                    (digest, now, now)).fetchone()
                 if not row:
                     return reply(start_response, "401 Unauthorized", {"error": "invalid_session"})
                 uid, role = row
@@ -140,10 +140,10 @@ def make_identity_app(next_app, database_url, *, clock=time.time, start_cleanup=
                 try:
                     length = int(environ.get("CONTENT_LENGTH", "0"))
                     limit = MAX_BODY if endpoint == "submit" else 1024
-                    if not 0 < length <= limit or not environ.get("CONTENT_TYPE", "").startswith("application/json"):
+                    if not 0 < length <= limit or environ.get("CONTENT_TYPE", "").split(";",1)[0].strip().lower() != "application/json":
                         raise ValueError("invalid_request")
                     payload = json.loads(environ["wsgi.input"].read(length))
-                    if not isinstance(payload, dict):
+                    if not isinstance(payload, dict) or set(payload) != ({"photo"} if endpoint == "submit" else {"decision"}):
                         raise ValueError("invalid_request")
                 except (ValueError, TypeError, KeyError, UnicodeError):
                     return reply(start_response, "400 Bad Request", {"error": "invalid_request"})

@@ -9,6 +9,8 @@ import psycopg
 from PIL import Image
 
 from pd_native_auth_postgres_http import initialize_database
+from werkzeug.test import Client
+from werkzeug.wrappers import Response
 from pd_native_identity_http import make_identity_app, sanitize_photo, APPROVAL_TTL, PENDING_TTL
 
 
@@ -100,6 +102,24 @@ class IdentityHttpTests(unittest.TestCase):
         self.assertEqual(self.request('reviewer', 'queue')[1]['items'], [])
         with psycopg.connect(self.db) as conn:
             self.assertIsNone(conn.execute('SELECT photo FROM native_identity_checks WHERE id=%s', (first['id'],)).fetchone()[0])
+
+    def test_future_session_and_photo_privacy(self):
+        client=Client(self.app, Response)
+        def get(uid,path):
+            return client.get('/native-identity/'+path,headers={'Authorization':'Bearer '+uid.ljust(48,'x')})
+        check_id=self.request('pilot','submit',self.payload)[1]['id']
+        for uid in ('passenger','other','pilot'):
+            self.assertEqual(get(uid,'photo/'+check_id).status_code,403)
+        photo=get('reviewer','photo/'+check_id)
+        self.assertEqual(photo.status_code,200)
+        self.assertEqual(photo.headers['Cache-Control'],'no-store')
+        self.assertEqual(photo.headers['X-Content-Type-Options'],'nosniff')
+        with psycopg.connect(self.db) as conn:
+            conn.execute("UPDATE native_auth_sessions SET created_at=%s WHERE user_id='reviewer'",(self.now+1,))
+        self.assertEqual(get('reviewer','photo/'+check_id).status_code,401)
+        self.assertEqual(get('reviewer','queue').status_code,401)
+        self.assertEqual(self.request('reviewer','decision/'+check_id,{'decision':'approved'})[0],401)
+        self.assertEqual(self.request('pilot','submit',{**self.payload,'role':'admin'})[0],400)
 
     def test_invalid_photo_cannot_be_submitted(self):
         self.assertEqual(self.request('pilot', 'submit', {'photo': 'invalid'})[0], 400)

@@ -60,6 +60,46 @@ def registered_passenger(uid):
     record = core.user_record(uid)
     return bool(record and str(record['name'] or '').strip() and core.clean_phone(str(record['phone'] or '')))
 
+def qa_shared_orders_enabled():
+    """Explicit synthetic QA bridge: never activates on deployed/live databases."""
+    from psycopg.conninfo import conninfo_to_dict
+    dsn = os.environ.get('PD_DISPATCH_ORDERS_DATABASE_URL', '')
+    try:
+        parts = conninfo_to_dict(dsn)
+    except (ValueError, TypeError):
+        return False
+    return (os.environ.get('PD_QA_MINIAPP_POSTGRES') == '1'
+            and os.environ.get('PD_QA25_WSGI') == '1'
+            and os.environ.get('PD_QA26_ASSIGNMENT') == '1'
+            and os.environ.get('PD_DISPATCH_STAGING_ONLY') == '1'
+            and os.environ.get('PD_PAYMENT_MODE') == 'disabled'
+            and os.environ.get('PD_NATIVE_SMS_LIVE') == 'NO'
+            and str(core.TOKEN).startswith('qa25-synthetic-')
+            and parts.get('host') == '127.0.0.1'
+            and parts.get('port') == '5432'
+            and parts.get('dbname') == 'private_drive_test'
+            and 'hostaddr' not in parts and 'service' not in parts)
+
+
+@app.before_request
+def qa_shared_order_bridge():
+    if os.environ.get('PD_QA_MINIAPP_POSTGRES') != '1':
+        return None
+    if request.path not in ('/api/order', '/api/orders'):
+        return None
+    if not qa_shared_orders_enabled():
+        return jsonify(error='orders_disabled'), 503
+    uid, _ = auth()
+    if not registered_passenger(uid):
+        return jsonify(error='passenger_profile_required'), 403
+    from pd_qa25_telegram_orders import telegram_order, telegram_history
+    if request.path == '/api/order' and request.method == 'POST':
+        return telegram_order(uid, request.get_json(silent=True))
+    if request.path == '/api/orders' and request.method == 'GET':
+        return telegram_history(uid)
+    return jsonify(error='method_not_allowed'), 405
+
+
 @app.before_request
 def protect_private_information():
     path = request.path.lower()

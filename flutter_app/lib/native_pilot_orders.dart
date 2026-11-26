@@ -211,6 +211,122 @@ class NativePilotOrdersApi {
   }
 }
 
+/// The connected shift control never uses a local substitute for server state.
+/// It starts unknown until a validated server read has completed.
+class PilotServerAvailabilityButton extends StatefulWidget {
+  const PilotServerAvailabilityButton({super.key, required this.api});
+  final NativePilotOrdersApi api;
+
+  @override
+  State<PilotServerAvailabilityButton> createState() =>
+      _PilotServerAvailabilityButtonState();
+}
+
+class _PilotServerAvailabilityButtonState
+    extends State<PilotServerAvailabilityButton> with WidgetsBindingObserver {
+  bool? _online;
+  bool _busy = false;
+  String? _error;
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _read();
+  }
+
+  @override
+  void didUpdateWidget(PilotServerAvailabilityButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.api.baseUrl != widget.api.baseUrl ||
+        oldWidget.api.token != widget.api.token) {
+      _generation++;
+      _online = null;
+      _error = null;
+      _busy = false;
+      _read();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _read();
+    } else if (mounted) {
+      _generation++;
+      setState(() => _online = null);
+    }
+  }
+
+  Future<void> _read() async {
+    final generation = ++_generation;
+    if (mounted) setState(() { _busy = true; _error = null; });
+    try {
+      final online = await widget.api.availability();
+      if (mounted && generation == _generation) setState(() => _online = online);
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() { _online = null; _error = 'Не удалось получить статус линии'; });
+      }
+    } finally {
+      if (mounted && generation == _generation) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _toggle() async {
+    final prior = _online;
+    if (prior == null || _busy) return;
+    final generation = ++_generation;
+    setState(() { _busy = true; _error = null; });
+    try {
+      final confirmed = await widget.api.availability(!prior);
+      if (mounted && generation == _generation) setState(() => _online = confirmed);
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _online = null;
+          _error = 'Сервер не подтвердил смену статуса. Проверь статус снова.';
+        });
+      }
+    } finally {
+      if (mounted && generation == _generation) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    Text(
+      _online == true ? 'НА ЛИНИИ' :
+          _online == false ? 'НЕ НА ЛИНИИ' : 'СТАТУС НЕИЗВЕСТЕН',
+      key: const Key('pilot-server-line-status'),
+      style: TextStyle(fontWeight: FontWeight.w800,
+        color: _online == true
+            ? const Color(0xFF34E88A) : const Color(0xFFFC4654)),
+    ),
+    const SizedBox(height: 8),
+    FilledButton.icon(
+      key: const Key('pilot-server-line-toggle'),
+      onPressed: _busy || _online == null ? null : _toggle,
+      icon: Icon(_online == true ? Icons.power_off : Icons.power_settings_new),
+      label: Text(_busy ? 'Проверка…' :
+          _online == true ? 'УЙТИ С ЛИНИИ' : 'ВЫЙТИ НА ЛИНИЮ'),
+    ),
+    if (_error != null) ...[
+      Text(_error!, key: const Key('pilot-server-line-error')),
+      TextButton(onPressed: _busy ? null : _read,
+        child: const Text('Повторить проверку')),
+    ],
+  ]);
+}
+
 /// Server-truth projection within the existing pilot cabin, not a trip demo.
 /// Reads only when mounted in the foreground; never invokes mutable actions.
 class PilotAssignedOrdersPanel extends StatefulWidget {

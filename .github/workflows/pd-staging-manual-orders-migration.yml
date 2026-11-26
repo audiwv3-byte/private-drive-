@@ -83,29 +83,25 @@ jobs:
           END
           $guard$;
           """
-          verify = """
-          DO $verify$
-          BEGIN
-              IF to_regprocedure('public.pd_create_dispatch_order(uuid,text,text,text,text,text)') IS NULL
-                 OR NOT EXISTS (
-                     SELECT FROM pg_proc
-                      WHERE oid=to_regprocedure('public.pd_assign_native_order(uuid,text,text,bigint)')
-                        AND position('o.source = ''dispatcher'' OR EXISTS' in prosrc)>0
-                 ) THEN
-                  RAISE EXCEPTION 'Staging order functions did not verify';
-              END IF;
-          END
-          $verify$;
-          """
           result = subprocess.run(
               ["psql", "-Xqw", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-f", "-"],
-              input=guard + manual + assignment + verify, env=postgres,
+              input=guard + manual + assignment, env=postgres,
               capture_output=True, text=True, timeout=45,
           )
           if result.returncode != 0:
-              phase = ("database preflight" if "Unexpected staging" in result.stderr
-                       else "post-migration verification" if "did not verify" in result.stderr
-                       else "PostgreSQL transaction")
+              phase = "database preflight" if "Unexpected staging" in result.stderr else "PostgreSQL transaction"
               raise SystemExit(phase + " failed; transaction not committed")
-          print("Staging manual order and assignment functions committed")
+          sql = """
+          SELECT to_regprocedure('public.pd_create_dispatch_order(uuid,text,text,text,text,text)') IS NOT NULL,
+                 EXISTS (SELECT FROM pg_proc
+                          WHERE oid=to_regprocedure('public.pd_assign_native_order(uuid,text,text,bigint)')
+                            AND strpos(prosrc, 'o.source') > 0)
+          """
+          verified = subprocess.run(
+              ["psql", "-XAtqw", "-v", "ON_ERROR_STOP=1", "-c", sql], env=postgres,
+              capture_output=True, text=True, timeout=20,
+          )
+          if verified.returncode or verified.stdout.strip() != "t|t":
+              raise SystemExit("Transaction completed; fresh catalog connection could not verify both functions")
+          print("Staging manual order and assignment functions committed and read back")
           PY

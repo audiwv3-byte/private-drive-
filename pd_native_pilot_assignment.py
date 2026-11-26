@@ -1,5 +1,6 @@
 """Explicit isolated pilot assignment; no GPS, SMS or payment services."""
 from contextlib import contextmanager
+from urllib.parse import urlsplit
 import json
 import os
 import re
@@ -44,6 +45,23 @@ def dispatcher_assignment_enabled():
     return reader is not None and reader == writer
 
 
+def dispatcher_list_enabled():
+    if dispatcher_assignment_enabled():
+        return True
+    if os.getenv("PD_DISPATCH_STAGING_ONLY") != "1":
+        return False
+    try:
+        url = urlsplit(os.getenv("PD_PILOT_ASSIGNMENT_DATABASE_URL", ""))
+        return (url.scheme in ("postgres", "postgresql")
+                and url.username == "pd_staging_dispatch_list"
+                and url.path == "/private_drive_test"
+                and url.hostname in ("dpg-dc00pubm8hqs7397rblg-a",
+                        "dpg-dc00pubm8hqs7397rblg-a.frankfurt-postgres.render.com")
+                and url.port in (None, 5432) and url.query == "sslmode=require")
+    except ValueError:
+        return False
+
+
 @contextmanager
 def _connect(url):
     import psycopg
@@ -68,7 +86,7 @@ def register_dispatch_assignment(app, authorized, valid_csrf, admin_id, *, clock
     def dispatch_eligible_pilots():
         if not authorized():
             return reply({"error": "unauthorized"}, 401)
-        if not dispatcher_assignment_enabled():
+        if not dispatcher_list_enabled():
             return reply({"error": "assignment_disabled"}, 503)
         try:
             with _connect(os.environ["PD_PILOT_ASSIGNMENT_DATABASE_URL"]) as db:

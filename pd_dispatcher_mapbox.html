@@ -252,10 +252,10 @@ async function refreshAvailablePilots(){
             return row;
         });
         list.replaceChildren(...(rows.length ? rows : ['Нет доступных пилотов']));
-        $('countOnline').textContent = String(rows.length);
+        {% if not test_sync_enabled %}$('countOnline').textContent = String(rows.length);{% endif %}
     } catch {
         list.textContent = 'Нет связи со списком пилотов';
-        $('countOnline').textContent = '—';
+        {% if not test_sync_enabled %}$('countOnline').textContent = '—';{% endif %}
     } finally {
         setTimeout(refreshAvailablePilots, 5000);
     }

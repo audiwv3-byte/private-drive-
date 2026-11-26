@@ -1,8 +1,10 @@
 """Drive the QA29 APK and verify the actual dispatcher marker for its order."""
 import time
 
-import psycopg
 from urllib.parse import urlsplit
+
+import psycopg
+from playwright.sync_api import TimeoutError as BrowserTimeout
 
 import qa29_gps_integration as fixture
 
@@ -64,7 +66,18 @@ def verify_android_fix(page, oid, lat, lon, previous_timestamp):
         row = db.execute("""SELECT latitude, longitude, captured_at FROM public.pd_qa27_gps
                             WHERE order_id = %s AND pilot_id = %s""", (oid, "qa29-pilot")).fetchone()
     assert row and abs(row[0]-lat) < 0.0001 and abs(row[1]-lon) < 0.0001 and row[2] >= gps["captured_at"]
-    page.wait_for_function(MARKER_AT_FIX, arg=[lat, lon], timeout=12000)
+    try:
+        page.wait_for_function(MARKER_AT_FIX, arg=[lat, lon], timeout=12000)
+    except BrowserTimeout:
+        print("Map geometry at timeout:", page.evaluate("""() => {
+            const sample = selector => [...document.querySelectorAll(selector)].slice(0,2).map(el => ({
+                label: el.title, url: el.src, cls: el.className, rect: el.getBoundingClientRect().toJSON(),
+                margin: getComputedStyle(el).margin, transform: el.style.transform
+            }));
+            return {map: sample('#rasterMap'), icons: sample('.pilot-marker'),
+                    tiles: sample('.leaflet-tile'), loaded: sample('.leaflet-tile-loaded')};
+        }"""), flush=True)
+        raise
     print(f"PASS: {oid} Android, PostgreSQL, dispatcher response and visible marker agree at {lat}, {lon}",
           flush=True)
     return gps["captured_at"]

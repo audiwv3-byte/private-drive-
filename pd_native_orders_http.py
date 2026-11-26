@@ -119,7 +119,11 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                     request_id = str(uuid.UUID(data.pop("request_id")))
                     submitted_details = data.pop("details", None)
                     scoped = hashlib.sha256((str(uid)+":"+request_id).encode()).hexdigest()
-                    values = validated_order(dict(data, source="android", source_order_id=scoped))
+                    source = environ.get("HTTP_X_PD_NATIVE_PLATFORM", "android")
+                    if source not in ("android", "ios"):
+                        raise ValueError("invalid native platform")
+                    # Platform is client-reported metadata, never an authorization claim.
+                    values = validated_order(dict(data, source=source, source_order_id=scoped))
                     quote = (validated_details(submitted_details, origin=data["from"],
                                                destination=data["to"])
                              if submitted_details is not None else None)

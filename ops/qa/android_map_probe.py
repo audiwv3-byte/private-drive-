@@ -37,11 +37,13 @@ MARKER_AT_FIX = r"""([lat, lon]) => {
         const parts = new URL(tile.src).pathname.match(/\/(\d+)\/(\d+)\/(\d+)\.png$/);
         if (!parts) continue;
         const [, zoom, tx, ty] = parts.map(Number);
-        const expected = L.CRS.EPSG3857.latLngToPoint([lat, lon], zoom);
+        const worldTiles = 2 ** zoom;
+        const xTile = worldTiles * (lon + 180) / 360;
+        const yTile = worldTiles * (1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2;
         const rect = tile.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) continue;
-        const dx = rect.left + (expected.x / 256 - tx) * rect.width - x;
-        const dy = rect.top + (expected.y / 256 - ty) * rect.height - y;
+        const dx = rect.left + (xTile - tx) * rect.width - x;
+        const dy = rect.top + (yTile - ty) * rect.height - y;
         if (Math.abs(dx) <= 2 && Math.abs(dy) <= 2) return true;
     }
     return false;

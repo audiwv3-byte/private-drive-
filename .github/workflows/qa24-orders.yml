@@ -1,0 +1,32 @@
+name: QA 24 isolated order integration
+on:
+  push:
+    branches: [qa/unified-staging-integration]
+    paths: ['.github/workflows/qa24-orders.yml','tests/test_qa24_orders.py','pd_native_orders_http.py','pd_dispatch_persistent.py','migrations/native_dispatch_orders.sql']
+permissions:
+  contents: read
+jobs:
+  orders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres -d private_drive_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements-sms-render.txt flask pytest
+      - run: python -m pytest -v tests/test_qa24_orders.py tests/test_native_dispatch_payment_guard.py
+        env:
+          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+          PD_PAYMENT_MODE: disabled
+          PD_NATIVE_SMS_LIVE: 'NO'

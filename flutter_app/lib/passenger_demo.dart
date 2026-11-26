@@ -1293,8 +1293,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
             const SizedBox(height: 12),
             if (widget.initialExtraService == null)
               Text('${pdLabel(context, _rideType)} · ${pdLabel(context, 'выбранный тип поездки')}',
-                key: const Key('passenger-selected-ride-type')),
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+                key: const Key('passenger-selected-ride-type'),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             if (_rideType == 'Трансфер') ...[
               SwitchListTile(

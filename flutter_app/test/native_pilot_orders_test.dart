@@ -49,6 +49,26 @@ class WidgetOrdersApi extends NativePilotOrdersApi {
   Future<bool> availability([bool? desiredOnline]) async => false;
 }
 
+class FakeAvailabilityApi extends NativePilotOrdersApi {
+  FakeAvailabilityApi() : super(baseUrl: NativePilotOrdersApi.stage, token: token);
+  bool serverOnline = false;
+  bool failNextToggle = false;
+  int heartbeatCalls = 0;
+
+  @override
+  Future<bool> availability([bool? desiredOnline]) async {
+    if (desiredOnline != null) {
+      if (failNextToggle) {
+        failNextToggle = false;
+        throw const PdHttpStatusException(503);
+      }
+      serverOnline = desiredOnline;
+      if (desiredOnline) heartbeatCalls++;
+    }
+    return serverOnline;
+  }
+}
+
 void main() {
   test('read uses the staging endpoint and never follows redirects', () async {
     var requestCount = 0;
@@ -103,6 +123,36 @@ void main() {
     expect((await api.action(orderId, 'approach'))['status'], 'approaching');
     await expectLater(api.action(orderId, 'pay'), throwsFormatException);
     await expectLater(api.action('bad-order', 'approach'), throwsFormatException);
+  });
+
+  testWidgets('connected POWER uses only server-acknowledged state and foreground heartbeat',
+      (tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    final api = FakeAvailabilityApi();
+    await tester.pumpWidget(MaterialApp(home: Scaffold(
+      body: PilotServerAvailabilityButton(api: api))));
+    await tester.pumpAndSettle();
+    expect(find.text('НЕ НА ЛИНИИ'), findsOneWidget);
+    expect(api.serverOnline, false);
+
+    await tester.tap(find.byKey(const Key('pilot-server-line-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('НА ЛИНИИ'), findsOneWidget);
+    expect(api.serverOnline, true);
+    final count = api.heartbeatCalls;
+    await tester.pump(const Duration(seconds: 46));
+    await tester.pump();
+    expect(api.heartbeatCalls, greaterThan(count));
+
+    api.failNextToggle = true;
+    await tester.tap(find.byKey(const Key('pilot-server-line-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('СТАТУС НЕИЗВЕСТЕН'), findsOneWidget);
+    expect(find.byKey(const Key('pilot-server-line-toggle')),
+      findsOneWidget);
+    expect(tester.widget<FilledButton>(
+      find.byKey(const Key('pilot-server-line-toggle'))).onPressed, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   test('server availability is never inferred from local toggle', () async {

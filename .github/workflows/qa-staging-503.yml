@@ -10,6 +10,7 @@ on:
       - qa/native-orders-render-wsgi-20261126
       - qa/native-orders-dispatcher-e2e-20261126
       - qa/unified-integration-release-20261126
+      - qa/store-blockers-unified-20261126
   workflow_dispatch:
 
 permissions:

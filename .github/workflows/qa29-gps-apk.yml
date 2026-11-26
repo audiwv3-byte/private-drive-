@@ -129,17 +129,20 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
-            set -euo pipefail
-            python -u flutter_app/tool/qa29_gps_integration.py serve qa27_server > qa29-server.log 2>&1 &
-            SERVER_PID=$!
-            trap 'kill "$SERVER_PID" 2>/dev/null || true; adb logcat -d > qa29-android.log' EXIT
-            for i in $(seq 1 40); do test -s /tmp/qa29-order-id && break; sleep 1; done
-            test -s /tmp/qa29-order-id
-            python -u flutter_app/tool/qa29_gps_integration.py emulator qa29_apk/PRIVATE-DRIVE-GPS-QA29.apk | tee qa29-e2e.log
+            bash flutter_app/tool/qa29_run_emulator.sh
+      - name: Require actual end-to-end success marker
+        run: |
+          test -s qa29-e2e.log
+          grep -F 'PASS: foreground fix persisted and visible to dispatcher' qa29-e2e.log
+          grep -F 'PASS: new fix received with app backgrounded and screen asleep' qa29-e2e.log
+          grep -F 'PASS: no retained coordinates or accepted post-finish updates' qa29-e2e.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: private-drive-gps-qa29-logs
-          path: qa29-*.log
+          path: |
+            qa29-*.log
+            qa29-ui.xml
+            qa29-screen.png
           if-no-files-found: warn
           retention-days: 7

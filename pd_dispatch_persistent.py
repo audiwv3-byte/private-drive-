@@ -33,6 +33,17 @@ def ingest_enabled():
     return enabled() and len(os.environ.get("PD_DISPATCH_ORDERS_INGEST_SECRET", "")) >= 32
 
 
+
+def order_gps_enabled():
+    """Fail-closed QA27 display gate for the browser dispatcher."""
+    return (enabled()
+            and os.environ.get("PD_QA27_GPS") == "1"
+            and os.environ.get("PD_NATIVE_SMS_LIVE") == "NO"
+            and os.environ.get("PD_PAYMENT_MODE") == "disabled"
+            and os.environ.get("PD_DISPATCH_ORDERS_DATABASE_URL", "").startswith(
+                "postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test"))
+
+
 def verified_request(raw, headers, key, now=None):
     issued = headers.get("X-PD-Order-Timestamp", "")
     signature = headers.get("X-PD-Order-Signature", "")
@@ -124,6 +135,26 @@ def register(app, authorized):
         except Exception:
             app.logger.exception("Persistent dispatcher order store unavailable")
             return reply({"error":"storage_unavailable"},503)
+
+    @app.get("/dispatch/orders/<uuid:order_id>/gps")
+    def dispatch_order_gps(order_id):
+        if not authorized():
+            return reply({"error": "unauthorized"}, 401)
+        if not order_gps_enabled():
+            return reply({"error": "gps_disabled"}, 503)
+        try:
+            with connect() as db:
+                if db.execute("SELECT current_database()").fetchone()[0] != "private_drive_test":
+                    return reply({"error": "gps_disabled"}, 503)
+                result = db.execute(
+                    "SELECT public.pd_qa27_dispatch_gps(%s, %s)",
+                    (order_id, int(time.time())),
+                ).fetchone()[0]
+            status = {"order_not_found": 404}.get(result.get("error"), 200)
+            return reply(result, status)
+        except Exception as exc:
+            app.logger.warning("Dispatcher GPS read unavailable (%s)", type(exc).__name__)
+            return reply({"error": "storage_unavailable"}, 503)
 
     @app.get("/dispatch/orders/state")
     def order_state():

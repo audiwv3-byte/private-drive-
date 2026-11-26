@@ -1,7 +1,7 @@
 name: QA30 dispatcher GPS map
 on:
   push:
-    branches: [qa/store-blockers-unified-20261126]
+    branches: [qa/store-blockers-unified-20261126, qa/final-integrated-rc-20261126]
 permissions:
   contents: read
 jobs:

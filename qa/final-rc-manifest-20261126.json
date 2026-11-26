@@ -1,0 +1,32 @@
+{
+  "release_candidate": "PRIVATE DRIVE QA RC 2026-11-26",
+  "branch": "qa/final-integrated-rc-20261126",
+  "base_sha": "9697756ef42a725123fa829f2d94d96824e3c7bb",
+  "ancestor_branches": [
+    "qa/store-blockers-unified-20261126",
+    "qa/server-passenger-telegram-orders-20261126"
+  ],
+  "included_contracts": [
+    "Android passenger server orders",
+    "Telegram Mini App PostgreSQL orders",
+    "dispatcher orders and browser map",
+    "pilot assignment",
+    "QA29 GPS",
+    "booking JSONB extras and fare preview"
+  ],
+  "gps_blobs": {
+    "flutter_app/lib/qa_pilot_gps.dart": "43637591675003f5504db04d101d20dae50a81ae",
+    "flutter_app/lib/qa29_gps_main.dart": "ce35fa7128b127df083ee37d45a8e91ac56292e5",
+    "flutter_app/lib/native_pilot_orders.dart": "9817c5f0f90f99f1aaff5a2b8d02a6abb6d47256"
+  },
+  "forbidden_actions": [
+    "Render changes",
+    "production",
+    "deploy",
+    "real database",
+    "SMS",
+    "payment processing",
+    "installed Android changes"
+  ],
+  "notes": "QA-only synthetic PostgreSQL and browser/Flutter tests. Not approved for production or store submission."
+}

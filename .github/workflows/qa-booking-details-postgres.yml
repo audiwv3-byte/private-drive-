@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - qa/order-details-postgres-20261126
+      - qa/final-integrated-rc-20261126
   workflow_dispatch:
 
 permissions:

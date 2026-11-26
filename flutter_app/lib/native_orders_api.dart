@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:http/http.dart' as http;
 import 'pd_http_api.dart';
 
@@ -53,7 +54,11 @@ class NativeOrdersApi {
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Content-Type'] = 'application/json';
-      if (payload != null) request.body = jsonEncode(payload);
+      if (payload != null) {
+        request.headers['X-PD-Native-Platform'] =
+            defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+        request.body = jsonEncode(payload);
+      }
       final response = await http.Response.fromStream(
         await client.send(request).timeout(const Duration(seconds: 15)))
         .timeout(const Duration(seconds: 15));

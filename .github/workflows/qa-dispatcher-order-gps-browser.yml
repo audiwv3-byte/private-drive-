@@ -1,0 +1,59 @@
+name: QA dispatcher order GPS in Chromium
+on:
+  push:
+    branches: [qa/dispatcher-order-gps-browser]
+permissions:
+  contents: read
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: b3158cd9510262b5694d8cd7073fa23c70d85b18
+          path: qa_server
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 2b250eb5e3d4540431ade62c482de1eb6de1570a
+          path: qa_android
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare isolated browser and API dependencies
+        run: |
+          python -m pip install -r qa_server/requirements-sms-render.txt flask playwright
+          command -v google-chrome
+          curl -fsS --retry 3 https://unpkg.com/leaflet@1.9.4/dist/leaflet.js -o leaflet.js
+          curl -fsS --retry 3 https://unpkg.com/leaflet@1.9.4/dist/leaflet.css -o leaflet.css
+      - name: Observe assigned order, two fixes, finish and renderer control
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/qa_android/flutter_app/tool"
+          python -u -m qa29_gps_integration serve qa_server > "$RUNNER_TEMP/map-api.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true; tail -n 30 "$RUNNER_TEMP/map-api.log"' EXIT
+          for attempt in {1..40}; do
+            if curl -s -o /dev/null http://127.0.0.1:18729/dispatch/orders/state; then break; fi
+            kill -0 "$server"
+            sleep 1
+          done
+          python -u ops/qa/dispatcher_order_gps_browser.py

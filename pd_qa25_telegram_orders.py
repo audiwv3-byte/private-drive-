@@ -16,6 +16,8 @@ def safe():
 def telegram_order(uid, data):
     if not safe():
         return jsonify(error="orders_disabled"), 503
+    if not isinstance(data, dict):
+        return jsonify(error="invalid_order"), 400
     if data.get("payment_method", "Наличными") != "Наличными":
         return jsonify(error="payment_disabled"), 503
     key = data.get("request_key")

@@ -103,7 +103,7 @@ def register_dispatch_assignment(app, authorized, valid_csrf, admin_id, *, clock
             with _connect(os.environ["PD_PILOT_ASSIGNMENT_DATABASE_URL"]) as db:
                 outcome, status = db.execute(
                     "SELECT * FROM public.pd_assign_native_order(%s,%s,%s,%s)",
-                    (order_id, pilot_id, str(admin_id), int(clock())),
+                    (order_id, pilot_id, str(admin_id() if callable(admin_id) else admin_id), int(clock())),
                 ).fetchone()
             if outcome in {"assigned", "already_assigned"}:
                 return reply({"order_id": str(order_id), "status": status,

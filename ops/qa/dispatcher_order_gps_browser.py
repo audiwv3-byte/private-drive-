@@ -71,6 +71,9 @@ def run(android_apk=None, persistent_only=False):
         page.route("**/*", route)
         anonymous = page.request.get(web_url + read_path)
         assert anonymous.status == 401 and "no-store" in anonymous.headers["cache-control"]
+        for path, mime in (("/pd-logo-transparent.png", "image/png"), ("/assets/pd-black-gold.css", "text/css")):
+            asset = page.request.get(web_url + path)
+            assert asset.ok and asset.headers["content-type"].startswith(mime), (path, asset.status)
         page.goto(web_url + "/dispatch/login")
         page.locator('input[name=password]').fill(password)
         page.locator('button[type=submit], form button').first.click()

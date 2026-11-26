@@ -124,6 +124,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 </div>
 <section id="pilotDirectory">
 {% if pilot_intake_enabled %}<div class="tabs"><a class="btn" href="{{ pilot_add_url }}">Добавить пилота</a><a href="/dispatch/pilot-applications">Анкеты и допуск</a></div>{% endif %}
+{% if pilot_availability_enabled %}<h3>Доступны для назначения</h3><div id="availablePilotList" aria-live="polite">Загрузка…</div>{% endif %}
 <h2 id="pilotsTitle">Пилоты</h2><div class="tabs"><button class="tab active" id="allPilots" aria-pressed="true">Все</button><button class="tab" id="onlinePilots" aria-pressed="false">На линии</button></div>
 {% if persistent_queue_enabled %}<div class="empty">Список пилотов будет доступен после подключения подтверждённых учётных записей.</div>{% elif test_sync_enabled %}
 <div class="card"><strong id="pilotName">Тестовый пилот</strong><p id="pilotStatus">Ожидание данных…</p></div>
@@ -236,6 +237,31 @@ let orderFilter='all';
 const labels={all:'Все заказы',new:'Новые заказы',active:'Заказы в пути',done:'История заказов'};
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});orderFilter=b.dataset.filter;$('ordersTitle').textContent=labels[orderFilter];document.dispatchEvent(new Event('pd-test-filter'));}));
 ['allPilots','onlinePilots'].forEach(id=>$(id).addEventListener('click',()=>{['allPilots','onlinePilots'].forEach(k=>{$(k).classList.toggle('active',k===id);$(k).setAttribute('aria-pressed',String(k===id))});document.dispatchEvent(new Event('pd-test-filter'));}));
+{% if pilot_availability_enabled %}
+async function refreshAvailablePilots(){
+    const list = $('availablePilotList');
+    try {
+        const response = await fetch('/dispatch/orders/eligible-pilots', {
+            cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(7000)
+        });
+        if (!response.ok) throw new Error();
+        const {pilots} = await response.json();
+        const rows = pilots.map(pilot => {
+            const row = document.createElement('p');
+            row.textContent = pilot.id;
+            return row;
+        });
+        list.replaceChildren(...(rows.length ? rows : ['Нет доступных пилотов']));
+        $('countOnline').textContent = String(rows.length);
+    } catch {
+        list.textContent = 'Нет связи со списком пилотов';
+        $('countOnline').textContent = '—';
+    } finally {
+        setTimeout(refreshAvailablePilots, 5000);
+    }
+}
+refreshAvailablePilots();
+{% endif %}
 {% if persistent_queue_enabled %}
 const liveStatusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'К пассажиру',underway:'В поездке',finished:'Завершён',cancelled:'Отменён'};
 let lastOrders=null;
@@ -248,7 +274,7 @@ function renderPersistentOrders(){
     (orderFilter==='done'&&['finished','cancelled'].includes(o.status)));
  for(const [id,n] of Object.entries({countNew:items.filter(o=>o.status==='requested').length,
  countActive:items.filter(o=>['assigned','approaching','underway'].includes(o.status)).length,
- countOnline:0,countDone:items.filter(o=>['finished','cancelled'].includes(o.status)).length})){
+ {% if not pilot_availability_enabled %}countOnline:0,{% endif %}countDone:items.filter(o=>['finished','cancelled'].includes(o.status)).length})){
    $(id).textContent=n;
  }
  const cards=chosen.map(order=>{

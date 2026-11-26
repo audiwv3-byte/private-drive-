@@ -319,6 +319,8 @@ def register(app, core):
     from pd_dispatch_persistent import enabled as persistent_queue_ready
     from pd_dispatch_persistent import register as register_persistent_queue
     register_persistent_queue(app, authorized)
+    from pd_native_pilot_assignment import dispatcher_assignment_enabled, register_dispatch_assignment
+    register_dispatch_assignment(app, authorized, valid_csrf, admin_id)
     persistent_queue_enabled = persistent_queue_ready()
 
     test_sync_enabled = (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
@@ -371,6 +373,7 @@ def register(app, core):
         response = app.make_response(render_template_string(
             page, mapbox_token=token, test_sync_enabled=use_test_queue,
             persistent_queue_enabled=persistent_queue_enabled and not use_test_queue,
+            pilot_availability_enabled=dispatcher_assignment_enabled() and not use_test_queue,
             gps_sync_enabled=test_sync_enabled,
             test_queue_link=url_for("pd_dispatch_map", queue="test")
                 if test_sync_enabled and not use_test_queue else None,

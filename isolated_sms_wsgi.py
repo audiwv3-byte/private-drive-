@@ -7,7 +7,8 @@ import os
 import json
 import threading
 
-from pd_native_pilot_assignment import make_native_pilot_orders_app
+from pd_native_orders_http import make_orders_app
+from pd_native_pilot_assignment import _database_target, make_native_pilot_orders_app
 from pd_native_auth_postgres_http import make_app
 from pd_native_identity_http import make_identity_app
 
@@ -45,7 +46,19 @@ application = make_app(
 application = make_identity_app(application, database_url, sms_enabled=live,
     telegram_enabled=telegram is not None, session_resume_enabled=True)
 
-application = make_native_pilot_orders_app(application, database_url)
+orders_db = os.getenv("PD_DISPATCH_ORDERS_DATABASE_URL", "")
+auth_target = _database_target(database_url)
+orders_target = _database_target(orders_db)
+staging_hosts = {
+    "dpg-dc00pubm8hqs7397rblg-a",
+    "dpg-dc00pubm8hqs7397rblg-a.frankfurt-postgres.render.com",
+}
+if (auth_target and orders_target and auth_target[1:] == orders_target[1:]
+        and auth_target[0] in staging_hosts and orders_target[0] in staging_hosts):
+    application = make_orders_app(application, orders_db)
+else:
+    orders_db = database_url
+application = make_native_pilot_orders_app(application, orders_db)
 
 def _report_sms_setup():
     from pd_twilio_setup_diagnostics import inspect_setup

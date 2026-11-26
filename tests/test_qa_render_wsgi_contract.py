@@ -44,7 +44,9 @@ class DeployedEntrypointContract(unittest.TestCase):
         native = next(s for s in DATA["services"] if s["role"] == "native_api")
         checkout = verify_checkout(native)
         entrypoint = parse(checkout / native["source_file"])
-        orders = parse(checkout / "pd_native_orders_http.py")
+        # The deployed revision predates the QA order adapter entirely.
+        self.assertFalse((checkout / "pd_native_orders_http.py").exists())
+        orders = parse(ROOT / "pd_native_orders_http.py")
         self.assertTrue(imports(orders, "pd_dispatch_persistent", "validated_order"))
         self.assertTrue(any(isinstance(n, ast.Constant) and n.value == "/native-orders"
                             for n in ast.walk(orders)))
@@ -53,7 +55,7 @@ class DeployedEntrypointContract(unittest.TestCase):
         self.assertFalse(imports(entrypoint, "pd_native_orders_http", "make_orders_app"))
         self.assertFalse(calls(entrypoint, "make_orders_app"))
         self.assertNotIn("/native-orders", (checkout / native["source_file"]).read_text())
-        print("CONFIRMED: deployed native API WSGI lacks /native-orders mount (HTTP 404 path); not evidence of HTTP 503")
+        print("CONFIRMED: deployed native API revision lacks /native-orders module and mount (HTTP 404 path); not evidence of HTTP 503")
 
     def test_dispatcher_uses_different_wsgi_and_registers_queue(self):
         dispatcher = next(s for s in DATA["services"] if s["role"] == "dispatcher")

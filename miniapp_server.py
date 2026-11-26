@@ -112,11 +112,12 @@ def qa_shared_order_bridge():
             except ValueError:
                 return jsonify(error='invalid_departure'), 400
         response = app.make_response(telegram_order(uid, body))
-        # The common contract stores route/date/time, not optional pricing,
-        # payments or preferences. Never indicate these are saved.
+        # Booking notes, extras and fare preview are stored in PostgreSQL,
+        # but map-point metadata is not part of this contract.
         if response.status_code in (200, 201):
             payload = response.get_json()
-            payload['details_not_saved'] = True
+            payload['details_saved'] = True
+            payload['details_not_saved'] = False
             return jsonify(payload), response.status_code
         return response
     if request.path == '/api/orders' and request.method == 'GET':

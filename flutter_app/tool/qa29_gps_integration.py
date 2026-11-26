@@ -4,9 +4,11 @@ import hmac
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -79,21 +81,36 @@ def request(path, method="GET", body=None, headers=None):
 def adb(*args):
     return subprocess.check_output(["adb",*args],text=True,timeout=20)
 
-def tap_text(label, deadline=45):
+def find_control(label, *, order_id=None, deadline=45):
     end=time.monotonic()+deadline
     while time.monotonic()<end:
         adb("shell","uiautomator","dump","/sdcard/qa29.xml")
         raw=adb("shell","cat","/sdcard/qa29.xml")
         root=ET.fromstring(raw)
-        import re
+        if order_id and not any(order_id in value for node in root.iter("node")
+                                for value in (node.get("text", ""), node.get("content-desc", ""))):
+            time.sleep(1)
+            continue
         for node in root.iter("node"):
             if label in (node.get("text","")+" "+node.get("content-desc","")):
                 nums=list(map(int,re.findall(r"\d+",node.get("bounds",""))))
                 if len(nums)==4:
-                    adb("shell","input","tap",str((nums[0]+nums[2])//2),str((nums[1]+nums[3])//2))
-                    return
+                    return str((nums[0]+nums[2])//2), str((nums[1]+nums[3])//2)
         time.sleep(1)
     raise AssertionError("UI control not found: "+label)
+
+def require_denial(path, status, error, **kwargs):
+    try:
+        request(path, **kwargs)
+    except urllib.error.HTTPError as response:
+        with response:
+            assert response.code == status and json.load(response)["error"] == error
+        return
+    raise AssertionError(f"Expected {status} for {path}")
+
+def gps_writes(oid):
+    path = f"POST /native-pilot-orders/{oid}/gps HTTP/"
+    return [line for line in Path("qa29-server.log").read_text().splitlines() if path in line]
 
 def poll(fn, predicate, description, seconds=60):
     end=time.monotonic()+seconds
@@ -109,10 +126,17 @@ def poll(fn, predicate, description, seconds=60):
     raise AssertionError("Timed out: "+description)
 
 def emulator(apk):
+    import psycopg
     oid=OID_FILE.read_text().strip()
     read="/dispatch/orders/"+oid+"/gps"
+    write="/native-pilot-orders/"+oid+"/gps"
     gps=lambda: request(read,headers=signed(201))
     bearer={"Authorization":"Bearer "+PILOT}
+    rows=request("/native-pilot-orders",headers=bearer)["orders"]
+    assert [(row["order_id"], row["status"]) for row in rows] == [(oid, "assigned")], rows
+    require_denial(read,401,"unauthorized",headers=signed(101))
+    require_denial(write,401,"invalid_session",method="POST",body={"enabled":False,"captured_at":int(time.time())})
+    print("PASS: assigned pilot can load order; passenger read and anonymous GPS write denied",flush=True)
     assert gps()=={"available":False}
     adb("install","-r",str(apk))
     adb("reverse","tcp:18729","tcp:18729")
@@ -120,28 +144,47 @@ def emulator(apk):
         adb("shell","pm","grant",PACKAGE,"android.permission."+permission)
     adb("shell","cmd","location","set-location-enabled","true")
     adb("shell","am","start","-W","-n",PACKAGE+"/lt.privatedrive.private_drive.MainActivity")
-    tap_text("Передавать GPS диспетчеру")
+    button=find_control("Передавать GPS диспетчеру",order_id=oid)
+    print("PASS: assigned order and GPS control visible together",flush=True)
+    adb("shell","input","tap",*button)
+    find_control("Остановить передачу GPS")
     def fake_fix(lat,lon):
         adb("emu","geo","fix",str(lon),str(lat))
     def matches(g,lat,lon):
         return g.get("available") is True and abs(g["latitude"]-lat)<0.01 and abs(g["longitude"]-lon)<0.01
     fake_fix(1.25,2.5)
     first=poll(gps,lambda g:matches(g,1.25,2.5),"foreground fix persisted and visible to dispatcher")
+    def stored_fix_matches(fix):
+        with psycopg.connect(DSN) as db:
+            row=db.execute("SELECT latitude, longitude, captured_at FROM public.pd_qa27_gps WHERE order_id=%s AND pilot_id=%s",
+                           (oid,"qa29-pilot")).fetchone()
+        return row is not None and abs(row[0]-fix["latitude"])<0.0001 and abs(row[1]-fix["longitude"])<0.0001 and row[2]>=fix["captured_at"]
+    assert stored_fix_matches(first), "Dispatcher fix missing in PostgreSQL"
     adb("shell","input","keyevent","KEYCODE_HOME")
     adb("shell","input","keyevent","KEYCODE_SLEEP")
     time.sleep(6)
+    def screen_asleep():
+        return "mWakefulness=Asleep" in adb("shell","dumpsys","power")
+    assert screen_asleep(), "Emulator did not enter sleep"
     fake_fix(1.35,2.6)
-    poll(gps,lambda g:matches(g,1.35,2.6) and g["captured_at"]>first["captured_at"],"new fix received with app backgrounded and screen asleep")
+    second=poll(gps,lambda g:matches(g,1.35,2.6) and g["captured_at"]>first["captured_at"],"new fix received with app backgrounded and screen asleep")
+    assert screen_asleep() and stored_fix_matches(second)
+    print("PASS: PostgreSQL contains both observed fixes at their respective checkpoints",flush=True)
+    prior_writes=len(gps_writes(oid))
     for action in ("approach","start","finish"):
         result=request("/native-pilot-orders","PATCH",{"order_id":oid,"action":action},bearer)
         assert result["payment_mode"]=="disabled",result
     assert result["status"]=="finished"
     poll(gps,lambda g:g=={"available":False},"finished trip no longer exposes GPS")
-    time.sleep(12)
+    poll(lambda:gps_writes(oid)[prior_writes:],lambda lines:any('409' in line.split('HTTP/')[-1] for line in lines),
+         "client contacted server to stop after trip finished",seconds=45)
+    write_count=len(gps_writes(oid))
     fake_fix(1.45,2.7)
     time.sleep(8)
     assert gps()=={"available":False}
-    import psycopg
+    assert len(gps_writes(oid))==write_count, "Android kept sending GPS after trip finished"
+    require_denial(write,409,"inactive_order",method="POST",headers=bearer,
+                   body={"enabled":True,"latitude":1.45,"longitude":2.7,"captured_at":int(time.time())})
     with psycopg.connect(DSN) as db:
         assert db.execute("SELECT count(*) FROM public.pd_qa27_gps").fetchone()[0]==0
     print("PASS: no retained coordinates or accepted post-finish updates",flush=True)

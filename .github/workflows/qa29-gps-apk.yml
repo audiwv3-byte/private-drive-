@@ -133,8 +133,12 @@ jobs:
       - name: Require actual end-to-end success marker
         run: |
           test -s qa29-e2e.log
+          grep -F 'PASS: assigned pilot can load order; passenger read and anonymous GPS write denied' qa29-e2e.log
+          grep -F 'PASS: assigned order and GPS control visible together' qa29-e2e.log
           grep -F 'PASS: foreground fix persisted and visible to dispatcher' qa29-e2e.log
           grep -F 'PASS: new fix received with app backgrounded and screen asleep' qa29-e2e.log
+          grep -F 'PASS: PostgreSQL contains both observed fixes at their respective checkpoints' qa29-e2e.log
+          grep -F 'PASS: client contacted server to stop after trip finished' qa29-e2e.log
           grep -F 'PASS: no retained coordinates or accepted post-finish updates' qa29-e2e.log
       - uses: actions/upload-artifact@v4
         if: always()

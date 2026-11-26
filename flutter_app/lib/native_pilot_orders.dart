@@ -236,14 +236,12 @@ class NativePilotOrdersApi {
   }
 
   Future<List<PilotAssignedOrder>> load() async {
-    if (baseUrl != stage) {
-      throw const FormatException('Pilot assignments require the staging API');
-    }
+    final endpoint = _endpoint('/native-pilot-orders');
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
       throw const PdHttpStatusException(401);
     }
     final request = http.Request(
-      'GET', _endpoint('/native-pilot-orders'),
+      'GET', endpoint,
     )
       ..followRedirects = false
       ..headers['Authorization'] = 'Bearer $token'

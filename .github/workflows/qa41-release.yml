@@ -75,7 +75,7 @@ jobs:
           cache: true
       - name: Audit isolated release with consented background GPS
         run: |
-          python3 ops/qa/qa41_release_audit.py
+          python3 ops/qa/qa38_release_audit.py
       - name: Build arm64 device Release without signing
         working-directory: flutter_app
         run: |

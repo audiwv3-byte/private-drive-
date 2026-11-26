@@ -57,3 +57,23 @@ def telegram_order(uid, data):
         return jsonify(ok=True,order_id=oid,status=status if qa26 else "Новая",price="",replayed=not bool(row))
     except psycopg.Error:
         return jsonify(error="storage_unavailable"), 503
+
+def telegram_history(uid):
+    """One PostgreSQL ownership contract for QA25 and the real Mini App WSGI."""
+    if not safe() or os.getenv("PD_QA26_ASSIGNMENT") != "1":
+        return jsonify(error="orders_disabled"), 503
+    import psycopg
+    try:
+        with psycopg.connect(os.environ["PD_DISPATCH_ORDERS_DATABASE_URL"],
+                            connect_timeout=4, options="-c statement_timeout=4000") as db:
+            rows = db.execute("""SELECT o.id,o.origin,o.destination,o.trip_date,
+                o.trip_time,o.status FROM public.pd_dispatch_orders o
+                JOIN public.pd_telegram_order_owners t ON t.order_id=o.id
+                WHERE t.telegram_id=%s ORDER BY o.created_at DESC LIMIT 100""", (uid,)).fetchall()
+        response = jsonify(orders=[dict(zip(
+            ("order_id","origin","destination","trip_date","trip_time","status"),
+            (str(row[0]),*row[1:]))) for row in rows])
+        response.headers["Cache-Control"] = "private, no-store"
+        return response
+    except psycopg.Error:
+        return jsonify(error="storage_unavailable"), 503

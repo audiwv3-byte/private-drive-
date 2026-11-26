@@ -29,4 +29,29 @@ def main():
     print(f"Scanned {scanned} tracked text files; {len(hits)} findings")
     for hit in hits: print(*hit)
     if hits: raise SystemExit(1)
+    # Scan unique reachable historical blobs without emitting matching content.
+    import sys
+    if '--history' not in sys.argv: return
+    objects=subprocess.check_output(['git','rev-list','--objects','--all']).splitlines()
+    ids=[line.split(b' ',1)[0] for line in objects]
+    proc=subprocess.Popen(['git','cat-file','--batch'],stdin=subprocess.PIPE,stdout=subprocess.PIPE)
+    findings=0
+    count=0
+    for oid in ids:
+        proc.stdin.write(oid+b'\n'); proc.stdin.flush()
+        header=proc.stdout.readline().split()
+        if len(header)!=3: raise RuntimeError('missing git object')
+        size=int(header[2])
+        data=proc.stdout.read(size)
+        proc.stdout.read(1)
+        if header[1]!=b'blob' or b'\0' in data[:8192]: continue
+        count+=1
+        for kind,pattern in patterns.items():
+            if re.search(pattern,data):
+                findings+=1
+                print('historical finding',oid.decode(),kind)
+    proc.stdin.close()
+    if proc.wait()!=0: raise RuntimeError('git object scan failed')
+    print(f'History: {count} unique text blobs; {findings} findings')
+    if findings: raise SystemExit(1)
 if __name__=="__main__": main()

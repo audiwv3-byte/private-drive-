@@ -23,6 +23,7 @@ def ensure_tables(core):
 def read_photos():
     photos={}
     for side in SIDES:
+        if len(request.files.getlist(side))>1:raise ValueError('Повторяющийся файл документа')
         f=request.files.get(side)
         if not f:continue
         if side not in ACTIVE_SIDES:raise ValueError("Загружаются водительские права и три фотографии автомобиля")
@@ -43,6 +44,13 @@ def read_photos():
 
 def register(app,core,auth):
     ensure_tables(core)
+    @app.after_request
+    def private_driver_responses(response):
+        if request.path.startswith(('/api/driver/', '/api/admin/driver-applications')) or request.path == '/api/me':
+            response.headers['Cache-Control']='private, no-store'
+            response.headers['X-Content-Type-Options']='nosniff'
+            response.headers['Referrer-Policy']='no-referrer'
+        return response
     app.config['MAX_CONTENT_LENGTH']=82*1024*1024
     @app.errorhandler(413)
     def pd_documents_too_large(exc):return jsonify(error='Файлы слишком большие. Максимум 10 МБ на фото'),413

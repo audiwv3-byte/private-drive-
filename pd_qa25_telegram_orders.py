@@ -18,7 +18,9 @@ def telegram_order(uid, data):
         return jsonify(error="orders_disabled"), 503
     if not isinstance(data, dict):
         return jsonify(error="invalid_order"), 400
-    if data.get("payment_method", "Наличными") != "Наличными":
+    isolated_booking = os.getenv("PD_QA39_2_BOOKING_UI") == "1"
+    if (("payment_method" in data) if isolated_booking
+            else data.get("payment_method", "Наличными") != "Наличными"):
         return jsonify(error="payment_disabled"), 503
     key = data.get("request_key")
     if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9_-]{16,80}", key):
@@ -54,6 +56,10 @@ def telegram_order(uid, data):
                 status = old[2]
                 if qa26 and not db.execute("SELECT 1 FROM public.pd_telegram_order_owners WHERE order_id=%s AND telegram_id=%s",(oid,uid)).fetchone():
                     return jsonify(error="request_conflict"), 409
-        return jsonify(ok=True,order_id=oid,status=status if qa26 else "Новая",price="",replayed=not bool(row))
+        result = dict(ok=True, order_id=oid, status=status if qa26 else "Новая",
+                      price="", replayed=not bool(row))
+        if isolated_booking:
+            result["payment_mode"] = "disabled"
+        return jsonify(result)
     except psycopg.Error:
         return jsonify(error="storage_unavailable"), 503

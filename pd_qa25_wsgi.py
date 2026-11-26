@@ -1,6 +1,6 @@
 """Isolated WSGI entry for PostgreSQL order integration; no live services."""
 import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 from pd_request_security import verify_telegram_user, register_request_guard
 from pd_dispatch_persistent import register
 from pd_native_orders_http import make_orders_app
@@ -17,7 +17,10 @@ def create_application():
     admins = frozenset(int(x) for x in os.environ["PD_QA25_ADMINS"].split(","))
     if passengers & admins:
         raise RuntimeError("QA25 roles must be distinct")
-    app = Flask(__name__)
+    isolated_booking = os.getenv("PD_QA39_2_BOOKING_UI") == "1"
+    if isolated_booking and os.getenv("PD_QA26_ASSIGNMENT") != "1":
+        raise RuntimeError("Isolated booking requires the PostgreSQL order ownership schema")
+    app = Flask(__name__, template_folder="miniapp/templates")
     register_request_guard(app)
 
     @app.get("/qa/staging/readiness")
@@ -39,6 +42,19 @@ def create_application():
     @app.errorhandler(PermissionError)
     def denied(exc):
         return jsonify(error="unauthorized"), 401
+
+    if isolated_booking:
+        @app.get("/")
+        def booking_page():
+            return render_template("index.html", pd_lang="ru", pd_ui={}, pd_isolated_booking=True)
+
+        @app.get("/api/me")
+        def synthetic_passenger():
+            user = uid()
+            if user not in passengers:
+                return jsonify(error="passenger_required"), 403
+            return jsonify(id=user, name="Synthetic Passenger", phone="+37060000000",
+                           registered=True, admin=False)
 
     @app.post("/api/order")
     def order():

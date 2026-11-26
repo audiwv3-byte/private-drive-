@@ -1029,6 +1029,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
   @override
   Widget build(BuildContext context) {
+    final canOpenOrders = widget.ordersApi != null || widget.tripStore != null;
     const gold = Color(0xFFDDC184);
     final start = _resolve(_from.text);
     final finish = _resolve(_to.text);
@@ -1963,11 +1964,11 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-drawer-history'),
               leading: const Icon(Icons.history),
               title: Text(pdTr(context, 'История', 'Istorija', 'History')),
-              enabled: widget.tripStore != null,
-              onTap: widget.tripStore == null ? null : () {
+              enabled: canOpenOrders,
+              onTap: canOpenOrders ? () {
                 Navigator.pop(context);
                 _openOrders();
-              },
+              } : null,
             ),
             ListTile(
               key: const Key('passenger-drawer-profile'),
@@ -2042,7 +2043,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
         title: Text(pdLabel(context, 'PRIVATE DRIVE · Пассажир')),
         actions: [
           const PdLanguageMenu(),
-          if (widget.tripStore != null)
+          if (canOpenOrders)
             IconButton(
               key: const Key('passenger-orders-button'),
               tooltip: pdLabel(context, 'Мои заказы'),

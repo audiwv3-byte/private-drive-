@@ -16,10 +16,17 @@ def make_application():
     os.environ.update(PD_DISPATCH_SESSION_SECRET=secrets.token_hex(32),
         PD_DISPATCH_PASSWORD_HASH=generate_password_hash(password),
         PD_DISPATCH_ADMIN_ID="201", PD_DISPATCH_TEST_SYNC="0")
+    from pd_native_auth_postgres_http import session_request, reply
+    import time
+    api_dsn = os.environ['PD_DISPATCH_ORDERS_DATABASE_URL']
     from pd_dispatcher_staging_wsgi import create_app
     web = create_app()
     def application(environ, start_response):
         path = environ.get("PATH_INFO", "")
+        if path in ("/native-auth/session", "/native-auth/sign-out") and environ.get("REQUEST_METHOD") == "POST":
+            return session_request(api_dsn, environ, start_response, path, int(time.time()))
+        if path.startswith("/native-auth/"):
+            return reply(start_response, "503 Service Unavailable", {"error": "external_auth_disabled"})
         # Browser owns dispatcher paths; native API keeps its original auth.
         if path == "/native-orders" or path.startswith("/native-pilot-orders"):
             return native(environ, start_response)

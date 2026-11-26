@@ -40,7 +40,13 @@ void main() {
       token:token,client:MockClient((_) async => http.Response('',302)));
     await expectLater(redirected.publishGps(order,null,102),
       throwsA(isA<PdHttpStatusException>()));
-  });
+  }, skip: !NativePilotOrdersApi.qaGpsEnabled);
+
+  test('GPS is disabled without both QA flags', () async {
+    final api = NativePilotOrdersApi(baseUrl:NativePilotOrdersApi.stage,
+      token:token,client:MockClient((_) async {fail('GPS must not send without QA flags');}));
+    await expectLater(api.publishGps(order,null,100),throwsFormatException);
+  }, skip: NativePilotOrdersApi.qaGpsEnabled);
 
   testWidgets('consented publisher keeps sending on simulated pause and stops when assignment ends',
     (tester) async {

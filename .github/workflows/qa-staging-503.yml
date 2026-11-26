@@ -1,17 +1,7 @@
 name: QA staging API 503 synthetic PostgreSQL
 on:
   push:
-    branches:
-      - qa/staging-api-503-20261126
-      - qa/staging-api-503-readiness-20261126
-      - qa/staging-api-503-contract-20261126
-      - qa/staging-503-contract-gates-20261126
-      - qa/staging-503-render-entrypoint-20261126
-      - qa/native-orders-render-wsgi-20261126
-      - qa/native-orders-dispatcher-e2e-20261126
-      - qa/unified-integration-release-20261126
-      - qa/store-blockers-unified-20261126
-  workflow_dispatch:
+    branches: [qa/merged-passenger-gps-20261126]
 
 permissions:
   contents: read

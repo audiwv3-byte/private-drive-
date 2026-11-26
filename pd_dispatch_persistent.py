@@ -36,12 +36,22 @@ def ingest_enabled():
 
 def order_gps_enabled():
     """Fail-closed QA27 display gate for the browser dispatcher."""
-    return (enabled()
-            and os.environ.get("PD_QA27_GPS") == "1"
+    if not (enabled() and os.environ.get("PD_QA27_GPS") == "1"
             and os.environ.get("PD_NATIVE_SMS_LIVE") == "NO"
-            and os.environ.get("PD_PAYMENT_MODE") == "disabled"
-            and os.environ.get("PD_DISPATCH_ORDERS_DATABASE_URL", "").startswith(
-                "postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test"))
+            and os.environ.get("PD_PAYMENT_MODE") == "disabled"):
+        return False
+    from psycopg import ProgrammingError
+    from psycopg.conninfo import conninfo_to_dict
+
+    try:
+        fields = conninfo_to_dict(os.environ["PD_DISPATCH_ORDERS_DATABASE_URL"])
+    except ProgrammingError:
+        return False
+    # Reject alternate hosts, services and libpq routing overrides.
+    return (fields.keys() <= {"host", "port", "dbname", "user", "password"}
+            and fields.get("host") == "127.0.0.1"
+            and fields.get("port", "5432") == "5432"
+            and fields.get("dbname") == "private_drive_test")
 
 
 def verified_request(raw, headers, key, now=None):

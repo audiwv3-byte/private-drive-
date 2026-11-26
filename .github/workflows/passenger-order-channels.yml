@@ -1,8 +1,8 @@
 name: Passenger order channels
 on:
   push:
-    branches: [qa/passenger-only-order-channels]
-  workflow_dispatch:
+    branches: [qa/merged-passenger-gps-20261126]
+
 permissions:
   contents: read
 jobs:

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - qa/unified-integration-release-20261126
+      - qa/store-blockers-unified-20261126
   workflow_dispatch:
 
 permissions:

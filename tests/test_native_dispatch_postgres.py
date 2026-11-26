@@ -59,9 +59,11 @@ def pilot_db():
             GRANT EXECUTE ON FUNCTION public.pd_validate_native_session(text,bigint),
                 public.pd_revoke_current_session(text,bigint) TO pd_ci_order_api;
             GRANT SELECT, INSERT ON public.pd_dispatch_orders,
-                public.pd_native_order_owners TO pd_ci_order_api;
+                public.pd_native_order_owners,
+                public.pd_native_order_quotes TO pd_ci_order_api;
             GRANT UPDATE (status) ON public.pd_dispatch_orders TO pd_ci_order_api;
-            GRANT SELECT ON public.pd_dispatch_orders TO pd_ci_order_dispatcher;
+            GRANT SELECT ON public.pd_dispatch_orders,
+                public.pd_native_order_quotes TO pd_ci_order_dispatcher;
             GRANT SELECT (id,user_id,status,photo,created_at,expires_at,decided_at),
                   INSERT (id,user_id,status,photo,created_at,expires_at),
                   UPDATE (status,photo,reviewer_id,decided_at)

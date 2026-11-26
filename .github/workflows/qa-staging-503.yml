@@ -1,0 +1,41 @@
+name: QA staging API 503 synthetic PostgreSQL
+on:
+  push:
+    branches:
+      - qa/staging-api-503-20261126
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: qa
+          POSTGRES_PASSWORD: qa
+          POSTGRES_DB: private_drive_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qa -d private_drive_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PD_QA_SYNTHETIC_POSTGRES_URL: postgresql://qa:qa@127.0.0.1:5432/private_drive_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install isolated dependencies
+        run: python -m pip install 'psycopg[binary]>=3.1,<4'
+      - name: Check Python syntax of changed QA components
+        run: python -m py_compile pd_qa_staging_preflight.py pd_qa25_wsgi.py pd_qa25_telegram_orders.py tests/test_qa_staging_preflight.py
+      - name: Test synthetic PostgreSQL and all 503 conditions
+        run: python -m unittest discover -s tests -p test_qa_staging_preflight.py -v

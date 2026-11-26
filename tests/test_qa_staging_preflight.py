@@ -8,8 +8,9 @@ ENV = {**REQUIRED, "PD_DISPATCH_ORDERS_DATABASE_URL": URL}
 
 
 class FakeDatabase:
-    def __init__(self, missing=(), ping=(1,), failure=False):
+    def __init__(self, missing=(), ping=(1,), failure=False, denied=()):
         self.missing = set(missing)
+        self.denied = set(denied)
         self.ping = ping
         self.failure = failure
 
@@ -25,8 +26,11 @@ class FakeDatabase:
         if query == "SELECT 1":
             self.row = self.ping
         else:
-            assert query in ("SELECT to_regclass(%s)", "SELECT to_regprocedure(%s)")
-            self.row = (None if params[0] in self.missing else params[0],)
+            if query.startswith("SELECT has_"):
+                self.row = (params[0] not in self.denied,)
+            else:
+                assert query in ("SELECT to_regclass(%s)", "SELECT to_regprocedure(%s)")
+                self.row = (None if params[0] in self.missing else params[0],)
         return self
 
     def fetchone(self):
@@ -74,6 +78,14 @@ class PreflightTests(unittest.TestCase):
             with self.subTest(relation=relation):
                 self.assertEqual(check(environment=env, connect=fake(FakeDatabase(missing=(relation,))))["reason"],
                                  "database_schema_missing")
+
+    def test_missing_grants_reported_separately(self):
+        for obj in ("public.pd_dispatch_orders", "public.pd_native_order_owners",
+                    "public.pd_validate_native_session(text,bigint)"):
+            with self.subTest(obj=obj):
+                self.assertEqual(check(environment=ENV,
+                    connect=fake(FakeDatabase(denied=(obj,))))["reason"],
+                    "database_permissions_missing")
 
     def test_real_synthetic_postgres_if_configured(self):
         url = os.getenv("PD_QA_SYNTHETIC_POSTGRES_URL")

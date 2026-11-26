@@ -49,3 +49,42 @@ jobs:
           channel: stable
       - run: flutter pub get
       - run: flutter test test/qa39_server_cabins_test.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --reporter expanded
+  browser-services:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+      PD_NATIVE_SMS_ISOLATED: 'YES'
+      PD_NATIVE_SMS_LIVE: 'NO'
+      PD_PAYMENT_MODE: disabled
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare Chromium, Playwright and offline Leaflet assets
+        run: |
+          python -m pip install -r requirements-sms-render.txt flask playwright pytest
+          command -v google-chrome
+          for asset in leaflet.js leaflet.css; do
+            curl --fail --silent --show-error --retry 3 "https://unpkg.com/leaflet@1.9.4/dist/$asset" -o "$asset"
+          done
+      - name: Test service cards in real Chromium
+        run: python -m pytest -vs tests/test_qa39_services_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa39-services-browser
+          path: qa39-services-browser.png

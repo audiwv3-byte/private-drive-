@@ -29,3 +29,12 @@ for name in ("INTERNET", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "CAME
     if full not in existing:
         doc.insert(0, ET.Element("uses-permission", {"{" + ns + "}name": full}))
 tree.write(manifest, encoding="utf-8", xml_declaration=True)
+
+# The release-only scaffold must not register Flutter's debug-only integration
+# test plugin. Keep the original app pubspec and test suite unchanged.
+pubspec = root / "pubspec.yaml"
+source = pubspec.read_text()
+source, count = re.subn(r"(?m)^  integration_test:\s*\n    sdk: flutter[ \t]*\n", "", source)
+assert count == 1, "Expected one integration_test SDK dev dependency"
+pubspec.write_text(source)
+print("Removed integration_test from isolated release scaffold only")

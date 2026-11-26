@@ -83,7 +83,13 @@ def test_real_sms_wsgi_order_chain(monkeypatch):
     client = Client(application, Response)
     bearer = lambda char: {"Authorization": "Bearer " + char * 48}
     body = {"request_id": str(uuid.uuid4()), "from": "Synthetic Airport",
-            "to": "Synthetic City", "trip_date": "2027-01-01", "trip_time": "14:00"}
+            "to": "Synthetic City", "trip_date": "2027-01-01", "trip_time": "14:00",
+            "booking_details":{"ride_type":"Трансфер","tariff":"Трансфер",
+                "round_trip":True,"advance_booking":True,
+                "fare_preview_eur":110,"fare_requires_quote":False,
+                "extras":["Встреча с табличкой","Вода"],
+                "wishes":"Без громкой музыки",
+                "preferences":{"radio":"M-1","temperature":21,"tracks":["Track A"]}}}
 
     health = client.get("/health")
     assert health.status_code == 200, health.get_data(as_text=True)
@@ -103,6 +109,13 @@ def test_real_sms_wsgi_order_chain(monkeypatch):
     history = client.get("/native-orders", headers=bearer("a"))
     assert history.status_code == 200
     assert history.json["orders"][0]["order_id"] == order_id
+    details = history.json["orders"][0]["booking_details"]
+    assert details["fare_preview_eur"] == 110
+    assert details["extras"] == ["Встреча с табличкой","Вода"]
+    assert details["preferences"]["temperature"] == 21
+    assert client.post("/native-orders",
+                       json={**body,"booking_details":{"extras":"invalid"}},
+                       headers=bearer("a")).status_code == 400
     with psycopg.connect(DSN) as db:
         assert db.execute(
             "SELECT source FROM public.pd_dispatch_orders WHERE id=%s", (order_id,)

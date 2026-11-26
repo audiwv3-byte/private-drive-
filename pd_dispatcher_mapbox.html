@@ -378,6 +378,12 @@ function renderPersistentOrders(){
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
      ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
    card.append(route,info);
+   if(['delivery','jumpstart'].includes(order.service_type)){
+     const service=document.createElement('p');
+     service.textContent=(order.service_type==='delivery'?'Доставка товаров':'Запуск автомобиля')+' · '+(order.quoted_total_cents/100).toFixed(2)+' €';
+     card.append(service);
+     if(order.service_notes){const notes=document.createElement('p');notes.textContent=order.service_notes;card.append(notes);}
+   }
    if(Number.isInteger(order.stop_charge_cents)){
      const meter=document.createElement('p');
      meter.textContent='Остановка: '+order.waiting_seconds+' сек · QA: '+(order.stop_charge_cents/100).toFixed(2)+' €'+(order.waiting_active?' · таймер идёт':'');

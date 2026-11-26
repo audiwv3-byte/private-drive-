@@ -1,3 +1,4 @@
+import 'native_orders_api.dart';
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'passenger_orders_demo.dart';
@@ -11,9 +12,11 @@ class PassengerExtraServices extends StatefulWidget {
     super.key,
     required this.type,
     required this.tripStore,
+    this.ordersApi,
   });
   final ExtraServiceType type;
-  final DemoTripStore tripStore;
+  final DemoTripStore? tripStore;
+  final NativeOrdersApi? ordersApi;
 
   @override
   State<PassengerExtraServices> createState() =>
@@ -35,10 +38,13 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
   bool get _cashBlockedForAdvance =>
       _isAdvanceBooking && _payment == 'Наличные';
 
-  bool get _valid => !_cashBlockedForAdvance && !widget.tripStore.isActive &&
+  bool _sending = false;
+  Map<String,dynamic>? _pending;
+  bool get _locked => _sending || _pending != null || (widget.tripStore?.isActive ?? false);
+  bool get _valid => !_cashBlockedForAdvance && !_sending && (widget.ordersApi != null || widget.tripStore != null) && (_pending != null || !_locked &&
       _from.text.trim().isNotEmpty &&
       (_jumpstart || (_to.text.trim().isNotEmpty &&
-          _to.text.trim().toLowerCase() != _from.text.trim().toLowerCase()));
+          _to.text.trim().toLowerCase() != _from.text.trim().toLowerCase())));
 
   @override
   void initState() {
@@ -59,14 +65,31 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
     super.dispose();
   }
 
-  void _create() {
+  Future<void> _create() async {
     if (!_valid) return;
     final current = DateTime.now();
     final date = _date ?? DateUtils.dateOnly(current);
     final time = _time ?? TimeOfDay.fromDateTime(current);
     final when = DateTime(date.year, date.month, date.day,
         time.hour, time.minute);
-    final created = widget.tripStore.create(
+    final api = widget.ordersApi;
+    if (api != null) {
+      String two(int n) => n.toString().padLeft(2, '0');
+      final payload = _pending ??= {'request_id': NativeOrdersApi.requestId(), 'from': _from.text.trim(),
+        'to': _jumpstart ? 'Помощь на месте' : _to.text.trim(),
+        'trip_date': '${date.year}-${two(date.month)}-${two(date.day)}', 'trip_time': '${two(time.hour)}:${two(time.minute)}',
+        'details': {'ride_type': _jumpstart ? 'jumpstart' : 'delivery', 'preferences': {'wishes': _notes.text.trim()}}};
+      setState(() => _sending = true);
+      try {
+        final result = await api.call(payload);
+        if (result['order_id'] is! String || result['quoted_total_cents'] != 2000) throw const FormatException('Invalid service acknowledgement');
+        if (mounted) Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => NativeOrdersHistory(api: api)));
+      } catch (_) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Заказ не подтверждён. Повтори отправку той же заявки.')));
+      } finally { if (mounted) setState(() => _sending = false); }
+      return;
+    }
+    final created = widget.tripStore!.create(
       from: _from.text.trim(),
       to: _jumpstart ? 'Помощь на месте' : _to.text.trim(),
       paymentMethod: _payment,
@@ -82,7 +105,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
     );
     if (created) {
       Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => PassengerOrdersDemo(tripStore: widget.tripStore)));
+        builder: (_) => PassengerOrdersDemo(tripStore: widget.tripStore!)));
     }
   }
 
@@ -110,14 +133,14 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
             key: Key('extra-service-price'),
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,
               color: Color(0xFFDDC184))),
-          const Text('Наличие пилота, территория обслуживания '
+          Text(widget.ordersApi != null ? 'Наличие пилота подтверждает диспетчер. Оплата отключена.' : 'Наличие пилота, территория обслуживания '
             'и окончательная стоимость подтверждаются диспетчером '
             'до оплаты. Демо не выполняет реальных заказов.',
             style: TextStyle(fontSize: 12)),
           const SizedBox(height: 20),
           TextField(
             key: const Key('extra-service-from'),
-            readOnly: widget.tripStore.isActive,
+            readOnly: _locked,
             controller: _from,
             maxLength: 200,
             decoration: InputDecoration(
@@ -131,7 +154,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
             const SizedBox(height: 12),
             TextField(
               key: const Key('extra-service-to'),
-              readOnly: widget.tripStore.isActive,
+              readOnly: _locked,
               controller: _to,
               maxLength: 200,
               decoration: const InputDecoration(
@@ -144,7 +167,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
           const SizedBox(height: 10),
           TextField(
             key: const Key('extra-service-notes'),
-            readOnly: widget.tripStore.isActive,
+            readOnly: _locked,
             controller: _notes,
             maxLength: 500,
             maxLines: 3,
@@ -162,13 +185,13 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
               label: Text(_date == null
                   ? 'Дата'
                   : '${_date!.day}.${_date!.month}.${_date!.year}'),
-              onPressed: widget.tripStore.isActive ? null : () async {
+              onPressed: _locked ? null : () async {
                 final d = await showDatePicker(
                   context: context,
                   initialDate: _date ?? DateTime.now(),
                   firstDate: DateUtils.dateOnly(DateTime.now()),
                   lastDate: DateTime.now().add(const Duration(days: 365)));
-                if (d != null && mounted && !widget.tripStore.isActive) setState(() {
+                if (d != null && mounted && !_locked) setState(() {
                   _date = d;
                   if (_cashBlockedForAdvance) _payment = 'Карта';
                 });
@@ -179,11 +202,11 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
               key: const Key('extra-service-time'),
               icon: const Icon(Icons.schedule),
               label: Text(_time?.format(context) ?? 'Время'),
-              onPressed: widget.tripStore.isActive ? null : () async {
+              onPressed: _locked ? null : () async {
                 final t = await showTimePicker(
                   context: context,
                   initialTime: _time ?? TimeOfDay.now());
-                if (t != null && mounted && !widget.tripStore.isActive) setState(() {
+                if (t != null && mounted && !_locked) setState(() {
                   _time = t;
                   if (_cashBlockedForAdvance) _payment = 'Карта';
                 });
@@ -191,8 +214,8 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
             )),
           ]),
           const SizedBox(height: 14),
-          const Text('Способ оплаты · выбор без списания'),
-          Wrap(spacing: 8, children: [
+          if (widget.ordersApi == null) const Text('Способ оплаты · выбор без списания'),
+          if (widget.ordersApi == null) Wrap(spacing: 8, children: [
             for (final method in [
               'Карта', 'PayPal', 'Банковский перевод', 'Криптовалюта',
             ])
@@ -200,7 +223,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
                 key: Key('extra-payment-$method'),
                 label: Text(method),
                 selected: _payment == method,
-                onSelected: widget.tripStore.isActive ||
+                onSelected: _locked ||
                     (_isAdvanceBooking && method == 'Наличные') ? null
                     : (_) => setState(() => _payment = method),
               ),
@@ -208,7 +231,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
           if (_isAdvanceBooking)
             const Text('Предварительные заявки принимаются только по безналичной оплате.',
               key: Key('extra-advance-cash-notice')),
-          if (widget.tripStore.isActive)
+          if (widget.tripStore?.isActive == true)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 10),
               child: Text('Сначала заверши активную заявку.',
@@ -219,7 +242,7 @@ class _PassengerExtraServicesState extends State<PassengerExtraServices> {
             key: const Key('extra-service-submit'),
             onPressed: _valid ? _create : null,
             icon: const Icon(Icons.task_alt),
-            label: const Text('Создать тестовую заявку · 20 €'),
+            label: Text(widget.ordersApi != null ? (_sending ? 'Отправка…' : _pending != null ? 'Повторить заявку' : 'Заказать · 20 €') : 'Создать тестовую заявку · 20 €'),
           ),
         ],
       ),

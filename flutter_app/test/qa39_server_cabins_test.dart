@@ -30,12 +30,12 @@ void main() {
     }
     expect(calls,1);
   });
-  testWidgets('connected passenger entry does not offer local delivery', (tester) async {
+  testWidgets('connected passenger entry offers connected delivery', (tester) async {
     await tester.pumpWidget(MaterialApp(home:PassengerRideEntry(
       ordersApi:NativeOrdersApi(origin,token),tripStore:null,enableMapTiles:false)));
     final delivery=tester.widget<ListTile>(find.byKey(const Key('passenger-entry-delivery')));
-    expect(delivery.enabled,false);
-    expect(delivery.onTap,isNull);
+    expect(delivery.enabled,true);
+    expect(delivery.onTap,isNotNull);
     expect(find.textContaining('Тестовый режим'),findsNothing);
   });
 }

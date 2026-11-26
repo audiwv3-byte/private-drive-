@@ -215,10 +215,18 @@ def register(app, authorized):
                      (%s='active' AND status IN ('assigned','approaching','arrived','underway')) OR
                      (%s='done' AND status IN ('finished','cancelled')))
                      ORDER BY created_at DESC,id DESC LIMIT 100 OFFSET %s""",(mode,mode,mode,mode,(page-1)*100)).fetchall()
+                quotes = {}
+                if db.execute("SELECT has_table_privilege(to_regclass('public.pd_native_order_quotes'), 'SELECT')").fetchone()[0]:
+                    quotes = {str(q[0]): (q[1], q[2]) for q in db.execute("SELECT order_id, details, quoted_total_cents FROM public.pd_native_order_quotes WHERE order_id = ANY(%s::uuid[])", ([str(row[0]) for row in rows],)).fetchall()}
             orders = [{"id":str(row[0]),"source":row[1],"source_order_id":row[2],
                        "origin":row[3],"destination":row[4],
                        "trip_date":row[5],"trip_time":row[6],
                        "status":row[7],"created_at":row[8].isoformat(),"website_contact":row[9]} for row in rows]
+            for order in orders:
+                if order["id"] in quotes:
+                    details, cents = quotes[order["id"]]
+                    if details.get("ride_type") in ("delivery", "jumpstart"):
+                        order.update(service_type=details["ride_type"], service_notes=details.get("preferences", {}).get("wishes", ""), quoted_total_cents=cents)
             if qa33:
                 for order,row in zip(orders,rows):
                     order.update(waiting_seconds=row[10],waiting_active=row[11],stop_charge_cents=row[12])

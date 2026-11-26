@@ -1589,7 +1589,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ],
             ),
             const SizedBox(height: 16),
-            if (widget.tripStore != null) ...[
+            if (widget.tripStore != null || widget.ordersApi != null) ...[
               Text(pdTr(context, 'Дополнительные услуги',
                   'Papildomos paslaugos', 'Additional services'),
                 key: const Key('passenger-booking-extra-services-title'),
@@ -1608,7 +1608,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   builder: (_) => PdPassengerLanguageScope(
                     child: PassengerExtraServices(
                       type: ExtraServiceType.jumpstart,
-                      tripStore: widget.tripStore!)))),
+                      tripStore: widget.tripStore, ordersApi: widget.ordersApi)))),
               )),
               Card(child: ListTile(
                 key: const Key('passenger-booking-delivery'),
@@ -1623,7 +1623,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   builder: (_) => PdPassengerLanguageScope(
                     child: PassengerExtraServices(
                       type: ExtraServiceType.delivery,
-                      tripStore: widget.tripStore!)))),
+                      tripStore: widget.tripStore, ordersApi: widget.ordersApi)))),
               )),
             ],
             const SizedBox(height: 16),

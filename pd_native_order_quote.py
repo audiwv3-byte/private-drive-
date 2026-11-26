@@ -43,7 +43,7 @@ def validated_details(data, *, origin, destination):
     }:
         raise ValueError("invalid_details")
     kind = data.get("ride_type", "transfer")
-    if kind not in ("transfer", "taxi"):
+    if kind not in ("transfer", "taxi", "delivery", "jumpstart"):
         raise ValueError("invalid_ride_type")
     round_trip = data.get("round_trip", False)
     if type(round_trip) is not bool:
@@ -68,6 +68,14 @@ def validated_details(data, *, origin, destination):
                 raise ValueError("invalid_temperature")
         elif not isinstance(value, str) or len(value.strip()) > (500 if key == "wishes" else 100):
             raise ValueError("invalid_preference")
+    if kind in ("delivery", "jumpstart"):
+        if round_trip or extras or set(preferences) - {"wishes"}:
+            raise ValueError("invalid_service_details")
+        if kind == "jumpstart" and destination != "Помощь на месте":
+            raise ValueError("invalid_service_destination")
+        return {"ride_type": kind, "round_trip": False, "extras": [],
+                "preferences": preferences, "quote_required": False,
+                "quoted_total_cents": 2000, "currency": "EUR"}
     base = None
     if kind == "transfer":
         route = f"{origin.strip().casefold()}|{destination.strip().casefold()}"

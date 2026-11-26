@@ -44,12 +44,13 @@ class PassengerRideEntry extends StatelessWidget {
 
   void _openDelivery(BuildContext context) {
     final store = tripStore;
-    if (ordersApi != null || store == null) return;
+    if (ordersApi == null && store == null) return;
     Navigator.push(context, MaterialPageRoute<void>(
       builder: (_) => PdPassengerLanguageScope(
         child: PassengerExtraServices(
           type: ExtraServiceType.delivery,
           tripStore: store,
+          ordersApi: ordersApi,
         ),
       ),
     ));
@@ -191,8 +192,8 @@ class PassengerRideEntry extends StatelessWidget {
               subtitle: Text(pdTr(context, 'Доставка товаров · 20 €',
                   'Prekių pristatymas · 20 €', 'Goods delivery · €20')),
               trailing: const Icon(Icons.chevron_right),
-              enabled: ordersApi == null && tripStore != null,
-              onTap: ordersApi == null && tripStore != null ? () => _openDelivery(context) : null,
+              enabled: ordersApi != null || tripStore != null,
+              onTap: ordersApi != null || tripStore != null ? () => _openDelivery(context) : null,
             )),
             const SizedBox(height: 20),
             Text(ordersApi != null ? 'Заказы передаются диспетчеру. Оплата пока недоступна.' : pdLabel(context, 'Тестовый режим. Реальные заказы и оплата выключены.'),

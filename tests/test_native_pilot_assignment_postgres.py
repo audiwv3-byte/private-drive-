@@ -76,8 +76,8 @@ def stage(monkeypatch):
               UPDATE (status,photo,reviewer_id,decided_at)
           ON public.native_identity_checks TO {native};
         GRANT SELECT, INSERT ON public.pd_dispatch_orders,
-            public.pd_native_order_owners TO {native};
-        GRANT SELECT ON public.pd_dispatch_orders TO {queue};
+            public.pd_native_order_owners, public.pd_native_order_quotes TO {native};
+        GRANT SELECT ON public.pd_dispatch_orders, public.pd_native_order_quotes TO {queue};
         GRANT EXECUTE ON FUNCTION public.pd_pilot_assignment_candidates(bigint),
             public.pd_assign_native_order(uuid,text,text,bigint) TO {assign};
     """)

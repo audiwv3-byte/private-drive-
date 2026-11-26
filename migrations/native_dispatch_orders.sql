@@ -36,4 +36,7 @@ CREATE TABLE IF NOT EXISTS public.pd_native_order_quotes (
 );
 REVOKE ALL ON TABLE public.pd_native_order_quotes FROM PUBLIC;
 
+ALTER TABLE public.pd_dispatch_orders ADD COLUMN IF NOT EXISTS website_contact text
+ CHECK (website_contact IS NULL OR (source = 'website' AND website_contact ~ '^[+][0-9]{7,15}$'));
+
 COMMIT;

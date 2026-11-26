@@ -100,7 +100,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <div class="stats" aria-label="Показатели"><div class="stat"><b id="countNew">—</b><span>Новые</span></div><div class="stat"><b id="countActive">—</b><span>Активные</span></div><div class="stat"><b id="countOnline">—</b><span>На линии</span></div><div class="stat"><b id="countDone">—</b><span>Завершены</span></div></div>
 <div class="tabs" role="group" aria-label="Фильтр заказов"><button class="tab active" data-filter="all" aria-pressed="true">Все</button><button class="tab" data-filter="new" aria-pressed="false">Новые</button><button class="tab" data-filter="active" aria-pressed="false">В пути</button><button class="tab" data-filter="done" aria-pressed="false">История</button></div>
 <h2 id="ordersTitle">Все заказы</h2>
-{% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">Назначение пилотов включим после серверной проверки ролей.</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
+{% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">{% if pilot_availability_enabled %}Выбери пилота в карточке нового заказа.{% else %}Назначение пилотов пока недоступно.{% endif %}</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
 <p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
 </aside>
 <section id="map" aria-label="Интерактивная карта диспетчерской">
@@ -238,6 +238,54 @@ const labels={all:'Все заказы',new:'Новые заказы',active:'З
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});orderFilter=b.dataset.filter;$('ordersTitle').textContent=labels[orderFilter];document.dispatchEvent(new Event('pd-test-filter'));}));
 ['allPilots','onlinePilots'].forEach(id=>$(id).addEventListener('click',()=>{['allPilots','onlinePilots'].forEach(k=>{$(k).classList.toggle('active',k===id);$(k).setAttribute('aria-pressed',String(k===id))});document.dispatchEvent(new Event('pd-test-filter'));}));
 {% if pilot_availability_enabled %}
+let eligiblePilots=[];
+const chosenPilots=new Map();
+let savingOrder=null;
+const pilotCsrf={{ csrf|tojson }};
+async function assignPersistentOrder(order, select, button){
+ if(savingOrder||!select.value)return;
+ savingOrder=order.id;button.disabled=true;
+ const outcome=$('assignmentStatus');
+ try{
+   const body=new URLSearchParams({pilot_id:select.value,csrf:pilotCsrf});
+   const response=await fetch('/dispatch/orders/'+encodeURIComponent(order.id)+'/assign',{
+     method:'POST',body,credentials:'same-origin',signal:AbortSignal.timeout(7000)});
+   const result=await response.json();
+   if(response.status===409){
+     outcome.textContent='Заказ уже изменился или пилот больше не допущен. Обновляем список.';
+     return;
+   }
+   if(!response.ok||result.order_id!==order.id)throw new Error('assignment');
+   const saved=lastOrders?.find(row=>row.id===order.id);
+   if(saved)saved.status=result.status;
+   chosenPilots.delete(order.id);
+   outcome.textContent='Пилот назначен.';
+ }catch{
+   outcome.textContent='Нет подтверждения назначения. Проверь статус заказа перед повтором.';
+ }finally{savingOrder=null;renderPersistentOrders();}
+}
+function appendAssignmentControl(card,order){
+ if(order.status!=='requested'||!['android','ios','website','telegram_miniapp'].includes(order.source)||!eligiblePilots.length)return;
+ const select=document.createElement('select');
+ select.setAttribute('aria-label','Пилот для заказа '+order.id);
+ const placeholder=new Option('Выбрать пилота','');
+ select.append(placeholder);
+ for(const pilot of eligiblePilots){
+   const label='Пилот '+pilot.id.slice(0,8)+'…'+pilot.id.slice(-4);
+   select.append(new Option(label,pilot.id));
+ }
+ const remembered=chosenPilots.get(order.id);
+ if(remembered&&eligiblePilots.some(p=>p.id===remembered))select.value=remembered;
+ const submit=document.createElement('button');
+ submit.type='button';submit.className='btn';submit.textContent='Назначить пилота';
+ submit.disabled=!select.value||savingOrder!==null;
+ select.addEventListener('change',()=>{
+   chosenPilots.set(order.id,select.value);
+   submit.disabled=!select.value||savingOrder!==null;
+ });
+ submit.addEventListener('click',()=>assignPersistentOrder(order,select,submit));
+ card.append(select,submit);
+}
 async function refreshAvailablePilots(){
     const list = $('availablePilotList');
     try {
@@ -246,6 +294,7 @@ async function refreshAvailablePilots(){
         });
         if (!response.ok) throw new Error();
         const {pilots} = await response.json();
+        eligiblePilots = pilots;
         const rows = pilots.map(pilot => {
             const row = document.createElement('p');
             row.textContent = pilot.id;
@@ -254,6 +303,7 @@ async function refreshAvailablePilots(){
         list.replaceChildren(...(rows.length ? rows : ['Нет доступных пилотов']));
         {% if not test_sync_enabled %}$('countOnline').textContent = String(rows.length);{% endif %}
     } catch {
+        eligiblePilots=[];
         list.textContent = 'Нет связи со списком пилотов';
         {% if not test_sync_enabled %}$('countOnline').textContent = '—';{% endif %}
     } finally {
@@ -326,6 +376,12 @@ function renderPersistentOrders(){
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
      ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
    card.append(route,info);
+   if(order.website_contact){
+     const contact=document.createElement('p');
+     contact.textContent='Телефон пассажира: '+order.website_contact;
+     card.append(contact);
+   }
+   {% if pilot_availability_enabled %}appendAssignmentControl(card,order);{% endif %}
    {% if order_gps_enabled %}
    if(activeTrip(order.status)){
      const button=document.createElement('button');

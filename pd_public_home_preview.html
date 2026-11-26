@@ -381,7 +381,7 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
 <a class="pd-img-card fare-link" href="#quick-order" data-from="Вильнюс" data-to="Клайпеда" data-type="Трансфер" aria-label="Вильнюс — Клайпеда, 320 евро. Выбрать маршрут"><img src="/assets/pd-approved-klaipeda.webp" alt="Вильнюс — Клайпеда — 320 евро, утверждённое изображение" width="360" height="149" loading="lazy"></a>
 <a class="pd-img-card fare-link" href="#quick-order" data-from="Вильнюс" data-to="Варшава" data-type="Трансфер" aria-label="Вильнюс — Варшава, 460 евро. Выбрать маршрут"><img src="/assets/pd-approved-warsaw.webp" alt="Вильнюс — Варшава — 460 евро, утверждённое изображение" width="360" height="149" loading="lazy"></a>
 </div></section>
-<section class="pd-quick" id="quick-order"><h2>Быстрый заказ поездки</h2><form id="quick-trip-form" autocomplete="off"><label>Откуда<input id="quick-from" name="from" placeholder="Откуда" maxlength="220" required></label><label>Куда<input id="quick-to" name="to" placeholder="Куда" maxlength="220" required></label><label>Дата<input id="quick-date" name="date" type="date" required></label><label>Время<input id="quick-time" name="time" type="time" required></label><button class="btn" type="submit">Забронировать</button></form><p>Форма тестового заказа: заявка поступает в очередь диспетчера. Реальные поездки, SMS и списания отключены.<span id="quick-order-status" role="status" aria-live="polite" style="display:block;margin-top:8px;color:var(--pd-gold)"></span></p></section>
+<section class="pd-quick" id="quick-order"><h2>Быстрый заказ поездки</h2><form id="quick-trip-form" autocomplete="off"><label>Откуда<input id="quick-from" name="from" placeholder="Откуда" maxlength="200" required></label><label>Куда<input id="quick-to" name="to" placeholder="Куда" maxlength="200" required></label><label>Телефон для связи<input id="quick-phone" type="tel" autocomplete="tel" placeholder="+370…" pattern="[+][0-9]{7,15}" required></label><label>Дата<input id="quick-date" name="date" type="date" required></label><label>Время<input id="quick-time" name="time" type="time" required></label><button class="btn" type="submit">Забронировать</button></form><p>Форма тестового заказа: заявка поступает в очередь диспетчера. Реальные поездки, SMS и списания отключены.<span id="quick-order-status" role="status" aria-live="polite" style="display:block;margin-top:8px;color:var(--pd-gold)"></span></p></section>
 
 <details class="pd-route-details" id="route-details"><summary>Дополнительно: подробная карта и расчёт маршрута</summary><section id="order" class="order-section" aria-label="Форма поездки и трансфера">
 <div class="order-shell">
@@ -393,9 +393,9 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
 </div>
 <form id="passenger-preview" autocomplete="off">
 <div class="order-form-grid">
-<div class="order-field full"><label for="pickup-address">Откуда</label><input id="pickup-address" name="pickup" placeholder="Улица, дом или аэропорт" maxlength="220" autocomplete="off"><div class="suggestions" id="pickup-suggestions" aria-live="polite"></div></div>
-<div class="order-field full"><label for="dropoff-address">Куда</label><input id="dropoff-address" name="dropoff" placeholder="Адрес назначения" maxlength="220"><div class="suggestions" id="dropoff-suggestions" aria-live="polite"></div></div>
-<div class="order-field"><label for="pickup-date">Дата подачи</label><input id="pickup-date" name="date" type="date" required></div>
+<div class="order-field full"><label for="pickup-address">Откуда</label><input id="pickup-address" name="pickup" placeholder="Улица, дом или аэропорт" maxlength="200" autocomplete="off"><div class="suggestions" id="pickup-suggestions" aria-live="polite"></div></div>
+<div class="order-field full"><label for="dropoff-address">Куда</label><input id="dropoff-address" name="dropoff" placeholder="Адрес назначения" maxlength="200"><div class="suggestions" id="dropoff-suggestions" aria-live="polite"></div></div>
+<div class="order-field"><label>Телефон для связи<input id="pickup-phone" type="tel" autocomplete="tel" placeholder="+370…" pattern="[+][0-9]{7,15}" required></label></div><div class="order-field"><label for="pickup-date">Дата подачи</label><input id="pickup-date" name="date" type="date" required></div>
 <div class="order-field"><label for="pickup-time">Время подачи</label><input id="pickup-time" name="time" type="time" required></div>
 <div class="order-field full"><label for="car-category">Класс автомобиля</label><select id="car-category" name="category"><option value="comfort">Комфорт</option></select></div>
 </div>
@@ -451,7 +451,7 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
        const response=await fetch("/preview/api/qa-booking",{
          method:"POST",credentials:"same-origin",
          headers:{"Content-Type":"application/json","Accept":"application/json"},
-         body:JSON.stringify({from,to,reference:quickOrderReference,trip_date:$("quick-date").value,trip_time:$("quick-time").value})
+         body:JSON.stringify({from,to,reference:quickOrderReference,phone:$("quick-phone").value,trip_date:$("quick-date").value,trip_time:$("quick-time").value})
        });
        const data=await response.json();
        if(!response.ok||!data.qa_only||!data.trip?.id)
@@ -549,7 +549,7 @@ body,.pd-main,.pd-main .pd-section,.pd-main .pd-about-slim{background:var(--pd-b
      const response=await fetch("/preview/api/qa-booking",{
        method:"POST",credentials:"same-origin",
        headers:{"Content-Type":"application/json","Accept":"application/json"},
-       body:JSON.stringify({from,to,reference:pendingWebsiteReference,trip_date:$("pickup-date").value,trip_time:$("pickup-time").value})
+       body:JSON.stringify({from,to,reference:pendingWebsiteReference,phone:$("pickup-phone").value,trip_date:$("pickup-date").value,trip_time:$("pickup-time").value})
      });
      const data=await response.json();
      if(!response.ok||!data.qa_only||!data.trip||!data.trip.id)

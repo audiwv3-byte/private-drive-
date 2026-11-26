@@ -271,6 +271,9 @@ def register(app):
         data = request.get_json(silent=True)
         if not isinstance(data, dict) or not re.fullmatch(r"[a-f0-9]{32}", str(data.get("reference", ""))):
             return jsonify(error="invalid_reference"), 400
+        phone = data.get("phone")
+        if not isinstance(phone, str) or not re.fullmatch(r"[+][0-9]{7,15}", phone):
+            return jsonify(error="invalid_phone"), 400
         try:
             values = dispatch.validated_order({
                 "source": "website", "source_order_id": data["reference"],
@@ -280,7 +283,7 @@ def register(app):
         except (TypeError, ValueError):
             return jsonify(error="invalid_order"), 400
         try:
-            order = dispatch.store_order(values)
+            order = dispatch.store_order(values, website_contact=phone)
         except ValueError:
             return jsonify(error="source_order_conflict"), 409
         except Exception:

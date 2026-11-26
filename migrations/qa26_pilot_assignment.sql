@@ -73,12 +73,14 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Only orders placed by authenticated passengers. Lock the same status row that
+    -- Native and Telegram orders require their owner record. Website bookings require
+    -- the contact captured by the website handler. Lock the same status row that
     -- their history reads; concurrent assignments cannot both be accepted.
     SELECT o.status INTO current_status
     FROM public.pd_dispatch_orders o
     WHERE o.id = target_order AND (EXISTS (SELECT 1 FROM public.pd_native_order_owners n WHERE n.order_id=o.id)
-        OR EXISTS (SELECT 1 FROM public.pd_telegram_order_owners t WHERE t.order_id=o.id)) FOR UPDATE OF o;
+        OR EXISTS (SELECT 1 FROM public.pd_telegram_order_owners t WHERE t.order_id=o.id)
+        OR (o.source='website' AND o.website_contact IS NOT NULL)) FOR UPDATE OF o;
     IF NOT FOUND THEN
         RETURN QUERY SELECT 'order_not_found'::text, NULL::text;
         RETURN;

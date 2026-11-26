@@ -248,7 +248,7 @@ def acknowledge_order(uid, row, replayed=False):
                 'trip_date': datetime.strptime(row['trip_date'], '%d.%m.%Y').date().isoformat(),
                 'trip_time': row['trip_time'],
             })
-            result = dispatch.store_order(values)
+            result = dispatch.store_order(values, telegram_id=uid)
         except ValueError:
             return jsonify(error='Данные заказа расходятся с записью диспетчерской.'), 409
         except Exception:

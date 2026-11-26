@@ -46,4 +46,4 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter test --no-pub test/native_orders_api_test.dart test/native_pilot_orders_test.dart test/passenger_ride_entry_test.dart
+      - run: flutter test --no-pub test/passenger_channel_test.dart test/native_orders_api_test.dart test/native_pilot_orders_test.dart test/passenger_ride_entry_test.dart

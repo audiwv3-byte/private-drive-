@@ -224,7 +224,9 @@ void main() {
       throw const PdHttpStatusException(403);
     });
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpWidget(MaterialApp(home: PilotCabin(assignmentApi: api)));
+    await tester.pumpWidget(MaterialApp(home: PilotCabin(assignmentApi: api, enableMapTiles: false)));
+    await tester.tap(find.byKey(const Key('pilot-assigned-trips')));
+    await tester.pump();
     await tester.pumpAndSettle();
     expect(requestCount, 1);
     expect(find.byKey(const ValueKey('pilot-server-order-$orderId')), findsOneWidget);
@@ -249,7 +251,9 @@ void main() {
       return requestCount == 1 ? delayed.future : Future.value([]);
     });
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpWidget(MaterialApp(home: PilotCabin(assignmentApi: api)));
+    await tester.pumpWidget(MaterialApp(home: PilotCabin(assignmentApi: api, enableMapTiles: false)));
+    await tester.tap(find.byKey(const Key('pilot-assigned-trips')));
+    await tester.pump();
     await tester.pump();
     expect(requestCount, 1);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);

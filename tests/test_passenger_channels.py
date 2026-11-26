@@ -67,6 +67,7 @@ def test_passenger_channels(monkeypatch, tmp_path):
     with sync_playwright() as pw:
         browser = pw.chromium.launch(executable_path=os.getenv("PD_TEST_CHROME"))
         page = browser.new_page()
+        page.set_default_timeout(9000)
         page.on("pageerror", lambda error: browser_errors.append(str(error)))
         clients = {"mini.test": mini, "site.test": site}
 
@@ -81,13 +82,13 @@ def test_passenger_channels(monkeypatch, tmp_path):
                 method=req.method, headers={k:v for k,v in req.headers.items()
                                             if k in ("content-type", "x-telegram-init-data")},
                 data=req.post_data_buffer)
-            route.fulfill(status=response.status_code, content_type=response.content_type, body=response.data)
+            route.fulfill(status=response.status_code, headers=dict(response.headers), body=response.data)
 
         page.route("**/*", serve)
         init_data = telegram_header(201, token)["X-Telegram-Init-Data"]
         page.add_init_script("window.Telegram={WebApp:{ready(){},expand(){},initData:" +
                              json.dumps(init_data) + ",initDataUnsafe:{start_param:'driver_taxi_lt'}}};")
-        page.goto("https://mini.test/?start=driver_taxi_lt&lang=ru")
+        assert page.goto("https://mini.test/?start=driver_taxi_lt&lang=ru").ok
         page.locator('#pdObLanguage button[lang=ru]').click()
         page.locator('#pdObPassengerName').fill("QA Passenger")
         page.locator('#pdObPassengerPhone').fill("+37060000000")
@@ -114,6 +115,9 @@ def test_passenger_channels(monkeypatch, tmp_path):
         for prefix, submit, origin, dest in [
                 ("quick", "#quick-trip-form button[type=submit]", "#quick-from", "#quick-to"),
                 ("pickup", "#submit-qa-order", "#pickup-address", "#dropoff-address")]:
+            if prefix == "pickup":
+                page.locator("#route-details > summary").click()
+            page.locator(f"#{prefix}-phone").fill("+37060000000")
             page.locator(origin).fill("Vilnius")
             page.locator(dest).fill("Kaunas")
             page.locator(f"#{prefix}-date").fill(tomorrow.isoformat())
@@ -125,31 +129,31 @@ def test_passenger_channels(monkeypatch, tmp_path):
             ids[oid] = "website"
             duplicate = site.post("/preview/api/qa-booking", json=sent.value.request.post_data_json)
             assert duplicate.status_code == 200 and duplicate.json["trip"]["id"] == oid
+        body = {"request_id": str(uuid.uuid4()), "from":"Vilnius", "to":"Kaunas",
+                "trip_date":tomorrow.isoformat(), "trip_time":"14:00",
+                "details":{"ride_type":"taxi", "round_trip":False, "extras":[], "preferences":{}}}
+        android = native.post("/native-orders", headers=accounts["passenger"], json=body)
+        assert android.status_code == 201, android.json
+        ids[android.json["order_id"]] = "android"
+        assert native.post("/native-orders", headers=accounts["passenger"], json=body).json["order_id"] == android.json["order_id"]
+        assert len(ids) == 4
+        base = "https://site.test"
+        assert site.get("/dispatch/orders/state", base_url=base).status_code == 401
+        login = site.get("/dispatch/login", base_url=base)
+        csrf = re.search(r'name="csrf" value="([^"]+)"', login.text)[1]
+        assert site.post("/dispatch/login", base_url=base,
+                         data={"csrf":csrf, "password":password}).status_code in (302,303)
+        rows = site.get("/dispatch/orders/state", base_url=base).json["orders"]
+        assert {r["id"]:r["source"] for r in rows if r["id"] in ids} == ids
+        assert page.goto(base + "/dispatch").ok
+        for oid in ids:
+            select = page.get_by_label("Пилот для заказа " + oid)
+            select.select_option(uid)
+            with page.expect_response(lambda r: urlsplit(r.url).path == f"/dispatch/orders/{oid}/assign") as saved:
+                select.locator("..").get_by_role("button", name="Назначить пилота").click()
+            assert saved.value.status == 200, saved.value.body()
         browser.close()
     assert not browser_errors, browser_errors
-
-    body = {"request_id": str(uuid.uuid4()), "from":"Vilnius", "to":"Kaunas",
-            "trip_date":tomorrow.isoformat(), "trip_time":"14:00",
-            "details":{"ride_type":"taxi", "round_trip":False, "extras":[], "preferences":{}}}
-    android = native.post("/native-orders", headers=accounts["passenger"], json=body)
-    assert android.status_code == 201, android.json
-    ids[android.json["order_id"]] = "android"
-    assert native.post("/native-orders", headers=accounts["passenger"], json=body).json["order_id"] == android.json["order_id"]
-    assert len(ids) == 4
-    base = "https://site.test"
-    assert site.get("/dispatch/orders/state", base_url=base).status_code == 401
-    login = site.get("/dispatch/login", base_url=base)
-    csrf = re.search(r'name="csrf" value="([^"]+)"', login.text)[1]
-    assert site.post("/dispatch/login", base_url=base,
-                     data={"csrf":csrf, "password":password}).status_code in (302,303)
-    rows = site.get("/dispatch/orders/state", base_url=base).json["orders"]
-    assert {r["id"]:r["source"] for r in rows if r["id"] in ids} == ids
-    with site.session_transaction(base_url=base + "/dispatch") as session:
-        csrf = session["pd_dispatch_csrf"]
-    for oid in ids:
-        result = site.post(f"/dispatch/orders/{oid}/assign", base_url=base,
-                           data={"csrf":csrf, "pilot_id":uid})
-        assert result.status_code == 200, result.json
     assigned = native.get("/native-pilot-orders", headers=accounts["pilot"])
     assert {r["order_id"] for r in assigned.json["orders"]} == set(ids)
     assert mini.get("/api/orders", headers=telegram_header(201,token)).json["orders"][0]["dispatch_status"] == "Пилот назначен"

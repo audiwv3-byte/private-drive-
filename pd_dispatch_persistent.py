@@ -93,17 +93,20 @@ def connect():
                            connect_timeout=4, options="-c statement_timeout=4000")
 
 
-def store_order(values):
+def store_order(values, *, telegram_id=None, website_contact=None):
     """Insert a validated booking or return the matching earlier submission."""
     source, original, *route = values
-    digest = fingerprint(values)
+    digest = fingerprint(values if website_contact is None else (*values, website_contact))
     with connect() as db:
         row = db.execute("""INSERT INTO public.pd_dispatch_orders
-            (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time,website_contact)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT(source,source_order_id) DO NOTHING RETURNING id,status""",
-            (uuid.uuid4(), source, original, digest, *route)).fetchone()
+            (uuid.uuid4(), source, original, digest, *route, website_contact)).fetchone()
         created = row is not None
+        if created and telegram_id is not None:
+            db.execute("INSERT INTO public.pd_telegram_order_owners(order_id,telegram_id) VALUES (%s,%s)",
+                       (row[0], telegram_id))
         if not created:
             row = db.execute("""SELECT id,status,fingerprint FROM public.pd_dispatch_orders
                 WHERE source=%s AND source_order_id=%s""", (source, original)).fetchone()
@@ -176,12 +179,12 @@ def register(app, authorized):
         try:
             with connect() as db:
                 rows = db.execute("""SELECT id,source,source_order_id,origin,destination,
-                     trip_date,trip_time,status,created_at
+                     trip_date,trip_time,status,created_at,website_contact
                      FROM public.pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()
             orders = [{"id":str(row[0]),"source":row[1],"source_order_id":row[2],
                        "origin":row[3],"destination":row[4],
                        "trip_date":row[5],"trip_time":row[6],
-                       "status":row[7],"created_at":row[8].isoformat()} for row in rows]
+                       "status":row[7],"created_at":row[8].isoformat(),"website_contact":row[9]} for row in rows]
             return reply({"orders":orders,"persistent":True})
         except Exception:
             app.logger.exception("Persistent dispatcher order read unavailable")

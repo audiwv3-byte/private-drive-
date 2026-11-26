@@ -48,6 +48,16 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                     return reply("403 Forbidden", {"error":"passenger_required"})
                 # Explicit migration is required; no runtime schema changes.
                 if method == "GET":
+                    # Existing read-only deployments may only have the original history grant.
+                    quotes_readable = db.execute("""SELECT has_table_privilege(
+                        to_regclass('public.pd_native_order_quotes'), 'SELECT')""").fetchone()[0]
+                    if not quotes_readable:
+                        rows = db.execute("""SELECT o.id,o.origin,o.destination,o.trip_date,o.trip_time,o.status
+                            FROM public.pd_dispatch_orders o JOIN public.pd_native_order_owners n ON n.order_id=o.id
+                            WHERE n.user_id=%s ORDER BY o.created_at DESC LIMIT 100""", (uid,)).fetchall()
+                        return reply("200 OK", {"payment_mode":"disabled","orders":[
+                            dict(zip(("order_id","from","to","trip_date","trip_time","status"),
+                                     (str(r[0]), *r[1:]))) for r in rows]})
                     rows = db.execute("""SELECT o.id,o.origin,o.destination,o.trip_date,
                         o.trip_time,o.status,q.details,q.quoted_total_cents,q.quote_required
                         FROM public.pd_dispatch_orders o

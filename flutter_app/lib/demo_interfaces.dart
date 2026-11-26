@@ -129,6 +129,10 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (widget.ordersApi != null || widget.pilotApi != null) {
+      _restoringOrder = false;
+      return;
+    }
     _orderPrefs = _openOrderPrefs();
     _trip.addListener(_onPilotShiftChanged);
     unawaited(_restoreOrder());
@@ -237,33 +241,9 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
       return const Scaffold(body: Center(child: CircularProgressIndicator(
         key: Key('demo-order-restoring'))));
     }
-    final pilotApi = widget.pilotApi;
-    if (widget.pilotOnly && pilotApi != null) {
-      return Scaffold(
-        body: PilotDemo(enableMapTiles: widget.enableMapTiles, showAssignedOffer: false),
-        floatingActionButton: FloatingActionButton.extended(
-          icon: const Icon(Icons.directions_car),
-          label: const Text('Мои поездки'),
-          onPressed: () => showModalBottomSheet<void>(
-            context: context,
-            isScrollControlled: true,
-            builder: (sheet) => SafeArea(child: FractionallySizedBox(
-              heightFactor: 0.72,
-              child: Column(children: [
-                Expanded(child: PilotAssignedOrdersPanel(api: pilotApi)),
-                if (widget.onSignOut != null)
-                  TextButton(onPressed: () {
-                    Navigator.pop(sheet);
-                    widget.onSignOut!();
-                  }, child: const Text('Выйти')),
-              ]),
-            )),
-          ),
-        ),
-      );
-    }
     if (widget.pilotOnly) {
       return PilotCabin(
+        assignmentApi: widget.pilotApi,
         showCockpit: widget.showPilotCockpit,
         showIdentityCheck: widget.showPilotIdentityCheck,
         enableMapTiles: widget.enableMapTiles,
@@ -448,6 +428,7 @@ class PilotDemo extends StatefulWidget {
     this.onIncomingSound,
     this.onIncomingMessageVoice,
     this.showAssignedOffer = true,
+    this.mapOnly = false,
     this.testRoadPoints,
   });
 
@@ -465,6 +446,7 @@ class PilotDemo extends StatefulWidget {
   final VoidCallback? onIncomingMessageVoice;
   /// The premium cockpit renders this offer in the root overlay instead.
   final bool showAssignedOffer;
+  final bool mapOnly;
   /// Synthetic route fixture for widget tests only; never used by app UI.
   final List<LatLng>? testRoadPoints;
 
@@ -1064,7 +1046,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
         : PdMapboxQaConfig.rasterTileUrl(night: _nightMap);
     final tileGeneration = _pilotTileRetry;
     return Scaffold(
-      drawer: Drawer(
+      drawer: widget.mapOnly ? null : Drawer(
         key: const Key('pilot-navigation-drawer'),
         child: SafeArea(child: ListView(children: [
           const DrawerHeader(child: Center(child: Text('PRIVATE DRIVE · Пилот',
@@ -1313,7 +1295,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
                 ),
               ),
             ),
-          SafeArea(
+          if (!widget.mapOnly) SafeArea(
             child: Stack(
               children: [
                 Positioned(

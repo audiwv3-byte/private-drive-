@@ -1,3 +1,4 @@
+import 'native_pilot_orders.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -21,12 +22,14 @@ class PilotCabin extends StatefulWidget {
     this.enableMapTiles = true,
     this.tripStore,
     this.onOfferAlert,
+    this.assignmentApi,
     this.onSignOut,
     this.onBackToCabinets,
     this.showIdentityCheck = true,
     this.showCockpit = true,
   });
 
+  final NativePilotOrdersApi? assignmentApi;
   final bool enableMapTiles;
   final DemoTripStore? tripStore;
   final VoidCallback? onSignOut;
@@ -66,6 +69,7 @@ class _PilotCabinState extends State<PilotCabin> {
   @override
   void initState() {
     super.initState();
+    if (widget.assignmentApi != null) return;
     _onLine = widget.tripStore?.pilotOnline ?? false;
     widget.tripStore?.addListener(_syncOfferSound);
     PilotSoundSettings.instance.addListener(_onSettingsChanged);
@@ -195,6 +199,32 @@ class _PilotCabinState extends State<PilotCabin> {
 
   @override
   Widget build(BuildContext context) {
+    final pilotApi = widget.assignmentApi;
+    if (pilotApi != null) {
+      return Scaffold(
+        body: PilotDemo(enableMapTiles: widget.enableMapTiles, showAssignedOffer: false, mapOnly: true),
+        floatingActionButton: FloatingActionButton.extended(
+          key: const Key('pilot-assigned-trips'),
+          icon: const Icon(Icons.directions_car),
+          label: const Text('Мои поездки'),
+          onPressed: () => showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            builder: (sheet) => SafeArea(child: FractionallySizedBox(
+              heightFactor: 0.72,
+              child: Column(children: [
+                Expanded(child: PilotAssignedOrdersPanel(api: pilotApi)),
+                if (widget.onSignOut != null)
+                  TextButton(onPressed: () {
+                    Navigator.pop(sheet);
+                    widget.onSignOut!();
+                  }, child: const Text('Выйти')),
+              ]),
+            )),
+          ),
+        ),
+      );
+    }
     const red = Color(0xFFFC4654);
     const green = Color(0xFF34E88A);
     final accent = _onLine ? green : red;

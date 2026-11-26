@@ -17,13 +17,14 @@ typedef QaGpsSend = Future<void> Function(String orderId, QaGpsFix? fix, int cap
 /// The server must still authorize every write and reject inactive trips.
 class QaPilotGpsPublisher {
   QaPilotGpsPublisher({required this.send, required this.isAssigned,
-    required this.positions, this.onStopped, this.canStart, DateTime Function()? clock})
+    required this.positions, this.onStopped, this.canStart, this.checkInterval = const Duration(seconds: 10), DateTime Function()? clock})
     : _clock = clock ?? DateTime.now;
   final QaGpsSend send;
   final Future<bool> Function(String) isAssigned;
   final Stream<QaGpsFix> Function() positions;
   final void Function()? onStopped;
   final bool Function()? canStart;
+  final Duration checkInterval;
   final DateTime Function() _clock;
   StreamSubscription<QaGpsFix>? _stream;
   Timer? _check;
@@ -51,7 +52,7 @@ class QaPilotGpsPublisher {
       _stream = positions().listen(_position,
         onError: (Object _) { unawaited(stop()); },
         onDone: () { unawaited(stop()); });
-      _check = Timer.periodic(const Duration(seconds: 10), (_) {
+      _check = Timer.periodic(checkInterval, (_) {
         unawaited(_verify());
       });
       return true;

@@ -90,3 +90,42 @@ jobs:
           flutter pub get
           flutter test test/passenger_server_booking_test.dart test/passenger_demo_test.dart test/passenger_ride_entry_test.dart test/native_orders_api_test.dart
           flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
+
+  browser-dispatcher-details:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+      PD_NATIVE_SMS_ISOLATED: 'YES'
+      PD_NATIVE_SMS_LIVE: 'NO'
+      PD_PAYMENT_MODE: disabled
+      PD_QA_BOOKING_DETAILS_CHECK: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare Chromium and isolated browser QA dependencies
+        run: |
+          python -m pip install -r requirements-sms-render.txt flask playwright
+          command -v google-chrome
+          for asset in leaflet.js leaflet.css; do
+            curl --fail --silent --show-error --retry 3 "https://unpkg.com/leaflet@1.9.4/dist/$asset" -o "$asset"
+          done
+      - name: Verify persisted order metadata in real dispatcher browser
+        env:
+          QA_FIXTURE_DIR: ${{ github.workspace }}/flutter_app/tool
+          QA_SERVER_DIR: ${{ github.workspace }}
+        run: bash ops/qa/run_dispatcher_map_browser.sh --persistent-only

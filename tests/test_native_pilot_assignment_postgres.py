@@ -217,21 +217,28 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     assert client.post(endpoint, data={"pilot_id": "pilotA"}).status_code == 401
     token = login(client)
     assert b"const pilotCsrf=" in client.get("/dispatch").data
+    def availability(user, desired=None):
+        # Native Bearer endpoint and dispatcher are distinct restricted
+        # database roles pointing at the same disposable PostgreSQL.
+        monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", native_url)
+        try:
+            headers = auth(tokens, user)
+            if desired is None:
+                return native.get("/native-pilot-availability", headers=headers)
+            return native.patch("/native-pilot-availability", headers=headers,
+                                json={"online": desired})
+        finally:
+            monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", queue_url)
+
     assert client.get("/dispatch/orders/eligible-pilots").json == {"pilots": []}
-    assert native.get("/native-pilot-availability",
-        headers=auth(tokens, "pilotA")).json == {
-            "online": False, "payment_mode": "disabled"}
-    assert native.patch("/native-pilot-availability",
-        headers=auth(tokens, "passenger"), json={"online": True}).status_code == 403
-    assert native.patch("/native-pilot-availability",
-        headers=auth(tokens, "pilotOld"), json={"online": True}).status_code == 403
-    assert native.patch("/native-pilot-availability",
-        headers=auth(tokens, "pilotA"), json={"online": "yes"}).status_code == 400
-    assert native.patch("/native-pilot-availability",
-        headers=auth(tokens, "pilotA"), json={"online": True}).json == {
-            "online": True, "payment_mode": "disabled"}
-    assert native.patch("/native-pilot-availability",
-        headers=auth(tokens, "pilotB"), json={"online": True}).status_code == 200
+    assert availability("pilotA").json == {
+        "online": False, "payment_mode": "disabled"}
+    assert availability("passenger", True).status_code == 403
+    assert availability("pilotOld", True).status_code == 403
+    assert availability("pilotA", "yes").status_code == 400
+    assert availability("pilotA", True).json == {
+        "online": True, "payment_mode": "disabled"}
+    assert availability("pilotB", True).status_code == 200
     assert client.get("/dispatch/orders/eligible-pilots").json == {
         "pilots": [{"id": "pilotA"}, {"id": "pilotB"}]}
     assert client.post(endpoint, data={"pilot_id": "pilotA", "csrf": "invalid"}).status_code == 403
@@ -303,8 +310,7 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", queue_url)
     ids = {item["id"] for item in client.get("/dispatch/orders/eligible-pilots").json["pilots"]}
     assert "pilotInvite" not in ids
-    assert native.patch("/native-pilot-availability",
-        headers=auth(tokens, "pilotInvite"), json={"online": True}).json["online"] is True
+    assert availability("pilotInvite", True).json["online"] is True
     ids = {item["id"] for item in client.get("/dispatch/orders/eligible-pilots").json["pilots"]}
     assert "pilotInvite" in ids
     assert client.post(invited_endpoint, data={"pilot_id": "pilotInvite", "csrf": token}).json == {

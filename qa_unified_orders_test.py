@@ -124,5 +124,57 @@ class OutboxAtomicity(unittest.TestCase):
             self.assertEqual(outbox.drain(conn,sender=received.append,now=lambda:200),0)
             self.assertEqual(len(received),1)
 
+class AndroidOrders(unittest.TestCase):
+    def test_native_orders(self):
+        import hashlib
+        import uuid
+        from pathlib import Path
+        from werkzeug.test import Client
+        from werkzeug.wrappers import Response
+        from pd_native_orders_http import make_orders_app
+        dsn = "postgresql://qa:qa@127.0.0.1:5432/qa"
+        # Separate database for guarded repository migrations.
+        with psycopg.connect(dsn, autocommit=True) as db:
+            db.execute("CREATE DATABASE private_drive_test")
+        dsn = dsn.rsplit("/", 1)[0] + "/private_drive_test"
+        with psycopg.connect(dsn, autocommit=True) as db:
+            db.execute("CREATE TABLE native_auth_users (id text PRIMARY KEY)")
+            db.execute("CREATE TABLE native_auth_roles (user_id text PRIMARY KEY, role text)")
+            db.execute("CREATE TABLE native_auth_sessions (user_id text, token_hash text PRIMARY KEY, created_at bigint, expires_at bigint, revoked_at bigint)")
+            for migration in ("native_auth_session_functions.sql", "native_dispatch_orders.sql"):
+                db.execute(Path("migrations", migration).read_text())
+            for uid, token, role in (("a", "a"*64, "passenger"), ("b", "b"*64, "passenger"), ("p", "p"*64, "pilot")):
+                db.execute("INSERT INTO native_auth_users VALUES (%s)", (uid,))
+                db.execute("INSERT INTO native_auth_roles VALUES (%s,%s)", (uid,role))
+                db.execute("INSERT INTO native_auth_sessions VALUES (%s,%s,0,2000,NULL)", (uid,hashlib.sha256(token.encode()).hexdigest()))
+        with patch.dict(os.environ, {"PD_NATIVE_SMS_ISOLATED":"YES",
+            "PD_DISPATCH_STAGING_ONLY":"1","PD_PAYMENT_MODE":"disabled",
+            "PD_DISPATCH_PERSISTENT_QUEUE":"1","PD_DISPATCH_ORDERS_DATABASE_URL":dsn}, clear=True):
+            app = Flask(__name__)
+            queue.register(app, lambda: True)
+            client = Client(make_orders_app(app, dsn, clock=lambda:1000), Response)
+            a = {"Authorization":"Bearer " + "a"*64}
+            b = {"Authorization":"Bearer " + "b"*64}
+            p = {"Authorization":"Bearer " + "p"*64}
+            order = {"request_id":str(uuid.uuid4()),"from":"QA origin","to":"QA destination","trip_date":"2099-01-01","trip_time":"12:00"}
+            self.assertEqual(client.get("/native-orders").status_code,401)
+            self.assertEqual(client.post("/native-orders",json=order,headers=p).status_code,403)
+            first = client.post("/native-orders",json=order,headers=a)
+            self.assertEqual(first.status_code,201,first.get_data(as_text=True))
+            oid = first.json["order_id"]
+            retry = client.post("/native-orders",json=order,headers=a)
+            self.assertEqual(retry.status_code,200)
+            self.assertEqual(retry.json["order_id"],oid)
+            self.assertEqual(client.post("/native-orders",json=dict(order,to="Changed"),headers=a).status_code,409)
+            self.assertEqual([x["order_id"] for x in client.get("/native-orders",headers=a).json["orders"]],[oid])
+            self.assertEqual(client.get("/native-orders",headers=b).json["orders"],[])
+            rows = client.get("/dispatch/orders/state").json["orders"]
+            self.assertEqual([(x["id"],x["source"]) for x in rows],[(oid,"android")])
+            with psycopg.connect(dsn) as db:
+                self.assertEqual(db.execute("SELECT count(*) FROM pd_dispatch_orders").fetchone()[0],1)
+            with patch.dict(os.environ, {"PD_PAYMENT_MODE":"live"}):
+                self.assertEqual(client.post("/native-orders",json=order,headers=a).status_code,503)
+
+
 if __name__ == "__main__":
     unittest.main()

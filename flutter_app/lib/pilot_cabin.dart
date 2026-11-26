@@ -242,6 +242,8 @@ class _PilotCabinState extends State<PilotCabin> {
                 const Text('Заказы и статусы подтверждаются сервером',
                   style: TextStyle(color: Colors.white70, fontSize: 12)),
                 const SizedBox(height: 8),
+                PilotServerAvailabilityButton(api: widget.assignmentApi!),
+                const SizedBox(height: 8),
                 Expanded(child: PilotAssignedOrdersPanel(
                   api: widget.assignmentApi!, visible: !_assignmentMapOpen)),
               ])),

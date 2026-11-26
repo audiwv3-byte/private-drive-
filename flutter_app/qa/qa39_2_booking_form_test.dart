@@ -75,14 +75,26 @@ void main() {
     final booking = find.byKey(const Key('passenger-form'));
     final scrollable = find.descendant(of: booking, matching: find.byType(Scrollable)).first;
     await tester.scrollUntilVisible(from, 220, scrollable: scrollable);
-    await tester.enterText(from, 'Flutter pickup');
-    await tester.scrollUntilVisible(to, 110, scrollable: scrollable);
-    await tester.enterText(to, 'Flutter destination');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.tap(from);
     await tester.pump();
+    await tester.enterText(from, 'Flutter pickup');
+    await tester.pump();
+    final fromController = tester.widget<TextField>(from).controller!;
+    expect(fromController.text, 'Flutter pickup');
+
+    await tester.scrollUntilVisible(to, 110, scrollable: scrollable);
+    await tester.tap(to);
+    await tester.pump();
+    await tester.enterText(to, 'Flutter destination');
+    await tester.pump();
+    final toController = tester.widget<TextField>(to).controller!;
+    expect(toController.text, 'Flutter destination');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
     final send = find.byKey(const Key('passenger-book-disabled'));
     await tester.scrollUntilVisible(send, 300, scrollable: scrollable);
-    expect(tester.widget<FilledButton>(send).onPressed, isNotNull);
+    expect(tester.widget<FilledButton>(send).onPressed, isNotNull,
+        reason: 'Booking form held "${fromController.text}" and "${toController.text}"');
     await tester.tap(send);
     final created = (await tester.runAsync(
       () => client.posted.future.timeout(const Duration(seconds: 15)),

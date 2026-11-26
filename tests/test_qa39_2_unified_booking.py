@@ -3,6 +3,7 @@ import hmac
 import json
 import os
 import ssl
+import sqlite3
 import subprocess
 import threading
 import time
@@ -33,6 +34,10 @@ def test_booking_interfaces_share_postgres(monkeypatch, tmp_path):
     assert os.environ["PD_NATIVE_SMS_ISOLATED"] == "YES"
     assert os.environ["PD_NATIVE_SMS_LIVE"] == "NO"
     assert os.environ["PD_PAYMENT_MODE"] == "disabled"
+    def reject_sqlite(*args, **kwargs):
+        raise AssertionError("Unified booking opened SQLite")
+
+    monkeypatch.setattr(sqlite3, "connect", reject_sqlite)
     initialize_database(dsn)
 
     native_token = "a" * 48

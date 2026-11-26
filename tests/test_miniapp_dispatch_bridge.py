@@ -5,7 +5,7 @@ import os
 import unittest
 from unittest.mock import patch
 from pd_miniapp_dispatch_bridge import (
-    DispatchBridgeUnavailable, bridge_enabled, publish_telegram_order,
+    DispatchBridgeUnavailable, bridge_enabled, central_delivery_required, publish_telegram_order,
 )
 from pd_dispatch_persistent import verified_request
 
@@ -114,6 +114,16 @@ class BridgeTests(unittest.TestCase):
                 "order_id": "central-123", "payment_mode": "disabled",
             })
         publish_telegram_order(dict(ORDER, trip_date="02.12.2026"), open_url=send)
+
+    def test_staging_requires_central_ack_even_when_bridge_off(self):
+        os.environ["PD_MINIAPP_DISPATCH_BRIDGE"] = "0"
+        self.assertTrue(central_delivery_required())
+        self.assertFalse(bridge_enabled())
+
+    def test_nonstaging_does_not_force_central_ack(self):
+        os.environ["PD_DISPATCH_STAGING_ONLY"] = "0"
+        self.assertFalse(central_delivery_required())
+        self.assertFalse(bridge_enabled())
 
     def test_disabled_is_no_network(self):
         os.environ["PD_PAYMENT_MODE"] = "live"

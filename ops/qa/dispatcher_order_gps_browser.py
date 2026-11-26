@@ -9,14 +9,12 @@ from pathlib import Path
 import shutil
 import time
 from threading import Thread
-from types import SimpleNamespace
 from urllib.parse import urlsplit
 
-from flask import Flask
+import psycopg
 from werkzeug.security import generate_password_hash
 from werkzeug.serving import make_server
 
-from pd_web_dispatcher import register
 from playwright.sync_api import sync_playwright
 
 import qa29_gps_integration as fixture
@@ -38,8 +36,8 @@ def run(android_apk=None):
         "PD_DISPATCH_ORDERS_DATABASE_URL": fixture.DSN.replace("postgres:isolated-test@", "qa29_api:synthetic-api@"),
         "PD_DISPATCH_TEST_SYNC": "1",
     })
-    app = Flask(__name__)
-    assert register(app, SimpleNamespace(ADMIN_IDS={201}, is_admin=lambda uid: uid == 201))
+    # Import after configuring the isolated web dispatcher and its session.
+    from pd_dispatcher_staging_wsgi import application as app
     server = make_server("127.0.0.1", 0, app, threaded=True)
     Thread(target=server.serve_forever, daemon=True).start()
     web_host = f"127.0.0.1:{server.server_port}"
@@ -101,10 +99,10 @@ def run(android_apk=None):
             return positions
 
         fixes = [(54.6872, 25.2797), (54.6906, 25.2980)]
+        assert page.request.get(web_url + read_path).json() == {"available": False}
+        assert markers.count() == 0
         if android_apk:
             from android_map_probe import is_asleep, start_pilot, verify_android_fix
-            assert fixture.request(read_path, headers=admin) == {"available": False}
-            assert markers.count() == 0
             lat, lon = fixes[0]
             fixture.adb("emu", "geo", "fix", str(lon), str(lat))
             start_pilot(android_apk, oid)
@@ -117,12 +115,24 @@ def run(android_apk=None):
             assert is_asleep(), "Emulator woke up during the second GPS check"
             observe("order_fix_2")
         else:
+            from android_map_probe import MARKER_AT_FIX
+
             for index, (lat, lon) in enumerate(fixes):
                 fix = dict(enabled=True, latitude=lat, longitude=lon, captured_at=int(time.time()))
                 fixture.request(write_path, "POST", fix, pilot)
-                gps = fixture.request(read_path, headers=admin)
-                assert gps["available"] and (gps["latitude"], gps["longitude"]) == (lat, lon)
+                with psycopg.connect(fixture.DSN) as db:
+                    row = db.execute(
+                        "SELECT latitude, longitude, captured_at FROM public.pd_qa27_gps "
+                        "WHERE order_id = %s AND pilot_id = %s", (oid, "qa29-pilot")
+                    ).fetchone()
+                assert row == (lat, lon, fix["captured_at"]), row
+                page.wait_for_function(MARKER_AT_FIX, arg=[lat, lon], timeout=15000)
+                gps = page.request.get(web_url + read_path)
+                assert gps.ok and "no-store" in gps.headers["cache-control"]
+                assert gps.json() == dict(available=True, latitude=lat, longitude=lon,
+                                          captured_at=fix["captured_at"])
                 observe(f"order_fix_{index+1}")
+                print(f"PASS fix {index+1}: PostgreSQL, dispatcher API and visible marker at {lat}, {lon}", flush=True)
         for action in ("approach", "start", "finish"):
             status = fixture.request("/native-pilot-orders", "PATCH", {"order_id": oid, "action": action}, pilot)
         assert status["status"] == "finished"
@@ -130,13 +140,12 @@ def run(android_apk=None):
         observe("order_finished")
         assert "Завершён" in card.inner_text()
 
-        if android_apk:
-            import psycopg
-            assert page.request.get(web_url + read_path).json() == {"available": False}
-            with psycopg.connect(fixture.DSN) as db:
-                assert db.execute("SELECT count(*) FROM public.pd_qa27_gps WHERE order_id=%s", (oid,)).fetchone()[0] == 0
-            assert markers.count() == 0
-            print(f"PASS: finished {oid}, no stored fix, browser GPS unavailable and marker removed", flush=True)
+        final = page.request.get(web_url + read_path)
+        assert final.ok and final.json() == {"available": False}
+        with psycopg.connect(fixture.DSN) as db:
+            assert db.execute("SELECT count(*) FROM public.pd_qa27_gps WHERE order_id=%s", (oid,)).fetchone()[0] == 0
+        assert markers.count() == 0
+        print(f"PASS: finished {oid}, no stored fix, browser GPS unavailable and marker removed", flush=True)
 
         # Independent positive control for the same offline renderer.
         for index, fix in enumerate(fixes):

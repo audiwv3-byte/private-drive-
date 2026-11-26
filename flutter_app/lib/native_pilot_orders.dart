@@ -91,8 +91,23 @@ class NativePilotOrdersApi {
   static const qaGpsEnabled = bool.fromEnvironment('PD_QA28_GPS') &&
       bool.fromEnvironment('PD_INTERNAL_QA');
 
+  // QA29 is a separate debug-only APK. It can never send a real session
+  // to plaintext HTTP, or reach the existing staging/production service.
+  static const qa29Loopback = bool.fromEnvironment('PD_QA29_LOOPBACK') &&
+      qaGpsEnabled;
+  static const qa29Base = 'http://127.0.0.1:18729';
+  bool get _qa29Allowed => qa29Loopback && baseUrl == qa29Base &&
+      token.startsWith('qa29-synthetic-') && token.length >= 40;
+  bool get _allowed => qa29Loopback ? _qa29Allowed : baseUrl == stage;
+
+  Uri _endpoint(String path) {
+    if (!_allowed) throw const FormatException('Unapproved pilot API');
+    if (_qa29Allowed) return Uri.parse(qa29Base).resolve(path);
+    return PdHttpApi.secureUri(baseUrl, path);
+  }
+
   Future<void> publishGps(String orderId, QaGpsFix? fix, int capturedAt) async {
-    if (!qaGpsEnabled || baseUrl != stage ||
+    if (!qaGpsEnabled || !_allowed ||
         !PilotAssignedOrder._uuid.hasMatch(orderId)) {
       throw const FormatException('GPS requires isolated QA and assigned order');
     }
@@ -107,8 +122,7 @@ class NativePilotOrdersApi {
     }
     final transport = _client ?? http.Client();
     try {
-      final request = http.Request('POST', PdHttpApi.secureUri(
-        baseUrl, '/native-pilot-orders/$orderId/gps'))
+      final request = http.Request('POST', _endpoint('/native-pilot-orders/$orderId/gps'))
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Content-Type'] = 'application/json'
@@ -138,7 +152,7 @@ class NativePilotOrdersApi {
   }
 
   Future<bool> availability([bool? desiredOnline]) async {
-    if (baseUrl != stage) {
+    if (!_allowed) {
       throw const FormatException('Pilot availability requires staging');
     }
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
@@ -148,7 +162,7 @@ class NativePilotOrdersApi {
     try {
       final request = http.Request(
         desiredOnline == null ? 'GET' : 'PATCH',
-        PdHttpApi.secureUri(baseUrl, '/native-pilot-availability'))
+        _endpoint('/native-pilot-availability'))
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Accept'] = 'application/json';
@@ -193,7 +207,7 @@ class NativePilotOrdersApi {
     final client = _client ?? http.Client();
     try {
       final request = http.Request(
-        'PATCH', PdHttpApi.secureUri(baseUrl, '/native-pilot-orders'))
+        'PATCH', _endpoint('/native-pilot-orders'))
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Content-Type'] = 'application/json'
@@ -229,7 +243,7 @@ class NativePilotOrdersApi {
       throw const PdHttpStatusException(401);
     }
     final request = http.Request(
-      'GET', PdHttpApi.secureUri(baseUrl, '/native-pilot-orders'),
+      'GET', _endpoint('/native-pilot-orders'),
     )
       ..followRedirects = false
       ..headers['Authorization'] = 'Bearer $token'

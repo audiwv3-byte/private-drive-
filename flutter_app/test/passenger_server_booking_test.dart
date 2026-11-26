@@ -12,18 +12,11 @@ void main() {
       (tester) async {
     final store = DemoTripStore();
     var sends = 0;
+    http.Request? received;
     final api = NativeOrdersApi('https://qa.example.invalid', 'synthetic-passenger-token',
       client: MockClient((request) async {
         sends++;
-        expect(request.method, 'POST');
-        expect(request.url.path, '/native-orders');
-        expect(request.headers['authorization'], 'Bearer synthetic-passenger-token');
-        final data = jsonDecode(request.body) as Map<String, dynamic>;
-        expect(data.keys.toSet(),
-          {'request_id','from','to','trip_date','trip_time'});
-        expect(data['from'], 'Вильнюс');
-        expect(data['to'], 'Каунас');
-        expect(data.containsKey('payment_method'), false);
+        received = request;
         return http.Response('{"order_id":"qa-confirmed-server-id",'
             '"payment_mode":"disabled"}', 201);
       }),
@@ -47,6 +40,14 @@ void main() {
     submit.onPressed!();
     await tester.pumpAndSettle();
     expect(sends, 1);
+    expect(received?.method, 'POST');
+    expect(received?.url.path, '/native-orders');
+    expect(received?.headers['authorization'], 'Bearer synthetic-passenger-token');
+    final data = jsonDecode(received!.body) as Map<String, dynamic>;
+    expect(data.keys.toSet(), {'request_id','from','to','trip_date','trip_time'});
+    expect(data['from'], 'Вильнюс');
+    expect(data['to'], 'Каунас');
+    expect(data.containsKey('payment_method'), false);
     expect(store.trip, isNull);
     expect(find.text('Заявка получена диспетчерской'), findsOneWidget);
     expect(find.textContaining('qa-confirmed-server-id'), findsOneWidget);

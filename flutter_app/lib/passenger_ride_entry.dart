@@ -27,7 +27,17 @@ class PassengerRideEntry extends StatelessWidget {
 
   void _openExtra(BuildContext context, ExtraServiceType service) {
     if (ordersApi != null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Дополнительные услуги пока не подключены к серверу.')));
+      Navigator.push(context, MaterialPageRoute<void>(
+        builder: (_) => PdPassengerLanguageScope(
+          child: PassengerDemo(
+            enableMapTiles: enableMapTiles,
+            tripStore: tripStore,
+            initialExtraService: service == ExtraServiceType.jumpstart
+                ? 'jumpstart' : 'delivery',
+            ordersApi: ordersApi,
+          ),
+        ),
+      ));
       return;
     }
     Navigator.push(context, MaterialPageRoute<void>(
@@ -191,7 +201,7 @@ class PassengerRideEntry extends StatelessWidget {
             Card(child: ListTile(
               key: const Key('passenger-entry-jumpstart'),
               leading: const Icon(Icons.battery_charging_full, size: 34),
-              title: const Text('Запуск автомобиля · 20 €'),
+              title: Text(ordersApi == null ? 'Запуск автомобиля · 20 €' : 'Запуск автомобиля · цена по запросу'),
               subtitle: const Text(
                 'Помощь с разряженным аккумулятором'),
               trailing: const Icon(Icons.chevron_right),
@@ -201,7 +211,7 @@ class PassengerRideEntry extends StatelessWidget {
             Card(child: ListTile(
               key: const Key('passenger-entry-delivery'),
               leading: const Icon(Icons.shopping_bag_outlined, size: 34),
-              title: const Text('Доставка товаров · 20 €'),
+              title: Text(ordersApi == null ? 'Доставка товаров · 20 €' : 'Доставка товаров · цена по запросу'),
               subtitle: const Text('Заберём покупки из магазина и доставим'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _openExtra(context, ExtraServiceType.delivery),

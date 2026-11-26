@@ -12,10 +12,79 @@ jobs:
     if: github.repository == 'audiwv3-byte/private-drive-' && github.ref == 'refs/heads/qa/render-pg-access-20261126'
     runs-on: ubuntu-latest
     timeout-minutes: 3
-    env:
-      RENDER_TOKEN: ${{ secrets.RENDER_API_KEY }}
     steps:
-      - name: Check access to the isolated PostgreSQL instance
+      - name: Check the isolated database identity and migration rights
+        env:
+          MIGRATION_DSN: ${{ secrets.PD_STAGING_MIGRATION_DSN }}
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          python3 -I - <<'PY'
+          import os
+          import subprocess
+          from urllib.parse import parse_qsl, unquote, urlsplit
+
+          raw_dsn = os.environ.pop("MIGRATION_DSN", "").strip()
+          if not raw_dsn:
+              raise SystemExit("Migration secret is unavailable")
+          try:
+              target = urlsplit(raw_dsn)
+              permitted = (
+                  target.scheme in {"postgresql", "postgres"}
+                  and target.hostname == "dpg-dc00pubm8hqs7397rblg-a.frankfurt-postgres.render.com"
+                  and target.port in (None, 5432)
+                  and target.path == "/private_drive_test"
+                  and target.username == "private_drive_test_user"
+                  and bool(target.password)
+                  and not target.fragment
+                  and all(k == "sslmode" and v in {"require","verify-ca","verify-full"}
+                          for k, v in parse_qsl(target.query, strict_parsing=True))
+              )
+          except ValueError:
+              permitted = False
+          if not permitted:
+              raise SystemExit("Migration secret does not match the isolated external database")
+          postgres_env = {
+              **{k: v for k, v in os.environ.items() if not k.startswith("PG")},
+              "PGHOST": target.hostname,
+              "PGPORT": "5432",
+              "PGDATABASE": "private_drive_test",
+              "PGUSER": "private_drive_test_user",
+              "PGPASSWORD": unquote(target.password),
+              "PGSSLMODE": "verify-full",
+              "PGSSLROOTCERT": "/etc/ssl/certs/ca-certificates.crt",
+              "PGCONNECT_TIMEOUT": "12",
+              "PGOPTIONS": "-c default_transaction_read_only=on",
+          }
+          sql = """
+              SELECT current_database() = 'private_drive_test'
+                 AND current_user = 'private_drive_test_user'
+                 AND current_user = pg_get_userbyid(datdba)
+                 AND has_schema_privilege('public','CREATE')
+                 AND (SELECT current_user = pg_get_userbyid(proowner)
+                        FROM pg_proc
+                        WHERE oid = to_regprocedure(
+                            'public.pd_assign_native_order(uuid,text,text,bigint)'))
+                FROM pg_database WHERE datname = current_database()
+          """
+          result = subprocess.run(["psql","-XAtq","-w","-v","ON_ERROR_STOP=1","-c",sql],
+                                  env=postgres_env, capture_output=True, text=True,
+                                  timeout=20)
+          if result.returncode != 0:
+              error = result.stderr.lower()
+              reason = next((label for label, needle in (
+                  ("TLS verification failed", "certificate"),
+                  ("authentication failed", "password authentication failed"),
+                  ("connection timed out", "timeout"),
+                  ("database host did not resolve", "could not translate host"),
+              ) if needle in error), "PostgreSQL connection or query failed")
+              raise SystemExit(reason)
+          if result.stdout.strip() != "t":
+              raise SystemExit("Database ownership or migration privileges are missing")
+          print("Verified TLS and migration privileges for private_drive_test")
+          PY
+      - name: Check credential access to the two existing staging services
+        env:
+          RENDER_TOKEN: ${{ secrets.RENDER_API_KEY }}
         shell: bash --noprofile --norc -e -o pipefail {0}
         run: |
           python3 -I - <<'PY'
@@ -29,22 +98,19 @@ jobs:
 
           token = os.environ.get("RENDER_TOKEN", "").strip()
           if not token:
-              raise SystemExit("Render API credential is unavailable")
+              raise SystemExit("Render API credential unavailable")
           opener = build_opener(NoRedirect())
-          instance_id = "dpg-dc00pubm8hqs7397rblg-a"
-          instance_url = "https://api.render.com/v1/postgres/" + instance_id
-
-          # The connected Render account already verified this exact staging
-          # instance independently. Probe only connection-info access here.
-          request = Request(instance_url + "/connection-info", headers={
-              "Authorization": "Bearer " + token, "Accept": "application/json",
-          })
-          try:
-              with opener.open(request, timeout=12) as response:
-                  status = response.status
-          except HTTPError as error:
-              with error:
-                  status = error.code
-          print("connection_info_http_status:", status)
-          raise SystemExit(0 if status == 200 else 1)
+          for label, service in (
+              ("native", "srv-dbvumcks728c73c1atvg"),
+              ("dispatcher", "srv-dc0qfsp42hec73c7ff3g"),
+          ):
+              url = "https://api.render.com/v1/services/" + service + "/env-vars"
+              req = Request(url, headers={"Authorization": "Bearer " + token})
+              try:
+                  with opener.open(req, timeout=12) as response:
+                      status = response.status
+              except HTTPError as error:
+                  with error:
+                      status = error.code
+              print(label + "_env_http_status:", status)
           PY

@@ -222,9 +222,30 @@ class _PilotCabinState extends State<PilotCabin> {
         ],
       ),
       body: widget.assignmentApi != null
-          ? SafeArea(child: PilotAssignedOrdersPanel(
-              api: widget.assignmentApi!, visible: !_assignmentMapOpen,
-            ))
+          ? Stack(fit: StackFit.expand, children: [
+              const VilniusEveningBackdrop(),
+              SafeArea(child: Column(children: [
+                const SizedBox(height: 14),
+                const SizedBox(
+                  key: Key('pilot-connected-brand-logo'),
+                  height: 86, width: 86,
+                  child: PrivateDriveBrandLogo(
+                    size: 86, transparentBackground: true),
+                ),
+                const SizedBox(height: 8),
+                const Text('КАБИНА ПИЛОТА',
+                  key: Key('pilot-connected-cabin-title'),
+                  style: TextStyle(color: Color(0xFFDDC184),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.8, fontSize: 19)),
+                const SizedBox(height: 4),
+                const Text('Заказы и статусы подтверждаются сервером',
+                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 8),
+                Expanded(child: PilotAssignedOrdersPanel(
+                  api: widget.assignmentApi!, visible: !_assignmentMapOpen)),
+              ])),
+            ])
           : Stack(
         fit: StackFit.expand,
         children: [

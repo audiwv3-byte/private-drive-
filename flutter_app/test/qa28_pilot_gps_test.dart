@@ -50,7 +50,7 @@ void main() {
 
   testWidgets('consented publisher keeps sending on simulated pause and stops when assignment ends',
     (tester) async {
-    final positions = StreamController<QaGpsFix>();
+    final positions = StreamController<QaGpsFix>(sync: true);
     final sent = <QaGpsFix?>[];
     var assigned = false;
     var now = 100;
@@ -64,25 +64,25 @@ void main() {
     assigned = true;
     expect(await publisher.start(order),isTrue);
     positions.add(const QaGpsFix(1.25,2.5,100));
-    await tester.pump();
+    await tester.pump(Duration.zero);
     expect(sent.whereType<QaGpsFix>().length,1);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     now = 105;
     positions.add(const QaGpsFix(1.5,2.5,105));
-    await tester.pump();
+    await tester.pump(Duration.zero);
     expect(sent.whereType<QaGpsFix>().length,2);
     positions.add(const QaGpsFix(1.0,2.5,100));
-    await tester.pump();
+    await tester.pump(Duration.zero);
     expect(sent.whereType<QaGpsFix>().length,2);
     assigned = false;
     now = 115;
     await tester.pump(const Duration(seconds:11));
-    await tester.pump();
+    await tester.pump(Duration.zero);
     expect(publisher.orderId,isNull);
     expect(sent.last,isNull);
     final count=sent.length;
     positions.add(const QaGpsFix(2,3,115));
-    await tester.pump();
+    await tester.pump(Duration.zero);
     expect(sent.length,count);
     await publisher.stop();
     await positions.close();

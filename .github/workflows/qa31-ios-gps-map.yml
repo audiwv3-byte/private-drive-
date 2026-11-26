@@ -1,0 +1,63 @@
+name: QA31 iOS Dart GPS to dispatcher map
+on:
+  push:
+    branches: [qa/qa31-ios-gps-map]
+
+permissions:
+  contents: read
+jobs:
+  browser-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+      PD_NATIVE_SMS_ISOLATED: 'YES'
+      PD_NATIVE_SMS_LIVE: 'NO'
+      PD_PAYMENT_MODE: disabled
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare Chromium, Playwright and offline Leaflet assets
+        run: |
+          python -m pip install -r requirements-sms-render.txt flask playwright
+          command -v google-chrome
+          for asset in leaflet.js leaflet.css; do
+            curl --fail --silent --show-error --retry 3 "https://unpkg.com/leaflet@1.9.4/dist/$asset" -o "$asset"
+          done
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+      - run: flutter pub get
+        working-directory: flutter_app
+      - name: Verify actual Dart GPS API, two plotted fixes and removal on finish
+        env:
+          QA_FIXTURE_DIR: ${{ github.workspace }}/flutter_app/tool
+          QA_SERVER_DIR: ${{ github.workspace }}
+        run: |
+          export PYTHONPATH="$PWD:$PWD/flutter_app/tool:$PWD/ops/qa"
+          export QA29_ORDER_FILE="$RUNNER_TEMP/qa31-order"
+          python -u -c 'import qa29_gps_integration as f; from pathlib import Path; f.PILOT="qa-ios-synthetic-pilot-session-not-a-real-credential"; f.serve(Path.cwd())' > "$RUNNER_TEMP/qa31-api.log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true; tail -n 40 "$RUNNER_TEMP/qa31-api.log"' EXIT
+          for attempt in {1..40}; do
+            if curl -s -o /dev/null http://127.0.0.1:18729/dispatch/orders/state; then break; fi
+            kill -0 "$server"
+            sleep 1
+          done
+          test -s "$QA29_ORDER_FILE"
+          python -u ops/qa/qa31_ios_map_browser.py --persistent-only

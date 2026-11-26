@@ -25,7 +25,8 @@ assert "PD_QA" not in pilot and "PD_INTERNAL_QA" not in pilot
 assert "kIsWeb && isolatedWebPreview" in main
 print("PASS explicit source-level guest, local PIN, web preview and isolated GPS transport")
 print("PUBLIC RELEASE BLOCKERS (not waived):")
-print("1. Authenticated cabins still use PrivateDriveDemo and local trip logic.")
+assert "child: NativeServerCabin(" in main and "child: PdPermissionsFirstLaunch(child: NativeServerCabin(" in cabin
+print("1. Authenticated server cabin entry checked; full device runtime remains unverified.")
 print("2. Store signing, verified public backend and device runtime not tested.")
 print("3. Foreground-only QA38 iOS profile removes background capability in runner only.")
 print("This CI builds non-distributable isolated release-mode binaries, not store-ready apps.")

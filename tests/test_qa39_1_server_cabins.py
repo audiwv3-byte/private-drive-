@@ -94,14 +94,14 @@ def test_native_cabins_against_isolated_postgres(monkeypatch, tmp_path):
     signing_key = hmac.digest(b"WebAppData", telegram_token.encode(), "sha256")
     fields = "\n".join(f"{key}={value}" for key, value in sorted(values.items()))
     values["hash"] = hmac.new(signing_key, fields.encode(), hashlib.sha256).hexdigest()
-    server = make_server("127.0.0.1", 0, create_application(), ssl_context=(str(cert), str(key)))
+    server = make_server("127.0.0.1", 443, create_application(), ssl_context=(str(cert), str(key)))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
         subprocess.run([
             "flutter", "test", "qa/qa39_1_server_cabins_live_test.dart",
             "--no-pub", "--reporter", "expanded",
-            f"--dart-define=PD_NATIVE_AUTH_API_URL=https://127.0.0.1:{server.server_port}",
+            "--dart-define=PD_NATIVE_AUTH_API_URL=https://127.0.0.1",
         ], cwd="flutter_app", check=True, timeout=180, env={
             **os.environ,
             "QA39_CERT": str(cert),

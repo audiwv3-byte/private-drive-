@@ -5,7 +5,7 @@ import '../lib/native_orders_api.dart';
 import '../lib/passenger_ride_entry.dart';
 
 void main() {
-  testWidgets('authenticated passenger has no local trip store or delivery',
+  testWidgets('authenticated passenger has no local trip store and offers server delivery',
       (tester) async {
     await tester.pumpWidget(MaterialApp(home: NativeServerCabin(
       ordersApi: NativeOrdersApi('https://qa.invalid', 'synthetic-token'),
@@ -16,6 +16,6 @@ void main() {
     expect(entry.ordersApi, isNotNull);
     final delivery = tester.widget<ListTile>(
       find.byKey(const Key('passenger-entry-delivery')));
-    expect(delivery.onTap, isNull);
+    expect(delivery.onTap, isNotNull);
   });
 }

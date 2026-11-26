@@ -653,6 +653,35 @@ class _PassengerDemoState extends State<PassengerDemo> {
             '${date.day.toString().padLeft(2, '0')}',
         'trip_time': '${time.hour.toString().padLeft(2, '0')}:'
             '${time.minute.toString().padLeft(2, '0')}',
+        'booking_details': {
+          'ride_type': _rideType,
+          'tariff': _rideType == 'Такси'
+              ? (_taxiOutsideCity ? 'Такси за городом' : 'Такси городской')
+              : 'Трансфер',
+          'round_trip': _roundTrip,
+          'advance_booking': _isAdvanceBooking,
+          'fare_requires_quote': _requiresCustomQuote,
+          if (_rideType == 'Трансфер' && _pricePreview != null)
+            'fare_preview_eur': _pricePreview,
+          'extras': <String>[
+            if (_meetSign) 'Встреча с табличкой',
+            if (_pets) 'Животные',
+            if (_soberDriver) 'Трезвый водитель',
+            if (_music) 'Музыка в дорогу',
+            if (_flowers) 'Цветы',
+            if (_coffee) 'Кофе',
+            if (_water) 'Вода',
+            if (_quietRide) 'Тихая поездка',
+            if (_luggageHelp) 'Помощь с багажом',
+          ],
+          'wishes': _tripWishes.text.trim(),
+          'preferences': {
+            'radio': _radioStation,
+            'tracks': _favoriteTracks.map((x) => x.text.trim())
+                .where((x) => x.isNotEmpty).toList(),
+            'temperature': _cabinTemperature,
+          },
+        },
       });
       final id = response['order_id'];
       if (id is! String || id.isEmpty) throw const FormatException('Missing order ID');

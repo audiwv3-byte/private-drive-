@@ -122,7 +122,7 @@ def _pilot_line_database(auth_database):
     """Use the dedicated login only on the isolated auth service's own staging DB."""
     from psycopg.conninfo import conninfo_to_dict
 
-    url = os.getenv("PD_NATIVE_PILOT_LINE_DATABASE_URL", "")
+    url = os.getenv("PD_NATIVE_PILOT_LINE_DATABASE_URL", "").rstrip("\r\n")
     if (not url or os.getenv("PD_NATIVE_SMS_ISOLATED") != "YES"
             or os.getenv("PD_DISPATCH_STAGING_ONLY") != "1"
             or os.getenv("PD_PAYMENT_MODE") != "disabled"):

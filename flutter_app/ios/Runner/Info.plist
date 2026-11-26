@@ -9,7 +9,13 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Фотоконтроль использует только камеру. Доступ к твоей галерее не запрашивается.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>PRIVATE DRIVE показывает местоположение пилота на карте только после включения GPS. Данные не отправляются на сервер в демоверсии.</string>
+	<string>PRIVATE DRIVE использует геолокацию во время назначенной поездки после согласия пилота, чтобы передавать координаты диспетчеру. Передачу можно остановить в кабине пилота.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Для непрерывной передачи GPS диспетчеру во время назначенной поездки PRIVATE DRIVE может использовать геолокацию в фоне после согласия пилота. Передача прекращается по завершении поездки или отключении GPS.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

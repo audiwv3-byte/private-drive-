@@ -84,20 +84,19 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                           AND o.status IN ('requested', 'assigned', 'approaching')
                         RETURNING o.id, o.status
                     """, (order_id, uid)).fetchone()
-                    if cancelled:
-                        return reply("200 OK", {"order_id": str(cancelled[0]),
-                            "status": cancelled[1], "payment_mode": "disabled"})
-                    current = db.execute("""
-                        SELECT o.status FROM public.pd_dispatch_orders AS o
-                        JOIN public.pd_native_order_owners AS n ON n.order_id=o.id
-                        WHERE o.id=%s AND n.user_id=%s
-                    """, (order_id, uid)).fetchone()
-                    if not current:
-                        return reply("404 Not Found", {"error": "order_not_found"})
-                    if current[0] == "cancelled":
-                        return reply("200 OK", {"order_id": order_id,
-                            "status": "cancelled", "payment_mode": "disabled"})
-                    return reply("409 Conflict", {"error": "cannot_cancel_active_trip"})
+                    if not cancelled:
+                        current = db.execute("""
+                            SELECT o.status FROM public.pd_dispatch_orders AS o
+                            JOIN public.pd_native_order_owners AS n ON n.order_id=o.id
+                            WHERE o.id=%s AND n.user_id=%s
+                        """, (order_id, uid)).fetchone()
+                        if not current:
+                            return reply("404 Not Found", {"error": "order_not_found"})
+                        if current[0] != "cancelled":
+                            return reply("409 Conflict", {"error": "cannot_cancel_active_trip"})
+                    db.commit()
+                    return reply("200 OK", {"order_id": order_id,
+                        "status": "cancelled", "payment_mode": "disabled"})
                 try:
                     length = int(environ.get("CONTENT_LENGTH", "0"))
                     if not 0 < length <= 8192 or environ.get("CONTENT_TYPE","").split(";")[0] != "application/json":

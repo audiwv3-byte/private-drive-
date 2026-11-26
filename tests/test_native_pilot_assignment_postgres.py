@@ -80,7 +80,8 @@ def stage(monkeypatch):
             public.pd_native_order_owners, public.pd_native_order_quotes TO {native};
         GRANT SELECT ON public.pd_dispatch_orders, public.pd_native_order_quotes TO {queue};
         GRANT EXECUTE ON FUNCTION public.pd_pilot_assignment_candidates(bigint),
-            public.pd_assign_native_order(uuid,text,text,bigint) TO {assign};
+            public.pd_assign_native_order(uuid,text,text,bigint),
+            public.pd_create_dispatch_order(uuid,text,text,text,text,text,text) TO {assign};
     """)
     def role_dsn(role):
         # Keep URI form for the same application-level validation used in staging.
@@ -215,8 +216,12 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     endpoint = f"/dispatch/orders/{order_id}/assign"
     assert client.get("/dispatch/orders/eligible-pilots").status_code == 401
     assert client.post(endpoint, data={"pilot_id": "pilotA"}).status_code == 401
+    manual_endpoint = "/dispatch/orders/create"
+    assert client.post(manual_endpoint, data={"from": "Vilnius"}).status_code == 401
     token = login(client)
-    assert b"const pilotCsrf=" in client.get("/dispatch").data
+    dashboard = client.get("/dispatch").data
+    assert b"const pilotCsrf=" in dashboard
+    assert b'action="/dispatch/orders/create"' in dashboard
     def availability(user, desired=None):
         # Native Bearer endpoint and dispatcher are distinct restricted
         # database roles pointing at the same disposable PostgreSQL.
@@ -365,6 +370,30 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     assert trip("pilotA", "finish").status_code == 409
     assert next(o for o in orders() if o["order_id"] == order_id)["status"] == "finished"
 
+    monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", queue_url)
+    manual_payload = {"csrf": token, "request_id": str(uuid.uuid4()), "from": "Vilnius",
+                      "to": "Kaunas", "trip_date": "2026-12-01", "trip_time": "12:00"}
+    assert client.post(manual_endpoint, data={**manual_payload, "csrf": "wrong"}).status_code == 403
+    assert client.post(manual_endpoint, data={**manual_payload, "source": "android"}).status_code == 400
+    monkeypatch.setenv("PD_PAYMENT_MODE", "live")
+    assert client.post(manual_endpoint, data=manual_payload).status_code == 503
+    monkeypatch.setenv("PD_PAYMENT_MODE", "disabled")
+    manual = client.post(manual_endpoint, data=manual_payload)
+    assert manual.status_code == 201, manual.json
+    manual_id = manual.json["order_id"]
+    again = client.post(manual_endpoint, data=manual_payload)
+    assert again.status_code == 200 and again.json == manual.json
+    assert client.post(manual_endpoint, data={**manual_payload, "to": "Trakai"}).status_code == 409
+    assert next(o for o in client.get("/dispatch/orders/state").json["orders"]
+                if o["id"] == manual_id)["source"] == "dispatcher"
+    assert client.post(f"/dispatch/orders/{manual_id}/assign",
+                       data={"pilot_id": "pilotInvite", "csrf": token}).json == {
+        "order_id": manual_id, "status": "assigned", "changed": True,
+    }
+    monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", native_url)
+    assert manual_id in {o["order_id"] for o in assignments("pilotInvite").json["orders"]}
+    assert manual_id not in {o["order_id"] for o in orders()}
+
     owner.execute("""INSERT INTO public.native_identity_checks
         (id,user_id,status,created_at,expires_at) VALUES (%s,'pilotA','pending',%s,%s)""",
         (uuid.uuid4().hex, int(time.time()), int(time.time()) + 1000))
@@ -380,3 +409,8 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
         with psycopg.connect(queue_url) as db:
             db.execute("SELECT * FROM public.pd_assign_native_order(%s,%s,%s,%s)",
                        (order_id, "pilotA", "1001", int(time.time())))
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        with psycopg.connect(queue_url) as db:
+            db.execute("SELECT * FROM public.pd_create_dispatch_order(%s,%s,%s,%s,%s,%s,%s)",
+                       (uuid.uuid4(), "synthetic", "fingerprint", "Vilnius", "Kaunas",
+                        "2026-12-01", "12:00"))

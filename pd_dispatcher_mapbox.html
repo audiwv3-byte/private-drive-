@@ -30,6 +30,8 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.stat,.card{background:#242019;border:1px solid var(--line);border-radius:11px;padding:12px}.stat b{font-size:25px;display:block;color:#f7e7c3}.stat span{font-size:11px;color:var(--soft)}
 .tabs{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0}.btn,.tab{border:1px solid #725c3b;border-radius:8px;background:#292118;color:#f5d9a1;padding:9px 11px;min-height:40px}.tab.active{background:#d7ad65;color:#17100a}
 .card{margin:10px 0}.card strong{display:block;margin:7px 0;color:#f4ead9}.muted{color:var(--soft);font-size:12px}
+#manualOrderForm label{display:grid;gap:3px;margin:8px 0}
+#manualOrderForm input{min-width:0;width:100%;font:inherit;padding:7px;border:1px solid var(--line);border-radius:6px}
 #map{min-height:530px;height:calc(100dvh - 69px);background:#24231f;position:relative;overflow:hidden;isolation:isolate}
 #mapNotice{position:absolute;z-index:500;left:16px;top:16px;right:16px;max-width:445px;border-radius:10px;background:#15120fe8;border:1px solid #8a7049;padding:12px 15px;pointer-events:none}
 #mapNotice b{display:block;color:var(--gold)}#mapNotice span{font-size:12px;color:#f2e6d2}
@@ -64,6 +66,19 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <div class="stats" aria-label="Показатели"><div class="stat"><b id="countNew">—</b><span>Новые</span></div><div class="stat"><b id="countActive">—</b><span>Активные</span></div><div class="stat"><b id="countOnline">—</b><span>На линии</span></div><div class="stat"><b id="countDone">—</b><span>Завершены</span></div></div>
 <div class="tabs" role="group" aria-label="Фильтр заказов"><button class="tab active" data-filter="all" aria-pressed="true">Все</button><button class="tab" data-filter="new" aria-pressed="false">Новые</button><button class="tab" data-filter="active" aria-pressed="false">В пути</button><button class="tab" data-filter="done" aria-pressed="false">История</button></div>
 <h2 id="ordersTitle">Все заказы</h2>
+{% if pilot_assignment_enabled %}
+<details class="card">
+<summary>Создать заказ вручную</summary>
+<form id="manualOrderForm" method="post" action="/dispatch/orders/create">
+<label>Откуда<input name="from" required minlength="2" maxlength="200"></label>
+<label>Куда<input name="to" required minlength="2" maxlength="200"></label>
+<label>Дата поездки<input name="trip_date" type="date" required></label>
+<label>Время поездки<input name="trip_time" type="time" required></label>
+<button class="btn" type="submit">Создать заказ</button>
+</form>
+<p id="manualOrderStatus" class="muted" role="status"></p>
+</details>
+{% endif %}
 {% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">{% if pilot_assignment_enabled %}Можно назначить пилота с действующим фотоконтролем.{% else %}Назначение пилотов выключено.{% endif %}</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
 <p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
 </aside>
@@ -106,6 +121,46 @@ let lastOrders=null;
 const pilotCsrf={{ csrf|tojson }};
 let eligiblePilots=[], savingOrder=null;
 const chosenPilots=new Map();
+const manualOrderForm=$('manualOrderForm');
+const manualOrderFields=manualOrderForm.querySelectorAll('input');
+const manualOrderButton=manualOrderForm.querySelector('button');
+let pendingManualOrder=null;
+manualOrderForm.addEventListener('submit',async event=>{
+ event.preventDefault();
+ if(manualOrderButton.disabled)return;
+ const outcome=$('manualOrderStatus');
+ manualOrderButton.disabled=true;
+ try{
+   if(!pendingManualOrder){
+     const body=new URLSearchParams(new FormData(manualOrderForm));
+     body.set('request_id',crypto.randomUUID());
+     body.set('csrf',pilotCsrf);
+     pendingManualOrder=body;
+   }
+   for(const field of manualOrderFields)field.readOnly=true;
+   const response=await fetch(manualOrderForm.action,{
+     method:'POST',body:pendingManualOrder,credentials:'same-origin',
+     signal:AbortSignal.timeout(7000)});
+   const result=await response.json();
+   if(response.status===400||response.status===409){
+     pendingManualOrder=null;
+     outcome.textContent=response.status===400?'Проверь данные заказа.':
+       'Номер отправки уже использован. Проверь очередь перед новой отправкой.';
+     return;
+   }
+   if(!response.ok||typeof result.order_id!=='string'||result.payment_mode!=='disabled'){
+     throw new Error('Order not confirmed');
+   }
+   pendingManualOrder=null;
+   manualOrderForm.reset();
+   outcome.textContent='Заказ получен. ID заявки: '+result.order_id;
+ }catch{
+   outcome.textContent='Сервер не подтвердил заказ. Повтори отправку.';
+ }finally{
+   manualOrderButton.disabled=false;
+   for(const field of manualOrderFields)field.readOnly=Boolean(pendingManualOrder);
+ }
+});
 async function assignPersistentOrder(order, select, button){
  if(savingOrder||!select.value)return;
  savingOrder=order.id;button.disabled=true;
@@ -129,7 +184,7 @@ async function assignPersistentOrder(order, select, button){
  }finally{savingOrder=null;renderPersistentOrders();}
 }
 function appendAssignmentControl(card,order){
- if(order.status!=='requested'||!['android','ios'].includes(order.source)||!eligiblePilots.length)return;
+ if(order.status!=='requested'||!['android','ios','dispatcher'].includes(order.source)||!eligiblePilots.length)return;
  const select=document.createElement('select');
  select.setAttribute('aria-label','Пилот для заказа '+order.id);
  const placeholder=new Option('Выбрать пилота','');
@@ -180,8 +235,12 @@ function renderPersistentOrders(){
    const route=document.createElement('strong');route.textContent=order.origin+' → '+order.destination;
    const info=document.createElement('p');
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
-     ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
-   card.append(route,info);
+     ' · '+order.trip_date+' '+order.trip_time;
+   const orderId=document.createElement('p');
+   orderId.className='muted';
+   orderId.textContent='ID заявки: '+order.id;
+   orderId.style.overflowWrap='anywhere';
+   card.append(route,info,orderId);
    if(order.details&&typeof order.details==='object'){
      const quote=document.createElement('p');
      const cents=order.quoted_total_cents;

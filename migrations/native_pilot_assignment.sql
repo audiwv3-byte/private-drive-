@@ -10,6 +10,32 @@ BEGIN
 END
 $$;
 
+-- Explicitly grant EXECUTE only to the isolated dispatcher writer.
+CREATE OR REPLACE FUNCTION public.pd_create_dispatch_order(
+    new_id uuid, source_id text, request_fingerprint text,
+    origin_address text, destination_address text, travel_date text, travel_time text
+) RETURNS TABLE(order_id uuid, status text, created boolean)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+    INSERT INTO public.pd_dispatch_orders AS o
+        (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
+    VALUES (new_id,'dispatcher',source_id,request_fingerprint,
+            origin_address,destination_address,travel_date,travel_time)
+    ON CONFLICT (source,source_order_id) DO NOTHING
+    RETURNING o.id,o.status INTO order_id,status;
+    IF FOUND THEN
+        created := true;
+        RETURN NEXT;
+        RETURN;
+    END IF;
+    RETURN QUERY SELECT o.id,o.status,false FROM public.pd_dispatch_orders o
+    WHERE o.source='dispatcher' AND o.source_order_id=source_id
+      AND o.fingerprint=request_fingerprint;
+END
+$$;
+REVOKE ALL ON FUNCTION public.pd_create_dispatch_order(uuid,text,text,text,text,text,text) FROM PUBLIC;
+
 CREATE TABLE IF NOT EXISTS public.pd_native_order_assignments (
     order_id uuid PRIMARY KEY REFERENCES public.pd_dispatch_orders(id),
     pilot_user_id text NOT NULL REFERENCES public.native_auth_users(id),
@@ -117,12 +143,13 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Only orders placed by native passengers. Lock the same status row that
-    -- their history reads; concurrent assignments cannot both be accepted.
+    -- Native passenger orders and manual dispatcher orders share the same
+    -- lock. Imports without an established dispatch workflow stay excluded.
     SELECT o.status INTO current_status
     FROM public.pd_dispatch_orders o
-    JOIN public.pd_native_order_owners n ON n.order_id = o.id
-    WHERE o.id = target_order FOR UPDATE OF o;
+    WHERE o.id = target_order AND (o.source = 'dispatcher' OR EXISTS (
+        SELECT 1 FROM public.pd_native_order_owners n WHERE n.order_id = o.id
+    )) FOR UPDATE OF o;
     IF NOT FOUND THEN
         RETURN QUERY SELECT 'order_not_found'::text, NULL::text;
         RETURN;

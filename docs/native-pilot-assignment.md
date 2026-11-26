@@ -1,8 +1,9 @@
 # Pilot assignment — first staging slice
 
-Scope: a verified dispatcher assigns an Android/iOS native passenger order in the
-existing `/dispatch` web queue. The passenger's history and the assigned pilot's
-authenticated read endpoint see the same persisted order ID and new status.
+Scope: a verified dispatcher assigns Android/iOS passenger orders and orders
+created manually in the existing `/dispatch` web queue. Native passengers and
+assigned pilots see the same persisted order ID and new status as the
+dispatcher. Manual orders have no native passenger owner.
 There is no acceptance/decline transition, live GPS, SMS, payment or live release
 in this change. An explicitly opted-in Flutter build projects the server
 assignments into the existing pilot cabin without local demo controls.
@@ -28,7 +29,7 @@ Returning to the order list refreshes assignments with the same native session.
    explicitly as the isolated DB owner. Do not use database owner DSNs at runtime.
 3. Preserve the dispatcher queue reader connection/SELECT permissions. Add a
    separate login for assignment, with USAGE on `public` and only EXECUTE on its
-   two wrappers. Its internal URL goes in `PD_PILOT_ASSIGNMENT_DATABASE_URL`
+   creation and assignment wrappers. Its internal URL goes in `PD_PILOT_ASSIGNMENT_DATABASE_URL`
    on the dispatcher; it must match the queue reader's host, port and database.
    Native order API's existing runtime login receives only EXECUTE on the new
    native read wrapper. Replace the sample role names below; no public grants,
@@ -61,7 +62,8 @@ reassign/cancel operation is implemented and concurrency-tested.
 ```sql
 GRANT USAGE ON SCHEMA public TO assignment_runtime;
 GRANT EXECUTE ON FUNCTION public.pd_pilot_assignment_candidates(bigint),
-  public.pd_assign_native_order(uuid,text,text,bigint) TO assignment_runtime;
+  public.pd_assign_native_order(uuid,text,text,bigint),
+  public.pd_create_dispatch_order(uuid,text,text,text,text,text,text) TO assignment_runtime;
 GRANT EXECUTE ON FUNCTION public.pd_native_pilot_order_state(text,bigint)
   TO native_api_runtime;
 ```

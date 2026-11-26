@@ -17,6 +17,7 @@ from werkzeug.test import Client
 from werkzeug.wrappers import Response
 
 from pd_dispatcher_staging_wsgi import create_app
+from pd_miniapp_dispatch_bridge import publish_telegram_order
 from pd_native_auth_postgres_http import make_app
 from pd_native_auth_schema_migration import initialize_database
 from pd_native_orders_http import make_orders_app
@@ -149,6 +150,28 @@ def test_native_order_appears_in_authenticated_web_dispatch_and_passenger_histor
     invalid_cancel = api.patch("/native-orders", headers=passenger,
                      json={"order_id": order_id, "action": "pay"})
     assert invalid_cancel.status_code == 400
+
+    def fail_commit(_connection):
+        raise psycopg.OperationalError("synthetic commit failure")
+
+    response_statuses = []
+
+    def observe_response(environ, start_response):
+        def record_response(status, headers, exc_info=None):
+            response_statuses.append(status)
+            return start_response(status, headers, exc_info)
+
+        return api.application(environ, record_response)
+
+    with monkeypatch.context() as failing_database:
+        failing_database.setattr(psycopg.Connection, "commit", fail_commit)
+        unconfirmed = Client(observe_response, Response).patch(
+            "/native-orders", headers=passenger, json={"order_id": order_id, "action": "cancel"})
+    assert response_statuses == ["503 Service Unavailable"]
+    assert unconfirmed.status_code == 503
+    assert unconfirmed.json == {"error": "storage_unavailable"}
+    assert api.get("/native-orders", headers=passenger).json["orders"][0]["status"] == "requested"
+
     cancelled = api.patch("/native-orders", headers=passenger,
                      json={"order_id": order_id, "action": "cancel"})
     assert cancelled.status_code == 200, cancelled.json
@@ -174,13 +197,43 @@ def test_native_order_appears_in_authenticated_web_dispatch_and_passenger_histor
         "csrf": csrf.group(1).decode(), "password": "synthetic-dispatch-login"
     })
     assert login.status_code == 302
-    assert b"/dispatch/orders/state" in dispatcher.get("/dispatch").data
+    dashboard = dispatcher.get("/dispatch").get_data(as_text=True)
+    assert "/dispatch/orders/state" in dashboard
+    assert "'ID заявки: '+order.id" in dashboard
     queue = dispatcher.get("/dispatch/orders/state")
     assert queue.status_code == 200, queue.json
     assert [row["id"] for row in queue.json["orders"]] == [order_id]
     assert queue.json["orders"][0]["quoted_total_cents"] == 5500
     assert queue.json["orders"][0]["details"]["extras"] == ["meet_sign"]
     assert queue.json["orders"][0]["details"]["preferences"]["temperature"] == 21
+
+    # Keep the hosted transport and credentials out of this test. Exercise the
+    # real signature, import route, commit, retry and dispatcher queue.
+    with monkeypatch.context() as ingest:
+        ingest.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", api_dsn)
+        ingest.setenv("PD_DISPATCH_ORDERS_INGEST_SECRET", "synthetic-ingest-secret-only-for-qa")
+        ingest.setenv("PD_MINIAPP_DISPATCH_BRIDGE", "1")
+        ingest.setenv("PD_MINIAPP_DISPATCH_IMPORT_URL",
+                      "https://dispatcher.example.test/v1/dispatch/orders/import")
+
+        def forward(request, *, timeout):
+            response = dispatcher.post(urlsplit(request.full_url).path, data=request.data,
+                                       headers=dict(request.header_items()))
+            data = io.BytesIO(response.data)
+            data.status = response.status_code
+            return data
+
+        telegram_order = {"id": "test-miniapp-1", "origin": "Kaunas", "destination": "Vilnius",
+                          "trip_date": "01.12.2026", "trip_time": "11:30"}
+        telegram_id = publish_telegram_order(telegram_order, open_url=forward)
+        assert telegram_id
+        assert publish_telegram_order(telegram_order, open_url=forward) == telegram_id
+
+    queue = dispatcher.get("/dispatch/orders/state").json["orders"]
+    assert {row["source"]: row["id"] for row in queue} == {
+        "android": order_id, "telegram_miniapp": telegram_id,
+    }
+    assert len(queue) == 2
 
     monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", api_dsn)
     assert api.post("/native-auth/logout", headers=passenger).status_code == 200

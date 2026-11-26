@@ -4,6 +4,7 @@ import json
 import os
 import re
 import time
+import uuid
 
 from pd_native_auth_postgres_session_lifecycle import _digest
 
@@ -56,6 +57,7 @@ def _connect(url):
 
 def register_dispatch_assignment(app, authorized, valid_csrf, admin_id, *, clock=time.time):
     from flask import jsonify, request
+    from pd_dispatch_persistent import fingerprint, validated_order
 
     def reply(data, code=200):
         response = jsonify(data)
@@ -63,6 +65,46 @@ def register_dispatch_assignment(app, authorized, valid_csrf, admin_id, *, clock
         response.headers["Cache-Control"] = "private, no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
+
+    @app.post("/dispatch/orders/create")
+    def dispatch_create_order():
+        if not authorized():
+            return reply({"error": "unauthorized"}, 401)
+        if not dispatcher_assignment_enabled():
+            return reply({"error": "manual_orders_disabled"}, 503)
+        if (request.mimetype != "application/x-www-form-urlencoded"
+                or request.content_length is None or not 0 < request.content_length <= 8192):
+            return reply({"error": "invalid_body"}, 400)
+        if not valid_csrf():
+            return reply({"error": "csrf_required"}, 403)
+        fields = {"csrf", "request_id", "from", "to", "trip_date", "trip_time"}
+        if set(request.form) != fields or any(
+            len(request.form.getlist(key)) != 1 for key in fields
+        ):
+            return reply({"error": "invalid_order"}, 400)
+        try:
+            request_id = uuid.UUID(request.form["request_id"])
+            source_id = f"{admin_id}-{request_id}"
+            values = validated_order({
+                "source": "dispatcher", "source_order_id": source_id,
+                **{field: request.form[field] for field in ("from", "to", "trip_date", "trip_time")},
+            }, allowed_sources={"dispatcher"})
+        except ValueError:
+            return reply({"error": "invalid_order"}, 400)
+        try:
+            with _connect(os.environ["PD_PILOT_ASSIGNMENT_DATABASE_URL"]) as db:
+                saved = db.execute(
+                    "SELECT * FROM public.pd_create_dispatch_order(%s,%s,%s,%s,%s,%s,%s)",
+                    (uuid.uuid4(), source_id, fingerprint(values), *values[2:]),
+                ).fetchone()
+            if not saved:
+                return reply({"error": "request_conflict"}, 409)
+            order_id, status, created = saved
+            return reply({"order_id": str(order_id), "status": status,
+                          "payment_mode": "disabled"}, 201 if created else 200)
+        except Exception as exc:
+            app.logger.warning("Manual order storage unavailable (%s)", type(exc).__name__)
+            return reply({"error": "storage_unavailable"}, 503)
 
     @app.get("/dispatch/orders/eligible-pilots")
     def dispatch_eligible_pilots():

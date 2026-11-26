@@ -44,13 +44,13 @@ def verified_request(raw, headers, key, now=None):
     return hmac.compare_digest(digest, signature)
 
 
-def validated_order(data):
+def validated_order(data, *, allowed_sources=SOURCES):
     if not isinstance(data, dict) or set(data) != {
             "source", "source_order_id", "from", "to", "trip_date", "trip_time"}:
         raise ValueError("invalid_order")
     source = data["source"]
     original = data["source_order_id"]
-    if not isinstance(source, str) or source not in SOURCES or not isinstance(original, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", original):
+    if not isinstance(source, str) or source not in allowed_sources or not isinstance(original, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", original):
         raise ValueError("invalid_source")
     origin, destination = data["from"], data["to"]
     if not isinstance(origin, str) or not isinstance(destination, str):

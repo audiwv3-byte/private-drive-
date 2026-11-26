@@ -31,6 +31,7 @@ class PassengerDemo extends StatefulWidget {
       this.preferencesStorage, this.initialRideType = 'Трансфер',
       this.initialAdvanceBooking = false,
       this.initialAdvanceDate, this.initialAdvanceTime,
+      this.initialExtraService,
       this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController,
       this.onIncomingMessageVoice, this.ordersApi});
   final NativeOrdersApi? ordersApi;
@@ -40,6 +41,8 @@ class PassengerDemo extends StatefulWidget {
   final bool initialAdvanceBooking;
   final DateTime? initialAdvanceDate;
   final TimeOfDay? initialAdvanceTime;
+  /// 'jumpstart' or 'delivery' for the standalone server order screen.
+  final String? initialExtraService;
   /// Test injection: null uses a real HTTPS tile request on Android.
   final Future<String?> Function()? mapConnectivityCheck;
   final DemoTripStore? tripStore;
@@ -613,6 +616,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
         'ride_type': _rideType == 'Такси' ? 'taxi' : 'transfer',
         'round_trip': _roundTrip,
         'extras': <String>[
+          if (widget.initialExtraService == 'jumpstart') 'jumpstart',
+          if (widget.initialExtraService == 'delivery') 'delivery',
           if (_meetSign) 'meet_sign',
           if (_soberDriver) 'sober_driver',
           if (_pets) 'pets',

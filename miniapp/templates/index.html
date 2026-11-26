@@ -749,11 +749,27 @@ async function pdbSendOrder(){
   const date=$('pdbDate').value.split('-').reverse().join('.');const extra=[...pdbChosen].filter(x=>x!=='Без пожеланий');
   const details='Услуги: '+(extra.join(', ')||'Без пожеланий')+'; Комментарий: '+($('pdbWishes').value.trim()||'Нет');
   const payload={origin:a,destination:b,...pdStopPayload(),trip_date:date,trip_time:$('pdbTime').value,roundtrip:pdIsRoundtrip(),passengers:Number($('pdbPassengers').value),luggage:$('pdbLuggage').value,details,extras:extra,payment_method:pdbPay,...pdbPointPayload()};
+  // Booking metadata is informational; this request never collects a payment.
+  const priceLabel=$('pdbPrice').textContent.trim().replace(',', '.');
+  const preview=Number.parseFloat(priceLabel);
+  const hasPreview=Number.isFinite(preview)&&priceLabel.includes('€');
+  payload.booking_details={
+    ride_type:'Трансфер',
+    tariff:'Трансфер',
+    round_trip:pdIsRoundtrip(),
+    advance_booking:true,
+    fare_requires_quote:!hasPreview,
+    ...(hasPreview?{fare_preview_eur:preview}:{}),
+    extras:extra,
+    wishes:$('pdbWishes').value.trim(),
+    passengers:Number($('pdbPassengers').value),
+    luggage:$('pdbLuggage').value
+  };
   const request_key=await pdbRequestKey(payload);
   feedback.textContent=pdL("Отправляем заявку…");await api('/api/register',{name,phone});
   const res=await api('/api/order',{...payload,request_key});
   feedback.textContent=(res.replayed?pdL("Заявка №")+res.order_id+pdL(" уже была получена. Дубликат не создан."):pdL("Заявка №")+res.order_id+pdL(" успешно отправлена. Ожидайте подтверждения пилотом."));
-   if(res.details_not_saved)feedback.textContent+=' '+pdL('Пожелания, дополнительные услуги и стоимость пока не сохраняются в серверном заказе. Согласуй их с диспетчером.');
+   if(res.details_saved)feedback.textContent+=' '+pdL('Пожелания и дополнительные услуги сохранены у диспетчера. Предварительная стоимость не является оплатой.');
   $('pdbNewRequest').classList.remove('hidden');$('pdBookedPilot').classList.remove('hidden');btt.textContent=pdL("Проверить отправленную заявку");message(pdL("✅ Заявка №")+res.order_id+pdL(" получена"));
  }catch(e){feedback.textContent=pdL("Не удалось подтвердить отправку: ")+pdL(e.message)+pdL(". Повторите попытку — защита от дублей включена.");message(pdL(e.message),true)}
  finally{pdbOrderBusy=false;btt.disabled=false}

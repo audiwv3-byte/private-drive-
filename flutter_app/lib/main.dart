@@ -268,6 +268,7 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
   }
 
   Future<void> _startTelegram() async {
+    if (const bool.fromEnvironment('PD_ISOLATED_DEVICE_QA')) return;
     if (busy || !_acknowledgedLegal) return;
     setState(() {
       busy = true;

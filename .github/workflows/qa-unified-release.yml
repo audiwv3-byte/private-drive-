@@ -1,0 +1,51 @@
+name: PRIVATE DRIVE unified integration QA release
+
+on:
+  push:
+    branches:
+      - qa/unified-integration-release-20261126
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unified-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout isolated QA code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout pinned browser dispatcher source, no deployment
+        uses: actions/checkout@v4
+        with:
+          repository: audiwv3-byte/private-drive-
+          ref: 44795f496ed05760cfc09474c506c6d7916c86fb
+          path: .qa_snapshot/dispatcher
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated QA dependencies
+        run: python -m pip install -r requirements-sms-render.txt -r .qa_snapshot/dispatcher/requirements-dispatcher-registration.txt 'Flask==3.0.3' 'Werkzeug==3.1.9' pytest
+      - name: Test unified Android Telegram dispatcher pilot and GPS contracts
+        run: python -m pytest -v -s tests/test_qa_unified_release.py
+        env:
+          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+          PD_PAYMENT_MODE: disabled
+          PD_NATIVE_SMS_LIVE: 'NO'

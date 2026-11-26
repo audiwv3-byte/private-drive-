@@ -1031,6 +1031,16 @@ function pdPreviewRating(id,preview){const o=pdPassengerOrders.find(x=>Number(x.
 async function loadOrders(append=false){
  if(pdOrderListBusy)return;pdOrderListBusy=true;
  try{const d=await api('/api/orders'+(append&&pdOrdersBefore?'?before='+pdOrdersBefore:''));pdPassengerOrders=append?[...pdPassengerOrders,...d.orders]:d.orders;pdOrdersBefore=d.next_before;
+  if(pdPassengerOrders.some(o=>typeof o.order_id==='string')){
+    $('orders').innerHTML=pdPassengerOrders.length?pdPassengerOrders.map(o=>
+      '<article class="item"><b>№'+escapeHtml(String(o.order_id||''))+
+      '</b> · '+escapeHtml(pdL(o.status||''))+
+      '<p>'+escapeHtml(String(o.origin||''))+' → '+escapeHtml(String(o.destination||''))+
+      '</p><small>'+escapeHtml(String(o.trip_date||''))+' '+escapeHtml(String(o.trip_time||''))+
+      '</small><p>'+escapeHtml(pdL('Стоимость и дополнительные пожелания согласовываются с диспетчером'))+
+      '</p></article>').join(''):pdL('<p>Заказов пока нет</p>');
+    return;
+  }
  $('orders').innerHTML=pdPassengerOrders.length?pdPassengerOrders.map(o=>'<article class="item"><b>№'+Number(o.id)+'</b> · '+escapeHtml(pdL(o.status))+'<p>'+pdTripRouteText(o)+'</p><small>'+pdTripTypeText(o)+'</small><div>'+escapeHtml(o.trip_date)+' '+escapeHtml(o.trip_time)+' · '+escapeHtml(o.price||pdL('Цена уточняется'))+' €</div><small>'+escapeHtml(pdBankStatusText(o))+'</small><div class="actions"><button class="secondary" onclick="openPay('+Number(o.id)+')">'+escapeHtml(pdL('Оплата / детали'))+'</button><button type="button" class="secondary" onclick="go(9)">'+escapeHtml(pdL('Карточка пилота'))+'</button></div>'+(o.status==='Выполнена'?pdStarsMarkup(o): '')+(o.review_comment?'<p>'+escapeHtml(o.review_comment)+'</p>':'')+'</article>').join(''):pdL('<p>Заказов пока нет</p>');
  if(pdOrdersBefore)$('orders').insertAdjacentHTML('beforeend','<button class="secondary pay-choice" onclick="loadOrders(true)">'+escapeHtml(pdL('Показать более ранние поездки'))+'</button>');
  }catch(e){message(pdL(e.message),true)}finally{pdOrderListBusy=false}

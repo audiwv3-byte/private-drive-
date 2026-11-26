@@ -19,6 +19,14 @@ CREATE TABLE IF NOT EXISTS public.pd_native_order_assignments (
 CREATE INDEX IF NOT EXISTS pd_native_order_assignments_pilot
     ON public.pd_native_order_assignments(pilot_user_id);
 
+-- Availability is an explicit server state, never inferred from an app toggle
+-- or a GPS marker. New pilots start offline and can enable only while approved.
+CREATE TABLE IF NOT EXISTS public.pd_native_pilot_availability (
+    pilot_user_id text PRIMARY KEY REFERENCES public.native_auth_users(id),
+    online boolean NOT NULL DEFAULT false,
+    changed_at bigint NOT NULL
+);
+
 -- Require an actual pilot entitlement (not a generic admin privilege) and
 -- the latest current photo review. Do not grant direct table or photo access.
 CREATE OR REPLACE FUNCTION public.pd_pilot_assignment_is_eligible(
@@ -42,6 +50,40 @@ AS $$
     )
 $$;
 
+CREATE OR REPLACE FUNCTION public.pd_native_pilot_availability_state(
+    supplied_digest text, observed_at bigint, desired_online boolean DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp
+AS $pd_avail$
+DECLARE
+    principal record;
+    current_online boolean;
+BEGIN
+    SELECT * INTO principal
+      FROM public.pd_validate_native_session(supplied_digest, observed_at);
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('error','invalid_session');
+    END IF;
+    IF principal.server_role NOT IN ('pilot','pilot_dispatcher') THEN
+        RETURN jsonb_build_object('error','pilot_required');
+    END IF;
+    IF NOT public.pd_pilot_assignment_is_eligible(principal.user_id,observed_at) THEN
+        RETURN jsonb_build_object('error','identity_approval_required');
+    END IF;
+    IF desired_online IS NOT NULL THEN
+        INSERT INTO public.pd_native_pilot_availability(pilot_user_id,online,changed_at)
+        VALUES(principal.user_id,desired_online,observed_at)
+        ON CONFLICT(pilot_user_id) DO UPDATE
+          SET online=EXCLUDED.online,changed_at=EXCLUDED.changed_at;
+    END IF;
+    SELECT a.online INTO current_online
+      FROM public.pd_native_pilot_availability a
+      WHERE a.pilot_user_id=principal.user_id;
+    RETURN jsonb_build_object('online',coalesce(current_online,false),
+      'payment_mode','disabled');
+END
+$pd_avail$;
+
 CREATE OR REPLACE FUNCTION public.pd_pilot_assignment_candidates(observed_at bigint)
 RETURNS TABLE(pilot_user_id text)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp
@@ -49,6 +91,8 @@ AS $$
     SELECT r.user_id FROM public.native_auth_roles r
     WHERE r.role IN ('pilot','pilot_dispatcher')
       AND public.pd_pilot_assignment_is_eligible(r.user_id, observed_at)
+      AND EXISTS (SELECT 1 FROM public.pd_native_pilot_availability a
+                  WHERE a.pilot_user_id=r.user_id AND a.online)
     ORDER BY r.user_id LIMIT 100
 $$;
 
@@ -77,7 +121,9 @@ BEGIN
         RETURN;
     END IF;
 
-    IF NOT public.pd_pilot_assignment_is_eligible(target_pilot, observed_at) THEN
+    IF NOT public.pd_pilot_assignment_is_eligible(target_pilot, observed_at)
+       OR NOT EXISTS (SELECT 1 FROM public.pd_native_pilot_availability a
+                      WHERE a.pilot_user_id=target_pilot AND a.online) THEN
         RETURN QUERY SELECT 'pilot_not_eligible'::text, NULL::text;
         RETURN;
     END IF;
@@ -231,6 +277,8 @@ $pd_trip$;
 REVOKE ALL ON TABLE public.pd_native_trip_waiting FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.pd_native_pilot_trip_action(text,uuid,text,bigint) FROM PUBLIC;
 
+REVOKE ALL ON TABLE public.pd_native_pilot_availability FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.pd_native_pilot_availability_state(text,bigint,boolean) FROM PUBLIC;
 REVOKE ALL ON TABLE public.pd_native_order_assignments FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.pd_pilot_assignment_is_eligible(text,bigint) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.pd_pilot_assignment_candidates(bigint) FROM PUBLIC;

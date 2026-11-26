@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -48,23 +49,32 @@ void main() {
       expect(order['order_id'],id);
       expect((await pilot.load()).single.orderId,id);
       var consent = false;
+      var sensorEvents = 0;
+      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: Center(child: Text('QA42 GPS runtime')))));
+      await tester.pump();
       final publisher = QaPilotGpsPublisher(send:pilot.publishGps,
         canStart:()=>consent,isAssigned:(order) async => order == id,
-        positions:()=> Geolocator.getPositionStream(locationSettings: const LocationSettings(
-          accuracy:LocationAccuracy.high,distanceFilter:0)).map((p)=>QaGpsFix(
-          p.latitude,p.longitude,p.timestamp.millisecondsSinceEpoch ~/ 1000)));
+        positions:()=> (Platform.isAndroid ? qaAndroidPositions() : qaIosPositions()).map((fix) {
+          sensorEvents++;
+          debugPrint('QA42 OS fix #$sensorEvents ageSeconds=${DateTime.now().millisecondsSinceEpoch ~/ 1000 - fix.capturedAt}');
+          return fix;
+        }), onStopped: () => debugPrint('QA42 publisher stopped; OS fixes=$sensorEvents'));
       try {
         expect(await publisher.start(id),false);
         expect(gps,isEmpty);
         expect(await qaGpsPermission(),true);
         consent = true;
         expect(await publisher.start(id),true);
+        debugPrint('QA42 subscribed: permission=${await Geolocator.checkPermission()} service=${await Geolocator.isLocationServiceEnabled()}');
         final deadline = DateTime.now().add(const Duration(seconds:60));
         while(gps.isEmpty && DateTime.now().isBefore(deadline)) {
           await Future<void>.delayed(const Duration(seconds:1));
         }
-        expect(gps,isNotEmpty,reason:'OS location stream must produce a fix');
+        expect(sensorEvents, greaterThan(0), reason:'Native OS stream must emit a fix');
+        expect(gps,isNotEmpty,reason:'OS location stream must produce a fix accepted by publisher');
         expect(gps.first['enabled'],true);
+        expect(gps.first['latitude'], closeTo(54.6872, 0.01));
+        expect(gps.first['longitude'], closeTo(25.2797, 0.01));
         await publisher.stop();
         expect(gps.last['enabled'],false);
         final count = gps.length;

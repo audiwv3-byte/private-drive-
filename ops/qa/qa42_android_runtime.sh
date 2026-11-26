@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 adb shell cmd location set-location-enabled true
+adb shell pm grant lt.privatedrive.qa.private_drive android.permission.POST_NOTIFICATIONS
+adb shell input keyevent KEYCODE_WAKEUP
 adb shell dumpsys location > "${RUNNER_TEMP}/qa42-location-before.txt"
 (
   while true; do
@@ -11,6 +13,6 @@ adb shell dumpsys location > "${RUNNER_TEMP}/qa42-location-before.txt"
   done
 ) &
 gps_pid=$!
-trap 'kill "$gps_pid" 2>/dev/null || true; wait "$gps_pid" 2>/dev/null || true; adb shell dumpsys location > "${RUNNER_TEMP}/qa42-location-after.txt" || true' EXIT
+trap 'kill "$gps_pid" 2>/dev/null || true; wait "$gps_pid" 2>/dev/null || true; adb shell dumpsys location > "${RUNNER_TEMP}/qa42-location-after.txt" || true; cat "${RUNNER_TEMP}/qa42-location-after.txt" || true; adb logcat -d -s Geolocator flutter AndroidRuntime || true' EXIT
 cd qa_android
 flutter test integration_test/qa42_device_runtime_test.dart -d emulator-5554 --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --reporter expanded

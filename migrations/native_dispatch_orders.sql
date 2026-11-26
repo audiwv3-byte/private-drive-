@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS public.pd_dispatch_orders (
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  UNIQUE(source,source_order_id)
 );
+-- This migration refuses databases outside the synthetic QA allowlist above.
+ALTER TABLE public.pd_dispatch_orders
+  ADD COLUMN IF NOT EXISTS booking_details JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE TABLE IF NOT EXISTS public.pd_native_order_owners (
  order_id UUID PRIMARY KEY REFERENCES public.pd_dispatch_orders(id),
  user_id TEXT NOT NULL REFERENCES public.native_auth_users(id)

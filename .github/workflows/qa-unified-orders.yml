@@ -1,0 +1,32 @@
+name: Isolated unified orders QA
+on:
+  push:
+    branches: [qa/unified-orders-no-payments]
+permissions:
+  contents: read
+jobs:
+  isolated-orders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: qa
+          POSTGRES_PASSWORD: qa
+          POSTGRES_DB: qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qa -d qa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install flask 'psycopg[binary]'
+      - run: python -m py_compile miniapp_server.py pd_native_orders_http.py pd_telegram_persistent_bridge.py
+      - run: python -m unittest -v qa_unified_orders_test

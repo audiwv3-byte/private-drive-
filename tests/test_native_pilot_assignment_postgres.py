@@ -251,6 +251,11 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
         "SELECT count(*) FROM public.pd_pilot_assignment_candidates(%s)",
         (int(time.time()) + 121,)).fetchone()[0] == 0
     assert availability("pilotA").json["online"] is True
+    assert availability("pilotB", False).json["online"] is False
+    assert client.get("/dispatch/orders/eligible-pilots").json == {
+        "pilots": [{"id": "pilotA"}]}
+    assert client.post(endpoint, data={"pilot_id": "pilotB", "csrf": token}).status_code == 409
+    assert availability("pilotB", True).json["online"] is True
 
     assert client.post(endpoint, data={"pilot_id": "pilotA", "csrf": "invalid"}).status_code == 403
     assert client.post(endpoint, data={"pilot_id": "pilotOld", "csrf": token}).status_code == 409

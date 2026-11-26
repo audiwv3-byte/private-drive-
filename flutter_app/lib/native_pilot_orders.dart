@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'pd_http_api.dart';
+import 'qa_pilot_gps.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 class PilotAssignedOrder {
   const PilotAssignedOrder({
@@ -85,6 +87,55 @@ class NativePilotOrdersApi {
   final http.Client? _client;
   static const stage = 'https://private-drive-drbd.onrender.com';
   static const _timeout = Duration(seconds: 7);
+
+  static const qaGpsEnabled = bool.fromEnvironment('PD_QA28_GPS') &&
+      bool.fromEnvironment('PD_INTERNAL_QA');
+
+  Future<void> publishGps(String orderId, QaGpsFix? fix, int capturedAt) async {
+    if (!qaGpsEnabled || baseUrl != stage ||
+        !PilotAssignedOrder._uuid.hasMatch(orderId)) {
+      throw const FormatException('GPS requires isolated QA and assigned order');
+    }
+    if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
+      throw const PdHttpStatusException(401);
+    }
+    if (capturedAt <= 0 || (fix != null &&
+        (fix.capturedAt != capturedAt || !fix.latitude.isFinite ||
+         !fix.longitude.isFinite || fix.latitude.abs() > 90 ||
+         fix.longitude.abs() > 180))) {
+      throw const FormatException('Invalid GPS fix');
+    }
+    final transport = _client ?? http.Client();
+    try {
+      final request = http.Request('POST', PdHttpApi.secureUri(
+        baseUrl, '/native-pilot-orders/$orderId/gps'))
+        ..followRedirects = false
+        ..headers['Authorization'] = 'Bearer $token'
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode({
+          'enabled': fix != null, 'captured_at': capturedAt,
+          if (fix != null) 'latitude': fix.latitude,
+          if (fix != null) 'longitude': fix.longitude,
+        });
+      final response = await transport.send(request).timeout(_timeout);
+      if (response.statusCode != 200) {
+        throw PdHttpStatusException(response.statusCode);
+      }
+      final bytes = <int>[];
+      await response.stream.timeout(_timeout).forEach((chunk) {
+        if (bytes.length + chunk.length > 1024) {
+          throw const FormatException('GPS response too large');
+        }
+        bytes.addAll(chunk);
+      }).timeout(_timeout);
+      final data = jsonDecode(utf8.decode(bytes));
+      if (data is! Map<String, dynamic> || data['available'] != (fix != null)) {
+        throw const FormatException('GPS acknowledgement missing');
+      }
+    } finally {
+      if (_client == null) transport.close();
+    }
+  }
 
   Future<bool> availability([bool? desiredOnline]) async {
     if (baseUrl != stage) {
@@ -384,11 +435,49 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
   bool _foreground = true;
   int _generation = 0;
   String? _actingOrderId;
+  QaPilotGpsPublisher? _gpsPublisher;
+  bool _gpsStarting = false;
+
+  Future<void> _toggleGps(PilotAssignedOrder order) async {
+    if (_gpsStarting || !_foreground || !widget.visible) return;
+    final prior = _gpsPublisher;
+    if (prior != null && prior.orderId == order.orderId) {
+      await prior.stop();
+      return;
+    }
+    if (prior?.orderId != null || prior?.busy == true) return;
+    final api = widget.api;
+    setState(() { _gpsStarting = true; _error = null; });
+    try {
+      if (!await qaGpsPermission() || !mounted || !_foreground ||
+          !widget.visible || !identical(api, widget.api)) return;
+      final publisher = QaPilotGpsPublisher(
+        send: api.publishGps,
+        isAssigned: (id) async => (await api.load()).any((row) => row.orderId == id),
+        positions: qaAndroidPositions,
+        onStopped: () { if (mounted) setState(() {}); },
+      );
+      _gpsPublisher = publisher;
+      final started = await publisher.start(order.orderId);
+      if (!mounted || !identical(api, widget.api)) {
+        await publisher.stop();
+        return;
+      }
+      if (!started) setState(() => _error = 'GPS: назначение не подтверждено.');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'GPS недоступен.');
+    } finally {
+      if (mounted) setState(() => _gpsStarting = false);
+    }
+  }
 
   Future<void> _perform(PilotAssignedOrder order, String action) async {
     if (_actingOrderId != null || _loading) return;
     setState(() { _actingOrderId = order.orderId; _error = null; });
     try {
+      if (action == 'finish' && _gpsPublisher?.orderId == order.orderId) {
+        await _gpsPublisher?.stop();
+      }
       await widget.api.action(order.orderId, action);
       if (mounted) {
         setState(() => _actingOrderId = null);
@@ -417,6 +506,12 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
     if (oldWidget.api.baseUrl != widget.api.baseUrl ||
         oldWidget.api.token != widget.api.token ||
         oldWidget.visible != widget.visible) {
+      if (oldWidget.api.baseUrl != widget.api.baseUrl ||
+          oldWidget.api.token != widget.api.token) {
+        final old = _gpsPublisher;
+        _gpsPublisher = null;
+        if (old != null) unawaited(old.stop());
+      }
       _forget();
       if (widget.visible) unawaited(_refresh());
     }
@@ -448,6 +543,10 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
     try {
       final orders = await widget.api.load();
       if (!mounted || generation != _generation) return;
+      final gps = _gpsPublisher;
+      if (gps?.orderId != null && !orders.any((o) => o.orderId == gps!.orderId)) {
+        unawaited(gps!.stop());
+      }
       setState(() {
         _orders = orders;
         _error = null;
@@ -481,6 +580,8 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
+    final gps = _gpsPublisher;
+    if (gps != null) unawaited(gps.stop());
     super.dispose();
   }
 
@@ -514,6 +615,18 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
                   children: [
                     Text('${order.date} ${order.time} · ${order.statusLabel}'),
                     SelectableText('ID заказа: ${order.orderId}'),
+                    if (NativePilotOrdersApi.qaGpsEnabled && !kIsWeb &&
+                        defaultTargetPlatform == TargetPlatform.android)
+                      OutlinedButton(
+                        key: ValueKey('qa28-gps-${order.orderId}'),
+                        onPressed: _gpsStarting || _actingOrderId != null ||
+                            (_gpsPublisher?.orderId != null &&
+                              _gpsPublisher?.orderId != order.orderId)
+                            ? null : () => _toggleGps(order),
+                        child: Text(_gpsPublisher?.orderId == order.orderId
+                            ? 'Остановить передачу GPS'
+                            : 'Передавать GPS диспетчеру · QA'),
+                      ),
                     if (order.waitingSeconds > 0 || order.waitingActive)
                       Text('Ожидание: ${order.waitingSeconds} сек · '
                           'начатые минуты оплачиваемого ожидания: '

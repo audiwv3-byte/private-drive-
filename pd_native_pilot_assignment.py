@@ -222,7 +222,7 @@ def make_native_pilot_orders_app(next_app, database_url, *, clock=time.time):
                     from uuid import UUID
                     order_id = str(UUID(payload["order_id"]))
                     action = payload["action"]
-                    if action not in {"approach", "start", "stop_start", "stop_end", "finish"}:
+                    if action not in {"approach", "arrive", "start", "stop_start", "stop_end", "finish"}:
                         raise ValueError()
                 except (ValueError, TypeError, KeyError, AttributeError):
                     return reply("400 Bad Request", {"error": "invalid_trip_action"})
@@ -242,7 +242,7 @@ def make_native_pilot_orders_app(next_app, database_url, *, clock=time.time):
                             "invalid_transition": "409 Conflict"}.get(error, "503 Service Unavailable")
                     return reply(code, {"error": error})
                 if result.get("payment_mode") != "disabled" or result.get("status") not in (
-                    "approaching", "underway", "finished"):
+                    "approaching", "arrived", "underway", "finished"):
                     return reply("503 Service Unavailable", {"error": "unsafe_state"})
                 return reply("200 OK", result)
             with _connect(database_url) as db:

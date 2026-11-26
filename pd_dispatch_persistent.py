@@ -188,13 +188,18 @@ def register(app, authorized):
             return reply({"error":"persistent_queue_disabled"},503)
         try:
             with connect() as db:
+                qa33 = os.getenv("PD_QA33_TRIP") == "1" and order_gps_enabled()
+                extra = ",waiting_seconds + CASE WHEN waiting_started_at IS NULL THEN 0 ELSE greatest(0,extract(epoch from now())::bigint-waiting_started_at) END, waiting_started_at IS NOT NULL, stop_charge_cents + CASE WHEN waiting_started_at IS NULL THEN 0 ELSE ((greatest(0,extract(epoch from now())::bigint-waiting_started_at)+59)/60)*25 END" if qa33 else ""
                 rows = db.execute("""SELECT id,source,source_order_id,origin,destination,
-                     trip_date,trip_time,status,created_at,website_contact
+                     trip_date,trip_time,status,created_at,website_contact""" + extra + """
                      FROM public.pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()
             orders = [{"id":str(row[0]),"source":row[1],"source_order_id":row[2],
                        "origin":row[3],"destination":row[4],
                        "trip_date":row[5],"trip_time":row[6],
                        "status":row[7],"created_at":row[8].isoformat(),"website_contact":row[9]} for row in rows]
+            if qa33:
+                for order,row in zip(orders,rows):
+                    order.update(waiting_seconds=row[10],waiting_active=row[11],stop_charge_cents=row[12])
             return reply({"orders":orders,"persistent":True})
         except Exception:
             app.logger.exception("Persistent dispatcher order read unavailable")

@@ -315,12 +315,12 @@ async function refreshAvailablePilots(){
 refreshAvailablePilots();
 {% endif %}
 {% if persistent_queue_enabled %}
-const liveStatusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'К пассажиру',underway:'В поездке',finished:'Завершён',cancelled:'Отменён'};
+const liveStatusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'К пассажиру',arrived:'На месте',underway:'В поездке',finished:'Завершён',cancelled:'Отменён'};
 let lastOrders=null;
 {% if order_gps_enabled %}
 let selectedGpsOrder=null;
 let gpsRevision=0;
-const activeTrip=status=>['assigned','approaching','underway'].includes(status);
+const activeTrip=status=>['assigned','approaching','arrived','underway'].includes(status);
 function showOrderFix(position,message){
  pilotPoint=position;
  pilotPoints=position?[{id:selectedGpsOrder,position,label:'Пилот выбранного заказа'}]:[];
@@ -359,10 +359,10 @@ function renderPersistentOrders(){
  const items=lastOrders;
  const chosen=items.filter(o=>orderFilter==='all' ||
     (orderFilter==='new'&&o.status==='requested') ||
-    (orderFilter==='active'&&['assigned','approaching','underway'].includes(o.status)) ||
+    (orderFilter==='active'&&['assigned','approaching','arrived','underway'].includes(o.status)) ||
     (orderFilter==='done'&&['finished','cancelled'].includes(o.status)));
  for(const [id,n] of Object.entries({countNew:items.filter(o=>o.status==='requested').length,
- countActive:items.filter(o=>['assigned','approaching','underway'].includes(o.status)).length,
+ countActive:items.filter(o=>['assigned','approaching','arrived','underway'].includes(o.status)).length,
  {% if not pilot_availability_enabled %}countOnline:0,{% endif %}countDone:items.filter(o=>['finished','cancelled'].includes(o.status)).length})){
    $(id).textContent=n;
  }
@@ -378,6 +378,11 @@ function renderPersistentOrders(){
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
      ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
    card.append(route,info);
+   if(Number.isInteger(order.stop_charge_cents)){
+     const meter=document.createElement('p');
+     meter.textContent='Остановка: '+order.waiting_seconds+' сек · QA: '+(order.stop_charge_cents/100).toFixed(2)+' €'+(order.waiting_active?' · таймер идёт':'');
+     card.append(meter);
+   }
    if(order.website_contact){
      const contact=document.createElement('p');
      contact.textContent='Телефон пассажира: '+order.website_contact;
@@ -489,7 +494,7 @@ $('chatForm').addEventListener('submit',async event=>{
     }finally{chatSending=false;button.disabled=false;}
 });
 const statusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'Пилот едет к пассажиру',underway:'В поездке',finished:'Завершён'};
-const active=trip=>['assigned','approaching','underway'].includes(trip.status);
+const active=trip=>['assigned','approaching','arrived','underway'].includes(trip.status);
 let snapshot=null, signature='', assigning=false, switching=false, modeRevision=0;
 const pilotName=id=>id==='pilot_test_2'?'Тестовый пилот 2':'Тестовый пилот';
 function renderAutopilot(){

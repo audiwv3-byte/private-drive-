@@ -18,6 +18,7 @@ class PilotAssignedOrder {
     required this.status,
     this.waitingSeconds = 0,
     this.waitingActive = false,
+    this.stopChargeCents = 0,
   });
 
   final String orderId;
@@ -28,6 +29,7 @@ class PilotAssignedOrder {
   final String status;
   final int waitingSeconds;
   final bool waitingActive;
+  final int stopChargeCents;
 
   static final _uuid = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -48,7 +50,7 @@ class PilotAssignedOrder {
     final id = value('order_id', maxLength: 36);
     final status = value('status', maxLength: 16);
     if (!_uuid.hasMatch(id) ||
-        !(const {'assigned', 'approaching', 'underway'}.contains(status))) {
+        !(const {'assigned', 'approaching', 'arrived', 'underway'}.contains(status))) {
       throw const FormatException('Unknown assigned order');
     }
     return PilotAssignedOrder(
@@ -62,12 +64,14 @@ class PilotAssignedOrder {
           (data['waiting_seconds'] as int) >= 0
           ? data['waiting_seconds'] as int : 0,
       waitingActive: data['waiting_active'] == true,
+      stopChargeCents: data['stop_charge_cents'] is int ? data['stop_charge_cents'] as int : 0,
     );
   }
 
   String get statusLabel => switch (status) {
     'assigned' => 'Назначен',
     'approaching' => 'Пилот едет к пассажиру',
+    'arrived' => 'На месте',
     'underway' => 'В поездке',
     _ => 'Статус неизвестен',
   };
@@ -206,7 +210,7 @@ class NativePilotOrdersApi {
       throw const PdHttpStatusException(401);
     }
     if (!PilotAssignedOrder._uuid.hasMatch(orderId) ||
-        !const {'approach', 'start', 'finish', 'stop_start', 'stop_end'}.contains(action)) {
+        !const {'approach', 'arrive', 'start', 'finish', 'stop_start', 'stop_end'}.contains(action)) {
       throw const FormatException('Invalid trip action');
     }
     final client = _client ?? http.Client();
@@ -231,7 +235,7 @@ class NativePilotOrdersApi {
       final data = jsonDecode(utf8.decode(bytes));
       if (data is! Map<String, dynamic> ||
           data['order_id'] != orderId || data['payment_mode'] != 'disabled' ||
-          !const {'approaching', 'underway', 'finished'}.contains(data['status'])) {
+          !const {'approaching', 'arrived', 'underway', 'finished'}.contains(data['status'])) {
         throw const FormatException('Invalid trip acknowledgement');
       }
       return data;
@@ -663,40 +667,38 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
                             : 'Передавать GPS диспетчеру · QA'),
                       ),
                     if (order.waitingSeconds > 0 || order.waitingActive)
-                      Text('Ожидание: ${order.waitingSeconds} сек · '
-                          'начатые минуты оплачиваемого ожидания: '
-                          '${(order.waitingSeconds + 59) ~/ 60}'
-                          '${order.waitingActive ? ' · таймер идёт' : ''}'),
-                    if (order.status == 'assigned')
-                      FilledButton(
-                        key: ValueKey('pilot-trip-approach-${order.orderId}'),
-                        onPressed: _actingOrderId != null ? null :
-                            () => _perform(order, 'approach'),
-                        child: const Text('К пассажиру'),
-                      ),
-                    if (order.status == 'approaching')
-                      FilledButton(
-                        key: ValueKey('pilot-trip-start-${order.orderId}'),
-                        onPressed: _actingOrderId != null ? null :
-                            () => _perform(order, 'start'),
-                        child: const Text('В путь'),
-                      ),
-                    if (order.status == 'underway') ...[
-                      OutlinedButton(
-                        key: ValueKey('pilot-trip-stop-${order.orderId}'),
-                        onPressed: _actingOrderId != null ? null :
-                            () => _perform(order,
-                                order.waitingActive ? 'stop_end' : 'stop_start'),
-                        child: Text(order.waitingActive
-                            ? 'Продолжить поездку' : 'Остановка'),
-                      ),
-                      FilledButton(
-                        key: ValueKey('pilot-trip-finish-${order.orderId}'),
-                        onPressed: _actingOrderId != null ? null :
-                            () => _perform(order, 'finish'),
-                        child: const Text('Завершить'),
-                      ),
-                    ],
+                      Text('Остановка: ${order.waitingSeconds} сек · QA: ${(order.stopChargeCents / 100).toStringAsFixed(2)} €'),
+                    FilledButton(
+                      key: ValueKey('pilot-trip-control-${order.orderId}'),
+                      onPressed: _actingOrderId != null || _loading ? null : () async {
+                        final action = switch (order.status) {
+                          'assigned' => 'approach',
+                          'approaching' => 'arrive',
+                          'arrived' => 'start',
+                          _ => order.waitingActive ? 'stop_end' : 'stop_start',
+                        };
+                        if (order.status == 'underway' && !order.waitingActive) {
+                          final selected = await showDialog<String>(context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Управление поездкой'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(context, 'stop_start'), child: const Text('Остановка')),
+                                TextButton(onPressed: () => Navigator.pop(context, 'finish'), child: const Text('Завершить поездку')),
+                                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+                              ],
+                            ));
+                          if (selected != null && mounted) await _perform(order, selected);
+                        } else {
+                          await _perform(order, action);
+                        }
+                      },
+                      child: Text(switch (order.status) {
+                        'assigned' => 'К пассажиру',
+                        'approaching' => 'На месте',
+                        'arrived' => 'В путь',
+                        _ => order.waitingActive ? 'Продолжить поездку' : 'Управление поездкой',
+                      }),
+                    ),
                   ],
                 ),
               ),

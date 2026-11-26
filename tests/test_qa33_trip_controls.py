@@ -83,23 +83,41 @@ def test_qa33_trip_controls(monkeypatch):
     assert gps(tid).status_code == 200
     for act,status in (("approach","approaching"),("arrive","arrived"),("start","underway"),("finish","finished")):
         if act=="finish":
+            # Exercise the actual SQL action and read functions with deterministic
+            # server timestamps; no client can supply these via the HTTP API.
+            digest=hashlib.sha256(("b"*48).encode()).hexdigest()
             for oid in (tid,nid):
-                first=action(oid,"stop_start")
-                assert first.status_code==200 and first.json["waiting_active"] is True, first.json
-                assert action(oid,"stop_start").json["changed"] is False
-                assert action(oid,"finish").status_code==409
-                assert action(oid,"stop_end","c").status_code==404
-            time.sleep(2)
-            for oid in (tid,nid):
-                ended=action(oid,"stop_end")
-                assert ended.status_code==200 and ended.json["waiting_seconds"]>=1 and ended.json["waiting_active"] is False, ended.json
-                assert ended.json["payment_mode"]=="disabled"
-                assert action(oid,"stop_end").json["changed"] is False
+                elapsed=charge=0
+                stamp=int(time.time())
+                for duration,fee in ((0,0),(1,25),(60,25),(61,50)):
+                    with psycopg.connect(api_dsn) as db:
+                        def transition(act,at):
+                            return db.execute("SELECT public.pd_native_pilot_trip_action(%s,%s,%s,%s)",(digest,oid,act,at)).fetchone()[0]
+                        assert transition("stop_start",stamp)["changed"] is True
+                        assert transition("stop_start",stamp)["changed"] is False
+                        assert transition("finish",stamp)["error"]=="invalid_transition"
+                    # New DB connection models a restored client reading server state.
+                    with psycopg.connect(api_dsn) as db:
+                        state=db.execute("SELECT public.pd_native_pilot_order_state(%s,%s)",(digest,stamp+duration)).fetchone()[0]
+                        active=next(x for x in state["orders"] if x["order_id"]==oid)
+                        assert active["waiting_active"] is True
+                        assert active["waiting_seconds"]==elapsed+duration
+                        assert active["stop_charge_cents"]==charge+fee
+                        ended=db.execute("SELECT public.pd_native_pilot_trip_action(%s,%s,%s,%s)",(digest,oid,"stop_end",stamp+duration)).fetchone()[0]
+                        assert ended["changed"] is True and ended["payment_mode"]=="disabled"
+                        duplicate=db.execute("SELECT public.pd_native_pilot_trip_action(%s,%s,%s,%s)",(digest,oid,"stop_end",stamp+duration)).fetchone()[0]
+                        assert duplicate["changed"] is False
+                    elapsed+=duration
+                    charge+=fee
+                    stamp+=duration+1
+                    print(f"PASS boundary {duration}s: {fee} cents; cumulative {charge} cents",flush=True)
+                # HTTP reads must report persisted totals identically.
                 active=next(x for x in api.get("/native-pilot-orders",headers=native("b")).json["orders"] if x["order_id"]==oid)
-                assert active["waiting_seconds"]==ended.json["waiting_seconds"] and not active["waiting_active"]
-                assert active["stop_charge_cents"]==25
                 dispatcher=next(x for x in api.get("/dispatch/orders/state",headers=tg(201)).json["orders"] if x["id"]==oid)
-                assert dispatcher["stop_charge_cents"]==25 and dispatcher["waiting_seconds"]==active["waiting_seconds"]
+                for row in (active,dispatcher):
+                    assert row["waiting_seconds"]==122 and row["stop_charge_cents"]==100 and not row["waiting_active"], row
+                assert action(oid,"stop_end","c").status_code==404
+            print("PASS four sequential stops: 122 seconds, 100 cents, restored state and matching dispatcher",flush=True)
             print("PASS paid-stop timer, duplicate protection, ownership and no payments",flush=True)
         for oid in (tid,nid):
             r = action(oid,act)

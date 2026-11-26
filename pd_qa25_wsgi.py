@@ -78,6 +78,9 @@ def create_application():
         except psycopg.Error:
             return jsonify(error="storage_unavailable"), 503
 
+    if os.getenv("PD_QA27_GPS") == "1":
+        from pd_qa27_gps import register_gps
+        register_gps(app, authorized, database_url)
     pilot = make_native_pilot_orders_app(native, database_url)
     def qa26_application(environ, start_response):
         if environ.get("PATH_INFO") == "/native-pilot-orders":

@@ -41,7 +41,7 @@ def test_qa36_load(monkeypatch):
     api_dsn = dsn.replace("postgres:isolated-test@", "qa26_api:synthetic-api@")
     token = "qa25-synthetic-token"
     csrf = "qa26-synthetic-csrf"
-    for k,v in {"PD_QA33_TRIP":"1","PD_QA27_GPS":"1","PD_QA25_WSGI":"1","PD_QA26_ASSIGNMENT":"1","PD_QA26_CSRF":csrf,"PD_QA25_TELEGRAM_TEST_TOKEN":token,"PD_QA25_PASSENGERS":"101,102","PD_QA25_ADMINS":"201","PD_NATIVE_SMS_ISOLATED":"YES","PD_NATIVE_SMS_LIVE":"NO","PD_DISPATCH_STAGING_ONLY":"1","PD_PAYMENT_MODE":"disabled","PD_DISPATCH_PERSISTENT_QUEUE":"1","PD_NATIVE_PILOT_ASSIGNMENT":"1","PD_DISPATCH_ORDERS_DATABASE_URL":api_dsn,"PD_PILOT_ASSIGNMENT_DATABASE_URL":api_dsn}.items():
+    for k,v in {"PD_QA36_PAGINATION":"1","PD_QA33_TRIP":"1","PD_QA27_GPS":"1","PD_QA25_WSGI":"1","PD_QA26_ASSIGNMENT":"1","PD_QA26_CSRF":csrf,"PD_QA25_TELEGRAM_TEST_TOKEN":token,"PD_QA25_PASSENGERS":"101,102","PD_QA25_ADMINS":"201","PD_NATIVE_SMS_ISOLATED":"YES","PD_NATIVE_SMS_LIVE":"NO","PD_DISPATCH_STAGING_ONLY":"1","PD_PAYMENT_MODE":"disabled","PD_DISPATCH_PERSISTENT_QUEUE":"1","PD_NATIVE_PILOT_ASSIGNMENT":"1","PD_DISPATCH_ORDERS_DATABASE_URL":api_dsn,"PD_PILOT_ASSIGNMENT_DATABASE_URL":api_dsn}.items():
         monkeypatch.setenv(k,v)
     from pd_qa25_wsgi import create_application
     api = Client(create_application(),Response)
@@ -86,7 +86,7 @@ def test_qa36_load(monkeypatch):
             db.execute("TRUNCATE public.pd_dispatch_orders CASCADE")
         def order(i):
             return lambda c:c.post('/api/order',headers=tg(101),json={
-                'request_key':f'qa36-{n}-{i}', 'origin':f'Synthetic A {i}',
+                'request_key':uuid.uuid5(uuid.NAMESPACE_URL,f'qa36-{n}-{i}').hex, 'origin':f'Synthetic A {i}',
                 'destination':f'Synthetic B {i}', 'trip_date':'2027-01-01','trip_time':'12:00'})
         orders=batch(n,'booking',[order(i) for i in range(n)])
         ids=[o['order_id'] for o in orders]
@@ -107,8 +107,12 @@ def test_qa36_load(monkeypatch):
         fixes=batch(n,'gps_read',[lambda c,i=i:c.get('/dispatch/orders/'+ids[i]+'/gps',headers=tg(201)) for i in range(pilots)])
         assert all(x['available'] for x in fixes)
         queue=batch(n,'dispatcher_state',[lambda c:c.get('/dispatch/orders/state',headers=tg(201)) for _ in range(100)])
-        # Existing dispatcher endpoint returns at most 100 rows. Do not imply
-        # visibility of all orders; report this functional limitation explicitly.
-        assert all(len(q['orders'])==min(n,100) for q in queue)
-        print(f'QA36_QUEUE total={n} visible={len(queue[0]["orders"])} pilots={pilots}',flush=True)
+        assert all(len(q['orders'])==min(n,100) and q['total']==n and q['counts']['active']==pilots and q['counts']['new']==n-pilots for q in queue)
+        pages=batch(n,'dispatcher_pages',[lambda c,i=i:c.get('/dispatch/orders/state?page='+str(i),headers=tg(201)) for i in range(1,(n+99)//100+1)])
+        visible=[o['id'] for q in pages for o in q['orders']]
+        assert len(visible)==n and set(visible)==set(ids)
+        active=api.get('/dispatch/orders/state?filter=active',headers=tg(201)).json
+        assert active['total']==pilots and len(active['orders'])==pilots
+        assert api.get('/dispatch/orders/state?page=-1',headers=tg(201)).status_code==400
+        print(f'QA36_QUEUE total={n} visible={len(visible)} pilots={pilots}',flush=True)
     print('PASS load scenarios; see metrics JSON for measured latency and throughput',flush=True)

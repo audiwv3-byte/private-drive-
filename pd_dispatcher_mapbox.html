@@ -100,7 +100,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <div class="stats" aria-label="Показатели"><div class="stat"><b id="countNew">—</b><span>Новые</span></div><div class="stat"><b id="countActive">—</b><span>Активные</span></div><div class="stat"><b id="countOnline">—</b><span>На линии</span></div><div class="stat"><b id="countDone">—</b><span>Завершены</span></div></div>
 <div class="tabs" role="group" aria-label="Фильтр заказов"><button class="tab active" data-filter="all" aria-pressed="true">Все</button><button class="tab" data-filter="new" aria-pressed="false">Новые</button><button class="tab" data-filter="active" aria-pressed="false">В пути</button><button class="tab" data-filter="done" aria-pressed="false">История</button></div>
 <h2 id="ordersTitle">Все заказы</h2>
-{% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">{% if pilot_availability_enabled %}Выбери пилота в карточке нового заказа.{% else %}Назначение пилотов пока недоступно.{% endif %}</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
+{% if persistent_queue_enabled %}<div id="ordersList"></div><div id="pdQueuePages" hidden><button type="button" id="pdQueuePrev">Назад</button> <span id="pdQueuePage"></span> <button type="button" id="pdQueueNext">Далее</button></div><p id="assignmentStatus" role="status">{% if pilot_availability_enabled %}Выбери пилота в карточке нового заказа.{% else %}Назначение пилотов пока недоступно.{% endif %}</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
 <p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
 </aside>
 <section id="map" aria-label="Интерактивная карта диспетчерской">
@@ -361,9 +361,9 @@ function renderPersistentOrders(){
     (orderFilter==='new'&&o.status==='requested') ||
     (orderFilter==='active'&&['assigned','approaching','arrived','underway'].includes(o.status)) ||
     (orderFilter==='done'&&['finished','cancelled'].includes(o.status)));
- for(const [id,n] of Object.entries({countNew:items.filter(o=>o.status==='requested').length,
- countActive:items.filter(o=>['assigned','approaching','arrived','underway'].includes(o.status)).length,
- {% if not pilot_availability_enabled %}countOnline:0,{% endif %}countDone:items.filter(o=>['finished','cancelled'].includes(o.status)).length})){
+ for(const [id,n] of Object.entries({countNew:queueMeta?.counts.new??items.filter(o=>o.status==='requested').length,
+ countActive:queueMeta?.counts.active??items.filter(o=>['assigned','approaching','arrived','underway'].includes(o.status)).length,
+ {% if not pilot_availability_enabled %}countOnline:0,{% endif %}countDone:queueMeta?.counts.done??items.filter(o=>['finished','cancelled'].includes(o.status)).length})){
    $(id).textContent=n;
  }
  {% if order_gps_enabled %}
@@ -410,22 +410,38 @@ function renderPersistentOrders(){
  });
  $('ordersList').replaceChildren(...(cards.length?cards:['Заказов пока нет']));
 }
+let queuePage=1,queueMeta=null,queueBusy=false,queueGeneration=0;
 async function pollPersistentOrders(){
+ if(queueBusy)return;
+ queueBusy=true;
+ const generation=queueGeneration;
  try{
-   const response=await fetch('/dispatch/orders/state',{cache:'no-store',credentials:'same-origin',
+   const response=await fetch('/dispatch/orders/state?'+new URLSearchParams({page:String(queuePage),filter:orderFilter}),{cache:'no-store',credentials:'same-origin',
      signal:AbortSignal.timeout(7000)});
    if(!response.ok)throw new Error('Cannot read orders');
    const body=await response.json();
    if(!body.persistent||!Array.isArray(body.orders))throw new Error('Invalid response');
-   lastOrders=body.orders;renderPersistentOrders();
+   if(generation!==queueGeneration)return;
+   lastOrders=body.orders;queueMeta=body.counts?body:null;
+   renderPersistentOrders();
+   $('pdQueuePages').hidden=!queueMeta;
+   if(queueMeta){
+     queuePage=body.page;
+     $('pdQueuePage').textContent='Страница '+body.page+' / '+Math.max(1,Math.ceil(body.total/body.page_size))+' · '+body.total+' заказов';
+     $('pdQueuePrev').disabled=body.page<=1;
+     $('pdQueueNext').disabled=body.page*body.page_size>=body.total;
+   }
    {% if order_gps_enabled %}await refreshOrderGps();{% endif %}
    $('syncStatus').textContent='Постоянное хранилище подключено.';
  }catch{
    {% if order_gps_enabled %}clearGpsSelection('Нет связи с сервером заказов.');{% endif %}
    $('syncStatus').textContent='Сервер недоступен. Последние данные не обновлялись.';
- }finally{setTimeout(pollPersistentOrders,5000)}
+ }finally{queueBusy=false;setTimeout(pollPersistentOrders,generation===queueGeneration?5000:0)}
 }
-document.addEventListener('pd-test-filter',renderPersistentOrders);
+function changeQueuePage(page){queuePage=Math.max(1,page);queueGeneration++;if(!queueBusy)pollPersistentOrders();}
+$('pdQueuePrev').onclick=()=>changeQueuePage(queuePage-1);
+$('pdQueueNext').onclick=()=>changeQueuePage(queuePage+1);
+document.addEventListener('pd-test-filter',()=>{if(queueMeta)changeQueuePage(1);else renderPersistentOrders();});
 pollPersistentOrders();
 {% endif %}
 {% if test_sync_enabled %}

@@ -186,13 +186,35 @@ def register(app, authorized):
             return reply({"error":"unauthorized"},401)
         if not enabled():
             return reply({"error":"persistent_queue_disabled"},503)
+        paginated = os.getenv("PD_QA36_PAGINATION") == "1" and order_gps_enabled()
+        page=1
+        mode="all"
+        if paginated:
+            try:
+                page=int(request.args.get("page","1"))
+                mode=request.args.get("filter","all")
+                if not 1<=page<=10000 or mode not in ("all","new","active","done"):
+                    raise ValueError()
+            except ValueError:
+                return reply({"error":"invalid_page"},400)
         try:
             with connect() as db:
+                if paginated:
+                    db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+                    counts=db.execute("""SELECT count(*),count(*) FILTER(WHERE status='requested'),
+                        count(*) FILTER(WHERE status IN ('assigned','approaching','arrived','underway')),
+                        count(*) FILTER(WHERE status IN ('finished','cancelled')) FROM public.pd_dispatch_orders""").fetchone()
+                    total=counts[("all","new","active","done").index(mode)]
+                    page=min(page,max(1,(total+99)//100))
                 qa33 = os.getenv("PD_QA33_TRIP") == "1" and order_gps_enabled()
                 extra = ",waiting_seconds + CASE WHEN waiting_started_at IS NULL THEN 0 ELSE greatest(0,extract(epoch from now())::bigint-waiting_started_at) END, waiting_started_at IS NOT NULL, stop_charge_cents + CASE WHEN waiting_started_at IS NULL THEN 0 ELSE ((greatest(0,extract(epoch from now())::bigint-waiting_started_at)+59)/60)*25 END" if qa33 else ""
                 rows = db.execute("""SELECT id,source,source_order_id,origin,destination,
                      trip_date,trip_time,status,created_at,website_contact""" + extra + """
-                     FROM public.pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()
+                     FROM public.pd_dispatch_orders
+                     WHERE (%s='all' OR (%s='new' AND status='requested') OR
+                     (%s='active' AND status IN ('assigned','approaching','arrived','underway')) OR
+                     (%s='done' AND status IN ('finished','cancelled')))
+                     ORDER BY created_at DESC,id DESC LIMIT 100 OFFSET %s""",(mode,mode,mode,mode,(page-1)*100)).fetchall()
             orders = [{"id":str(row[0]),"source":row[1],"source_order_id":row[2],
                        "origin":row[3],"destination":row[4],
                        "trip_date":row[5],"trip_time":row[6],
@@ -200,7 +222,10 @@ def register(app, authorized):
             if qa33:
                 for order,row in zip(orders,rows):
                     order.update(waiting_seconds=row[10],waiting_active=row[11],stop_charge_cents=row[12])
-            return reply({"orders":orders,"persistent":True})
+            result={"orders":orders,"persistent":True}
+            if paginated:
+                result.update(page=page,page_size=100,total=total,counts=dict(zip(("all","new","active","done"),counts)))
+            return reply(result)
         except Exception:
             app.logger.exception("Persistent dispatcher order read unavailable")
             return reply({"error":"storage_unavailable"},503)

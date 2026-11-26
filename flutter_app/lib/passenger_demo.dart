@@ -583,7 +583,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   }
 
   bool _sendingOrder = false;
-  Map<String,String>? _pendingOrder;
+  Map<String,dynamic>? _pendingOrder;
   void _openOrders() {
     final api = widget.ordersApi;
     if (api != null) {
@@ -607,6 +607,30 @@ class _PassengerDemoState extends State<PassengerDemo> {
       'from': _from.text.trim(), 'to': _to.text.trim(),
       'trip_date': '${date.year}-${two(date.month)}-${two(date.day)}',
       'trip_time': '${two(time.hour)}:${two(time.minute)}',
+      // Only approved tariff rules are evaluated on the server. Never send
+      // a client-calculated amount or any payment instruction.
+      'details': {
+        'ride_type': _rideType == 'Такси' ? 'taxi' : 'transfer',
+        'round_trip': _roundTrip,
+        'extras': <String>[
+          if (_meetSign) 'meet_sign',
+          if (_soberDriver) 'sober_driver',
+          if (_pets) 'pets',
+          if (_music) 'music',
+          if (_flowers) 'flowers',
+          if (_coffee) 'coffee',
+          if (_water) 'water',
+          if (_quietRide) 'quiet_ride',
+          if (_luggageHelp) 'luggage_help',
+        ],
+        'preferences': {
+          'radio': _radioStation,
+          'tracks': _favoriteTracks.map((x) => x.text.trim()).where(
+            (x) => x.isNotEmpty).toList(),
+          if (_cabinTemperature != null) 'temperature': _cabinTemperature!.round(),
+          'wishes': _tripWishes.text.trim(),
+        },
+      },
     };
     setState(() => _sendingOrder = true);
     try {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:private_drive/demo_trip_store.dart';
 import 'package:private_drive/passenger_demo.dart';
+import 'package:private_drive/native_orders_api.dart';
 import 'package:private_drive/passenger_ride_entry.dart';
 import 'package:private_drive/app_language.dart';
 
@@ -118,6 +119,25 @@ void main() {
     expect(find.text('Кабина пилота'), findsOneWidget);
     expect(find.text('Кабинет диспетчера · демо'), findsOneWidget);
     expect(find.text('Go online'), findsNothing);
+  });
+
+  testWidgets('connected extras open an authorized order rather than offline demo',
+      (tester) async {
+    final store = DemoTripStore();
+    addTearDown(store.dispose);
+    await tester.pumpWidget(MaterialApp(home: PassengerRideEntry(
+      enableMapTiles: false,
+      tripStore: store,
+      ordersApi: NativeOrdersApi('https://example.invalid', 'synthetic-token'),
+    )));
+    await tester.ensureVisible(find.byKey(const Key('passenger-entry-jumpstart')));
+    await tester.tap(find.byKey(const Key('passenger-entry-jumpstart')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PassengerDemo), findsOneWidget);
+    expect(tester.widget<PassengerDemo>(find.byType(PassengerDemo))
+        .initialExtraService, 'jumpstart');
+    expect(find.text('Дополнительные услуги пока не подключены к серверу.'),
+        findsNothing);
   });
 
   testWidgets('Passenger chooses taxi before seeing booking form', (tester) async {

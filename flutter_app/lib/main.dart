@@ -24,7 +24,7 @@ import 'native_cabin_entry.dart';
 import 'native_session.dart';
 import 'native_session_store.dart';
 
-const apiBaseUrl = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
+const apiBaseUrl = PdHttpApi.configuredOrigin;
 // Opt-in only for the isolated static Safari/Android browser test artifact.
 // No production auth URL, payment gateway or automatic backend connection.
 const isolatedWebPreview = bool.fromEnvironment('PD_ISOLATED_WEB_PREVIEW');

@@ -1,3 +1,4 @@
+import '../lib/qa_pilot_transport.dart';
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -13,7 +14,7 @@ void main() {
     final client = MockClient((req) async {
       requests++;
       expect(req.method, 'GET');
-      expect(req.url.toString(), '${NativePilotOrdersApi.qa29Base}/native-pilot-orders');
+      expect(req.url.toString(), '${QaPilotOrdersApi.qa29Base}/native-pilot-orders');
       expect(req.followRedirects, isFalse);
       expect(req.headers['authorization'], 'Bearer $token');
       return http.Response(jsonEncode({
@@ -24,17 +25,17 @@ void main() {
         }],
       }), 200);
     });
-    NativePilotOrdersApi api(String base, String session) =>
-        NativePilotOrdersApi(baseUrl: base, token: session, client: client);
-    final orders = await api(NativePilotOrdersApi.qa29Base, token).load();
+    QaPilotOrdersApi api(String base, String session) =>
+        QaPilotOrdersApi(baseUrl: base, token: session, client: client);
+    final orders = await api(QaPilotOrdersApi.qa29Base, token).load();
     expect(orders.single.orderId, id);
-    for (final base in [NativePilotOrdersApi.stage, 'http://127.0.0.1:18730']) {
+    for (final base in [QaPilotOrdersApi.stage, 'http://127.0.0.1:18730']) {
       await expectLater(api(base, token).load(), throwsFormatException);
     }
-    await expectLater(api(NativePilotOrdersApi.qa29Base, 'unapproved-session').load(),
+    await expectLater(api(QaPilotOrdersApi.qa29Base, 'unapproved-session').load(),
         throwsFormatException);
     expect(requests, 1);
-  }, skip: !NativePilotOrdersApi.qa29Loopback);
+  }, skip: !QaPilotOrdersApi.qa29Loopback);
 
   test('QA29 accepts only local synthetic backend and never redirects', () async {
     const order = '05cdbc84-0930-4c52-baa1-149a03190d78';
@@ -42,20 +43,20 @@ void main() {
     var sends = 0;
     final client = MockClient((req) async {
       sends++;
-      expect(req.url.toString(), '${NativePilotOrdersApi.qa29Base}/native-pilot-orders/$order/gps');
+      expect(req.url.toString(), '${QaPilotOrdersApi.qa29Base}/native-pilot-orders/$order/gps');
       expect(req.headers['authorization'],'Bearer $token');
       expect(req.followRedirects,isFalse);
       expect(jsonDecode(req.body),{'enabled':true,'captured_at':100,'latitude':1.25,'longitude':2.5});
       return http.Response('{"available":true}',200);
     });
-    final api = NativePilotOrdersApi(baseUrl:NativePilotOrdersApi.qa29Base,token:token,client:client);
+    final api = QaPilotOrdersApi(baseUrl:QaPilotOrdersApi.qa29Base,token:token,client:client);
     await api.publishGps(order,const QaGpsFix(1.25,2.5,100),100);
-    for(final base in [NativePilotOrdersApi.stage,'http://127.0.0.1:18730','http://example.invalid:18729']){
-      final wrong = NativePilotOrdersApi(baseUrl:base,token:token,client:client);
+    for(final base in [QaPilotOrdersApi.stage,'http://127.0.0.1:18730','http://example.invalid:18729']){
+      final wrong = QaPilotOrdersApi(baseUrl:base,token:token,client:client);
       await expectLater(wrong.publishGps(order,null,101),throwsFormatException);
     }
-    final realToken = NativePilotOrdersApi(baseUrl:NativePilotOrdersApi.qa29Base,token:'not-a-synthetic-token-xxxxxxxxxxxxxxxxxxxxxxxx',client:client);
+    final realToken = QaPilotOrdersApi(baseUrl:QaPilotOrdersApi.qa29Base,token:'not-a-synthetic-token-xxxxxxxxxxxxxxxxxxxxxxxx',client:client);
     await expectLater(realToken.publishGps(order,null,101),throwsFormatException);
     expect(sends,1);
-  },skip:!NativePilotOrdersApi.qa29Loopback);
+  },skip:!QaPilotOrdersApi.qa29Loopback);
 }

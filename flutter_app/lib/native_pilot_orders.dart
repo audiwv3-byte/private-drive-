@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'pd_http_api.dart';
 import 'qa_pilot_gps.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, kDebugMode, TargetPlatform;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 class PilotAssignedOrder {
   const PilotAssignedOrder({
@@ -77,7 +77,7 @@ class PilotAssignedOrder {
   };
 }
 
-/// Read-only staging transport. The existing native Bearer remains in memory
+/// Authenticated pilot transport. The existing native Bearer remains in memory
 /// and is never forwarded by redirects, stored here, or put in URLs.
 class NativePilotOrdersApi {
   const NativePilotOrdersApi({
@@ -89,44 +89,19 @@ class NativePilotOrdersApi {
   final String baseUrl;
   final String token;
   final http.Client? _client;
-  static const stage = 'https://private-drive-drbd.onrender.com';
   static const _timeout = Duration(seconds: 7);
 
-  static const qaGpsEnabled = bool.fromEnvironment('PD_QA28_GPS') &&
-      bool.fromEnvironment('PD_INTERNAL_QA');
+  bool get originAllowed => baseUrl == PdHttpApi.configuredOrigin &&
+      PdHttpApi.isSecureOrigin(baseUrl);
+  bool get gpsEnabled => originAllowed;
 
-  // QA29 is a separate debug-only APK. It can never send a real session
-  // to plaintext HTTP, or reach the existing staging/production service.
-  static const qaIosGps = bool.fromEnvironment('PD_QA_IOS_GPS') && qaGpsEnabled;
-  static const qaIosBase = 'https://qa.invalid';
-  bool get _qaIosAllowed => qaIosGps && baseUrl == qaIosBase &&
-      token.startsWith('qa-ios-synthetic-') && token.length >= 40 &&
-      _client != null;
-  static const qa29Loopback = bool.fromEnvironment('PD_QA29_LOOPBACK') &&
-      qaGpsEnabled && kDebugMode;
-  static const qa29Base = 'http://127.0.0.1:18729';
-  bool get _qa29Allowed => qa29Loopback && baseUrl == qa29Base &&
-      token.startsWith('qa29-synthetic-') && token.length >= 40;
-  static const configuredOrigin = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
-  bool get _configuredAllowed {
-    final uri = Uri.tryParse(baseUrl);
-    return configuredOrigin.isNotEmpty && baseUrl == configuredOrigin &&
-        uri != null && uri.scheme == 'https' && uri.host.isNotEmpty &&
-        uri.userInfo.isEmpty && uri.port == 443 && !uri.hasQuery &&
-        !uri.hasFragment && (uri.path.isEmpty || uri.path == '/');
-  }
-  bool get _allowed => qaIosGps ? _qaIosAllowed : (qa29Loopback ? _qa29Allowed :
-      _configuredAllowed || baseUrl == stage);
-  bool get gpsEnabled => _configuredAllowed || (qaGpsEnabled && _allowed);
-
-  Uri _endpoint(String path) {
-    if (!_allowed) throw const FormatException('Unapproved pilot API');
-    if (_qa29Allowed) return Uri.parse(qa29Base).resolve(path);
+  Uri endpoint(String path) {
+    if (!originAllowed) throw const FormatException('Unapproved pilot API');
     return PdHttpApi.secureUri(baseUrl, path);
   }
 
   Future<void> publishGps(String orderId, QaGpsFix? fix, int capturedAt) async {
-    if (!gpsEnabled || !_allowed ||
+    if (!gpsEnabled ||
         !PilotAssignedOrder._uuid.hasMatch(orderId)) {
       throw const FormatException('GPS requires configured API and assigned order');
     }
@@ -141,7 +116,7 @@ class NativePilotOrdersApi {
     }
     final transport = _client ?? http.Client();
     try {
-      final request = http.Request('POST', _endpoint('/native-pilot-orders/$orderId/gps'))
+      final request = http.Request('POST', endpoint('/native-pilot-orders/$orderId/gps'))
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Content-Type'] = 'application/json'
@@ -171,7 +146,7 @@ class NativePilotOrdersApi {
   }
 
   Future<bool> availability([bool? desiredOnline]) async {
-    if (!_allowed) {
+    if (!originAllowed) {
       throw const FormatException('Pilot availability requires configured API');
     }
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
@@ -181,7 +156,7 @@ class NativePilotOrdersApi {
     try {
       final request = http.Request(
         desiredOnline == null ? 'GET' : 'PATCH',
-        _endpoint('/native-pilot-availability'))
+        endpoint('/native-pilot-availability'))
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Accept'] = 'application/json';
@@ -213,7 +188,7 @@ class NativePilotOrdersApi {
   }
 
   Future<Map<String, dynamic>> action(String orderId, String action) async {
-    if (!_allowed) {
+    if (!originAllowed) {
       throw const FormatException('Pilot trip actions require configured API');
     }
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
@@ -226,7 +201,7 @@ class NativePilotOrdersApi {
     final client = _client ?? http.Client();
     try {
       final request = http.Request(
-        'PATCH', _endpoint('/native-pilot-orders'))
+        'PATCH', endpoint('/native-pilot-orders'))
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Content-Type'] = 'application/json'
@@ -255,7 +230,7 @@ class NativePilotOrdersApi {
   }
 
   Future<List<PilotAssignedOrder>> load() async {
-    final endpoint = _endpoint('/native-pilot-orders');
+    final endpoint = endpoint('/native-pilot-orders');
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
       throw const PdHttpStatusException(401);
     }

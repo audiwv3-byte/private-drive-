@@ -1,3 +1,4 @@
+import '../lib/qa_pilot_transport.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -15,9 +16,9 @@ const token = 'qa28-synthetic-session-for-test-only-not-a-secret';
 
 void main() {
   test('QA28 API matches QA27 and blocks redirects and foreign hosts', () async {
-    expect(NativePilotOrdersApi.qaGpsEnabled, isTrue);
+    expect(QaPilotOrdersApi.qaGpsEnabled, isTrue);
     final payloads = <Map<String, dynamic>>[];
-    final api = NativePilotOrdersApi(baseUrl: NativePilotOrdersApi.stage,
+    final api = QaPilotOrdersApi(baseUrl: QaPilotOrdersApi.stage,
       token: token, client: MockClient((req) async {
         expect(req.method, 'POST');
         expect(req.url.path, '/native-pilot-orders/$order/gps');
@@ -33,20 +34,20 @@ void main() {
       {'enabled':false,'captured_at':101}]);
     await expectLater(api.publishGps('invalid',null,102),throwsFormatException);
     await expectLater(api.publishGps(order,const QaGpsFix(91,2,102),102),throwsFormatException);
-    final foreign = NativePilotOrdersApi(baseUrl:'https://elsewhere.invalid',
+    final foreign = QaPilotOrdersApi(baseUrl:'https://elsewhere.invalid',
       token:token,client:MockClient((_) async {fail('No foreign network');}));
     await expectLater(foreign.publishGps(order,null,102),throwsFormatException);
-    final redirected = NativePilotOrdersApi(baseUrl:NativePilotOrdersApi.stage,
+    final redirected = QaPilotOrdersApi(baseUrl:QaPilotOrdersApi.stage,
       token:token,client:MockClient((_) async => http.Response('',302)));
     await expectLater(redirected.publishGps(order,null,102),
       throwsA(isA<PdHttpStatusException>()));
-  }, skip: !NativePilotOrdersApi.qaGpsEnabled);
+  }, skip: !QaPilotOrdersApi.qaGpsEnabled);
 
   test('GPS is disabled without both QA flags', () async {
-    final api = NativePilotOrdersApi(baseUrl:NativePilotOrdersApi.stage,
+    final api = QaPilotOrdersApi(baseUrl:QaPilotOrdersApi.stage,
       token:token,client:MockClient((_) async {fail('GPS must not send without QA flags');}));
     await expectLater(api.publishGps(order,null,100),throwsFormatException);
-  }, skip: NativePilotOrdersApi.qaGpsEnabled);
+  }, skip: QaPilotOrdersApi.qaGpsEnabled);
 
   test('consented publisher sends sensor fixes while paused and automatically opts out',
     () async {

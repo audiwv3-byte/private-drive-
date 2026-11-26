@@ -1,3 +1,4 @@
+import 'qa_pilot_transport.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'native_pilot_orders.dart';
@@ -9,14 +10,14 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final allowed = kDebugMode && !kIsWeb &&
       defaultTargetPlatform == TargetPlatform.android &&
-      NativePilotOrdersApi.qa29Loopback;
+      QaPilotOrdersApi.qa29Loopback;
   runApp(MaterialApp(
     title: 'PRIVATE DRIVE GPS QA29',
     home: Scaffold(
       appBar: AppBar(title: const Text('PRIVATE DRIVE GPS QA29')),
       body: allowed
-          ? const PilotAssignedOrdersPanel(api: NativePilotOrdersApi(
-              baseUrl: NativePilotOrdersApi.qa29Base, token: qa29Token))
+          ? const PilotAssignedOrdersPanel(api: QaPilotOrdersApi(
+              baseUrl: QaPilotOrdersApi.qa29Base, token: qa29Token))
           : const Center(child: Text('Изолированный Android QA29 недоступен')),
     ),
   ));

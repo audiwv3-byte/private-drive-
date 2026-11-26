@@ -6,12 +6,20 @@ import 'package:http/http.dart' as http;
 /// Callers supply only public HTTPS API endpoints; credentials are never added
 /// to URLs. Browser CORS policy is enforced by Safari/Chrome.
 class PdHttpApi {
+  static const configuredOrigin = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
+
+  static bool isSecureOrigin(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty &&
+        uri.userInfo.isEmpty && uri.port == 443 && !uri.hasQuery &&
+        !uri.hasFragment && (uri.path.isEmpty || uri.path == '/');
+  }
+
   const PdHttpApi();
 
   static Uri secureUri(String baseUrl, String path) {
     final base = Uri.tryParse(baseUrl);
-    if (base == null || base.scheme != 'https' || base.host.isEmpty ||
-        base.userInfo.isNotEmpty) {
+    if (base == null || !isSecureOrigin(baseUrl)) {
       throw const FormatException('Безопасный адрес API не настроен.');
     }
     final uri = base.resolve(path);

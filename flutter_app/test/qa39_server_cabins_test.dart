@@ -21,7 +21,7 @@ void main() {
       return http.Response('{"available":true}',200);
     });
     final api=NativePilotOrdersApi(baseUrl:origin,token:token,client:transport);
-    expect(NativePilotOrdersApi.qaGpsEnabled,false);
+    expect(const bool.fromEnvironment('PD_INTERNAL_QA'),false);
     expect(api.gpsEnabled,true);
     await api.publishGps(id,QaGpsFix(54.1,25.1,100),100);
     for(final host in ['https://other.invalid','http://qa.invalid','https://qa.invalid@other.invalid']){

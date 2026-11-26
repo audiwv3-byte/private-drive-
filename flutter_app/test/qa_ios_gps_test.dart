@@ -1,3 +1,4 @@
+import '../lib/qa_pilot_transport.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,16 +10,16 @@ const order = '05cdbc84-0930-4c52-baa1-149a03190d78';
 const token = 'qa-ios-synthetic-session-for-isolated-tests-only';
 void main() {
   test('iOS QA transport refuses real host and non-injected client', () async {
-    expect(NativePilotOrdersApi.qaIosGps, isTrue);
-    final bad = NativePilotOrdersApi(baseUrl: NativePilotOrdersApi.stage, token: token,
+    expect(QaPilotOrdersApi.qaIosGps, isTrue);
+    final bad = QaPilotOrdersApi(baseUrl: QaPilotOrdersApi.stage, token: token,
       client: MockClient((_) async => throw StateError('unexpected network')));
     await expectLater(bad.publishGps(order,null,100),throwsFormatException);
-    final noClient = NativePilotOrdersApi(baseUrl: NativePilotOrdersApi.qaIosBase, token: token);
+    final noClient = QaPilotOrdersApi(baseUrl: QaPilotOrdersApi.qaIosBase, token: token);
     await expectLater(noClient.publishGps(order,null,100),throwsFormatException);
   });
   test('consent and assignment gate; synthetic HTTPS fix and opt out', () async {
     final sent = <Map<String,dynamic>>[];
-    final api = NativePilotOrdersApi(baseUrl: NativePilotOrdersApi.qaIosBase,token:token,
+    final api = QaPilotOrdersApi(baseUrl: QaPilotOrdersApi.qaIosBase,token:token,
       client:MockClient((req) async {
         expect(req.url.scheme,'https'); expect(req.url.host,'qa.invalid');
         expect(req.followRedirects,false);

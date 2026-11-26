@@ -1,3 +1,4 @@
+import '../lib/qa_pilot_transport.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -36,9 +37,9 @@ class RecordingClient extends http.BaseClient {
 
 /// Keep widget timing on controlled Futures; the transport tests
 /// exercise real response streams outside Flutter's fake widget clock.
-class WidgetOrdersApi extends NativePilotOrdersApi {
+class WidgetOrdersApi extends QaPilotOrdersApi {
   const WidgetOrdersApi(this._read)
-      : super(baseUrl: NativePilotOrdersApi.stage, token: token);
+      : super(baseUrl: QaPilotOrdersApi.stage, token: token);
 
   final Future<List<PilotAssignedOrder>> Function() _read;
 
@@ -49,8 +50,8 @@ class WidgetOrdersApi extends NativePilotOrdersApi {
   Future<bool> availability([bool? desiredOnline]) async => false;
 }
 
-class FakeAvailabilityApi extends NativePilotOrdersApi {
-  FakeAvailabilityApi() : super(baseUrl: NativePilotOrdersApi.stage, token: token);
+class FakeAvailabilityApi extends QaPilotOrdersApi {
+  FakeAvailabilityApi() : super(baseUrl: QaPilotOrdersApi.stage, token: token);
   bool serverOnline = false;
   bool failNextToggle = false;
   int heartbeatCalls = 0;
@@ -72,14 +73,14 @@ class FakeAvailabilityApi extends NativePilotOrdersApi {
 void main() {
   test('read uses the staging endpoint and never follows redirects', () async {
     var requestCount = 0;
-    final api = NativePilotOrdersApi(
-      baseUrl: NativePilotOrdersApi.stage,
+    final api = QaPilotOrdersApi(
+      baseUrl: QaPilotOrdersApi.stage,
       token: token,
       client: RecordingClient((request) {
         requestCount++;
         expect(request.method, 'GET');
         expect(request.url.toString(),
-            '${NativePilotOrdersApi.stage}/native-pilot-orders');
+            '${QaPilotOrdersApi.stage}/native-pilot-orders');
         expect(request.headers['authorization'], 'Bearer $token');
         expect(request.followRedirects, isFalse);
         expect(request.contentLength, 0);
@@ -104,8 +105,8 @@ void main() {
   });
 
   test('pilot trip actions require staging Bearer and server acknowledgement', () async {
-    final api = NativePilotOrdersApi(
-      baseUrl: NativePilotOrdersApi.stage,
+    final api = QaPilotOrdersApi(
+      baseUrl: QaPilotOrdersApi.stage,
       token: token,
       client: MockClient((request) async {
         expect(request.method, 'PATCH');
@@ -157,8 +158,8 @@ void main() {
 
   test('server availability is never inferred from local toggle', () async {
     final methods = <String>[];
-    final api = NativePilotOrdersApi(
-      baseUrl: NativePilotOrdersApi.stage,
+    final api = QaPilotOrdersApi(
+      baseUrl: QaPilotOrdersApi.stage,
       token: token,
       client: MockClient((request) async {
         methods.add(request.method);
@@ -175,14 +176,14 @@ void main() {
     expect(await api.availability(), false);
     expect(await api.availability(true), true);
     expect(methods, ['GET', 'PATCH']);
-    final unconfirmed = NativePilotOrdersApi(
-      baseUrl: NativePilotOrdersApi.stage, token: token,
+    final unconfirmed = QaPilotOrdersApi(
+      baseUrl: QaPilotOrdersApi.stage, token: token,
       client: MockClient((_) async =>
         http.Response('{"online":false,"payment_mode":"disabled"}', 200)),
     );
     await expectLater(unconfirmed.availability(true), throwsFormatException);
     await expectLater(unconfirmed.availability(false), completes);
-    final forbidden = NativePilotOrdersApi(
+    final forbidden = QaPilotOrdersApi(
       baseUrl: 'https://elsewhere.invalid', token: token,
       client: MockClient((_) async {
         fail('Bearer must not reach untrusted server');
@@ -192,7 +193,7 @@ void main() {
   });
 
   test('refuses other hosts and data outside the no-payment contract', () async {
-    final other = NativePilotOrdersApi(
+    final other = QaPilotOrdersApi(
       baseUrl: 'https://elsewhere.invalid',
       token: token,
       client: MockClient((_) async {
@@ -207,8 +208,8 @@ void main() {
       result([{...order, 'status': 'requested'}]),
     ];
     for (final body in invalid) {
-      final api = NativePilotOrdersApi(
-        baseUrl: NativePilotOrdersApi.stage,
+      final api = QaPilotOrdersApi(
+        baseUrl: QaPilotOrdersApi.stage,
         token: token,
         client: MockClient((_) async => http.Response(body, 200)),
       );

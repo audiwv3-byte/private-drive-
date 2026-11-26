@@ -1,3 +1,4 @@
+import '../lib/qa_pilot_transport.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/native_pilot_orders.dart';
@@ -16,8 +17,8 @@ class Server {
     })
   ];
 }
-class FakeApi extends NativePilotOrdersApi {
-  FakeApi(this.server):super(baseUrl:NativePilotOrdersApi.stage,token:'synthetic-test-token-never-sent-to-network');
+class FakeApi extends QaPilotOrdersApi {
+  FakeApi(this.server):super(baseUrl:QaPilotOrdersApi.stage,token:'synthetic-test-token-never-sent-to-network');
   final Server server;
   @override
   Future<List<PilotAssignedOrder>> load() async =>server.read();

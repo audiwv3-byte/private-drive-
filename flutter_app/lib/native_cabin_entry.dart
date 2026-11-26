@@ -1,5 +1,6 @@
 import 'native_pilot_orders.dart';
 import 'native_orders_api.dart';
+import 'pd_http_api.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -176,10 +177,10 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     final cabin = PrivateDriveDemo(
       key: ValueKey('entry-$role-${session?.userId ?? (localQa ? 'local-qa' : 'guest')}'),
       pilotApi: role == 'pilot' && session != null
-          ? NativePilotOrdersApi(baseUrl: const String.fromEnvironment('PD_NATIVE_AUTH_API_URL'), token: session.token)
+          ? NativePilotOrdersApi(baseUrl: PdHttpApi.configuredOrigin, token: session.token)
           : null,
       ordersApi: role == 'passenger' && session != null
-          ? NativeOrdersApi(const String.fromEnvironment('PD_NATIVE_AUTH_API_URL'), session.token)
+          ? NativeOrdersApi(PdHttpApi.configuredOrigin, session.token)
           : null,
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',
       showPilotIdentityCheck: !localQa,

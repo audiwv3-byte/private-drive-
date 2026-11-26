@@ -1,3 +1,4 @@
+import '../lib/qa_pilot_transport.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,7 +16,7 @@ void main() {
     final body=jsonDecode(const String.fromEnvironment('QA31_BODY')) as Map<String,dynamic>;
     final io=HttpClient();
     addTearDown(()=>io.close(force:true));
-    final api=NativePilotOrdersApi(baseUrl:NativePilotOrdersApi.qaIosBase,token:token,
+    final api=QaPilotOrdersApi(baseUrl:QaPilotOrdersApi.qaIosBase,token:token,
       client:MockClient((req) async {
         expect(req.url.scheme,'https'); expect(req.url.host,'qa.invalid');
         expect(req.followRedirects,false);

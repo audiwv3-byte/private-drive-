@@ -4,6 +4,7 @@ on:
     branches:
       - qa/staging-api-503-20261126
       - qa/staging-api-503-readiness-20261126
+      - qa/staging-api-503-contract-20261126
   workflow_dispatch:
 
 permissions:

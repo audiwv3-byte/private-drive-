@@ -87,8 +87,8 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(fields.get("dbname"), "private_drive_test")
         with psycopg.connect(url, autocommit=True) as db:
             db.execute("CREATE TABLE native_auth_users (id text PRIMARY KEY)")
-            db.execute("CREATE TABLE native_auth_sessions (token_hash text PRIMARY KEY)")
-            db.execute("CREATE TABLE native_auth_roles (user_id text PRIMARY KEY)")
+            db.execute("CREATE TABLE native_auth_sessions (token_hash text PRIMARY KEY, user_id text, created_at bigint, expires_at bigint, revoked_at bigint)")
+            db.execute("CREATE TABLE native_auth_roles (user_id text PRIMARY KEY, role text)")
             db.execute((Path("migrations") / "native_auth_session_functions.sql").read_text())
             db.execute((Path("migrations") / "native_dispatch_orders.sql").read_text())
         self.assertEqual(check(environment={**REQUIRED, "PD_DISPATCH_ORDERS_DATABASE_URL": url}),

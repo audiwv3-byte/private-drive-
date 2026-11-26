@@ -42,13 +42,17 @@ jobs:
           source=source.replace('<application',
               ''.join('<uses-permission android:name="android.permission.'+p+'"/>\n' for p in permissions)
               +'<application',1)
+          source=source.replace('<application', '<application android:networkSecurityConfig="@xml/qa29_network_security"',1)
           manifest.write_text(source)
+          security=manifest.parent/'res/xml/qa29_network_security.xml'
+          security.parent.mkdir(parents=True, exist_ok=True)
+          security.write_text('<network-security-config><base-config cleartextTrafficPermitted="false"/><domain-config cleartextTrafficPermitted="true"><domain includeSubdomains="false">127.0.0.1</domain></domain-config></network-security-config>')
           PY
       - name: Run isolated GPS and pilot API regression tests
         working-directory: qa_merge_android
         run: |
           flutter pub get
-          flutter test --no-pub --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true test/qa28_pilot_gps_test.dart test/qa29_loopback_test.dart test/native_pilot_orders_test.dart
+          flutter test --no-pub --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true --dart-define=PD_QA29_LOOPBACK=true test/qa28_pilot_gps_test.dart test/qa29_loopback_test.dart test/native_pilot_orders_test.dart test/native_orders_api_test.dart test/pilot_cabin_test.dart
       - name: Build QA-only debug APK with a distinct package ID
         working-directory: qa_merge_android
         run: |

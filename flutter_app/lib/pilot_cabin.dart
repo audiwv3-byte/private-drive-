@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'pilot_offer_tone.dart';
+import 'native_pilot_orders.dart';
 import 'pilot_sound_settings.dart';
 import 'pilot_payment_settings.dart';
 import 'pilot_identity_notice_page.dart';
@@ -20,6 +21,7 @@ class PilotCabin extends StatefulWidget {
     super.key,
     this.enableMapTiles = true,
     this.tripStore,
+    this.assignmentApi,
     this.onOfferAlert,
     this.onSignOut,
     this.onBackToCabinets,
@@ -29,6 +31,7 @@ class PilotCabin extends StatefulWidget {
 
   final bool enableMapTiles;
   final DemoTripStore? tripStore;
+  final NativePilotOrdersApi? assignmentApi;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
   final bool showIdentityCheck;
@@ -42,6 +45,7 @@ class PilotCabin extends StatefulWidget {
 
 class _PilotCabinState extends State<PilotCabin> {
   bool _onLine = false;
+  bool _assignmentMapOpen = false;
   OverlayEntry? _cockpitEntry;
   Timer? _offerAlert;
   bool _hasAnnouncedOffer = false;
@@ -66,6 +70,7 @@ class _PilotCabinState extends State<PilotCabin> {
   @override
   void initState() {
     super.initState();
+    if (widget.assignmentApi != null) return;
     _onLine = widget.tripStore?.pilotOnline ?? false;
     widget.tripStore?.addListener(_syncOfferSound);
     PilotSoundSettings.instance.addListener(_onSettingsChanged);
@@ -180,6 +185,18 @@ class _PilotCabinState extends State<PilotCabin> {
     ));
   }
 
+  Future<void> _openAssignmentMap() async {
+    if (_assignmentMapOpen || widget.assignmentApi == null) return;
+    setState(() => _assignmentMapOpen = true);
+    try {
+      await Navigator.of(context).push<void>(MaterialPageRoute<void>(
+        builder: (_) => PilotDemo(enableMapTiles: widget.enableMapTiles, showAssignedOffer: false),
+      ));
+    } finally {
+      if (mounted) setState(() => _assignmentMapOpen = false);
+    }
+  }
+
   void _toggleLine() {
     if (_onLine) {
       setState(() => _onLine = false);
@@ -206,6 +223,13 @@ class _PilotCabinState extends State<PilotCabin> {
             ? null
             : BackButton(onPressed: widget.onBackToCabinets),
         actions: [
+          if (widget.assignmentApi != null)
+            IconButton(
+              key: const Key('pilot-server-open-map'),
+              tooltip: 'Открыть карту',
+              icon: const Icon(Icons.map_outlined),
+              onPressed: _assignmentMapOpen ? null : _openAssignmentMap,
+            ),
           if (widget.onSignOut != null)
             IconButton(
               tooltip: 'Выйти',
@@ -214,7 +238,34 @@ class _PilotCabinState extends State<PilotCabin> {
             ),
         ],
       ),
-      body: Stack(
+      body: widget.assignmentApi != null
+          ? Stack(fit: StackFit.expand, children: [
+              const VilniusEveningBackdrop(),
+              SafeArea(child: Column(children: [
+                const SizedBox(height: 14),
+                const SizedBox(
+                  key: Key('pilot-connected-brand-logo'),
+                  height: 86, width: 86,
+                  child: PrivateDriveBrandLogo(
+                    size: 86, transparentBackground: true),
+                ),
+                const SizedBox(height: 8),
+                const Text('КАБИНА ПИЛОТА',
+                  key: Key('pilot-connected-cabin-title'),
+                  style: TextStyle(color: Color(0xFFDDC184),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.8, fontSize: 19)),
+                const SizedBox(height: 4),
+                const Text('Заказы и статусы подтверждаются сервером',
+                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 8),
+                PilotServerAvailabilityButton(api: widget.assignmentApi!),
+                const SizedBox(height: 8),
+                Expanded(child: PilotAssignedOrdersPanel(
+                  api: widget.assignmentApi!, visible: !_assignmentMapOpen)),
+              ])),
+            ])
+          : Stack(
         fit: StackFit.expand,
         children: [
           const VilniusEveningBackdrop(),

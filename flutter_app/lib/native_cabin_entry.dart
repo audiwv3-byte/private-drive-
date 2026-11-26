@@ -8,6 +8,8 @@ import 'private_drive_bright_backdrop.dart';
 import 'demo_interfaces.dart';
 import 'permissions_onboarding.dart';
 import 'native_session.dart';
+import 'native_pilot_orders.dart';
+import 'pilot_cabin.dart';
 import 'native_session_store.dart';
 import 'pilot_identity_api.dart';
 import 'pilot_identity_notice_page.dart';
@@ -171,6 +173,19 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
 
   Widget _cabin(String role, PdNativeSession? session,
       {bool localQa = false, bool showPilotCockpit = true}) {
+    if (!localQa && role == 'pilot' && session != null &&
+        const bool.fromEnvironment('PD_NATIVE_PILOT_ASSIGNMENT') &&
+        const {'pilot', 'pilot_dispatcher'}.contains(session.role)) {
+      return PdPermissionsFirstLaunch(child: PilotCabin(
+        key: ValueKey('pilot-assignments-${session.userId}'),
+        assignmentApi: NativePilotOrdersApi(
+          baseUrl: const String.fromEnvironment('PD_NATIVE_AUTH_API_URL'),
+          token: session.token,
+        ),
+        onSignOut: _signOut,
+        onBackToCabinets: _entry,
+      ));
+    }
     final cabin = PrivateDriveDemo(
       key: ValueKey('entry-$role-${session?.userId ?? (localQa ? 'local-qa' : 'guest')}'),
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',

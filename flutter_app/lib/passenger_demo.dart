@@ -66,6 +66,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   TimeOfDay? _time;
   String _route = '';
   Future<void> _openPayseraPaymentInfo() async {
+    if (const bool.fromEnvironment('PD_ISOLATED_DEVICE_QA')) return;
     try {
       final opened = await launchUrl(
         Uri.https('privatedrive.lt', '/payment/paysera'),

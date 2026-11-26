@@ -45,7 +45,7 @@ class NativeOrdersApi {
     }
   }
 
-  Future<Map<String,dynamic>> call([Map<String,String>? payload]) async {
+  Future<Map<String,dynamic>> call([Map<String,dynamic>? payload]) async {
     final uri = PdHttpApi.secureUri(baseUrl, '/native-orders');
     final client = _client ?? http.Client();
     try {
@@ -154,7 +154,20 @@ class _NativeOrdersHistoryState extends State<NativeOrdersHistory>
       return ListView(children: [
         for (final row in rows.whereType<Map<String,dynamic>>())
           ListTile(title: Text("${row['from']} → ${row['to']}"),
-            subtitle: Text("${row['trip_date']} ${row['trip_time']} · ${row['status']}"),
+            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("${row['trip_date']} ${row['trip_time']} · ${row['status']}"),
+                if (row['quote_required'] == true)
+                  const Text('Стоимость по запросу'),
+                if (row['quoted_total_cents'] is int)
+                  Text('Подтверждённый расчёт: '
+                      '${((row['quoted_total_cents'] as int) / 100).toStringAsFixed(2)} €'),
+                if (row['details'] is Map &&
+                    (row['details'] as Map)['extras'] is List &&
+                    ((row['details'] as Map)['extras'] as List).isNotEmpty)
+                  Text('Дополнительные услуги: '
+                      '${((row['details'] as Map)['extras'] as List).join(', ')}'),
+              ]),
             trailing: row['order_id'] is String &&
                 const {'requested','assigned','approaching'}.contains(row['status'])
                 ? TextButton(

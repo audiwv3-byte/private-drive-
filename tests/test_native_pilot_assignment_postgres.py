@@ -69,6 +69,7 @@ def stage(monkeypatch):
         GRANT EXECUTE ON FUNCTION public.pd_validate_native_session(text,bigint),
                                    public.pd_native_pilot_order_state(text,bigint),
                                    public.pd_native_pilot_trip_action(text,uuid,text,bigint),
+                                   public.pd_native_pilot_availability_state(text,bigint,boolean),
                                    public.pd_redeem_closed_pilot_invite(text,text),
                                    public.pd_redeem_closed_pilot_account_invite(text,text) TO {native};
         GRANT SELECT (id,user_id,status,photo,created_at,expires_at,decided_at),
@@ -216,6 +217,21 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     assert client.post(endpoint, data={"pilot_id": "pilotA"}).status_code == 401
     token = login(client)
     assert b"const pilotCsrf=" in client.get("/dispatch").data
+    assert client.get("/dispatch/orders/eligible-pilots").json == {"pilots": []}
+    assert native.get("/native-pilot-availability",
+        headers=auth(tokens, "pilotA")).json == {
+            "online": False, "payment_mode": "disabled"}
+    assert native.patch("/native-pilot-availability",
+        headers=auth(tokens, "passenger"), json={"online": True}).status_code == 403
+    assert native.patch("/native-pilot-availability",
+        headers=auth(tokens, "pilotOld"), json={"online": True}).status_code == 403
+    assert native.patch("/native-pilot-availability",
+        headers=auth(tokens, "pilotA"), json={"online": "yes"}).status_code == 400
+    assert native.patch("/native-pilot-availability",
+        headers=auth(tokens, "pilotA"), json={"online": True}).json == {
+            "online": True, "payment_mode": "disabled"}
+    assert native.patch("/native-pilot-availability",
+        headers=auth(tokens, "pilotB"), json={"online": True}).status_code == 200
     assert client.get("/dispatch/orders/eligible-pilots").json == {
         "pilots": [{"id": "pilotA"}, {"id": "pilotB"}]}
     assert client.post(endpoint, data={"pilot_id": "pilotA", "csrf": "invalid"}).status_code == 403
@@ -285,6 +301,10 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     assert owner.execute("SELECT photo FROM public.native_identity_checks WHERE id=%s",
                          (photo.json['id'],)).fetchone() == (None,)
     monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", queue_url)
+    ids = {item["id"] for item in client.get("/dispatch/orders/eligible-pilots").json["pilots"]}
+    assert "pilotInvite" not in ids
+    assert native.patch("/native-pilot-availability",
+        headers=auth(tokens, "pilotInvite"), json={"online": True}).json["online"] is True
     ids = {item["id"] for item in client.get("/dispatch/orders/eligible-pilots").json["pilots"]}
     assert "pilotInvite" in ids
     assert client.post(invited_endpoint, data={"pilot_id": "pilotInvite", "csrf": token}).json == {

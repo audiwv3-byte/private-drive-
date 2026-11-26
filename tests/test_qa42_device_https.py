@@ -37,7 +37,13 @@ def test_shared_https_dispatcher(tmp_path):
             browser = pw.chromium.launch(env={**os.environ,"HOME":str(home)})
             page = browser.new_page()
             page.route("**/*",lambda route: route.continue_() if route.request.url.startswith(base+"/") else route.abort())
-            assert page.request.get(base+"/dispatch/orders/state",ignore_https_errors=True).status == 401
+            from urllib.error import HTTPError
+            try:
+                urllib.request.urlopen(base+"/dispatch/orders/state", context=context, timeout=10)
+            except HTTPError as exc:
+                assert exc.code == 401
+            else:
+                raise AssertionError("Anonymous dispatcher API access")
             page.goto(base+"/dispatch/login")
             page.locator("input[name=password]").fill(password)
             page.locator("button[type=submit], form button").first.click()

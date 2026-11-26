@@ -35,7 +35,7 @@ void main() {
       try {
         final api = AssignedOrderApi();
         await tester.pumpWidget(MaterialApp(home: Scaffold(body:
-            SingleChildScrollView(child: PilotAssignedOrdersPanel(api: api)))));
+            PilotAssignedOrdersPanel(api: api))));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Передавать GPS диспетчеру'));
         await tester.pumpAndSettle();

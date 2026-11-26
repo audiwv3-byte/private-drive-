@@ -20,6 +20,19 @@ def create_application():
     app = Flask(__name__)
     register_request_guard(app)
 
+    @app.get("/qa/staging/readiness")
+    def qa_staging_readiness():
+        # Only a synthetic admin may inspect readiness; no DSN or secrets in output.
+        from pd_qa_staging_preflight import check
+        try:
+            identity = verify_telegram_user(request.headers.get("X-Telegram-Init-Data", ""), token)[0]
+        except (PermissionError, ValueError):
+            return jsonify(error="unauthorized"), 401
+        if identity not in admins:
+            return jsonify(error="forbidden"), 403
+        outcome = check()
+        return jsonify(outcome), 200 if outcome["ready"] else 503
+
     def uid():
         return verify_telegram_user(request.headers.get("X-Telegram-Init-Data", ""), token)[0]
 

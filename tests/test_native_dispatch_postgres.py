@@ -111,21 +111,35 @@ def test_native_order_appears_in_authenticated_web_dispatch_and_passenger_histor
     assert api.get("/native-orders", headers=auth(tokens["expired"])).status_code == 401
     assert api.get("/native-orders", headers=auth(tokens["pilot"])).status_code == 403
 
-    payload = {"request_id": str(uuid.uuid4()), "from": "Synthetic origin",
-               "to": "Synthetic destination", "trip_date": "2026-12-01", "trip_time": "11:30"}
+    payload = {"request_id": str(uuid.uuid4()), "from": "Вильнюс",
+               "to": "Аэропорт Вильнюса", "trip_date": "2026-12-01", "trip_time": "11:30",
+               "details": {"ride_type": "transfer", "round_trip": False,
+                           "extras": ["meet_sign"],
+                           "preferences": {"radio": "M-1 · 106,8 FM",
+                                           "tracks": ["track 1"], "temperature": 21}}}
     monkeypatch.setenv("PD_PAYMENT_MODE", "live")
     assert api.post("/native-orders", headers=passenger, json=payload).status_code == 503
     monkeypatch.setenv("PD_PAYMENT_MODE", "disabled")
     created = api.post("/native-orders", headers=passenger, json=payload)
     assert created.status_code == 201, created.json
     assert created.json["payment_mode"] == "disabled"
+    assert created.json["quoted_total_cents"] == 5500
+    assert created.json["quote_required"] is False
     order_id = created.json["order_id"]
     retry = api.post("/native-orders", headers=passenger, json=payload)
     assert retry.status_code == 200 and retry.json["order_id"] == order_id
     assert api.post("/native-orders", headers=passenger,
                     json={**payload, "to": "Changed destination"}).status_code == 409
-    assert [row["order_id"] for row in
-            api.get("/native-orders", headers=passenger).json["orders"]] == [order_id]
+    assert api.post("/native-orders", headers=passenger, json={
+        **payload, "details": {**payload["details"], "extras": []}
+    }).status_code == 409
+    assert api.post("/native-orders", headers=passenger, json={
+        **payload, "quoted_total_cents": 1
+    }).status_code == 400
+    history = api.get("/native-orders", headers=passenger).json["orders"]
+    assert [row["order_id"] for row in history] == [order_id]
+    assert history[0]["quoted_total_cents"] == 5500
+    assert history[0]["details"]["extras"] == ["meet_sign"]
     assert api.get("/native-orders", headers=auth(tokens["other"])).json["orders"] == []
 
     # Owner-only cancellation: unrelated passenger cannot mutate or even
@@ -164,6 +178,9 @@ def test_native_order_appears_in_authenticated_web_dispatch_and_passenger_histor
     queue = dispatcher.get("/dispatch/orders/state")
     assert queue.status_code == 200, queue.json
     assert [row["id"] for row in queue.json["orders"]] == [order_id]
+    assert queue.json["orders"][0]["quoted_total_cents"] == 5500
+    assert queue.json["orders"][0]["details"]["extras"] == ["meet_sign"]
+    assert queue.json["orders"][0]["details"]["preferences"]["temperature"] == 21
 
     monkeypatch.setenv("PD_DISPATCH_ORDERS_DATABASE_URL", api_dsn)
     assert api.post("/native-auth/logout", headers=passenger).status_code == 200

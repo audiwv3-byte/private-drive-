@@ -39,6 +39,8 @@ def test_shared_wsgi(monkeypatch):
     ready = api.get("/qa/staging/readiness", headers=headers(201))
     assert ready.status_code == 200, ready.json
     assert api.post("/api/order", data="not-json", content_type="text/plain",
+                    headers=headers(101)).status_code == 415
+    assert api.post("/api/order", data="{broken-json", content_type="application/json",
                     headers=headers(101)).status_code == 400
     body = {"request_key":uuid.uuid4().hex,"origin":"Synthetic A","destination":"Synthetic B","trip_date":"2027-01-01","trip_time":"12:00"}
     assert api.post("/api/order",json=body).status_code == 401

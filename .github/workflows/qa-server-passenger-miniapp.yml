@@ -30,7 +30,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install synthetic-only Mini App and PostgreSQL dependencies
-        run: python -m pip install -r requirements-miniapp.txt -r requirements-sms-render.txt 'stripe>=11,<15' pytest
+        run: python -m pip install -r requirements-miniapp.txt -r requirements-sms-render.txt 'stripe>=11,<15' 'reportlab>=4,<5' pytest
       - name: Verify real Mini App WSGI and shared queue (no order SQLite)
         run: python -m pytest -v -s tests/test_qa_actual_miniapp_postgres.py
         env:

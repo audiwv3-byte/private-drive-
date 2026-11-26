@@ -94,7 +94,29 @@ def qa_shared_order_bridge():
         return jsonify(error='passenger_profile_required'), 403
     from pd_qa25_telegram_orders import telegram_order, telegram_history
     if request.path == '/api/order' and request.method == 'POST':
-        return telegram_order(uid, request.get_json(silent=True))
+        # Keep the existing booking form's DD.MM.YYYY contract. PostgreSQL
+        # stores canonical ISO dates. Do not write or mirror a SQLite order.
+        import re
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify(error='invalid_order'), 400
+        body = dict(body)
+        date = body.get('trip_date')
+        if isinstance(date, str) and re.fullmatch(r'[0-9]{2}\\.[0-9]{2}\\.20[0-9]{2}', date):
+            day, month, year = date.split('.')
+            try:
+                from datetime import date as _date
+                body['trip_date'] = _date(int(year), int(month), int(day)).isoformat()
+            except ValueError:
+                return jsonify(error='invalid_departure'), 400
+        response = telegram_order(uid, body)
+        # The common contract stores route/date/time, not optional pricing,
+        # payments or preferences. Never indicate these are saved.
+        if response.status_code in (200, 201):
+            payload = response.get_json()
+            payload['details_not_saved'] = True
+            return jsonify(payload), response.status_code
+        return response
     if request.path == '/api/orders' and request.method == 'GET':
         return telegram_history(uid)
     return jsonify(error='method_not_allowed'), 405

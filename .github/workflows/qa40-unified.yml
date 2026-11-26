@@ -83,8 +83,18 @@ jobs:
       - run: python -m pip install -r requirements-sms-render.txt flask pytest
       - run: flutter pub get
         working-directory: flutter_app
+      - name: Permit standard HTTPS port on ephemeral CI runner only
+        run: |
+          sysctl -n net.ipv4.ip_unprivileged_port_start > "$RUNNER_TEMP/qa40-original-port-floor"
+          sudo sysctl -w net.ipv4.ip_unprivileged_port_start=443
       - name: Verify runner permits isolated HTTPS port 443
         run: python -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",443)); s.close()'
       - run: python -m pytest -vs tests/test_qa39_1_server_cabins.py
       - run: flutter test test/qa39_server_cabin_test.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --reporter expanded
         working-directory: flutter_app
+      - name: Restore runner port policy
+        if: always()
+        run: |
+          if test -s "$RUNNER_TEMP/qa40-original-port-floor"; then
+            sudo sysctl -w net.ipv4.ip_unprivileged_port_start="$(cat "$RUNNER_TEMP/qa40-original-port-floor")"
+          fi

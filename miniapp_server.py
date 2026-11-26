@@ -18,7 +18,7 @@ register_request_guard(app)
 import pd_languages
 import pd_stops
 import pd_fixed_prices
-from pd_miniapp_dispatch_bridge import (bridge_enabled, publish_telegram_order, DispatchBridgeUnavailable)
+from pd_miniapp_dispatch_bridge import (bridge_enabled, central_delivery_required, publish_telegram_order, DispatchBridgeUnavailable)
 TIMEZONE = ZoneInfo('Europe/Vilnius')
 MAX_AGE = 86400
 
@@ -248,6 +248,11 @@ def acknowledge_central_dispatch(oid, *, replayed=False):
         return jsonify(ok=True, order_id=oid, dispatch_order_id=central_id,
                        dispatch_received=True, status=row['status'],
                        price=row['price'], replayed=replayed)
+    if central_delivery_required():
+        # Staging requires a confirmed central ID; a local SQLite row alone
+        # must never be reported to a passenger as a received dispatch order.
+        return jsonify(ok=False, order_id=oid, dispatch_received=False,
+                       error='Диспетчерская не подключена. Заявка не подтверждена.'), 503
     return jsonify(ok=True, order_id=oid, status=row['status'],
                    price=row['price'], replayed=replayed)
 

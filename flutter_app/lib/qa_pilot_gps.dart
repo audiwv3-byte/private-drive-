@@ -122,9 +122,9 @@ class QaPilotGpsPublisher {
     try { await subscription?.cancel(); } catch (_) {}
     try { await pending; } catch (_) {}
     if (order != null) {
-      // Serialize opt-out after the final in-flight fix. If the network or
-      // trip ended first, QA27 hides stale data and deletes completed trips.
-      try { await send(order, null, math.max(_now, lastSent + 1)); } catch (_) {}
+      // Wait for the final fix. The server gives opt-out precedence at the same
+      // timestamp, so stopping never advances beyond its accepted clock skew.
+      try { await send(order, null, math.max(_now, lastSent)); } catch (_) {}
     }
   }
 }

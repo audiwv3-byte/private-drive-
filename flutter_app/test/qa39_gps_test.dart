@@ -95,13 +95,13 @@ void main() {
       expect(bodies, isEmpty);
       assigned = true;
       expect(await publisher.start(orderId), true);
-      positions.add(const QaGpsFix(1.25, 2.5, 100));
+      positions.add(const QaGpsFix(1.25, 2.5, 105));
       await publisher.stop();
-      positions.add(const QaGpsFix(2, 3, 102));
+      positions.add(const QaGpsFix(2, 3, 106));
       expect(positions.hasListener, false);
       expect(bodies, [
-        {'enabled': true, 'latitude': 1.25, 'longitude': 2.5, 'captured_at': 100},
-        {'enabled': false, 'captured_at': 101},
+        {'enabled': true, 'latitude': 1.25, 'longitude': 2.5, 'captured_at': 105},
+        {'enabled': false, 'captured_at': 105},
       ]);
     } finally {
       await publisher.stop();

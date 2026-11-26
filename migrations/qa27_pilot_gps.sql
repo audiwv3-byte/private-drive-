@@ -33,7 +33,9 @@ BEGIN
  OR (NOT enabled AND (lat IS NOT NULL OR lon IS NOT NULL)) THEN
  RETURN jsonb_build_object('error','invalid_fix'); END IF;
  SELECT g.captured_at INTO prior FROM public.pd_qa27_gps g WHERE g.order_id=oid;
- IF prior IS NOT NULL AND captured<=prior THEN RETURN jsonb_build_object('error','stale_fix'); END IF;
+ -- A stop wins over a fix with the same timestamp. Replaying that stop is safe.
+ IF prior IS NOT NULL AND (captured<prior OR (captured=prior AND enabled))
+ THEN RETURN jsonb_build_object('error','stale_fix'); END IF;
  INSERT INTO public.pd_qa27_gps(order_id,pilot_id,captured_at,latitude,longitude)
  VALUES(oid,p.user_id,captured,lat,lon)
  ON CONFLICT(order_id) DO UPDATE SET pilot_id=excluded.pilot_id,captured_at=excluded.captured_at,

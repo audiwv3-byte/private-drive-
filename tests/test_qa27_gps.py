@@ -89,6 +89,20 @@ def test_qa27_gps(monkeypatch):
     assert api.post(path,json=dict(fix,captured_at=now-6),headers=native("b")).status_code == 401
     with psycopg.connect(dsn) as db:
         db.execute("UPDATE native_auth_sessions SET revoked_at=NULL WHERE token_hash=%s",(hashlib.sha256(("b"*48).encode()).hexdigest(),))
+    def assert_stop_at_clock_edge(gps_path, read_path):
+        # Opt-out at the edge of the accepted skew is immediate and replayable.
+        edge = int(time.time()) + 5
+        edge_fix = dict(fix, captured_at=edge)
+        stop = {"enabled": False, "captured_at": edge}
+        assert api.post(gps_path, json=edge_fix, headers=native("b")).json == {"available": True}
+        assert api.get(read_path, headers=tg(201)).json["captured_at"] == edge
+        for _ in range(2):
+            assert api.post(gps_path, json=stop, headers=native("b")).json == {"available": False}
+        assert api.get(read_path, headers=tg(201)).json == {"available": False}
+        assert api.post(gps_path, json=edge_fix, headers=native("b")).status_code == 409
+
+    assert_stop_at_clock_edge(path, read)
+    print("PASS same-timestamp GPS stop on QA27; duplicate stop accepted, fix replay rejected")
     for act in ("approach","start","finish"):
         result = api.patch("/native-pilot-orders",json={"order_id":oid,"action":act},headers=native("b"))
         assert result.status_code == 200,result.json
@@ -96,6 +110,25 @@ def test_qa27_gps(monkeypatch):
     assert api.post(path,json=dict(fix,captured_at=now-5),headers=native("b")).status_code == 409
     with psycopg.connect(dsn) as db:
         assert db.execute("SELECT count(*) FROM public.pd_qa27_gps").fetchone()[0] == 0
+    # QA33 replaces the GPS SQL and adds the arrived state to the trip lifecycle.
+    with psycopg.connect(dsn, autocommit=True) as db:
+        for name in ("qa32_trip_waiting.sql", "qa33_trip_controls.sql"):
+            db.execute((Path("migrations") / name).read_text())
+    monkeypatch.setenv("PD_QA33_TRIP", "1")
+    modern = api.post("/api/order", json={**body, "request_key": uuid.uuid4().hex}, headers=tg(101))
+    assert modern.status_code == 200, modern.json
+    modern_id = modern.json["order_id"]
+    assigned = api.post(f"/dispatch/orders/{modern_id}/assign",
+                        data={"pilot_id": "qa26-pilot", "csrf": csrf}, headers=tg(201))
+    assert assigned.status_code == 200, assigned.json
+    for act in ("approach", "arrive"):
+        result = api.patch("/native-pilot-orders", json={"order_id": modern_id, "action": act},
+                           headers=native("b"))
+        assert result.status_code == 200, result.json
+    assert_stop_at_clock_edge(f"/native-pilot-orders/{modern_id}/gps",
+                              f"/dispatch/orders/{modern_id}/gps")
+    print("PASS same-timestamp GPS stop under QA33 in the arrived state")
+
     monkeypatch.setenv("PD_PAYMENT_MODE","live")
     assert api.post(path,json=fix,headers=native("b")).status_code == 503
     assert api.get(read,headers=tg(201)).status_code == 503

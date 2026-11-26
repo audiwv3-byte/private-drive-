@@ -17,12 +17,13 @@ typedef QaGpsSend = Future<void> Function(String orderId, QaGpsFix? fix, int cap
 /// The server must still authorize every write and reject inactive trips.
 class QaPilotGpsPublisher {
   QaPilotGpsPublisher({required this.send, required this.isAssigned,
-    required this.positions, this.onStopped, DateTime Function()? clock})
+    required this.positions, this.onStopped, this.canStart, DateTime Function()? clock})
     : _clock = clock ?? DateTime.now;
   final QaGpsSend send;
   final Future<bool> Function(String) isAssigned;
   final Stream<QaGpsFix> Function() positions;
   final void Function()? onStopped;
+  final bool Function()? canStart;
   final DateTime Function() _clock;
   StreamSubscription<QaGpsFix>? _stream;
   Timer? _check;
@@ -43,7 +44,8 @@ class QaPilotGpsPublisher {
     _starting = true;
     final generation = ++_generation;
     try {
-      if (!await isAssigned(orderId) || generation != _generation) return false;
+      if (!await isAssigned(orderId) || generation != _generation ||
+          canStart?.call() == false) return false;
       _order = orderId;
       _lastSent = 0;
       _stream = positions().listen(_position,
@@ -65,10 +67,11 @@ class QaPilotGpsPublisher {
     final order = _order;
     if (order == null || _checking) return;
     _checking = true;
+    final generation = _generation;
     try {
-      if (!await isAssigned(order) && _order == order) await stop();
+      if (!await isAssigned(order) && generation == _generation) await stop();
     } catch (_) {
-      if (_order == order) await stop();
+      if (generation == _generation) await stop();
     } finally {
       _checking = false;
     }

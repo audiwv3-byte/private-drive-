@@ -259,9 +259,9 @@ jobs:
       - name: Python syntax and isolated tests
         run: |
           python3 -m pip install pytest -r requirements-dispatcher-staging.txt -r requirements.txt
-          python3 -m py_compile pd_native_orders_http.py pd_dispatch_persistent.py isolated_sms_wsgi.py pd_dispatcher_staging_wsgi.py pd_miniapp_dispatch_bridge.py miniapp_server.py
+          python3 -m py_compile pd_native_orders_http.py pd_native_order_quote.py pd_dispatch_persistent.py isolated_sms_wsgi.py pd_dispatcher_staging_wsgi.py pd_miniapp_dispatch_bridge.py miniapp_server.py
           python3 -m pytest -q tests/test_miniapp_dispatch_bridge.py
-          python3 -m pytest -q tests/test_native_dispatch_payment_guard.py tests/test_native_dispatch_postgres.py
+          python3 -m pytest -q tests/test_native_order_quote.py tests/test_native_dispatch_payment_guard.py tests/test_native_dispatch_postgres.py
           python3 -m pytest -q tests/test_native_staging_compatibility_gate.py
           python3 -m unittest -v test_web_dispatcher.py test_dispatcher_staging_wsgi.py
       - name: Flutter tests and debug APK

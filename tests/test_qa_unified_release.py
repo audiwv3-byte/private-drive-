@@ -149,6 +149,16 @@ def test_unified_android_telegram_dispatcher_gps(monkeypatch):
     assert shown.status_code == 200
     assert shown.json == {"available": True, "captured_at": captured_at,
                           "latitude": 54.6872, "longitude": 25.2797}
+    # The merged browser WSGI reads the same GPS fix as QA27, via its
+    # own authenticated dispatcher route, not the QA25 emulation.
+    map_result = subprocess.run(
+        [sys.executable, str(ROOT / "tests/qa_merged_browser_map_probe.py"),
+         android.json["order_id"]],
+        cwd=str(ROOT), env=probe_env, text=True, capture_output=True, timeout=45,
+    )
+    assert map_result.returncode == 0, map_result.stderr[-5500:]
+    map_report = json.loads(map_result.stdout.strip().splitlines()[-1])
+    assert all(map_report.values()), map_report
     assert miniapp.post(gps_path, json=fix, headers=pilot).status_code == 409
     stopped = miniapp.post(gps_path,
         json={"enabled": False, "captured_at": captured_at + 1}, headers=pilot)

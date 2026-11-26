@@ -110,8 +110,10 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <button class="btn" id="modeBtn" type="button" aria-pressed="false" disabled>3D</button>
 <button class="btn" id="themeBtn" type="button">Дневная карта</button>
 <button class="btn" id="vilniusBtn" type="button">Вильнюс</button>
-{% if gps_sync_enabled %}
+{% if order_gps_enabled or gps_sync_enabled %}
 <button class="btn" id="pilotBtn" type="button" disabled>К пилоту</button>
+{% endif %}
+{% if gps_sync_enabled %}
 <button class="btn" id="passengerBtn" type="button" disabled>К пассажиру</button>
 {% endif %}
 </div>

@@ -20,7 +20,7 @@ from playwright.sync_api import sync_playwright
 import qa29_gps_integration as fixture
 
 
-def run(android_apk=None):
+def run(android_apk=None, persistent_only=False):
     oid = fixture.OID_FILE.read_text().strip()
     read_path = f"/dispatch/orders/{oid}/gps"
     write_path = f"/native-pilot-orders/{oid}/gps"
@@ -34,7 +34,7 @@ def run(android_apk=None):
         "PD_DISPATCH_PERSISTENT_QUEUE": "1", "PD_QA27_GPS": "1",
         "PD_DISPATCH_ORDERS_INGEST_SECRET": secrets.token_hex(32),
         "PD_DISPATCH_ORDERS_DATABASE_URL": fixture.DSN.replace("postgres:isolated-test@", "qa29_api:synthetic-api@"),
-        "PD_DISPATCH_TEST_SYNC": "1",
+        "PD_DISPATCH_TEST_SYNC": "0" if persistent_only else "1",
     })
     # Import after configuring the isolated web dispatcher and its session.
     from pd_dispatcher_staging_wsgi import application as app
@@ -53,7 +53,7 @@ def run(android_apk=None):
         path = url.path
         if url.netloc == web_host:
             browser_requests[path] += 1
-            if path == "/dispatch/test-sync/state":
+            if not persistent_only and path == "/dispatch/test-sync/state":
                 return request_route.fulfill(json={"pilots": legacy_points})
             return request_route.continue_()
         if url.netloc == "unpkg.com" and path in ("/leaflet@1.9.4/dist/leaflet.js", "/leaflet@1.9.4/dist/leaflet.css"):
@@ -86,8 +86,10 @@ def run(android_apk=None):
         print("Assigned order visible; 2D Leaflet map initialized", flush=True)
 
         def observe(label):
-            # Each sample includes a full new order-list refresh and a legacy GPS refresh.
-            for path in ("/dispatch/orders/state", "/dispatch/test-sync/state"):
+            paths = ["/dispatch/orders/state"]
+            if not persistent_only:
+                paths.append("/dispatch/test-sync/state")
+            for path in paths:
                 page.wait_for_event("response", predicate=lambda response: urlsplit(response.url).path == path,
                                     timeout=10000)
             page.evaluate("() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))")
@@ -127,6 +129,7 @@ def run(android_apk=None):
                     ).fetchone()
                 assert row == (lat, lon, fix["captured_at"]), row
                 page.wait_for_function(MARKER_AT_FIX, arg=[lat, lon], timeout=15000)
+                assert page.get_by_role("button", name="К пилоту", exact=True).is_enabled()
                 gps = page.request.get(web_url + read_path)
                 assert gps.ok and "no-store" in gps.headers["cache-control"]
                 assert gps.json() == dict(available=True, latitude=lat, longitude=lon,
@@ -145,21 +148,27 @@ def run(android_apk=None):
         with psycopg.connect(fixture.DSN) as db:
             assert db.execute("SELECT count(*) FROM public.pd_qa27_gps WHERE order_id=%s", (oid,)).fetchone()[0] == 0
         assert markers.count() == 0
+        assert page.get_by_role("button", name="К пилоту", exact=True).is_disabled()
         print(f"PASS: finished {oid}, no stored fix, browser GPS unavailable and marker removed", flush=True)
 
-        # Independent positive control for the same offline renderer.
-        for index, fix in enumerate(fixes):
-            legacy_points[:] = [{"id": "pilot_test", "position": list(fix)}]
-            observe(f"legacy_control_{index+1}")
-        legacy_points.clear()
-        observe("legacy_control_removed")
+        if not persistent_only:
+            # Independent positive control for the same offline renderer.
+            for index, fix in enumerate(fixes):
+                legacy_points[:] = [{"id": "pilot_test", "position": list(fix)}]
+                observe(f"legacy_control_{index+1}")
+            legacy_points.clear()
+            observe("legacy_control_removed")
         browser.close()
     server.shutdown()
     server.server_close()
 
-    first, second, finished, control1, control2, removed = [sample["positions"] for sample in observations]
+    first, second, finished = [sample["positions"] for sample in observations[:3]]
     print("Browser request counts:", dict(browser_requests), "page errors:", errors, flush=True)
-    assert len(control1) == len(control2) == 1 and control1 != control2 and not removed, "Leaflet control failed"
+    if persistent_only:
+        assert not browser_requests["/dispatch/test-sync/state"]
+    else:
+        control1, control2, removed = [sample["positions"] for sample in observations[3:]]
+        assert len(control1) == len(control2) == 1 and control1 != control2 and not removed, "Leaflet control failed"
     assert not errors, errors
     assert browser_requests[read_path] > 0, "Map did not request GPS for the assigned order"
     assert len(first) == len(second) == 1 and first != second and not finished, "Order marker lifecycle failed"
@@ -168,4 +177,6 @@ def run(android_apk=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--android-apk", type=Path)
-    run(parser.parse_args().android_apk)
+    parser.add_argument("--persistent-only", action="store_true")
+    args = parser.parse_args()
+    run(args.android_apk, args.persistent_only)

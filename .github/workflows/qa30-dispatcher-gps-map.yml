@@ -41,4 +41,4 @@ jobs:
         env:
           QA_FIXTURE_DIR: ${{ github.workspace }}/flutter_app/tool
           QA_SERVER_DIR: ${{ github.workspace }}
-        run: bash ops/qa/run_dispatcher_map_browser.sh
+        run: bash ops/qa/run_dispatcher_map_browser.sh --persistent-only

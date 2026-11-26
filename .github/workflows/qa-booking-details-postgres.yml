@@ -1,0 +1,92 @@
+name: PRIVATE DRIVE QA full booking metadata PostgreSQL
+
+on:
+  push:
+    branches:
+      - qa/order-details-postgres-20261126
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  telegram-details-postgresql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated Mini App dependencies
+        run: python -m pip install -r requirements-miniapp.txt -r requirements-sms-render.txt 'stripe>=11,<15' 'reportlab>=4,<5' pytest
+      - name: Test actual Mini App WSGI, booking JSONB and dispatcher visibility
+        run: python -m pytest -v -s tests/test_qa_actual_miniapp_postgres.py tests/test_qa_booking_details.py
+        env:
+          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+          PD_PAYMENT_MODE: disabled
+          PD_NATIVE_SMS_LIVE: 'NO'
+
+  native-details-postgresql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated native order dependencies
+        run: python -m pip install -r requirements-sms-render.txt 'Flask==3.0.3' pytest
+      - name: Test authenticated native booking JSONB and rejects
+        run: python -m pytest -v tests/test_qa_native_orders_wsgi.py
+        env:
+          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+          PD_PAYMENT_MODE: disabled
+          PD_NATIVE_SMS_LIVE: 'NO'
+
+  flutter-passenger-details:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Flutter booking form regression
+        working-directory: flutter_app
+        run: |
+          flutter pub get
+          flutter test test/passenger_server_booking_test.dart test/passenger_demo_test.dart test/passenger_ride_entry_test.dart test/native_orders_api_test.dart
+          flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings

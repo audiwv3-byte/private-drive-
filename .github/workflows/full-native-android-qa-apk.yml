@@ -63,6 +63,9 @@ jobs:
           permissions = '''<uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+              <uses-permission android:name="android.permission.WAKE_LOCK"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <uses-permission android:name="android.permission.CAMERA"/>
               <uses-feature android:name="android.hardware.camera" android:required="false"/>
@@ -126,6 +129,8 @@ jobs:
           grep "application-label:'PRIVATE DRIVE QA'" ../full-qa-apk-badging.txt
           "$BUILD_TOOLS/aapt" dump permissions "$APK" > ../full-qa-apk-permissions.txt
           grep "android.permission.CAMERA" ../full-qa-apk-permissions.txt
+          grep "android.permission.FOREGROUND_SERVICE" ../full-qa-apk-permissions.txt
+          grep "android.permission.FOREGROUND_SERVICE_LOCATION" ../full-qa-apk-permissions.txt
           if grep -q "android.permission.RECORD_AUDIO" ../full-qa-apk-permissions.txt; then
             echo "::error::Unexpected RECORD_AUDIO permission"
             exit 1

@@ -36,6 +36,10 @@ def test_shared_wsgi(monkeypatch):
         secret = hmac.new(b"WebAppData",token.encode(),hashlib.sha256).digest()
         values["hash"] = hmac.new(secret,"\n".join(k+"="+v for k,v in sorted(values.items())).encode(),hashlib.sha256).hexdigest()
         return {"X-Telegram-Init-Data":urllib.parse.urlencode(values)}
+    ready = api.get("/qa/staging/readiness", headers=headers(201))
+    assert ready.status_code == 200, ready.json
+    assert api.post("/api/order", data="not-json", content_type="text/plain",
+                    headers=headers(101)).status_code == 400
     body = {"request_key":uuid.uuid4().hex,"origin":"Synthetic A","destination":"Synthetic B","trip_date":"2027-01-01","trip_time":"12:00"}
     assert api.post("/api/order",json=body).status_code == 401
     assert api.post("/api/order",json=body,headers=headers(999)).status_code == 403

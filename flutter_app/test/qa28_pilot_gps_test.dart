@@ -78,7 +78,10 @@ void main() {
     now = 115;
     await tester.pump(const Duration(seconds:11));
     await tester.pump(Duration.zero);
+    // The timer must initiate shutdown without any explicit stop call.
     expect(publisher.orderId,isNull);
+    // Join the already initiated asynchronous cancellation/opt-out.
+    await publisher.stop();
     expect(sent.last,isNull);
     final count=sent.length;
     positions.add(const QaGpsFix(2,3,115));

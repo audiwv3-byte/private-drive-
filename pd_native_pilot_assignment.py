@@ -118,6 +118,29 @@ def register_dispatch_assignment(app, authorized, valid_csrf, admin_id, *, clock
             return reply({"error": "storage_unavailable"}, 503)
 
 
+def _pilot_line_database(auth_database):
+    """Use the dedicated login only on the isolated auth service's own staging DB."""
+    from psycopg.conninfo import conninfo_to_dict
+
+    url = os.getenv("PD_NATIVE_PILOT_LINE_DATABASE_URL", "")
+    if (not url or os.getenv("PD_NATIVE_SMS_ISOLATED") != "YES"
+            or os.getenv("PD_DISPATCH_STAGING_ONLY") != "1"
+            or os.getenv("PD_PAYMENT_MODE") != "disabled"):
+        return None
+    auth = _database_target(auth_database)
+    line = _database_target(url)
+    if not auth or not line or auth[1:] != line[1:]:
+        return None
+    hosts = {"dpg-dc00pubm8hqs7397rblg-a",
+             "dpg-dc00pubm8hqs7397rblg-a.frankfurt-postgres.render.com"}
+    if auth[0] not in hosts or line[0] not in hosts:
+        return None
+    fields = conninfo_to_dict(url)
+    if fields.get("user") == "pd_staging_pilot_line" and fields.get("sslmode") == "require":
+        return url
+    return None
+
+
 def make_native_pilot_orders_app(next_app, database_url, *, clock=time.time):
     def app(environ, start_response):
         path = environ.get("PATH_INFO")
@@ -135,7 +158,10 @@ def make_native_pilot_orders_app(next_app, database_url, *, clock=time.time):
             )
             return [body]
 
-        if (not assignment_enabled() or os.getenv("PD_NATIVE_SMS_ISOLATED") != "YES"
+        line_db = None
+        if path == "/native-pilot-availability":
+            line_db = _pilot_line_database(database_url)
+        if not line_db and (not assignment_enabled() or os.getenv("PD_NATIVE_SMS_ISOLATED") != "YES"
                 or os.getenv("PD_DISPATCH_ORDERS_DATABASE_URL") != database_url
                 or _database_target(database_url) is None):
             return reply("503 Service Unavailable", {"error": "assignment_disabled"})
@@ -161,7 +187,7 @@ def make_native_pilot_orders_app(next_app, database_url, *, clock=time.time):
                         requested = payload["online"]
                     except (ValueError, TypeError, KeyError, AttributeError):
                         return reply("400 Bad Request", {"error": "invalid_availability"})
-                with _connect(database_url) as db:
+                with _connect(line_db or database_url) as db:
                     result = db.execute(
                         "SELECT public.pd_native_pilot_availability_state(%s,%s,%s)",
                         (digest, int(clock()), requested),

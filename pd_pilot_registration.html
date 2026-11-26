@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>PRIVATE DRIVE — Регистрация пилота (тест)</title>
+<link rel="stylesheet" href="/assets/pd-black-gold.css"><style>
+:root{color-scheme:dark;--bg:var(--pd-black);--b:var(--pd-border);--g:var(--pd-gold);--t:var(--pd-ink);--m:var(--pd-muted)}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#392a17,var(--bg) 55%);color:var(--t);font:14px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}
+header{border-bottom:1px solid var(--b);background:var(--pd-deep);padding:18px max(18px,calc((100vw - 1100px)/2));display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.logo{color:var(--g);font:700 24px Georgia,serif;letter-spacing:.18em}.logo span{font:11px system-ui;display:block;letter-spacing:.28em}
+header a{color:var(--g);text-decoration:none;border:1px solid var(--b);border-radius:8px;padding:9px 13px}
+main{max-width:1040px;margin:32px auto;padding:0 16px 40px}h1{font:500 clamp(27px,4vw,38px) Georgia,serif;color:var(--g);margin:0 0 8px}p.lead{color:var(--m);margin:0 0 22px}
+.notice{border:1px solid #886731;background:#2b251a;border-radius:10px;color:#f1cf8c;padding:13px 16px;margin:0 0 20px}
+fieldset{border:1px solid var(--b);background:var(--pd-surface);border-radius:14px;padding:20px;margin:0 0 16px;min-width:0}legend{color:var(--g);padding:0 10px;font-size:17px;font-weight:650}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.field{min-width:0}label{display:block;color:#e3d9c5;margin:0 0 6px}
+input,select{width:100%;border:1px solid #685839;border-radius:8px;background:var(--pd-field);color:#f8f5eb;padding:12px;font:inherit;min-height:45px}
+input[type=file]{padding:10px;font-size:12px}input::placeholder{color:#889099}input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #f3d58a;outline-offset:2px}
+.help{display:block;font-size:12px;color:var(--m);margin:5px 0 0}.full{grid-column:1/-1}
+.doc{padding:12px;border:1px dashed #71603b;border-radius:10px;background:var(--pd-panel)}.doc small{color:#bfc1c4}
+.choice{display:flex;align-items:flex-start;gap:9px;margin:16px 0}.choice input{width:18px;min-height:18px;flex:none;margin-top:3px;accent-color:var(--g)}
+.actions{margin-top:22px}.submit{background:var(--pd-light);color:#1c1710;border:0;border-radius:9px;font-weight:750;padding:14px 22px;min-width:250px;opacity:.65;cursor:not-allowed}
+#demo-result{color:var(--g);margin-top:12px}footer{border-top:1px solid var(--b);color:#aaa;text-align:center;padding:20px}
+@media(max-width:650px){.grid{grid-template-columns:1fr}fieldset{padding:15px}.submit{width:100%}main{margin-top:20px}}
+</style></head>
+<body><header><a href="/" aria-label="PRIVATE DRIVE — главная" style="border:0;padding:0"><img src="/pd-logo-transparent.png" alt="PRIVATE DRIVE — золотой логотип PD с автомобилем" width="66" height="66" style="max-width:100%;aspect-ratio:1;object-fit:contain;border-radius:11px;vertical-align:middle"></a><a href="/dispatch/login">Диспетчерская</a></header>
+<main><h1>Регистрация пилота</h1>
+<p class="lead">Укажи контакты и приложи два фото для проверки диспетчером.</p>
+{% if enabled %}<div class="notice" role="status"><strong>ЗАКРЫТЫЙ ТЕСТ.</strong> Используй только согласованные тестовые данные. Доступ по приглашению; документы сохраняются в защищённом хранилище.</div>{% else %}<div class="notice" role="status"><strong>ТЕСТОВЫЙ МАКЕТ.</strong> Приём документов не включён: защищённое постоянное хранилище пока не готово. Не загружай настоящие документы.</div>{% endif %}
+<form id="pilot-form" autocomplete="off" method="post" action="/pilot-registration" enctype="multipart/form-data">
+<fieldset><legend>Контакты</legend><div class="grid">
+<div class="field"><label for="first-name">Имя</label><input id="first-name" name="first_name" maxlength="80" required></div>
+<div class="field"><label for="last-name">Фамилия</label><input id="last-name" name="last_name" maxlength="80" required></div>
+<div class="field"><label for="phone">Телефон</label><input id="phone" name="phone" type="tel" inputmode="tel" maxlength="32" required></div>
+<div class="field"><label for="email">Электронная почта</label><input id="email" name="email" type="email" maxlength="254" required></div>
+</div></fieldset>
+<fieldset><legend>Автомобиль и фотографии</legend><div class="grid">
+<div class="field full"><label for="plate">Госномер автомобиля</label><input id="plate" name="plate" maxlength="15" required></div>
+<div class="doc"><label for="file-license">Фото водительских прав</label><input id="file-license" name="license_front" type="file" accept="image/jpeg,image/png,image/webp" required></div>
+<div class="doc"><label for="file-car-front">Фото автомобиля</label><input id="file-car-front" name="car_front" type="file" accept="image/jpeg,image/png,image/webp" required></div>
+</div><p class="help">JPG, PNG или WebP. До 10 МБ на фотографию.</p></fieldset>
+<details><summary>Условия работы пилота</summary><p>Во время смены диспетчер видит местоположение автомобиля, в том числе при заблокированном экране. После завершения смены передача координат прекращается.</p></details>
+<label class="choice"><input type="checkbox" name="terms_version" value="pilot-shift-v1" required>Принимаю условия работы пилота</label>
+<div class="actions">{% if enabled %}<label for="qa-invitation">Код приглашения для закрытого теста</label><input id="qa-invitation" name="qa_invitation" type="password" autocomplete="off" required maxlength="128"><button class="submit" type="submit" style="opacity:1;cursor:pointer">Отправить на модерацию</button><p id="demo-result" aria-live="polite">Анкета будет отправлена на проверку диспетчеру.</p>{% else %}<button class="submit" type="submit" disabled>Отправить на модерацию</button><p id="demo-result" aria-live="polite">Приём анкет пока закрыт.</p>{% endif %}</div>
+</form></main>
+<script>
+const result=document.getElementById('demo-result');
+document.querySelectorAll('input[type="file"]').forEach(input=>input.addEventListener('change',()=>{
+ const file=input.files[0];
+ if(file&&(file.size>10*1024*1024||!['image/jpeg','image/png','image/webp'].includes(file.type))){
+  input.value='';
+  result.textContent='Выбери фото JPG, PNG или WebP размером до 10 МБ.';
+ }
+}));
+document.getElementById('pilot-form').addEventListener('submit',async event=>{
+ event.preventDefault();
+ const form=event.currentTarget,button=form.querySelector('button[type="submit"]');
+ if(button.disabled)return;
+ button.disabled=true;result.textContent='Отправляем анкету…';
+ try{
+   const response=await fetch('/pilot-registration',{method:'POST',body:new FormData(form),credentials:'same-origin'});
+   const data=await response.json();
+   if(!response.ok||!data.qa_only||!data.application_id)throw Error(response.status===413?'Слишком большие файлы. Не больше 10 МБ на фото.':(data.error||'Не удалось подтвердить анкету.'));
+   result.textContent='Анкета №'+data.application_id.slice(0,8)+' принята. Статус: На проверке.';
+   form.reset();
+ }catch(error){result.textContent=error.message||'Ошибка отправки.'}
+ finally{button.disabled=false;}
+});
+</script>
+</body></html>

@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive"><meta name="theme-color" content="#100e0c">
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+<title>PRIVATE DRIVE — Диспетчерская</title>
+<link rel="icon" href="assets/pd-logo.webp" type="image/webp">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.css" integrity="sha384-WR3U1V0+1MbG/yqoN2/UUbE92aMWypbO0XZyEPFDxl2zZgg3ppqJGUq3gqgaEZbX" crossorigin="anonymous">
+<style>
+:root{color-scheme:dark;--gold:#e8c581;--bg:#110f0c;--panel:#1b1713;--line:#4d402c;--soft:#c8bba3}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#f6efdf}
+button,a{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:3px}a{color:var(--gold)}
+body{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+header{padding:5px 16px;border-bottom:1px solid var(--line);background:#12100d}
+header summary{cursor:pointer;color:var(--gold);padding:5px 0;touch-action:pan-x}
+.header-content{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:11px;text-decoration:none;font-weight:750;color:var(--gold);letter-spacing:.08em}.brand img{width:43px;height:43px;object-fit:contain}.brand small{display:block;color:var(--soft);letter-spacing:.03em;font-size:11px;font-weight:400}
+.workspace-controls{display:flex;gap:8px;padding:6px 16px;border-bottom:1px solid var(--line)}
+.workspace-controls [aria-expanded="true"]{border-color:var(--gold);color:var(--gold)}
+.layout{display:grid;flex:1;min-height:0;grid-template-columns:auto minmax(0,1fr) auto;position:relative}
+aside{width:min(315px,30vw);grid-column:1;grid-row:1;background:#17130f;padding:16px;border-right:1px solid var(--line);overflow:auto}
+aside.right{grid-column:3;border-right:0;border-left:1px solid var(--line)}
+.directory-card{display:block;width:100%;text-align:left;margin:7px 0}
+#tripChat input{width:100%;font:inherit;padding:9px;margin-bottom:8px;border-radius:6px;border:1px solid var(--line)}
+#chatMessages{max-height:15rem;overflow:auto;overflow-wrap:anywhere;padding-left:20px}
+.toolbar form{margin:0}.test-order strong{overflow-wrap:anywhere}.test-order button{margin-top:5px}
+.pilot-marker{border:1px solid #ffe2a3;border-radius:50%;background:#1b1713;color:#ffd889;display:grid;place-items:center;width:35px;height:35px;font-size:22px;box-shadow:0 2px 8px #000a}
+.passenger-marker{border:2px solid #fff;border-radius:50%;background:#1684d8;color:#fff;display:grid;place-items:center;width:32px;height:32px;font-size:18px;box-shadow:0 2px 8px #000a}
+#glMap,#rasterMap{position:absolute;inset:0;background:#10100f}
+.map-actions{position:absolute;bottom:34px;left:16px;z-index:510;display:flex;gap:8px;flex-wrap:wrap}
+.map-actions .btn{background:#18140f;color:#f5d9a1}
+.map-actions .btn[aria-pressed="true"]{background:#d7ad65;color:#17100a}
+.map-actions .btn:disabled{opacity:.6;cursor:default}
+#rasterMap.night .leaflet-tile-pane{filter:sepia(.65) saturate(1.3)}
+h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 12px}h1{font-size:24px}h2{font-size:20px}h3{font-size:17px}p{color:var(--soft);margin:9px 0}
+.label{font-size:11px;letter-spacing:.11em;color:#d5b777;text-transform:uppercase}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.stat,.card{background:#242019;border:1px solid var(--line);border-radius:11px;padding:12px}.stat b{font-size:25px;display:block;color:#f7e7c3}.stat span{font-size:11px;color:var(--soft)}
+.tabs{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0}.btn,.tab{border:1px solid #725c3b;border-radius:8px;background:#292118;color:#f5d9a1;padding:9px 11px;min-height:40px}.tab.active{background:#d7ad65;color:#17100a}
+.card{margin:10px 0}.card strong{display:block;margin:7px 0;color:#f4ead9}.muted{color:var(--soft);font-size:12px}
+#map{grid-column:2;grid-row:1;min-width:0;min-height:0;background:#24231f;position:relative;overflow:hidden;isolation:isolate}
+#mapNotice{position:absolute;z-index:500;left:16px;top:16px;right:16px;max-width:445px;border-radius:10px;background:#15120fe8;border:1px solid #8a7049;padding:12px 15px;pointer-events:none}
+#mapNotice b{display:block;color:var(--gold)}#mapNotice span{font-size:12px;color:#f2e6d2}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.notice{padding:12px;background:#282016;border:1px solid #8b6a39;border-radius:9px}.notice strong{color:var(--gold)}.empty{margin:16px 0;padding:20px 12px;border:1px dashed #675438;border-radius:10px;text-align:center;color:var(--soft)}
+.status{font-size:12px;color:var(--gold);margin:10px 0}.legend{display:flex;gap:8px;flex-wrap:wrap}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:#e2b86e}
+.autopilot-switch{display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:9px 13px;border-radius:10px;border:1px solid #725c3b;background:#241b11;color:#f5d9a1}
+.autopilot-switch:disabled{opacity:.65;cursor:default}
+.autopilot-switch small{display:block;color:var(--soft);font-size:12px}
+.autopilot-lever{position:relative;flex:0 0 33px;height:49px;display:block;border-radius:7px;border:1px solid #6b5944;background:#18130e;box-shadow:inset 0 1px 4px #000}
+.autopilot-lever::before{content:"";position:absolute;left:13px;bottom:8px;height:32px;width:5px;background:#bba994;border-radius:3px;transform-origin:bottom;transform:rotate(-35deg);transition:transform .18s}
+.autopilot-lever::after{content:"";position:absolute;left:2px;bottom:23px;width:17px;height:10px;border:1px solid #f0ce99;border-radius:4px;background:#bc945a;box-shadow:0 2px 4px #000;transition:transform .18s}
+.autopilot-switch[aria-checked="true"] .autopilot-lever::before{transform:rotate(18deg)}
+.autopilot-switch[aria-checked="true"] .autopilot-lever::after{transform:translate(13px,-11px);background:#70d3a1;border-color:#baf2d5}
+@media(prefers-reduced-motion:reduce){.autopilot-lever::before,.autopilot-lever::after{transition:none}}
+[hidden]{display:none!important}
+@media(max-width:650px){
+ header,.workspace-controls{padding-inline:9px}
+ aside,aside.right{position:absolute;z-index:550;top:0;bottom:0;width:min(315px,86vw);padding:13px}
+ aside{left:0}aside.right{left:auto;right:0}
+ .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+</style></head>
+<body>
+<header>
+<details id="topSheet" open><summary>Панель диспетчерской</summary><div class="header-content">
+<a class="brand" href="/dispatch"><img src="/pd-logo-transparent.png" alt=""><span>PRIVATE DRIVE<small>Диспетчерская · тестовый интерфейс</small></span></a>
+<div class="toolbar">
+{% if test_sync_enabled or persistent_queue_enabled %}
+<a href="#ordersTitle">Заказы</a>
+<a href="#pilotsTitle">Пилоты</a>
+{% if test_queue_link %}<a href="{{ test_queue_link }}">Тестовые заказы</a>{% endif %}
+<a href="/dispatch/accounts">Пассажиры и пилоты</a>
+{% if analytics_enabled %}<a href="/dispatch/analytics">Воронка сайта</a>{% endif %}
+<a href="/pilot-registration">Регистрация пилота</a>
+<a href="/dispatch/pilot-applications">Анкеты пилотов (QA)</a>
+{% if test_sync_enabled %}<a class="btn" href="/dispatch/test-sync">Тестовая связь</a>{% endif %}
+{% if telegram_test_enabled %}<a class="btn" href="/dispatch/test-miniapp">Тест заявки из Telegram</a>{% endif %}
+<form method="post" action="/dispatch/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Выйти</button></form>
+{% else %}<span class="label">Доступ к заказам закрыт</span><a class="btn" href="/dispatch">В панель управления</a>{% endif %}
+</div></div></details>
+</header>
+<nav class="workspace-controls" aria-label="Боковые панели диспетчерской">
+<button class="btn" type="button" aria-expanded="true" aria-controls="ordersPanel">Заказы</button>
+<button class="btn" type="button" aria-expanded="true" aria-controls="peoplePanel">Пилоты и пассажиры</button>
+</nav>
+<main class="layout">
+<aside id="ordersPanel" aria-label="Заказы">
+<h1>Диспетчерская</h1>
+{% if persistent_queue_enabled %}<p class="notice">Постоянная серверная очередь · <span id="syncStatus" role="status">Подключаемся…</span></p>{% elif test_sync_enabled %}<p class="notice">Тестовые заказы из приложения. <span id="syncStatus" role="status">Подключаемся…</span></p>{% else %}
+<p class="notice"><strong>Безопасный предпросмотр.</strong> Реальные заказы, персональные данные и местоположения пилотов здесь не загружаются. Доступ к ним появится только после серверной проверки роли диспетчера.</p>{% endif %}
+{% if test_sync_enabled %}
+<button class="autopilot-switch" id="autopilot" type="button" role="switch"
+  aria-checked="false" aria-label="Автопилот" disabled>
+  <span class="autopilot-lever" aria-hidden="true"></span>
+  <span><strong>Автопилот</strong><small id="autopilotMode">Подключение…</small></span>
+</button>
+<p id="autopilotStatus" class="status" role="status"></p>
+{% endif %}
+<div class="stats" aria-label="Показатели"><div class="stat"><b id="countNew">—</b><span>Новые</span></div><div class="stat"><b id="countActive">—</b><span>Активные</span></div><div class="stat"><b id="countOnline">—</b><span>На линии</span></div><div class="stat"><b id="countDone">—</b><span>Завершены</span></div></div>
+<div class="tabs" role="group" aria-label="Фильтр заказов"><button class="tab active" data-filter="all" aria-pressed="true">Все</button><button class="tab" data-filter="new" aria-pressed="false">Новые</button><button class="tab" data-filter="active" aria-pressed="false">В пути</button><button class="tab" data-filter="done" aria-pressed="false">История</button></div>
+<h2 id="ordersTitle">Все заказы</h2>
+{% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">Назначение пилотов включим после серверной проверки ролей.</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
+<p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
+</aside>
+<section id="map" aria-label="Интерактивная карта диспетчерской">
+<div id="rasterMap"></div><div id="glMap" hidden></div>
+<div id="mapNotice" role="status"><b id="mapProvider">Загрузка Mapbox…</b><span id="mapStatus">{% if order_gps_enabled %}Выбери активный заказ, чтобы увидеть пилота на карте.{% elif gps_sync_enabled %}Синяя метка обозначает пассажира, который поделился GPS.{% else %}Карта доступна для просмотра. Позиции пилотов и маршруты заказов пока не подключены.{% endif %}</span></div>
+<div class="map-actions" role="group" aria-label="Управление картой">
+<button class="btn" id="modeBtn" type="button" aria-pressed="false" disabled>3D</button>
+<button class="btn" id="themeBtn" type="button">Дневная карта</button>
+<button class="btn" id="vilniusBtn" type="button">Вильнюс</button>
+{% if gps_sync_enabled %}
+<button class="btn" id="pilotBtn" type="button" disabled>К пилоту</button>
+<button class="btn" id="passengerBtn" type="button" disabled>К пассажиру</button>
+{% endif %}
+</div>
+</section>
+<aside id="peoplePanel" class="right" aria-label="Пилоты, пассажиры и связь">
+<div class="tabs" role="group" aria-label="Карточки участников">
+<button class="tab active" type="button" data-directory="pilotDirectory" aria-pressed="true">Пилоты</button>
+<button class="tab" type="button" data-directory="passengerDirectory" aria-pressed="false">Пассажиры</button>
+{% if test_sync_enabled %}<button class="tab" type="button" data-directory="tripChat" aria-pressed="false">Связь</button>{% endif %}
+</div>
+<section id="pilotDirectory">
+{% if pilot_intake_enabled %}<div class="tabs"><a class="btn" href="{{ pilot_add_url }}">Добавить пилота</a><a href="/dispatch/pilot-applications">Анкеты и допуск</a></div>{% endif %}
+{% if pilot_availability_enabled %}<h3>Доступны для назначения</h3><div id="availablePilotList" aria-live="polite">Загрузка…</div>{% endif %}
+<h2 id="pilotsTitle">Пилоты</h2><div class="tabs"><button class="tab active" id="allPilots" aria-pressed="true">Все</button><button class="tab" id="onlinePilots" aria-pressed="false">На линии</button></div>
+{% if persistent_queue_enabled %}<div class="empty">Список пилотов будет доступен после подключения подтверждённых учётных записей.</div>{% elif test_sync_enabled %}
+<div class="card"><strong id="pilotName">Тестовый пилот</strong><p id="pilotStatus">Ожидание данных…</p></div>
+<div id="otherPilots"></div>
+{% else %}<div class="empty">Позиции пилотов появятся после авторизованного подключения GPS к единому серверу.</div>
+<h2>Заказ и связь</h2>
+<div class="card"><span class="label">Выбранный заказ</span><strong>Заказ не выбран</strong><p class="muted">Маршрут, статус, назначение пилота, платежи и чат будут доступны после подключения API.</p><button class="btn" disabled title="Ожидает защищённого API">Назначить пилота</button></div>
+<div class="card"><span class="label">Единая синхронизация</span><p>Сайт · Android/iOS · Telegram-бот</p><p class="muted">Нужны общая база заказов, единые идентификаторы, серверные роли и обновления в реальном времени.</p></div>{% endif %}
+</section>
+<section id="passengerDirectory" hidden>
+<h2>Пассажиры</h2>
+<p id="passengerStatus" role="status"></p>
+<div id="passengerCards"></div>
+</section>
+{% if test_sync_enabled %}
+<section id="tripChat" hidden>
+<h2>Связь по заказу</h2>
+<p id="chatTrip">Выбери «Связь по заказу» в карточке заявки.</p>
+<ol id="chatMessages" aria-label="Сообщения"></ol>
+<p id="chatStatus" role="status"></p>
+<form id="chatForm" hidden>
+<label for="chatText">Сообщение участникам заказа</label>
+<input id="chatText" maxlength="500" required>
+<button class="btn" type="submit">Отправить</button>
+</form>
+</section>
+{% endif %}
+<p id="providerStatus" class="status" role="status"></p>
+</aside>
+</main>
+<script>window.PD_MAPBOX_PUBLIC_TOKEN={{ mapbox_token|tojson }};</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.32.0/mapbox-gl.js" integrity="sha384-acS2vHk2htvkMzGXnu5MTQNaFwFexCnoKasF90zPaHihi5xhWMsTcvVvTAJHXuHH" crossorigin="anonymous"></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const compact=matchMedia('(max-width:650px)');
+const panels=[...document.querySelectorAll('.workspace-controls [aria-controls]')];
+function setPanel(button,open){
+    $(button.getAttribute('aria-controls')).hidden=!open;
+    button.setAttribute('aria-expanded',String(open));
+}
+function showPanel(button){
+    if(compact.matches)panels.filter(other=>other!==button).forEach(other=>setPanel(other,false));
+    setPanel(button,true);
+}
+if(compact.matches){
+    panels.forEach(button=>setPanel(button,false));
+    $('topSheet').open=false;
+}
+panels.forEach(button=>button.addEventListener('click',()=>{
+    if(button.getAttribute('aria-expanded')==='true')setPanel(button,false);
+    else showPanel(button);
+}));
+const sheetHandle=$('topSheet').querySelector('summary');
+let sheetTouch=null;
+sheetHandle.addEventListener('touchstart',event=>sheetTouch=event.changedTouches[0].clientY,{passive:true});
+sheetHandle.addEventListener('touchend',event=>{
+    if(sheetTouch===null)return;
+    const offset=event.changedTouches[0].clientY-sheetTouch;
+    sheetTouch=null;
+    if(Math.abs(offset)>30){
+        $('topSheet').open=offset>0;
+        if(event.cancelable)event.preventDefault();
+    }
+});
+const directoryTabs=[...document.querySelectorAll('[data-directory]')];
+function showDirectory(id){
+    for(const tab of directoryTabs){
+        const active=tab.dataset.directory===id;
+        tab.classList.toggle('active',active);
+        tab.setAttribute('aria-pressed',String(active));
+        $(tab.dataset.directory).hidden=!active;
+    }
+}
+directoryTabs.forEach(tab=>tab.addEventListener('click',()=>showDirectory(tab.dataset.directory)));
+let passengerRequest;
+async function loadPassengers(){
+    if(passengerRequest)return passengerRequest;
+    const status=$('passengerStatus'),cards=$('passengerCards');
+    const endpoint={{ ('/dispatch/live/passengers' if live_orders_enabled else '/dispatch/accounts/state' if staging_registry else '')|tojson }};
+    if(!endpoint){
+        status.textContent='Реестр пассажиров пока не подключён.';
+        return;
+    }
+    passengerRequest=(async()=>{
+        try{
+            const response=await fetch(endpoint,{cache:'no-store',signal:AbortSignal.timeout(7000)});
+            if(!response.ok)throw Error();
+            const data=await response.json();
+            const people=data.passengers||data.accounts.filter(person=>person.role==='passenger');
+            cards.replaceChildren(...people.map(person=>{
+                const card=document.createElement('article');
+                card.className='card';
+                const name=document.createElement('strong');
+                name.textContent=person.name||'Без имени';
+                card.append(name);
+                return card;
+            }));
+            status.textContent=people.length?'':'Пассажиров пока нет.';
+        }catch{
+            status.textContent='Реестр пассажиров сейчас недоступен.';
+        }
+    })();
+    try{await passengerRequest;}finally{passengerRequest=null;}
+}
+document.querySelector('[data-directory="passengerDirectory"]').addEventListener('click',loadPassengers);
+let orderFilter='all';
+const labels={all:'Все заказы',new:'Новые заказы',active:'Заказы в пути',done:'История заказов'};
+document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});orderFilter=b.dataset.filter;$('ordersTitle').textContent=labels[orderFilter];document.dispatchEvent(new Event('pd-test-filter'));}));
+['allPilots','onlinePilots'].forEach(id=>$(id).addEventListener('click',()=>{['allPilots','onlinePilots'].forEach(k=>{$(k).classList.toggle('active',k===id);$(k).setAttribute('aria-pressed',String(k===id))});document.dispatchEvent(new Event('pd-test-filter'));}));
+{% if pilot_availability_enabled %}
+async function refreshAvailablePilots(){
+    const list = $('availablePilotList');
+    try {
+        const response = await fetch('/dispatch/orders/eligible-pilots', {
+            cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(7000)
+        });
+        if (!response.ok) throw new Error();
+        const {pilots} = await response.json();
+        const rows = pilots.map(pilot => {
+            const row = document.createElement('p');
+            row.textContent = pilot.id;
+            return row;
+        });
+        list.replaceChildren(...(rows.length ? rows : ['Нет доступных пилотов']));
+        {% if not test_sync_enabled %}$('countOnline').textContent = String(rows.length);{% endif %}
+    } catch {
+        list.textContent = 'Нет связи со списком пилотов';
+        {% if not test_sync_enabled %}$('countOnline').textContent = '—';{% endif %}
+    } finally {
+        setTimeout(refreshAvailablePilots, 5000);
+    }
+}
+refreshAvailablePilots();
+{% endif %}
+{% if persistent_queue_enabled %}
+const liveStatusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'К пассажиру',underway:'В поездке',finished:'Завершён',cancelled:'Отменён'};
+let lastOrders=null;
+{% if order_gps_enabled %}
+let selectedGpsOrder=null;
+let gpsRevision=0;
+const activeTrip=status=>['assigned','approaching','underway'].includes(status);
+function showOrderFix(position,message){
+ pilotPoint=position;
+ pilotPoints=position?[{id:selectedGpsOrder,position,label:'Пилот выбранного заказа'}]:[];
+ drawPilot();
+ $('mapStatus').textContent=message;
+}
+function clearGpsSelection(message){
+ selectedGpsOrder=null;
+ gpsRevision++;
+ showOrderFix(null,message);
+}
+async function refreshOrderGps(){
+ const id=selectedGpsOrder;
+ if(!id)return;
+ const revision=++gpsRevision;
+ try{
+   const response=await fetch('/dispatch/orders/'+encodeURIComponent(id)+'/gps',{
+     credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(4500)
+   });
+   if(!response.ok)throw new Error();
+   const fix=await response.json();
+   if(revision!==gpsRevision)return;
+   const valid=fix.available===true && Number.isFinite(fix.latitude) && Math.abs(fix.latitude)<=90
+     && Number.isFinite(fix.longitude) && Math.abs(fix.longitude)<=180;
+   const point=valid?[fix.latitude,fix.longitude]:null;
+   const first=point&&!pilotPoint;
+   showOrderFix(point,point?'Пилот выбранного заказа на карте.':'Координаты пилота пока недоступны.');
+   if(first)focusMap([fix.longitude,fix.latitude]);
+ }catch{
+   if(revision===gpsRevision)showOrderFix(null,'Не удалось обновить координаты пилота.');
+ }
+}
+{% endif %}
+function renderPersistentOrders(){
+ if(!lastOrders)return;
+ const items=lastOrders;
+ const chosen=items.filter(o=>orderFilter==='all' ||
+    (orderFilter==='new'&&o.status==='requested') ||
+    (orderFilter==='active'&&['assigned','approaching','underway'].includes(o.status)) ||
+    (orderFilter==='done'&&['finished','cancelled'].includes(o.status)));
+ for(const [id,n] of Object.entries({countNew:items.filter(o=>o.status==='requested').length,
+ countActive:items.filter(o=>['assigned','approaching','underway'].includes(o.status)).length,
+ {% if not pilot_availability_enabled %}countOnline:0,{% endif %}countDone:items.filter(o=>['finished','cancelled'].includes(o.status)).length})){
+   $(id).textContent=n;
+ }
+ {% if order_gps_enabled %}
+ if(selectedGpsOrder&&!chosen.some(o=>o.id===selectedGpsOrder&&activeTrip(o.status))){
+   clearGpsSelection('Выбери активный заказ, чтобы увидеть пилота на карте.');
+ }
+ {% endif %}
+ const cards=chosen.map(order=>{
+   const card=document.createElement('article');card.className='card';
+   const route=document.createElement('strong');route.textContent=order.origin+' → '+order.destination;
+   const info=document.createElement('p');
+   info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
+     ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
+   card.append(route,info);
+   {% if order_gps_enabled %}
+   if(activeTrip(order.status)){
+     const button=document.createElement('button');
+     button.type='button';button.className='btn';button.textContent='Пилот на карте';
+     button.setAttribute('aria-pressed',String(order.id===selectedGpsOrder));
+     card.append(button);
+     card.addEventListener('click',()=>{
+       if(selectedGpsOrder===order.id)return;
+       selectedGpsOrder=order.id;
+       showOrderFix(null,'Запрашиваем координаты пилота…');
+       for(const item of $('ordersList').querySelectorAll('[aria-pressed]')){
+         item.setAttribute('aria-pressed',String(item===button));
+       }
+       refreshOrderGps();
+     });
+   }
+   {% endif %}
+   return card;
+ });
+ $('ordersList').replaceChildren(...(cards.length?cards:['Заказов пока нет']));
+}
+async function pollPersistentOrders(){
+ try{
+   const response=await fetch('/dispatch/orders/state',{cache:'no-store',credentials:'same-origin',
+     signal:AbortSignal.timeout(7000)});
+   if(!response.ok)throw new Error('Cannot read orders');
+   const body=await response.json();
+   if(!body.persistent||!Array.isArray(body.orders))throw new Error('Invalid response');
+   lastOrders=body.orders;renderPersistentOrders();
+   {% if order_gps_enabled %}await refreshOrderGps();{% endif %}
+   $('syncStatus').textContent='Постоянное хранилище подключено.';
+ }catch{
+   {% if order_gps_enabled %}clearGpsSelection('Нет связи с сервером заказов.');{% endif %}
+   $('syncStatus').textContent='Сервер недоступен. Последние данные не обновлялись.';
+ }finally{setTimeout(pollPersistentOrders,5000)}
+}
+document.addEventListener('pd-test-filter',renderPersistentOrders);
+pollPersistentOrders();
+{% endif %}
+{% if test_sync_enabled %}
+const chatRoles={dispatcher:'Диспетчер',pilot:'Пилот',passenger:'Пассажир'};
+let chatSelection=null,chatSending=false,chatRetry=null;
+function appendChat(chat,message){
+    if(chat!==chatSelection||message.seq<=chat.after)return;
+    const item=document.createElement('li');
+    item.textContent=(chatRoles[message.role]||'Участник')+' · '+message.body;
+    $('chatMessages').append(item);
+    chat.after=message.seq;
+}
+async function refreshChat(){
+    const chat=chatSelection;
+    if(!chat||chat.loading||$('tripChat').hidden||$('peoplePanel').hidden)return;
+    chat.loading=true;
+    try{
+        const response=await fetch(chat.url+'?after='+chat.after,{cache:'no-store',
+            signal:AbortSignal.timeout(7000)});
+        if(!response.ok)throw Error();
+        const {messages}=await response.json();
+        for(const message of messages)appendChat(chat,message);
+    }catch{
+        if(chat===chatSelection&&!chatSending)$('chatStatus').textContent='Не удалось обновить переписку.';
+    }finally{chat.loading=false;}
+}
+function openChat(trip){
+    if(chatSelection?.id!==trip.id){
+        chatSelection={id:trip.id,url:'/dispatch/test-sync/trips/'+encodeURIComponent(trip.id)+'/messages',
+            after:0,loading:false};
+        chatRetry=null;
+        $('chatText').value='';
+        $('chatMessages').replaceChildren();
+        $('chatStatus').textContent='';
+    }
+    $('chatTrip').textContent=trip.origin+' → '+trip.destination;
+    $('chatForm').hidden=false;
+    showPanel(panels[1]);
+    showDirectory('tripChat');
+    refreshChat();
+}
+$('chatForm').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const chat=chatSelection,text=$('chatText').value.trim();
+    if(!chat||!text||chatSending)return;
+    if(!chatRetry||chatRetry.chat!==chat||chatRetry.text!==text){
+        const id=Array.from(crypto.getRandomValues(new Uint8Array(16)),
+            byte=>byte.toString(16).padStart(2,'0')).join('');
+        chatRetry={chat,text,id};
+    }
+    chatSending=true;
+    const button=$('chatForm').querySelector('button');
+    button.disabled=true;
+    try{
+        const response=await fetch(chat.url,{method:'POST',signal:AbortSignal.timeout(7000),
+            body:new URLSearchParams({csrf:{{ csrf|tojson }},text,client_id:chatRetry.id})});
+        if(!response.ok)throw Error();
+        if(chat===chatSelection){
+            if($('chatText').value.trim()===text)$('chatText').value='';
+            $('chatStatus').textContent='';
+            chatRetry=null;
+            await refreshChat();
+        }
+    }catch{
+        if(chat===chatSelection)$('chatStatus').textContent='Сообщение не подтверждено. Повтори отправку.';
+    }finally{chatSending=false;button.disabled=false;}
+});
+const statusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'Пилот едет к пассажиру',underway:'В поездке',finished:'Завершён'};
+const active=trip=>['assigned','approaching','underway'].includes(trip.status);
+let snapshot=null, signature='', assigning=false, switching=false, modeRevision=0;
+const pilotName=id=>id==='pilot_test_2'?'Тестовый пилот 2':'Тестовый пилот';
+function renderAutopilot(){
+    const on=snapshot?.autopilot===true;
+    $('autopilot').disabled=!snapshot||switching;
+    $('autopilot').setAttribute('aria-checked',String(on));
+    $('autopilotMode').textContent=on?'Включён · автоназначение':'Выключен · ручное назначение';
+}
+$('autopilot').addEventListener('click',async()=>{
+    if(!snapshot||switching)return;
+    switching=true;
+    modeRevision++;
+    renderAutopilot();
+    $('autopilotStatus').textContent='';
+    try{
+        const body=new URLSearchParams({csrf:{{ csrf|tojson }},enabled:snapshot.autopilot?'0':'1'});
+        const response=await fetch('/dispatch/test-sync/autopilot',{
+            method:'POST',body,signal:AbortSignal.timeout(7000)
+        });
+        if(!response.ok)throw new Error('autopilot');
+        snapshot=await response.json();
+        updateSharedPositions(snapshot);
+        renderTrips();
+    }catch{
+        $('autopilotStatus').textContent='Не удалось подтвердить режим. Обновляем статус.';
+    }finally{
+        switching=false;
+        renderAutopilot();
+    }
+});
+function renderTrips(){
+    if(!snapshot)return;
+    const trips=snapshot.trips;
+    renderAutopilot();
+    const pilots=snapshot.pilots??[];
+    const onlinePilots=pilots.filter(p=>p.online);
+    const available=onlinePilots.filter(p=>!p.busy&&!p.has_offer);
+    const counts={
+        countNew:trips.filter(t=>t.status==='requested').length,
+        countActive:trips.filter(active).length,
+        countOnline:onlinePilots.length,
+        countDone:trips.filter(t=>t.status==='finished').length,
+    };
+    for(const [id,count] of Object.entries(counts))$(id).textContent=count;
+    const onlyOnline=$('onlinePilots').getAttribute('aria-pressed')==='true';
+    const primary=pilots[0];
+    const pilotStatus=p=>p?.online ? (
+        p.busy?'В поездке':p.has_offer?'Ожидает ответа на заказ':p.position?'На линии · есть GPS':'На линии · без GPS'
+    ) : 'Вне сети';
+    $('pilotName').parentElement.hidden=onlyOnline&&!primary?.online;
+    $('pilotStatus').textContent=pilotStatus(primary);
+    $('otherPilots').replaceChildren(...pilots.slice(1).filter(p=>!onlyOnline||p.online).map(p=>{
+        const card=document.createElement('div');
+        card.className='card';
+        const name=document.createElement('strong');
+        name.textContent=pilotName(p.id);
+        const status=document.createElement('p');
+        status.textContent=pilotStatus(p);
+        card.append(name,status);
+        return card;
+    }));
+    const shown=trips.filter(t=>orderFilter==='all'||
+        (orderFilter==='new'&&t.status==='requested')||(orderFilter==='active'&&active(t))||
+        (orderFilter==='done'&&t.status==='finished'));
+    const nextSignature=JSON.stringify([available.map(p=>p.id),snapshot.autopilot,shown]);
+    if(signature===nextSignature)return;
+    signature=nextSignature;
+    const cards=shown.map(trip=>{
+        const card=document.createElement('article');
+        card.className='card test-order';
+        const route=document.createElement('strong');
+        route.textContent=[trip.origin,...(trip.stops??[]),trip.destination].join(' → ');
+        const status=document.createElement('p');
+        status.textContent=trip.paused?'Остановка':trip.awaiting_response?'Ожидаем ответа водителя':statusLabels[trip.status];
+        card.append(route,status);
+        if(trip.pilot){
+            const assignment=document.createElement('p');
+            assignment.textContent=pilotName(trip.pilot)+(trip.auto_assigned?' · Автопилот':'');
+            card.append(assignment);
+        }
+        const chatButton=document.createElement('button');
+        chatButton.type='button';chatButton.className='btn';
+        chatButton.textContent='Связь по заказу';
+        chatButton.addEventListener('click',()=>openChat(trip));
+        card.append(chatButton);
+        if(trip.source&&trip.source_order_id){
+            const source=document.createElement('p');
+            const label=trip.source==='telegram_miniapp'?'Telegram Mini App':'Telegram-бот';
+            source.textContent=label+' · исходный заказ №'+trip.source_order_id+
+                (trip.trip_date?' · '+trip.trip_date:'')+
+                (trip.trip_time?' '+trip.trip_time:'');
+            card.append(source);
+        }
+        if(trip.status==='requested'){
+            const button=document.createElement('button');
+            button.type='button';
+            button.className='btn';
+            const select=document.createElement('select');
+            select.setAttribute('aria-label','Свободный пилот');
+            for(const pilot of available){
+                const option=document.createElement('option');
+                option.value=pilot.id;
+                option.textContent=pilotName(pilot.id);
+                select.append(option);
+            }
+            if(available.length>1)card.append(select);
+            button.textContent='Назначить пилота вручную';
+            button.disabled=!available.length||assigning;
+            button.addEventListener('click',()=>assignPilot(trip,button,select.value));
+            card.append(button);
+        }
+        return card;
+    });
+    $('ordersList').replaceChildren(...(cards.length?cards:['Тестовых заказов нет']));
+}
+async function assignPilot(trip,button,pilot){
+    if(assigning)return;
+    assigning=true;
+    button.disabled=true;
+    $('assignmentStatus').textContent='';
+    try{
+        const body=new URLSearchParams({csrf:{{ csrf|tojson }},trip_id:trip.id,version:trip.version,pilot});
+        const response=await fetch('/dispatch/test-sync/assign',{method:'POST',body,signal:AbortSignal.timeout(7000)});
+        if(!response.ok)throw new Error('assignment');
+        $('assignmentStatus').textContent='Пилот назначен.';
+    }catch{
+        $('assignmentStatus').textContent='Не удалось подтвердить назначение. Проверь статус заказа.';
+    }finally{
+        assigning=false;
+        button.disabled=false;
+    }
+}
+async function refreshTrips(){
+    const revision=modeRevision;
+    try{
+        const response=await fetch('/dispatch/test-sync/state',{cache:'no-store',signal:AbortSignal.timeout(7000)});
+        if(!response.ok)throw new Error('sync');
+        const nextSnapshot=await response.json();
+        if(revision!==modeRevision||switching)return;
+        snapshot=nextSnapshot;
+        updateSharedPositions(snapshot);
+        renderTrips();
+        refreshChat();
+        $('syncStatus').textContent='Связь с сервером активна.';
+    }catch{
+        updateSharedPositions({});
+        $('syncStatus').textContent='Связь потеряна. Показаны последние доступные данные.';
+    }finally{
+        setTimeout(refreshTrips,3000);
+    }
+}
+document.addEventListener('pd-test-filter',renderTrips);
+{% endif %}
+const vilnius=[25.2797,54.6872];
+const token=window.PD_MAPBOX_PUBLIC_TOKEN;
+const hasToken=typeof token==='string'&&/^pk\.[\w.-]+$/.test(token);
+const osmCredit='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+let raster=null, vector=null, tileLayer=null, pilotPoint=null, pilotPoints=[];
+const pilotMarkers=new Map();
+let passengerMarker=null, passengerPoint=null;
+new ResizeObserver(()=>{raster?.invalidateSize({pan:false});vector?.resize();}).observe($('map'));
+let night=true, mode3d=false, vectorReady=false;
+const styleId=()=>night?'dark-v11':'light-v11';
+const buildingLayer='pd-buildings-3d';
+
+function drawPilot(){
+    if($('pilotBtn'))$('pilotBtn').disabled=!pilotPoint;
+    for(const [id,marker] of pilotMarkers){
+        if(!pilotPoints.some(p=>p.id===id)){
+            marker.remove();
+            pilotMarkers.delete(id);
+        }
+    }
+    for(const {id,position,label:orderLabel} of pilotPoints){
+        const [lat,lng]=position;
+        let marker=pilotMarkers.get(id);
+        const label=orderLabel||(id==='pilot_test_2'?'Тестовый пилот 2':'Тестовый пилот');
+        if(vector){
+            if(!marker){
+                const arrow=document.createElement('span');
+                arrow.className='pilot-marker';
+                arrow.textContent='➤';
+                arrow.setAttribute('aria-label',label);
+                marker=new mapboxgl.Marker({element:arrow})
+                    .setLngLat([lng,lat])
+                    .setPopup(new mapboxgl.Popup().setText(label))
+                    .addTo(vector);
+            }else marker.setLngLat([lng,lat]);
+        }else if(raster){
+            if(!marker){
+                marker=L.marker(position,{
+                    title:label,
+                    icon:L.divIcon({className:'pilot-marker',html:'➤',iconSize:[35,35],iconAnchor:[17,17]})
+                }).addTo(raster).bindTooltip(label);
+            }else marker.setLatLng(position);
+        }
+        if(marker)pilotMarkers.set(id,marker);
+    }
+}
+function drawPassenger(){
+    if($('passengerBtn'))$('passengerBtn').disabled=!passengerPoint;
+    if(!passengerPoint){
+        if(passengerMarker){passengerMarker.remove();passengerMarker=null;}
+        return;
+    }
+    const [lat,lng]=passengerPoint;
+    if(vector){
+        if(!passengerMarker){
+            const icon=document.createElement('span');
+            icon.className='passenger-marker';
+            icon.textContent='П';
+            icon.setAttribute('aria-label','Тестовый пассажир');
+            passengerMarker=new mapboxgl.Marker({element:icon})
+                .setLngLat([lng,lat])
+                .setPopup(new mapboxgl.Popup().setText('Тестовый пассажир'))
+                .addTo(vector);
+        }else passengerMarker.setLngLat([lng,lat]);
+    }else if(raster){
+        if(!passengerMarker){
+            passengerMarker=L.marker(passengerPoint,{
+                title:'Тестовый пассажир',
+                icon:L.divIcon({className:'passenger-marker',html:'П',iconSize:[32,32],iconAnchor:[16,16]})
+            }).addTo(raster).bindTooltip('Тестовый пассажир');
+        }else passengerMarker.setLatLng(passengerPoint);
+    }
+}
+
+function updateSharedPositions(snapshot){
+    {% if order_gps_enabled %}
+    if(selectedGpsOrder){
+        passengerPoint=snapshot.passenger_position??null;
+        drawPassenger();
+        return;
+    }
+    {% endif %}
+    pilotPoints=(snapshot.pilots??[]).filter(p=>Array.isArray(p.position));
+    if(!pilotPoints.length&&Array.isArray(snapshot.pilot_position)){
+        pilotPoints=[{id:'pilot_test',position:snapshot.pilot_position}];
+    }
+    pilotPoint=pilotPoints[0]?.position??null;
+    passengerPoint=snapshot.passenger_position??null;
+    $('mapStatus').textContent=[
+        pilotPoint?'Золотые метки — тестовые пилоты.':'',
+        passengerPoint?'Синяя метка — тестовый пассажир.':'',
+    ].filter(Boolean).join(' ')||'Метки появятся, когда пилот или пассажир поделятся GPS.';
+    drawPilot();
+    drawPassenger();
+}
+
+{% if gps_sync_enabled and not test_sync_enabled %}
+async function refreshSharedPositions(){
+    try{
+        const response=await fetch('/dispatch/test-sync/state',{cache:'no-store',signal:AbortSignal.timeout(7000)});
+        if(!response.ok)throw new Error('sync');
+        updateSharedPositions(await response.json());
+    }catch{
+        updateSharedPositions({});
+    }finally{
+        setTimeout(refreshSharedPositions,3000);
+    }
+}
+{% endif %}
+
+function rasterStyle(mapbox){
+    if(tileLayer)tileLayer.remove();
+    $('rasterMap').classList.toggle('night',night&&mapbox);
+    const url=mapbox?
+        'https://api.mapbox.com/styles/v1/mapbox/'+styleId()+'/tiles/256/{z}/{x}/{y}?access_token='+encodeURIComponent(token):
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const layer=L.tileLayer(url,{maxZoom:19,attribution:mapbox?
+        '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> '+osmCredit+
+            ' <a href="https://apps.mapbox.com/feedback/">Feedback</a>':osmCredit});
+    let errors=0;
+    if(mapbox)layer.on('tileerror',()=>{
+        if(layer===tileLayer&&++errors>=3)rasterStyle(false);
+    });
+    tileLayer=layer.addTo(raster);
+    $('mapProvider').textContent=mapbox?'Mapbox · '+(night?'ночная':'дневная')+' карта':
+        'Резервная карта OpenStreetMap';
+}
+function useRaster(){
+    if(vector){vector.remove();vector=null;}
+    pilotMarkers.clear();
+    passengerMarker=null;
+    $('glMap').hidden=true;
+    $('rasterMap').hidden=false;
+    $('modeBtn').disabled=true;
+    $('modeBtn').textContent='3D';
+    $('modeBtn').setAttribute('aria-pressed','false');
+    $('providerStatus').textContent='Доступна карта 2D. Для режима 3D нужен WebGL.';
+    if(typeof L==='undefined'){
+        $('mapProvider').textContent='Не удалось загрузить карту';
+        return;
+    }
+    raster=L.map('rasterMap',{zoomControl:false}).setView([vilnius[1],vilnius[0]],12);
+    L.control.zoom({position:'bottomright'}).addTo(raster);
+    rasterStyle(hasToken);
+    drawPilot();
+    drawPassenger();
+}
+function styleVector(){
+    const style=vector.getStyle();
+    if(night){
+        for(const layer of style.layers){
+            if(layer.type==='background')vector.setPaintProperty(layer.id,'background-color','#10100f');
+            if(layer.type==='line'&&/^(road|bridge|tunnel)/.test(layer.id)&&
+                /motorway|trunk|primary/.test(layer.id)){
+                vector.setPaintProperty(layer.id,'line-color',layer.id.includes('case')?'#392b1a':'#a88348');
+            }
+            if(layer.type==='fill'&&layer.id==='water')vector.setPaintProperty(layer.id,'fill-color','#151d22');
+        }
+    }
+    if(vector.getSource('composite')){
+        const label=style.layers.find(layer=>layer.type==='symbol'&&layer.layout?.['text-field']);
+        vector.addLayer({
+            id:buildingLayer,type:'fill-extrusion',source:'composite','source-layer':'building',
+            minzoom:14.5,filter:['==',['get','extrude'],'true'],
+            layout:{visibility:mode3d?'visible':'none'},
+            paint:{
+                'fill-extrusion-color':night?'#aa8550':'#c4ad82',
+                'fill-extrusion-height':['coalesce',['get','height'],0],
+                'fill-extrusion-base':['coalesce',['get','min_height'],0],
+                'fill-extrusion-opacity':.86,
+            },
+        },label?.id);
+    }
+    $('mapProvider').textContent=night?'Mapbox · чёрно-золотая карта':'Mapbox · дневная карта';
+}
+function startVector(){
+    if(!hasToken||typeof mapboxgl==='undefined'||!mapboxgl.supported()){
+        useRaster();
+        return;
+    }
+    $('rasterMap').hidden=true;
+    $('glMap').hidden=false;
+    try{
+        vector=new mapboxgl.Map({
+            container:'glMap',accessToken:token,style:'mapbox://styles/mapbox/'+styleId(),
+            center:vilnius,zoom:12,pitch:0,bearing:0,dragRotate:false,pitchWithRotate:false,
+        });
+    }catch{
+        useRaster();
+        return;
+    }
+    vector.touchZoomRotate.disableRotation();
+    vector.touchPitch.disable();
+    vector.addControl(new mapboxgl.NavigationControl({visualizePitch:true}),'bottom-right');
+    const startup=setTimeout(()=>{if(!vectorReady)useRaster();},14000);
+    vector.on('load',()=>{
+        vectorReady=true;
+        clearTimeout(startup);
+        $('modeBtn').disabled=false;
+        $('providerStatus').textContent='';
+        drawPilot();
+        drawPassenger();
+    });
+    vector.on('style.load',styleVector);
+    vector.on('error',event=>{
+        if(!vectorReady&&[401,403].includes(event.error?.status)){
+            clearTimeout(startup);
+            useRaster();
+        }
+    });
+}
+$('modeBtn').addEventListener('click',()=>{
+    if(!vectorReady||!vector)return;
+    mode3d=!mode3d;
+    $('modeBtn').textContent=mode3d?'2D':'3D';
+    $('modeBtn').setAttribute('aria-pressed',String(mode3d));
+    if(vector.getLayer(buildingLayer))vector.setLayoutProperty(buildingLayer,'visibility',mode3d?'visible':'none');
+    if(mode3d){
+        vector.dragRotate.enable();
+        vector.touchZoomRotate.enableRotation();
+        vector.touchPitch.enable();
+    }else{
+        vector.dragRotate.disable();
+        vector.touchZoomRotate.disableRotation();
+        vector.touchPitch.disable();
+    }
+    vector.easeTo({pitch:mode3d?55:0,bearing:mode3d?-22:0,
+        zoom:mode3d?Math.max(15.5,vector.getZoom()):vector.getZoom(),duration:600});
+});
+$('themeBtn').addEventListener('click',()=>{
+    night=!night;
+    $('themeBtn').textContent=night?'Дневная карта':'Ночная карта';
+    if(vector)vector.setStyle('mapbox://styles/mapbox/'+styleId());
+    else if(raster)rasterStyle(hasToken);
+});
+function focusMap(center){
+    if(vector)vector.easeTo({center,zoom:mode3d?15.5:13,duration:500});
+    else if(raster)raster.setView([center[1],center[0]],13);
+}
+$('vilniusBtn').addEventListener('click',()=>focusMap(vilnius));
+$('pilotBtn')?.addEventListener('click',()=>{
+    if(pilotPoint)focusMap([pilotPoint[1],pilotPoint[0]]);
+});
+$('passengerBtn')?.addEventListener('click',()=>{
+    if(passengerPoint)focusMap([passengerPoint[1],passengerPoint[0]]);
+});
+startVector();
+{% if test_sync_enabled %}refreshTrips();{% elif gps_sync_enabled %}refreshSharedPositions();{% endif %}
+})();
+</script></body></html>

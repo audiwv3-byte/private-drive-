@@ -151,7 +151,7 @@ REVOKE ALL ON FUNCTION public.pd_native_pilot_order_state(text,bigint) FROM PUBL
 CREATE OR REPLACE FUNCTION public.pd_native_pilot_trip_action(
     supplied_digest text, target_order text, action text, observed_at bigint
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp
-AS $
+AS $$
 DECLARE
     principal record;
     current_status text;
@@ -182,6 +182,6 @@ BEGIN
     UPDATE public.pd_dispatch_orders SET status=next_status WHERE id=target_order::uuid;
     RETURN jsonb_build_object('order_id',target_order,'status',next_status,'changed',true,'payment_mode','disabled');
 END
-$;
+$$;
 REVOKE ALL ON FUNCTION public.pd_native_pilot_trip_action(text,text,text,bigint) FROM PUBLIC;
 COMMIT;

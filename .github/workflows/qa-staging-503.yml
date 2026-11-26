@@ -5,6 +5,7 @@ on:
       - qa/staging-api-503-20261126
       - qa/staging-api-503-readiness-20261126
       - qa/staging-api-503-contract-20261126
+      - qa/staging-503-contract-gates-20261126
   workflow_dispatch:
 
 permissions:
@@ -68,6 +69,68 @@ jobs:
         run: python -m pip install -r requirements-sms-render.txt flask pytest
       - name: Test WSGI, Telegram, Android and dispatcher queue in synthetic PostgreSQL
         run: python -m pytest -v tests/test_qa25_wsgi.py
+        env:
+          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+          PD_PAYMENT_MODE: disabled
+          PD_NATIVE_SMS_LIVE: 'NO'
+
+  pilot-assignment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated dependencies
+        run: python -m pip install -r requirements-sms-render.txt flask pytest
+      - name: Validate pilot-assignment contracts and PostgreSQL permissions
+        run: python -m pytest -v tests/test_qa26_assignment.py
+        env:
+          PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+          PD_PAYMENT_MODE: disabled
+          PD_NATIVE_SMS_LIVE: 'NO'
+
+  pilot-gps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated dependencies
+        run: python -m pip install -r requirements-sms-render.txt flask pytest
+      - name: Validate pilot-gps contracts and PostgreSQL permissions
+        run: python -m pytest -v tests/test_qa27_gps.py
         env:
           PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
           PD_PAYMENT_MODE: disabled

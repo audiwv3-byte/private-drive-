@@ -749,7 +749,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
   // Only approved amounts enter the preview. Unpriced requests never
   // silently become free and never erase the known fare.
-  bool get _requiresCustomQuote => _pets || _flowers || _coffee || _water;
+  bool get _requiresCustomQuote => widget.initialExtraService != null ||
+      _pets || _flowers || _coffee || _water;
 
   int? get _taxiPriceCents {
     if (_rideType != 'Такси' || _roadDistanceMetres == null) return null;
@@ -761,6 +762,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
   }
 
   int? get _pricePreview {
+    if (widget.initialExtraService != null) return null;
     final fixed = _fixedPrice;
     if (fixed == null) return null;
     // Sober driver: approved double base fare; meet-and-greet stays +15 EUR.

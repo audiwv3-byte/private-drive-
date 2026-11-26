@@ -1,0 +1,27 @@
+{
+  "purpose": "Read-only pinned Render entrypoint snapshot for QA CI. No environment variables or credentials.",
+  "observed_date": "2026-11-26",
+  "source": "Render list_services and list_deploys (read-only)",
+  "services": [
+    {
+      "id": "srv-dbvumcks728c73c1atvg",
+      "name": "private-drive-",
+      "role": "native_api",
+      "repo_commit": "0ed1e60482f30aa5039d7f0ef170144949a4e2ec",
+      "entrypoint": "isolated_sms_wsgi:application",
+      "source_file": "isolated_sms_wsgi.py",
+      "expected_contract": "/native-orders",
+      "pinned_checkout": ".qa_snapshot/native_api"
+    },
+    {
+      "id": "srv-dc0qfsp42hec73c7ff3g",
+      "name": "private-drive-dispatcher-staging",
+      "role": "dispatcher",
+      "repo_commit": "44795f496ed05760cfc09474c506c6d7916c86fb",
+      "entrypoint": "pd_dispatcher_staging_wsgi:application",
+      "source_file": "pd_dispatcher_staging_wsgi.py",
+      "expected_contract": "/dispatch/orders/state",
+      "pinned_checkout": ".qa_snapshot/dispatcher"
+    }
+  ]
+}

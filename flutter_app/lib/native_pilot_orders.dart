@@ -107,7 +107,14 @@ class NativePilotOrdersApi {
   static const qa29Base = 'http://127.0.0.1:18729';
   bool get _qa29Allowed => qa29Loopback && baseUrl == qa29Base &&
       token.startsWith('qa29-synthetic-') && token.length >= 40;
-  bool get _allowed => qaIosGps ? _qaIosAllowed : (qa29Loopback ? _qa29Allowed : baseUrl == stage);
+  static const _configuredBase = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
+
+  bool get _allowed {
+    if (qaIosGps) return _qaIosAllowed;
+    if (qa29Loopback) return _qa29Allowed;
+    return baseUrl == stage ||
+        (_configuredBase.isNotEmpty && baseUrl == _configuredBase);
+  }
 
   Uri _endpoint(String path) {
     if (!_allowed) throw const FormatException('Unapproved pilot API');
@@ -203,8 +210,8 @@ class NativePilotOrdersApi {
   }
 
   Future<Map<String, dynamic>> action(String orderId, String action) async {
-    if (!_allowed || (!qaIosGps && baseUrl != stage)) {
-      throw const FormatException('Pilot trip actions require staging');
+    if (!_allowed || _qa29Allowed) {
+      throw const FormatException('Unapproved pilot trip API');
     }
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
       throw const PdHttpStatusException(401);

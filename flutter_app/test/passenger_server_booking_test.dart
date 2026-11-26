@@ -44,7 +44,12 @@ void main() {
     expect(received?.url.path, '/native-orders');
     expect(received?.headers['authorization'], 'Bearer synthetic-passenger-token');
     final data = jsonDecode(received!.body) as Map<String, dynamic>;
-    expect(data.keys.toSet(), {'request_id','from','to','trip_date','trip_time'});
+    expect(data.keys.toSet(), {'request_id','from','to','trip_date','trip_time','booking_details'});
+    final details = data['booking_details'] as Map<String,dynamic>;
+    expect(details['ride_type'], 'Трансфер');
+    expect(details['round_trip'], false);
+    expect(details['extras'], isA<List<dynamic>>());
+    expect(details['preferences'], isA<Map<String,dynamic>>());
     expect(data['from'], 'Вильнюс');
     expect(data['to'], 'Каунас');
     expect(data.containsKey('payment_method'), false);

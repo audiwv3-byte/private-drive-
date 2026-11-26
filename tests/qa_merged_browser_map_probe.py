@@ -23,6 +23,7 @@ def main():
     password = "qa-merged-map-only-password"
     os.environ["PD_DISPATCH_PASSWORD_HASH"] = generate_password_hash(password,method="pbkdf2:sha256")
     os.environ.pop("PD_DISPATCH_DATABASE_URL",None)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     module = importlib.import_module("pd_dispatcher_staging_wsgi")
     app = module.create_app()
     client = app.test_client()

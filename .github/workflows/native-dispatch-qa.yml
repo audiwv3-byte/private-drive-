@@ -283,10 +283,28 @@ jobs:
             --dart-define="PD_NATIVE_PILOT_ASSIGNMENT=$PD_CONNECTED_PILOT_APK" \
             --dart-define="PD_WEB_DISPATCH_ONLY=true" \
             --dart-define="PD_QUICK_RESUME=true"
+          # Inspect the actual built APK, not just its source manifest.
+          apk=build/app/outputs/flutter-apk/app-debug.apk
+          test -s "$apk"
+          unzip -tq "$apk"
+          aapt_bin="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$aapt_bin"
+          "$aapt_bin" dump badging "$apk" > ../private_drive_apk_badging.txt
+          if [[ "$PD_CONNECTED_PILOT_APK" == true ]]; then
+            grep -Fq "package: name='lt.privatedrive.private_drive.pilot'" ../private_drive_apk_badging.txt
+          else
+            grep -Fq "package: name='lt.privatedrive.private_drive'" ../private_drive_apk_badging.txt
+          fi
+          grep -Fq "application-label:'PRIVATE DRIVE'" ../private_drive_apk_badging.txt
+          apksigner_bin="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$apksigner_bin"
+          "$apksigner_bin" verify "$apk"
           mkdir -p ../private_drive_qa
-          cp build/app/outputs/flutter-apk/app-debug.apk ../private_drive_qa/private-drive-qa.apk
+          cp "$apk" ../private_drive_qa/private-drive-qa.apk
+          cp ../private_drive_apk_badging.txt ../private_drive_qa/APK_BADGING.txt
           cd ../private_drive_qa
           sha256sum private-drive-qa.apk > SHA256SUMS
+          sha256sum -c SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.pilot.outputs.connected == 'true' && 'private-drive-connected-pilot-internal-debug-apk' || 'private-drive-offline-qa-apk' }}

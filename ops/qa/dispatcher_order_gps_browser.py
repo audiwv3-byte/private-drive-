@@ -22,6 +22,20 @@ import qa29_gps_integration as fixture
 
 def run(android_apk=None, persistent_only=False):
     oid = fixture.OID_FILE.read_text().strip()
+    if os.environ.get("PD_QA_BOOKING_DETAILS_CHECK") == "1":
+        # Synthetic order already created by the QA29 loopback fixture. Ensure
+        # the browser renders persisted JSONB metadata, never executable HTML.
+        with psycopg.connect(fixture.DSN) as db:
+            db.execute("UPDATE public.pd_dispatch_orders "
+                       "SET booking_details=%s::jsonb WHERE id=%s",
+                       (json.dumps({
+                         "ride_type":"Трансфер","tariff":"Вильнюс–Каунас",
+                         "extras":["Встреча с табличкой","Вода"],
+                         "wishes":"Тихая поездка <script>doNotRun()</script>",
+                         "fare_preview_eur":110,"round_trip":True,
+                         "advance_booking":True,
+                         "preferences":{"radio":"M-1","temperature":21},
+                       },ensure_ascii=False),oid))
     read_path = f"/dispatch/orders/{oid}/gps"
     write_path = f"/native-pilot-orders/{oid}/gps"
     pilot = {"Authorization": "Bearer " + fixture.PILOT}
@@ -82,6 +96,16 @@ def run(android_apk=None, persistent_only=False):
         card = page.locator("#ordersList .card").filter(has_text="Synthetic A")
         card.wait_for()
         assert "Пилот назначен" in card.inner_text()
+        if os.environ.get("PD_QA_BOOKING_DETAILS_CHECK") == "1":
+            text = card.inner_text()
+            for part in ("Вильнюс–Каунас", "Встреча с табличкой", "Вода",
+                         "Тихая поездка", "110 €", "M-1", "21 °C",
+                         "не оплачено"):
+                assert part in text, (part, text)
+            assert card.locator("script").count() == 0
+            assert "booking-details" in card.locator(".booking-details").get_attribute("class")
+            print("BROWSER DETAILS PASS: tariff, extras, preferences and preview visible; HTML inert", flush=True)
+
         card.get_by_role("button", name="Пилот на карте").click()
         page.locator("#rasterMap.leaflet-container").wait_for(state="visible")
         page.locator(".leaflet-map-pane").wait_for(state="attached")

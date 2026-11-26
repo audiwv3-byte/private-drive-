@@ -86,6 +86,48 @@ class NativePilotOrdersApi {
   static const stage = 'https://private-drive-drbd.onrender.com';
   static const _timeout = Duration(seconds: 7);
 
+  Future<bool> availability([bool? desiredOnline]) async {
+    if (baseUrl != stage) {
+      throw const FormatException('Pilot availability requires staging');
+    }
+    if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
+      throw const PdHttpStatusException(401);
+    }
+    final client = _client ?? http.Client();
+    try {
+      final request = http.Request(
+        desiredOnline == null ? 'GET' : 'PATCH',
+        PdHttpApi.secureUri(baseUrl, '/native-pilot-availability'))
+        ..followRedirects = false
+        ..headers['Authorization'] = 'Bearer $token'
+        ..headers['Accept'] = 'application/json';
+      if (desiredOnline != null) {
+        request.headers['Content-Type'] = 'application/json';
+        request.body = jsonEncode({'online': desiredOnline});
+      }
+      final response = await client.send(request).timeout(_timeout);
+      if (response.statusCode != 200) {
+        throw PdHttpStatusException(response.statusCode);
+      }
+      final bytes = <int>[];
+      await response.stream.timeout(_timeout).forEach((chunk) {
+        if (bytes.length + chunk.length > 2048) {
+          throw const FormatException('Availability response too large');
+        }
+        bytes.addAll(chunk);
+      }).timeout(_timeout);
+      final data = jsonDecode(utf8.decode(bytes));
+      if (data is! Map<String, dynamic> || data['payment_mode'] != 'disabled' ||
+          data['online'] is! bool ||
+          (desiredOnline != null && data['online'] != desiredOnline)) {
+        throw const FormatException('Unconfirmed pilot availability');
+      }
+      return data['online'] as bool;
+    } finally {
+      if (_client == null) client.close();
+    }
+  }
+
   Future<Map<String, dynamic>> action(String orderId, String action) async {
     if (baseUrl != stage) {
       throw const FormatException('Pilot trip actions require staging');

@@ -62,6 +62,8 @@ def registered_passenger(uid):
 
 def qa_shared_orders_enabled():
     """Explicit synthetic QA bridge: never activates on deployed/live databases."""
+    if os.environ.get('PD_QA_MINIAPP_POSTGRES') != '1':
+        return False
     from psycopg.conninfo import conninfo_to_dict
     dsn = os.environ.get('PD_DISPATCH_ORDERS_DATABASE_URL', '')
     try:

@@ -93,12 +93,17 @@ class NativePilotOrdersApi {
 
   // QA29 is a separate debug-only APK. It can never send a real session
   // to plaintext HTTP, or reach the existing staging/production service.
+  static const qaIosGps = bool.fromEnvironment('PD_QA_IOS_GPS') && qaGpsEnabled;
+  static const qaIosBase = 'https://qa.invalid';
+  bool get _qaIosAllowed => qaIosGps && baseUrl == qaIosBase &&
+      token.startsWith('qa-ios-synthetic-') && token.length >= 40 &&
+      _client != null;
   static const qa29Loopback = bool.fromEnvironment('PD_QA29_LOOPBACK') &&
       qaGpsEnabled && kDebugMode;
   static const qa29Base = 'http://127.0.0.1:18729';
   bool get _qa29Allowed => qa29Loopback && baseUrl == qa29Base &&
       token.startsWith('qa29-synthetic-') && token.length >= 40;
-  bool get _allowed => qa29Loopback ? _qa29Allowed : baseUrl == stage;
+  bool get _allowed => qaIosGps ? _qaIosAllowed : (qa29Loopback ? _qa29Allowed : baseUrl == stage);
 
   Uri _endpoint(String path) {
     if (!_allowed) throw const FormatException('Unapproved pilot API');
@@ -194,7 +199,7 @@ class NativePilotOrdersApi {
   }
 
   Future<Map<String, dynamic>> action(String orderId, String action) async {
-    if (baseUrl != stage) {
+    if (!_allowed || (!qaIosGps && baseUrl != stage)) {
       throw const FormatException('Pilot trip actions require staging');
     }
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
@@ -461,12 +466,27 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
     final api = widget.api;
     setState(() { _gpsStarting = true; _error = null; });
     try {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final consent = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Передача GPS назначенной поездки'),
+            content: const Text('Координаты будут передаваться диспетчеру, в том числе при блокировке экрана. Передачу можно остановить в любой момент. После завершения поездки она прекращается.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Разрешить GPS')),
+            ],
+          ),
+        );
+        if (consent != true || !mounted || !_foreground || !widget.visible ||
+            !identical(api, widget.api)) return;
+      }
       if (!await qaGpsPermission() || !mounted || !_foreground ||
           !widget.visible || !identical(api, widget.api)) return;
       final publisher = QaPilotGpsPublisher(
         send: api.publishGps,
         isAssigned: (id) async => (await api.load()).any((row) => row.orderId == id),
-        positions: qaAndroidPositions,
+        positions: defaultTargetPlatform == TargetPlatform.iOS ? qaIosPositions : qaAndroidPositions,
         canStart: () => mounted && _foreground && widget.visible && identical(api, widget.api),
         onStopped: () { if (mounted) setState(() {}); },
       );
@@ -520,7 +540,8 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
         oldWidget.api.token != widget.api.token ||
         oldWidget.visible != widget.visible) {
       if (oldWidget.api.baseUrl != widget.api.baseUrl ||
-          oldWidget.api.token != widget.api.token) {
+          oldWidget.api.token != widget.api.token ||
+          (NativePilotOrdersApi.qaIosGps && !widget.visible)) {
         final old = _gpsPublisher;
         _gpsPublisher = null;
         if (old != null) unawaited(old.stop());
@@ -629,7 +650,8 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
                     Text('${order.date} ${order.time} · ${order.statusLabel}'),
                     SelectableText('ID заказа: ${order.orderId}'),
                     if (NativePilotOrdersApi.qaGpsEnabled && !kIsWeb &&
-                        defaultTargetPlatform == TargetPlatform.android)
+                        (defaultTargetPlatform == TargetPlatform.android ||
+                         (NativePilotOrdersApi.qaIosGps && defaultTargetPlatform == TargetPlatform.iOS)))
                       OutlinedButton(
                         key: ValueKey('qa28-gps-${order.orderId}'),
                         onPressed: _gpsStarting || _actingOrderId != null ||

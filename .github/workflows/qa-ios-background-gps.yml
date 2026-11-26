@@ -1,0 +1,38 @@
+name: iOS isolated background GPS
+on:
+  push:
+    branches: [qa/ios-background-gps-20261126]
+permissions:
+  contents: read
+jobs:
+  gps-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+      - working-directory: flutter_app
+        run: |
+          flutter pub get
+          flutter test test/qa_ios_gps_test.dart --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true --dart-define=PD_QA_IOS_GPS=true
+  ios-gps-compile:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+      - working-directory: flutter_app
+        run: |
+          flutter pub get
+          flutter build ios --simulator --debug --no-codesign --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true --dart-define=PD_QA_IOS_GPS=true
+          python3 -c 'import plistlib; p=plistlib.load(open("build/ios/iphonesimulator/Runner.app/Info.plist","rb")); assert "location" in p["UIBackgroundModes"]; assert p["NSLocationAlwaysAndWhenInUseUsageDescription"]; print("PASS iOS GPS capability")'

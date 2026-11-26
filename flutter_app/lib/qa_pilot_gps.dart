@@ -154,3 +154,15 @@ Stream<QaGpsFix> qaAndroidPositions() =>
       ),
     )).map((p) => QaGpsFix(p.latitude, p.longitude,
       p.timestamp.millisecondsSinceEpoch ~/ 1000));
+
+ // iOS starts in the foreground, retains the visible system location indicator,
+ // and never requests Always authorization for a new background session.
+Stream<QaGpsFix> qaIosPositions() =>
+    Geolocator.getPositionStream(locationSettings: AppleSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5,
+      pauseLocationUpdatesAutomatically: false,
+      showBackgroundLocationIndicator: true,
+      allowBackgroundLocationUpdates: true,
+    )).map((p) => QaGpsFix(p.latitude, p.longitude,
+      p.timestamp.millisecondsSinceEpoch ~/ 1000));

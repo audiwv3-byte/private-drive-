@@ -8,6 +8,10 @@
 	<string>PRIVATE DRIVE использует камеру по твоему нажатию для снимка лица пилота. После предпросмотра ты можешь отдельно отправить фото уполномоченному диспетчеру для проверки личности.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>PRIVATE DRIVE использует геопозицию при открытом приложении для выбора места подачи, отображения маршрута и работы пилота. При заказе поездки необходимые координаты передаются сервису для организации поездки.</string>
+	<key>UIBackgroundModes</key>
+	<array><string>location</string></array>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>GPS пилота используется только с согласия для назначенной поездки, включая блокировку экрана; передача прекращается после поездки или по кнопке остановки.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

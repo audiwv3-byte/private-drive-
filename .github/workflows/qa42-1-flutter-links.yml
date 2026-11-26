@@ -1,0 +1,29 @@
+name: QA42.1 isolated Flutter external links
+on:
+  push:
+    branches: [qa/qa42-1-local-https]
+    paths:
+      - 'flutter_app/lib/**'
+      - 'flutter_app/test/qa42_external_links_test.dart'
+      - '.github/workflows/qa42-1-flutter-links.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  flutter-links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test test/qa42_external_links_test.dart --dart-define=PD_ISOLATED_DEVICE_QA=true --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --reporter expanded

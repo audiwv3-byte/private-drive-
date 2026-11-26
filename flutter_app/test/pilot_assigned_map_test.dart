@@ -135,6 +135,11 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('ID заказа: $_id'), findsOneWidget);
+      expect(find.byKey(const Key('pilot-connected-brand-logo')), findsOneWidget);
+      expect(find.byKey(const Key('pilot-connected-cabin-title')), findsOneWidget);
+      expect(find.byKey(const Key('pilot-offline-vilnius-background')), findsOneWidget);
+      expect(find.byKey(const Key('pilot-power-toggle')), findsNothing,
+          reason: 'Never display demo online status in connected cabin');
       expect(assignments.reads, 1);
 
       await tester.tap(find.byKey(const Key('pilot-server-open-map')));

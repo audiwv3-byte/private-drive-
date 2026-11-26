@@ -319,7 +319,9 @@ def register(app, core):
     from pd_dispatch_persistent import enabled as persistent_queue_ready
     from pd_dispatch_persistent import register as register_persistent_queue
     register_persistent_queue(app, authorized)
-    from pd_native_pilot_assignment import dispatcher_list_enabled, register_dispatch_assignment
+    from pd_native_pilot_assignment import (
+        dispatcher_assignment_enabled, dispatcher_list_enabled, register_dispatch_assignment,
+    )
     register_dispatch_assignment(app, authorized, valid_csrf, admin_id)
     persistent_queue_enabled = persistent_queue_ready()
 
@@ -373,13 +375,15 @@ def register(app, core):
         response = app.make_response(render_template_string(
             page, mapbox_token=token, test_sync_enabled=use_test_queue,
             persistent_queue_enabled=persistent_queue_enabled and not use_test_queue,
+            pilot_assignment_enabled=(persistent_queue_enabled and not use_test_queue
+                                      and dispatcher_assignment_enabled()),
             pilot_availability_enabled=dispatcher_list_enabled(),
             gps_sync_enabled=test_sync_enabled,
             test_queue_link=url_for("pd_dispatch_map", queue="test")
                 if test_sync_enabled and not use_test_queue else None,
             telegram_test_enabled=telegram_test_ready,
             analytics_enabled="pd_site_analytics" in app.view_functions,
-            csrf=csrf() if test_sync_enabled else "",
+            csrf=csrf() if test_sync_enabled or persistent_queue_enabled else "",
             pilot_intake_enabled=pilot_intake_available,
             pilot_add_url="/pilot-registration" if pilot_intake_available else None,
             staging_registry="dispatch_accounts_state" in app.view_functions,

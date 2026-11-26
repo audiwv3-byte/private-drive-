@@ -4,6 +4,7 @@ Designed for isolated stage-to-real migration. No QA tokens, no client-chosen
 roles and no real payments. Requires separate, durable PostgreSQL and a private
 server-to-server HMAC key; remains disabled until deliberately configured.
 """
+from datetime import date as calendar_date
 import hashlib
 import hmac
 import json
@@ -16,6 +17,7 @@ from flask import jsonify, request
 
 MAX_BYTES = 8192
 SOURCES = frozenset({"website", "android", "ios", "telegram_miniapp", "telegram_bot"})
+
 SCHEMA = """CREATE TABLE IF NOT EXISTS pd_dispatch_orders (
  id UUID PRIMARY KEY,
  source TEXT NOT NULL,
@@ -34,11 +36,16 @@ SCHEMA = """CREATE TABLE IF NOT EXISTS pd_dispatch_orders (
 
 def enabled():
     dsn = os.environ.get("PD_DISPATCH_ORDERS_DATABASE_URL", "")
-    key = os.environ.get("PD_DISPATCH_ORDERS_INGEST_SECRET", "")
     return (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
             and os.environ.get("PD_DISPATCH_PERSISTENT_QUEUE") == "1"
-            and dsn.startswith(("postgresql://", "postgres://"))
-            and len(key) >= 32)
+            and os.environ.get("PD_PAYMENT_MODE") == "disabled"
+            and dsn.startswith(("postgresql://", "postgres://")))
+
+
+def ingest_enabled():
+    # Native orders write through their authenticated API directly.
+    # Reading the dispatcher queue must not enable the separate import route.
+    return enabled() and len(os.environ.get("PD_DISPATCH_ORDERS_INGEST_SECRET", "")) >= 32
 
 
 def verified_request(raw, headers, key, now=None):
@@ -52,13 +59,13 @@ def verified_request(raw, headers, key, now=None):
     return hmac.compare_digest(digest, signature)
 
 
-def validated_order(data):
+def validated_order(data, *, allowed_sources=SOURCES):
     if not isinstance(data, dict) or set(data) != {
             "source", "source_order_id", "from", "to", "trip_date", "trip_time"}:
         raise ValueError("invalid_order")
     source = data["source"]
     original = data["source_order_id"]
-    if source not in SOURCES or not isinstance(original, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", original):
+    if not isinstance(source, str) or source not in allowed_sources or not isinstance(original, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", original):
         raise ValueError("invalid_source")
     origin, destination = data["from"], data["to"]
     if not isinstance(origin, str) or not isinstance(destination, str):
@@ -71,6 +78,7 @@ def validated_order(data):
         raise ValueError("invalid_departure")
     if not isinstance(clock, str) or not re.fullmatch(r"[0-2][0-9]:[0-5][0-9]", clock) or int(clock[:2]) > 23:
         raise ValueError("invalid_departure")
+    calendar_date.fromisoformat(date)
     return source, original, origin, destination, date, clock
 
 
@@ -93,7 +101,7 @@ def register(app, authorized):
 
     @app.post("/v1/dispatch/orders/import")
     def import_order():
-        if not enabled():
+        if not ingest_enabled():
             return reply({"error":"persistent_queue_disabled"}, 503)
         if request.mimetype != "application/json" or request.content_length is None or not 0 < request.content_length <= MAX_BYTES:
             return reply({"error":"invalid_body"}, 400)
@@ -107,26 +115,27 @@ def register(app, authorized):
         source, original, origin, destination, date, clock = values
         digest = fingerprint(values)
         order_id = str(uuid.uuid4())
+        status = "requested"
         try:
             with connect() as db:
-                db.execute(SCHEMA)
                 # The insert either wins once or retrieves an existing record.
                 with db.cursor() as cur:
-                    cur.execute("""INSERT INTO pd_dispatch_orders
+                    cur.execute("""INSERT INTO public.pd_dispatch_orders
                         (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                         ON CONFLICT(source,source_order_id) DO NOTHING
                         RETURNING id""", (order_id,source,original,digest,origin,destination,date,clock))
                     inserted = cur.fetchone()
                     if not inserted:
-                        cur.execute("""SELECT id,fingerprint FROM pd_dispatch_orders
+                        cur.execute("""SELECT id,fingerprint,status FROM public.pd_dispatch_orders
                             WHERE source=%s AND source_order_id=%s""", (source,original))
                         existing = cur.fetchone()
                         if not existing or existing[1] != digest:
                             return reply({"error":"source_order_conflict"}, 409)
                         order_id = str(existing[0])
+                        status = existing[2]
             return reply({"order_id":order_id,"source":source,"source_order_id":original,
-                          "status":"requested","created":bool(inserted)}, 201 if inserted else 200)
+                          "status":status,"created":bool(inserted),"payment_mode":"disabled"}, 201 if inserted else 200)
         except Exception:
             app.logger.exception("Persistent dispatcher order store unavailable")
             return reply({"error":"storage_unavailable"},503)
@@ -139,14 +148,20 @@ def register(app, authorized):
             return reply({"error":"persistent_queue_disabled"},503)
         try:
             with connect() as db:
-                db.execute(SCHEMA)
-                rows = db.execute("""SELECT id,source,source_order_id,origin,destination,
-                     trip_date,trip_time,status,created_at
-                     FROM pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()
+                rows = db.execute("""SELECT o.id,o.source,o.source_order_id,
+                     o.origin,o.destination,o.trip_date,o.trip_time,
+                     o.status,o.created_at,q.details,q.quoted_total_cents,
+                     q.quote_required
+                     FROM public.pd_dispatch_orders o
+                     LEFT JOIN public.pd_native_order_quotes q ON q.order_id=o.id
+                     ORDER BY o.created_at DESC LIMIT 100""").fetchall()
             orders = [{"id":str(row[0]),"source":row[1],"source_order_id":row[2],
                        "origin":row[3],"destination":row[4],
                        "trip_date":row[5],"trip_time":row[6],
-                       "status":row[7],"created_at":row[8].isoformat()} for row in rows]
+                       "status":row[7],"created_at":row[8].isoformat(),
+                       "details":row[9],"quoted_total_cents":row[10],
+                       "quote_required":row[11] if row[11] is not None else True,
+                       "currency":"EUR"} for row in rows]
             return reply({"orders":orders,"persistent":True})
         except Exception:
             app.logger.exception("Persistent dispatcher order read unavailable")

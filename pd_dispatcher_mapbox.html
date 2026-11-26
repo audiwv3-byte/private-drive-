@@ -39,6 +39,8 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.stat,.card{background:#242019;border:1px solid var(--line);border-radius:11px;padding:12px}.stat b{font-size:25px;display:block;color:#f7e7c3}.stat span{font-size:11px;color:var(--soft)}
 .tabs{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0}.btn,.tab{border:1px solid #725c3b;border-radius:8px;background:#292118;color:#f5d9a1;padding:9px 11px;min-height:40px}.tab.active{background:#d7ad65;color:#17100a}
 .card{margin:10px 0}.card strong{display:block;margin:7px 0;color:#f4ead9}.muted{color:var(--soft);font-size:12px}
+#manualOrderForm label{display:grid;gap:3px;margin:8px 0}
+#manualOrderForm input{min-width:0;width:100%;font:inherit;padding:7px;border:1px solid var(--line);border-radius:6px}
 #map{grid-column:2;grid-row:1;min-width:0;min-height:0;background:#24231f;position:relative;overflow:hidden;isolation:isolate}
 #mapNotice{position:absolute;z-index:500;left:16px;top:16px;right:16px;max-width:445px;border-radius:10px;background:#15120fe8;border:1px solid #8a7049;padding:12px 15px;pointer-events:none}
 #mapNotice b{display:block;color:var(--gold)}#mapNotice span{font-size:12px;color:#f2e6d2}
@@ -100,6 +102,19 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <div class="stats" aria-label="Показатели"><div class="stat"><b id="countNew">—</b><span>Новые</span></div><div class="stat"><b id="countActive">—</b><span>Активные</span></div><div class="stat"><b id="countOnline">—</b><span>На линии</span></div><div class="stat"><b id="countDone">—</b><span>Завершены</span></div></div>
 <div class="tabs" role="group" aria-label="Фильтр заказов"><button class="tab active" data-filter="all" aria-pressed="true">Все</button><button class="tab" data-filter="new" aria-pressed="false">Новые</button><button class="tab" data-filter="active" aria-pressed="false">В пути</button><button class="tab" data-filter="done" aria-pressed="false">История</button></div>
 <h2 id="ordersTitle">Все заказы</h2>
+{% if pilot_assignment_enabled %}
+<details class="card">
+<summary>Создать заказ вручную</summary>
+<form id="manualOrderForm" method="post" action="/dispatch/orders/create">
+<label>Откуда<input name="from" required minlength="2" maxlength="200"></label>
+<label>Куда<input name="to" required minlength="2" maxlength="200"></label>
+<label>Дата поездки<input name="trip_date" type="date" required></label>
+<label>Время поездки<input name="trip_time" type="time" required></label>
+<button class="btn" type="submit">Создать заказ</button>
+</form>
+<p id="manualOrderStatus" class="muted" role="status"></p>
+</details>
+{% endif %}
 {% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">Назначение пилотов включим после серверной проверки ролей.</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
 <p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
 </aside>
@@ -237,6 +252,7 @@ let orderFilter='all';
 const labels={all:'Все заказы',new:'Новые заказы',active:'Заказы в пути',done:'История заказов'};
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});orderFilter=b.dataset.filter;$('ordersTitle').textContent=labels[orderFilter];document.dispatchEvent(new Event('pd-test-filter'));}));
 ['allPilots','onlinePilots'].forEach(id=>$(id).addEventListener('click',()=>{['allPilots','onlinePilots'].forEach(k=>{$(k).classList.toggle('active',k===id);$(k).setAttribute('aria-pressed',String(k===id))});document.dispatchEvent(new Event('pd-test-filter'));}));
+{% if pilot_assignment_enabled %}let eligiblePilots=[];{% endif %}
 {% if pilot_availability_enabled %}
 async function refreshAvailablePilots(){
     const list = $('availablePilotList');
@@ -246,7 +262,10 @@ async function refreshAvailablePilots(){
         });
         if (!response.ok) throw new Error();
         const {pilots} = await response.json();
-        const rows = pilots.map(pilot => {
+        if (!Array.isArray(pilots)) throw new Error();
+        const candidates = pilots.filter(pilot => typeof pilot.id === 'string');
+        {% if pilot_assignment_enabled %}eligiblePilots=candidates;{% endif %}
+        const rows = candidates.map(pilot => {
             const row = document.createElement('p');
             row.textContent = pilot.id;
             return row;
@@ -254,9 +273,11 @@ async function refreshAvailablePilots(){
         list.replaceChildren(...(rows.length ? rows : ['Нет доступных пилотов']));
         {% if not test_sync_enabled %}$('countOnline').textContent = String(rows.length);{% endif %}
     } catch {
+        {% if pilot_assignment_enabled %}eligiblePilots=[];{% endif %}
         list.textContent = 'Нет связи со списком пилотов';
         {% if not test_sync_enabled %}$('countOnline').textContent = '—';{% endif %}
     } finally {
+        {% if pilot_assignment_enabled %}renderPersistentOrders();{% endif %}
         setTimeout(refreshAvailablePilots, 5000);
     }
 }
@@ -265,6 +286,95 @@ refreshAvailablePilots();
 {% if persistent_queue_enabled %}
 const liveStatusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'К пассажиру',underway:'В поездке',finished:'Завершён',cancelled:'Отменён'};
 let lastOrders=null;
+{% if pilot_assignment_enabled %}
+const pilotCsrf={{ csrf|tojson }};
+let savingOrder=null;
+const chosenPilots=new Map();
+const manualOrderForm=$('manualOrderForm');
+const manualOrderFields=manualOrderForm.querySelectorAll('input');
+const manualOrderButton=manualOrderForm.querySelector('button');
+let pendingManualOrder=null;
+manualOrderForm.addEventListener('submit',async event=>{
+ event.preventDefault();
+ if(manualOrderButton.disabled)return;
+ const outcome=$('manualOrderStatus');
+ manualOrderButton.disabled=true;
+ try{
+   if(!pendingManualOrder){
+     const body=new URLSearchParams(new FormData(manualOrderForm));
+     body.set('request_id',crypto.randomUUID());
+     body.set('csrf',pilotCsrf);
+     pendingManualOrder=body;
+   }
+   for(const field of manualOrderFields)field.readOnly=true;
+   const response=await fetch(manualOrderForm.action,{
+     method:'POST',body:pendingManualOrder,credentials:'same-origin',
+     signal:AbortSignal.timeout(7000)});
+   const result=await response.json();
+   if(response.status===400||response.status===409){
+     pendingManualOrder=null;
+     outcome.textContent=response.status===400?'Проверь данные заказа.':
+       'Номер отправки уже использован. Проверь очередь перед новой отправкой.';
+     return;
+   }
+   if(!response.ok||typeof result.order_id!=='string'||result.payment_mode!=='disabled'){
+     throw new Error('Order not confirmed');
+   }
+   pendingManualOrder=null;
+   manualOrderForm.reset();
+   outcome.textContent='Заказ получен. ID заявки: '+result.order_id;
+ }catch{
+   outcome.textContent='Сервер не подтвердил заказ. Повтори отправку.';
+ }finally{
+   manualOrderButton.disabled=false;
+   for(const field of manualOrderFields)field.readOnly=Boolean(pendingManualOrder);
+ }
+});
+async function assignPersistentOrder(order, select, button){
+ if(savingOrder||!select.value)return;
+ savingOrder=order.id;button.disabled=true;
+ const outcome=$('assignmentStatus');
+ try{
+   const body=new URLSearchParams({pilot_id:select.value,csrf:pilotCsrf});
+   const response=await fetch('/dispatch/orders/'+encodeURIComponent(order.id)+'/assign',{
+     method:'POST',body,credentials:'same-origin',signal:AbortSignal.timeout(7000)});
+   const result=await response.json();
+   if(response.status===409){
+     outcome.textContent='Заказ уже изменился или пилот больше не допущен. Обновляем список.';
+     return;
+   }
+   if(!response.ok||result.order_id!==order.id)throw new Error('assignment');
+   const saved=lastOrders?.find(row=>row.id===order.id);
+   if(saved)saved.status=result.status;
+   chosenPilots.delete(order.id);
+   outcome.textContent='Пилот назначен.';
+ }catch{
+   outcome.textContent='Нет подтверждения назначения. Проверь статус заказа перед повтором.';
+ }finally{savingOrder=null;renderPersistentOrders();}
+}
+function appendAssignmentControl(card,order){
+ if(order.status!=='requested'||!['android','ios','dispatcher'].includes(order.source)||!eligiblePilots.length)return;
+ const select=document.createElement('select');
+ select.setAttribute('aria-label','Пилот для заказа '+order.id);
+ const placeholder=new Option('Выбрать пилота','');
+ select.append(placeholder);
+ for(const pilot of eligiblePilots){
+   const label='Пилот '+pilot.id.slice(0,8)+'…'+pilot.id.slice(-4);
+   select.append(new Option(label,pilot.id));
+ }
+ const remembered=chosenPilots.get(order.id);
+ if(remembered&&eligiblePilots.some(p=>p.id===remembered))select.value=remembered;
+ const submit=document.createElement('button');
+ submit.type='button';submit.className='btn';submit.textContent='Назначить пилота';
+ submit.disabled=!select.value||savingOrder!==null;
+ select.addEventListener('change',()=>{
+   chosenPilots.set(order.id,select.value);
+   submit.disabled=!select.value||savingOrder!==null;
+ });
+ submit.addEventListener('click',()=>assignPersistentOrder(order,select,submit));
+ card.append(select,submit);
+}
+{% endif %}
 function renderPersistentOrders(){
  if(!lastOrders)return;
  const items=lastOrders;
@@ -282,8 +392,45 @@ function renderPersistentOrders(){
    const route=document.createElement('strong');route.textContent=order.origin+' → '+order.destination;
    const info=document.createElement('p');
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
-     ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
-   card.append(route,info);return card;
+     ' · '+order.trip_date+' '+order.trip_time;
+   const orderId=document.createElement('p');
+   orderId.className='muted';
+   orderId.textContent='ID заявки: '+order.id;
+   orderId.style.overflowWrap='anywhere';
+   card.append(route,info,orderId);
+   if(order.details&&typeof order.details==='object'){
+     const quote=document.createElement('p');
+     const cents=order.quoted_total_cents;
+     quote.textContent=order.quote_required===false&&Number.isInteger(cents)&&cents>=0?
+       'Предварительная стоимость: '+(cents/100).toFixed(2)+' €':
+       'Стоимость по запросу диспетчеру';
+     card.append(quote);
+     const details=document.createElement('p');
+     const chosen=Array.isArray(order.details.extras)?
+       order.details.extras.filter(x=>typeof x==='string'):[];
+     const names={meet_sign:'Встреча с табличкой',sober_driver:'Трезвый водитель',
+       pets:'Животные',music:'Музыка',flowers:'Цветы',coffee:'Кофе',water:'Вода',
+       quiet_ride:'Тихая поездка',luggage_help:'Помощь с багажом',
+       jumpstart:'Запуск автомобиля',delivery:'Доставка'};
+     const selected=chosen.length?'Услуги: '+chosen.map(x=>names[x]||x).join(', '):
+       'Без дополнительных платных услуг';
+     const prefs=order.details.preferences;
+     const personal=[];
+     if(prefs&&typeof prefs==='object'){
+       if(typeof prefs.radio==='string'&&prefs.radio!=='Без радио')
+         personal.push('Радио: '+prefs.radio);
+       if(Array.isArray(prefs.tracks))
+         personal.push(...prefs.tracks.filter(x=>typeof x==='string'&&x).map(x=>'Трек: '+x));
+       if(Number.isFinite(prefs.temperature))
+         personal.push('Температура: '+prefs.temperature+'°C');
+       if(typeof prefs.wishes==='string'&&prefs.wishes)
+         personal.push('Пожелания: '+prefs.wishes);
+     }
+     details.textContent=selected+(personal.length?' · '+personal.join(' · '):'');
+     card.append(details);
+   }
+   {% if pilot_assignment_enabled %}appendAssignmentControl(card,order);{% endif %}
+   return card;
  });
  $('ordersList').replaceChildren(...(cards.length?cards:['Заказов пока нет']));
 }

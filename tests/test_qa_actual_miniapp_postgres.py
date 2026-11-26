@@ -79,12 +79,18 @@ def test_actual_telegram_miniapp_orders_use_only_synthetic_postgres(monkeypatch)
     client = app.test_client()
     body = {"origin":"QA Telegram Pickup","destination":"QA Telegram Airport",
             "trip_date":"01.01.2027","trip_time":"13:30",
-            "request_key":uuid.uuid4().hex,"payment_method":"Наличными"}
+            "request_key":uuid.uuid4().hex,"payment_method":"Наличными",
+            "booking_details":{"tariff":"Трансфер","ride_type":"Трансфер",
+              "round_trip":True,"advance_booking":True,
+              "extras":["Встреча с табличкой","Вода"],
+              "wishes":"В салоне 21 градус","passengers":2,
+              "luggage":"Средний","fare_preview_eur":110}}
     assert app_module.qa_shared_orders_enabled()
     assert client.post("/api/order", json=body).status_code == 401
     created = client.post("/api/order", json=body, headers=signed(101))
     assert created.status_code in (200,201), created.get_data(as_text=True)
-    assert created.json["details_not_saved"] is True
+    assert created.json["details_saved"] is True
+    assert created.json["details_not_saved"] is False
     oid = created.json["order_id"]
     assert str(uuid.UUID(oid)) == oid
     replay = client.post("/api/order",json=body,headers=signed(101))
@@ -99,6 +105,10 @@ def test_actual_telegram_miniapp_orders_use_only_synthetic_postgres(monkeypatch)
     assert len(history.json["orders"]) == 1
     assert history.json["orders"][0]["order_id"] == oid
     assert history.json["orders"][0]["trip_date"] == "2027-01-01"
+    details = history.json["orders"][0]["booking_details"]
+    assert details["fare_preview_eur"] == 110
+    assert details["extras"] == ["Встреча с табличкой","Вода"]
+    assert details["wishes"] == "В салоне 21 градус"
     assert client.get("/api/orders",headers=signed(102)).json == {"orders":[]}
     assert client.post("/api/order", json={**body,"payment_method":"Банковская карта"},
                        headers=signed(101)).status_code == 503
@@ -112,7 +122,9 @@ def test_actual_telegram_miniapp_orders_use_only_synthetic_postgres(monkeypatch)
     admin = dispatch.get("/dispatch/orders/state",headers=signed(201))
     assert admin.status_code == 200
     orders = admin.json["orders"]
-    assert any(o["id"]==oid and o["source"]=="telegram_miniapp" for o in orders)
+    assert any(o["id"]==oid and o["source"]=="telegram_miniapp"
+               and o["booking_details"]["passengers"] == 2
+               and o["booking_details"]["round_trip"] is True for o in orders)
     with psycopg.connect(DSN) as db:
         assert db.execute("SELECT count(*) FROM public.pd_dispatch_orders").fetchone() == (1,)
         assert db.execute("SELECT telegram_id FROM public.pd_telegram_order_owners "

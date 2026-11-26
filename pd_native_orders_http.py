@@ -7,6 +7,7 @@ import uuid
 
 import psycopg
 from pd_dispatch_persistent import validated_order, fingerprint
+from pd_qa_order_details import normalize_details
 from pd_native_auth_postgres_session_lifecycle import _digest
 
 def make_orders_app(next_app, database_url, *, clock=time.time):
@@ -48,33 +49,36 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                 # Explicit migration is required; no runtime schema changes.
                 if method == "GET":
                     rows = db.execute("""SELECT o.id,o.origin,o.destination,o.trip_date,
-                        o.trip_time,o.status FROM public.pd_dispatch_orders o
+                        o.trip_time,o.status,o.booking_details FROM public.pd_dispatch_orders o
                         JOIN public.pd_native_order_owners n ON n.order_id=o.id
                         WHERE n.user_id=%s ORDER BY o.created_at DESC LIMIT 100""",
                         (uid,)).fetchall()
                     return reply("200 OK", {"payment_mode":"disabled","orders":[
-                        dict(zip(("order_id","from","to","trip_date","trip_time","status"),
+                        dict(zip(("order_id","from","to","trip_date","trip_time","status","booking_details"),
                                  (str(r[0]), *r[1:]))) for r in rows]})
                 try:
                     length = int(environ.get("CONTENT_LENGTH", "0"))
                     if not 0 < length <= 8192 or environ.get("CONTENT_TYPE","").split(";")[0] != "application/json":
                         raise ValueError()
                     data = json.loads(environ["wsgi.input"].read(length))
-                    if not isinstance(data, dict) or set(data) != {"request_id","from","to","trip_date","trip_time"}:
+                    if not isinstance(data, dict) or set(data) not in (
+                            {"request_id","from","to","trip_date","trip_time"},
+                            {"request_id","from","to","trip_date","trip_time","booking_details"}):
                         raise ValueError()
+                    details = normalize_details(data.pop("booking_details", None))
                     request_id = str(uuid.UUID(data.pop("request_id")))
                     scoped = hashlib.sha256((str(uid)+":"+request_id).encode()).hexdigest()
                     values = validated_order(dict(data, source="android", source_order_id=scoped))
                 except (ValueError, TypeError, KeyError, AttributeError):
                     return reply("400 Bad Request", {"error":"invalid_order"})
                 source, original, origin, destination, date, clock_time = values
-                fp = fingerprint(values)
+                fp = fingerprint((values, details))
                 order_id = str(uuid.uuid4())
                 inserted = db.execute("""INSERT INTO public.pd_dispatch_orders
-                    (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                    (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time,booking_details)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)
                     ON CONFLICT(source,source_order_id) DO NOTHING RETURNING id""",
-                    (order_id,source,original,fp,origin,destination,date,clock_time)).fetchone()
+                    (order_id,source,original,fp,origin,destination,date,clock_time,json.dumps(details,ensure_ascii=False))).fetchone()
                 if inserted:
                     db.execute("INSERT INTO public.pd_native_order_owners(order_id,user_id) VALUES (%s,%s)",
                                (order_id,uid))

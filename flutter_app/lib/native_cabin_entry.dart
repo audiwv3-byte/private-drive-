@@ -9,6 +9,7 @@ import 'demo_interfaces.dart';
 import 'permissions_onboarding.dart';
 import 'native_session.dart';
 import 'native_pilot_orders.dart';
+import 'native_orders_api.dart';
 import 'pilot_cabin.dart';
 import 'native_session_store.dart';
 import 'pilot_identity_api.dart';
@@ -189,6 +190,11 @@ class _PdNativeCabinEntryState extends State<PdNativeCabinEntry> {
     final cabin = PrivateDriveDemo(
       key: ValueKey('entry-$role-${session?.userId ?? (localQa ? 'local-qa' : 'guest')}'),
       passengerOnly: role == 'passenger', pilotOnly: role == 'pilot',
+      ordersApi: !localQa && role == 'passenger' && session != null
+          && session.role == 'passenger'
+          && const String.fromEnvironment('PD_NATIVE_AUTH_API_URL').isNotEmpty
+          ? NativeOrdersApi(const String.fromEnvironment('PD_NATIVE_AUTH_API_URL'), session.token)
+          : null,
       showPilotIdentityCheck: !localQa,
       showPilotCockpit: showPilotCockpit,
       storageScope: session?.userId ?? (localQa ? 'local-qa' : 'internal-guest'),

@@ -54,5 +54,5 @@ jobs:
         working-directory: flutter_app
         run: |
           flutter pub get
-          flutter test test/passenger_demo_test.dart test/passenger_ride_entry_test.dart test/native_orders_api_test.dart
+          flutter test test/passenger_demo_test.dart test/passenger_ride_entry_test.dart test/native_orders_api_test.dart test/passenger_server_booking_test.dart
           flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings

@@ -45,6 +45,10 @@ def test_qa26_assignment_and_status(monkeypatch):
         return {"X-Telegram-Init-Data":urllib.parse.urlencode(values)}
     def native(ch):
         return {"Authorization":"Bearer "+ch*48}
+    readiness = api.get("/qa/staging/readiness", headers=tg(201))
+    assert readiness.status_code == 200, readiness.json
+    assert readiness.json == {"ready": True, "reason": "ok"}
+    assert api.get("/qa/staging/readiness", headers=tg(101)).status_code == 403
     telegram_body = {"request_key":uuid.uuid4().hex,"origin":"Synthetic A","destination":"Synthetic B","trip_date":"2027-01-01","trip_time":"12:00"}
     t = api.post("/api/order",json=telegram_body,headers=tg(101))
     assert t.status_code == 200,t.json

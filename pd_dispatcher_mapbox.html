@@ -182,6 +182,23 @@ function renderPersistentOrders(){
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
      ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
    card.append(route,info);
+   if(order.details&&typeof order.details==='object'){
+     const quote=document.createElement('p');
+     const cents=order.quoted_total_cents;
+     quote.textContent=order.quote_required===false&&Number.isInteger(cents)&&cents>=0?
+       'Предварительная стоимость: '+(cents/100).toFixed(2)+' €':
+       'Стоимость по запросу диспетчеру';
+     card.append(quote);
+     const details=document.createElement('p');
+     const chosen=Array.isArray(order.details.extras)?
+       order.details.extras.filter(x=>typeof x==='string'):[];
+     const selected=chosen.length?'Услуги: '+chosen.join(', '):'Без дополнительных платных услуг';
+     const prefs=order.details.preferences;
+     const notes=prefs&&typeof prefs==='object'&&typeof prefs.wishes==='string'
+       ?prefs.wishes:'';
+     details.textContent=selected+(notes?' · Пожелания: '+notes:'');
+     card.append(details);
+   }
    {% if pilot_assignment_enabled %}appendAssignmentControl(card,order);{% endif %}
    return card;
  });

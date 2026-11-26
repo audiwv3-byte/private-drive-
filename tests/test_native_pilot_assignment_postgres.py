@@ -241,6 +241,17 @@ def test_assignment_across_existing_web_and_native_order_apis(stage, monkeypatch
     assert availability("pilotB", True).status_code == 200
     assert client.get("/dispatch/orders/eligible-pilots").json == {
         "pilots": [{"id": "pilotA"}, {"id": "pilotB"}]}
+    # A lost phone connection cannot leave the pilot appearing online forever.
+    stale = owner.execute(
+        "SELECT public.pd_native_pilot_availability_state(%s,%s,%s)",
+        (sha256(tokens["pilotA"].encode()).hexdigest(), int(time.time()) + 121,
+         None)).fetchone()[0]
+    assert stale["online"] is False
+    assert owner.execute(
+        "SELECT count(*) FROM public.pd_pilot_assignment_candidates(%s)",
+        (int(time.time()) + 121,)).fetchone()[0] == 0
+    assert availability("pilotA").json["online"] is True
+
     assert client.post(endpoint, data={"pilot_id": "pilotA", "csrf": "invalid"}).status_code == 403
     assert client.post(endpoint, data={"pilot_id": "pilotOld", "csrf": token}).status_code == 409
     assert client.post(endpoint, data={"pilot_id": "pilotReview", "csrf": token}).status_code == 409

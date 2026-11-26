@@ -47,6 +47,11 @@ application = make_identity_app(application, database_url, sms_enabled=live,
 
 application = make_native_pilot_orders_app(application, database_url)
 
+# QA-only localhost adapter. No effect on Render or other deployed services:
+# both explicit QA opt-in and synthetic PostgreSQL are required.
+from pd_qa_native_orders_mount import mount_if_synthetic
+application = mount_if_synthetic(application, database_url)
+
 def _report_sms_setup():
     from pd_twilio_setup_diagnostics import inspect_setup
     print('PD_SMS_SETUP_STATUS ' + json.dumps(inspect_setup(os.environ)), flush=True)

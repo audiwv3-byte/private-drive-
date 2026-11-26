@@ -379,7 +379,7 @@ def register(app, core):
                 if test_sync_enabled and not use_test_queue else None,
             telegram_test_enabled=telegram_test_ready,
             analytics_enabled="pd_site_analytics" in app.view_functions,
-            csrf=csrf() if test_sync_enabled else "",
+            csrf=csrf() if test_sync_enabled or persistent_queue_enabled else "",
             pilot_intake_enabled=pilot_intake_available,
             pilot_add_url="/pilot-registration" if pilot_intake_available else None,
             staging_registry="dispatch_accounts_state" in app.view_functions,

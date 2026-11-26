@@ -88,13 +88,15 @@ class NativePilotOrdersApi {
   static const stage = 'https://private-drive-drbd.onrender.com';
   static const _timeout = Duration(seconds: 7);
 
-  static const qaGpsEnabled = bool.fromEnvironment('PD_QA28_GPS') &&
-      bool.fromEnvironment('PD_INTERNAL_QA');
+  // Production-capable pilot GPS uses the authenticated HTTPS contract. QA
+  // flags are reserved exclusively for the debug loopback transport.
+  static const qaGpsEnabled = true;
 
   // QA29 is a separate debug-only APK. It can never send a real session
   // to plaintext HTTP, or reach the existing staging/production service.
   static const qa29Loopback = bool.fromEnvironment('PD_QA29_LOOPBACK') &&
-      qaGpsEnabled && kDebugMode;
+      bool.fromEnvironment('PD_QA28_GPS') &&
+      bool.fromEnvironment('PD_INTERNAL_QA') && kDebugMode;
   static const qa29Base = 'http://127.0.0.1:18729';
   bool get _qa29Allowed => qa29Loopback && baseUrl == qa29Base &&
       token.startsWith('qa29-synthetic-') && token.length >= 40;
@@ -107,9 +109,8 @@ class NativePilotOrdersApi {
   }
 
   Future<void> publishGps(String orderId, QaGpsFix? fix, int capturedAt) async {
-    if (!qaGpsEnabled || !_allowed ||
-        !PilotAssignedOrder._uuid.hasMatch(orderId)) {
-      throw const FormatException('GPS requires isolated QA and assigned order');
+    if (!_allowed || !PilotAssignedOrder._uuid.hasMatch(orderId)) {
+      throw const FormatException('GPS requires authenticated HTTPS and assigned order');
     }
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
       throw const PdHttpStatusException(401);
@@ -520,7 +521,7 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
         oldWidget.api.token != widget.api.token ||
         oldWidget.visible != widget.visible) {
       if (oldWidget.api.baseUrl != widget.api.baseUrl ||
-          oldWidget.api.token != widget.api.token) {
+          oldWidget.api.token != widget.api.token || !widget.visible) {
         final old = _gpsPublisher;
         _gpsPublisher = null;
         if (old != null) unawaited(old.stop());
@@ -628,8 +629,9 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
                   children: [
                     Text('${order.date} ${order.time} · ${order.statusLabel}'),
                     SelectableText('ID заказа: ${order.orderId}'),
-                    if (NativePilotOrdersApi.qaGpsEnabled && !kIsWeb &&
-                        defaultTargetPlatform == TargetPlatform.android)
+                    if (!kIsWeb &&
+                        (defaultTargetPlatform == TargetPlatform.android ||
+                         defaultTargetPlatform == TargetPlatform.iOS))
                       OutlinedButton(
                         key: ValueKey('qa28-gps-${order.orderId}'),
                         onPressed: _gpsStarting || _actingOrderId != null ||
@@ -638,7 +640,7 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
                             ? null : () => _toggleGps(order),
                         child: Text(_gpsPublisher?.orderId == order.orderId
                             ? 'Остановить передачу GPS'
-                            : 'Передавать GPS диспетчеру · QA'),
+                            : 'Передавать GPS диспетчеру'),
                       ),
                     if (order.waitingSeconds > 0 || order.waitingActive)
                       Text('Ожидание: ${order.waitingSeconds} сек · '

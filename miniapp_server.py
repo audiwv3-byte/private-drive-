@@ -241,6 +241,16 @@ def create_order():
     d = request.get_json(force=True)
     if not isinstance(d,dict):raise ValueError('Некорректная заявка')
     validate_route_data(d)
+    import pd_telegram_persistent_bridge as bridge
+    if bridge.enabled() and not d.get('request_key'):
+        return jsonify(ok=False,error="request_key_required"),400
+    def deliver_saved(order):
+        if not bridge.enabled():
+            return None
+        try:
+            return bridge.deliver(order)
+        except bridge.DeliveryError:
+            return False
     request_key=d.get('request_key')
     fingerprint=''
     if request_key is not None:
@@ -254,6 +264,9 @@ def create_order():
         if previous:
             if previous['request_fingerprint']!=fingerprint:
                 raise ValueError('Состав заявки изменился. Начните новую заявку.')
+            delivered=deliver_saved(core.order_find(previous['id']))
+            if delivered is False:
+                return jsonify(ok=False,error="dispatch_pending",order_id=previous['id']),503
             return jsonify(ok=True,order_id=previous['id'],status=previous['status'],price=previous['price'],replayed=True)
     origin, dest = str(d.get('origin','')).strip(),str(d.get('destination','')).strip()
     if not (2 <= len(origin) <= 200 and 2 <= len(dest) <= 200) or origin.casefold() == dest.casefold():
@@ -303,12 +316,20 @@ def create_order():
         oid,created=core.order_save(uid,st,request_key,fingerprint)
         if not created:
             previous=core.order_find(oid)
+            delivered=deliver_saved(previous)
+            if delivered is False:
+                return jsonify(ok=False,error="dispatch_pending",order_id=oid),503
             return jsonify(ok=True,order_id=oid,status=previous['status'],price=previous['price'],replayed=True)
     else:
         oid=core.order_save(uid,st)
     with core.db(core.ORDERS_DB) as conn:
         conn.execute('UPDATE orders SET stop_address=? WHERE id=? AND telegram_id=?',(stop_address,oid,uid))
     r=core.order_find(oid)
+    if bridge.enabled():
+        delivered=deliver_saved(r)
+        if delivered is False:
+            return jsonify(ok=False,error="dispatch_pending",order_id=oid),503
+        return jsonify(ok=True,order_id=oid,status='Новая',price=price,dispatch_order_id=delivered["order_id"])
     try:
         core.say(uid, '✅ Заявка №%s получена. Ожидайте подтверждения пилотом.\n%s'%(oid,core.order_text(r)))
     except Exception: core.LOG.exception('Client notify failed')

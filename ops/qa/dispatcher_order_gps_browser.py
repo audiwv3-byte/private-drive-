@@ -58,7 +58,8 @@ def run():
         card.wait_for()
         assert "Пилот назначен" in card.inner_text()
         card.click()
-        page.locator(".leaflet-map-pane").wait_for()
+        page.locator("#rasterMap.leaflet-container").wait_for(state="visible")
+        page.locator(".leaflet-map-pane").wait_for(state="attached")
         markers = page.locator(".leaflet-marker-pane .pilot-marker")
         print("Assigned order visible; 2D Leaflet map initialized", flush=True)
 

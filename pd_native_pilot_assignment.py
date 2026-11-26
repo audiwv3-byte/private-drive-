@@ -44,6 +44,14 @@ def dispatcher_assignment_enabled():
     return reader is not None and reader == writer
 
 
+def dispatcher_list_enabled():
+    """Use the same isolated database guard for browser pilot candidate reads.
+
+    Never enable the legacy Render-specific list-only credential path.
+    """
+    return dispatcher_assignment_enabled()
+
+
 @contextmanager
 def _connect(url):
     import psycopg

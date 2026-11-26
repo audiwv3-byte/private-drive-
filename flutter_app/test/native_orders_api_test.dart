@@ -22,7 +22,9 @@ void main() {
     var reads = 0;
     final api = NativeOrdersApi('https://example.invalid', 'test-token',
       client: MockClient((request) async {
-        expect(request.method, 'GET');
+        // A request may resolve during pumpAndSettle; synchronous matcher
+        // avoids overlapping Flutter's guarded widget-test operations.
+        expectSync(request.method, 'GET');
         reads++;
         return http.Response(
           '{"orders":[{"from":"Vilnius","to":"Airport",'

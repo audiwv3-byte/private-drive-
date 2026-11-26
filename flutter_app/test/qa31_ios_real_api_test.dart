@@ -23,16 +23,18 @@ void main() {
         final out=await io.openUrl(req.method,local);
         out.followRedirects=false;
         req.headers.forEach(out.headers.set);
+        out.contentLength=req.bodyBytes.length;
         if(req.bodyBytes.isNotEmpty) out.add(req.bodyBytes);
         final res=await out.close();
         final bytes=await res.expand((x)=>x).toList();
+        if(res.statusCode>=400) { print('QA31 local response: ${res.statusCode} ${utf8.decode(bytes)}'); }
         return http.Response.bytes(bytes,res.statusCode);
       }));
     final assigned=await api.load();
     if(finish) {
       expect(assigned.any((x)=>x.orderId==oid),false);
       final stamp=DateTime.now().millisecondsSinceEpoch~/1000;
-      await expectLater(api.publishGps(oid,QaGpsFix(1,2,stamp),stamp),throwsA(isA<PdHttpStatusException>()));
+      await expectLater(api.publishGps(oid,QaGpsFix(1,2,stamp),stamp),throwsA(isA<PdHttpStatusException>().having((e)=>e.statusCode,'status',409)));
     } else {
       expect(assigned.any((x)=>x.orderId==oid),true);
       final stamp=body['captured_at'] as int;

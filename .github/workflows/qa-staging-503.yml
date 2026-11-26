@@ -6,6 +6,7 @@ on:
       - qa/staging-api-503-readiness-20261126
       - qa/staging-api-503-contract-20261126
       - qa/staging-503-contract-gates-20261126
+      - qa/staging-503-render-entrypoint-20261126
   workflow_dispatch:
 
 permissions:
@@ -135,3 +136,31 @@ jobs:
           PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
           PD_PAYMENT_MODE: disabled
           PD_NATIVE_SMS_LIVE: 'NO'
+
+  render-entrypoint-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout isolated QA branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout observed native API deploy source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: audiwv3-byte/private-drive-
+          ref: 0ed1e60482f30aa5039d7f0ef170144949a4e2ec
+          path: .qa_snapshot/native_api
+          persist-credentials: false
+      - name: Checkout observed dispatcher deploy source (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: audiwv3-byte/private-drive-
+          ref: 44795f496ed05760cfc09474c506c6d7916c86fb
+          path: .qa_snapshot/dispatcher
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Audit deployed WSGI contracts without network or database access
+        run: python -m unittest discover -s tests -p test_qa_render_wsgi_contract.py -v

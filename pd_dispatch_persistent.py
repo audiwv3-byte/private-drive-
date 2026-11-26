@@ -41,6 +41,10 @@ def enabled():
             and len(key) >= 32)
 
 
+def order_gps_enabled():
+    return enabled() and os.environ.get("PD_QA27_GPS") == "1"
+
+
 def verified_request(raw, headers, key, now=None):
     issued = headers.get("X-PD-Order-Timestamp", "")
     signature = headers.get("X-PD-Order-Signature", "")
@@ -130,6 +134,26 @@ def register(app, authorized):
         except Exception:
             app.logger.exception("Persistent dispatcher order store unavailable")
             return reply({"error":"storage_unavailable"},503)
+
+    @app.get("/dispatch/orders/<uuid:order_id>/gps")
+    def order_gps(order_id):
+        if not authorized():
+            return reply({"error": "unauthorized"}, 401)
+        if not order_gps_enabled():
+            return reply({"error": "gps_disabled"}, 503)
+        import psycopg
+        try:
+            with connect() as db:
+                if db.execute("SELECT current_database()").fetchone()[0] != "private_drive_test":
+                    return reply({"error": "gps_disabled"}, 503)
+                result = db.execute(
+                    "SELECT public.pd_qa27_dispatch_gps(%s, %s)",
+                    (order_id, int(time.time())),
+                ).fetchone()[0]
+            return reply(result)
+        except psycopg.Error:
+            app.logger.exception("Dispatcher GPS read unavailable")
+            return reply({"error": "storage_unavailable"}, 503)
 
     @app.get("/dispatch/orders/state")
     def order_state():

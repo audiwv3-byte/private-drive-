@@ -316,7 +316,7 @@ def register(app, core):
         from pd_site_analytics import register as register_site_analytics
         register_site_analytics(app, authorized, passwords.connect)
 
-    from pd_dispatch_persistent import enabled as persistent_queue_ready
+    from pd_dispatch_persistent import enabled as persistent_queue_ready, order_gps_enabled
     from pd_dispatch_persistent import register as register_persistent_queue
     register_persistent_queue(app, authorized)
     from pd_native_pilot_assignment import dispatcher_list_enabled, register_dispatch_assignment
@@ -375,6 +375,7 @@ def register(app, core):
             persistent_queue_enabled=persistent_queue_enabled and not use_test_queue,
             pilot_availability_enabled=dispatcher_list_enabled(),
             gps_sync_enabled=test_sync_enabled,
+            order_gps_enabled=persistent_queue_enabled and not use_test_queue and order_gps_enabled(),
             test_queue_link=url_for("pd_dispatch_map", queue="test")
                 if test_sync_enabled and not use_test_queue else None,
             telegram_test_enabled=telegram_test_ready,

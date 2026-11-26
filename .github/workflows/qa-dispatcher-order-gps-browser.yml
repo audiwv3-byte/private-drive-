@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export PYTHONPATH="$PWD/qa_android/flutter_app/tool"
+          export PYTHONPATH="$PWD:$PWD/qa_android/flutter_app/tool"
           python -u -m qa29_gps_integration serve qa_server > "$RUNNER_TEMP/map-api.log" 2>&1 &
           server=$!
           trap 'kill "$server" 2>/dev/null || true; tail -n 30 "$RUNNER_TEMP/map-api.log"' EXIT

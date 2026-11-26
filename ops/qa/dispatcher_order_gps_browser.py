@@ -2,12 +2,20 @@
 import base64
 from collections import Counter
 import json
+import os
+import secrets
 from pathlib import Path
 import shutil
 import time
+from threading import Thread
+from types import SimpleNamespace
 from urllib.parse import urlsplit
 
-from jinja2 import Environment
+from flask import Flask
+from werkzeug.security import generate_password_hash
+from werkzeug.serving import make_server
+
+from pd_web_dispatcher import register
 from playwright.sync_api import sync_playwright
 
 import qa29_gps_integration as fixture
@@ -19,10 +27,22 @@ def run():
     write_path = f"/native-pilot-orders/{oid}/gps"
     pilot = {"Authorization": "Bearer " + fixture.PILOT}
     admin = fixture.signed(201)
-    template = Environment(autoescape=True).from_string(Path("pd_dispatcher_mapbox.html").read_text())
-    html = template.render(mapbox_token="", persistent_queue_enabled=True, test_sync_enabled=False,
-                           gps_sync_enabled=True, test_queue_link="/dispatch/map?queue=test",
-                           pilot_availability_enabled=True, csrf=fixture.CSRF)
+    password = secrets.token_urlsafe(24)
+    os.environ.update({
+        "PD_DISPATCH_SESSION_SECRET": secrets.token_hex(32),
+        "PD_DISPATCH_PASSWORD_HASH": generate_password_hash(password),
+        "PD_DISPATCH_ADMIN_ID": "201", "PD_DISPATCH_STAGING_ONLY": "1",
+        "PD_DISPATCH_PERSISTENT_QUEUE": "1", "PD_QA27_GPS": "1",
+        "PD_DISPATCH_ORDERS_INGEST_SECRET": secrets.token_hex(32),
+        "PD_DISPATCH_ORDERS_DATABASE_URL": fixture.DSN.replace("postgres:isolated-test@", "qa29_api:synthetic-api@"),
+        "PD_DISPATCH_TEST_SYNC": "1",
+    })
+    app = Flask(__name__)
+    assert register(app, SimpleNamespace(ADMIN_IDS={201}, is_admin=lambda uid: uid == 201))
+    server = make_server("127.0.0.1", 0, app, threaded=True)
+    Thread(target=server.serve_forever, daemon=True).start()
+    web_host = f"127.0.0.1:{server.server_port}"
+    web_url = f"http://{web_host}"
     empty_png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jgGQAAAAASUVORK5CYII=")
     browser_requests = Counter()
     errors = []
@@ -32,14 +52,11 @@ def run():
     def route(request_route):
         url = urlsplit(request_route.request.url)
         path = url.path
-        if url.netloc == urlsplit(fixture.BASE).netloc:
+        if url.netloc == web_host:
             browser_requests[path] += 1
-            if path == "/dispatch/map":
-                return request_route.fulfill(body=html, content_type="text/html; charset=utf-8")
             if path == "/dispatch/test-sync/state":
                 return request_route.fulfill(json={"pilots": legacy_points})
-            if path.startswith("/dispatch/orders/"):
-                return request_route.continue_(headers={**request_route.request.headers, **admin})
+            return request_route.continue_()
         if url.netloc == "unpkg.com" and path in ("/leaflet@1.9.4/dist/leaflet.js", "/leaflet@1.9.4/dist/leaflet.css"):
             filename = Path(path).name
             mime = "text/javascript" if filename.endswith(".js") else "text/css"
@@ -53,11 +70,17 @@ def run():
         page = browser.new_page(viewport={"width": 1440, "height": 900})
         page.on("pageerror", lambda exc: errors.append(str(exc)))
         page.route("**/*", route)
-        page.goto(fixture.BASE + "/dispatch/map")
+        anonymous = page.request.get(web_url + read_path)
+        assert anonymous.status == 401 and "no-store" in anonymous.headers["cache-control"]
+        page.goto(web_url + "/dispatch/login")
+        page.locator('input[name=password]').fill(password)
+        page.locator('button[type=submit], form button').first.click()
+        page.wait_for_url(web_url + "/dispatch")
+        print("Unsigned browser GPS read denied; signed-in dispatcher opened /dispatch", flush=True)
         card = page.locator("#ordersList .card").filter(has_text="Synthetic A")
         card.wait_for()
         assert "Пилот назначен" in card.inner_text()
-        card.click()
+        card.get_by_role("button", name="Пилот на карте").click()
         page.locator("#rasterMap.leaflet-container").wait_for(state="visible")
         page.locator(".leaflet-map-pane").wait_for(state="attached")
         markers = page.locator(".leaflet-marker-pane .pilot-marker")
@@ -97,6 +120,8 @@ def run():
         legacy_points.clear()
         observe("legacy_control_removed")
         browser.close()
+    server.shutdown()
+    server.server_close()
 
     first, second, finished, control1, control2, removed = [sample["positions"] for sample in observations]
     print("Browser request counts:", dict(browser_requests), "page errors:", errors, flush=True)

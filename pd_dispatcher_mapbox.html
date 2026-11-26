@@ -105,7 +105,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 </aside>
 <section id="map" aria-label="Интерактивная карта диспетчерской">
 <div id="rasterMap"></div><div id="glMap" hidden></div>
-<div id="mapNotice" role="status"><b id="mapProvider">Загрузка Mapbox…</b><span id="mapStatus">{% if gps_sync_enabled %}Синяя метка обозначает пассажира, который поделился GPS.{% else %}Карта доступна для просмотра. Позиции пилотов и маршруты заказов пока не подключены.{% endif %}</span></div>
+<div id="mapNotice" role="status"><b id="mapProvider">Загрузка Mapbox…</b><span id="mapStatus">{% if order_gps_enabled %}Выбери активный заказ, чтобы увидеть пилота на карте.{% elif gps_sync_enabled %}Синяя метка обозначает пассажира, который поделился GPS.{% else %}Карта доступна для просмотра. Позиции пилотов и маршруты заказов пока не подключены.{% endif %}</span></div>
 <div class="map-actions" role="group" aria-label="Управление картой">
 <button class="btn" id="modeBtn" type="button" aria-pressed="false" disabled>3D</button>
 <button class="btn" id="themeBtn" type="button">Дневная карта</button>
@@ -265,6 +265,43 @@ refreshAvailablePilots();
 {% if persistent_queue_enabled %}
 const liveStatusLabels={requested:'Новый',assigned:'Пилот назначен',approaching:'К пассажиру',underway:'В поездке',finished:'Завершён',cancelled:'Отменён'};
 let lastOrders=null;
+{% if order_gps_enabled %}
+let selectedGpsOrder=null;
+let gpsRevision=0;
+const activeTrip=status=>['assigned','approaching','underway'].includes(status);
+function showOrderFix(position,message){
+ pilotPoint=position;
+ pilotPoints=position?[{id:selectedGpsOrder,position,label:'Пилот выбранного заказа'}]:[];
+ drawPilot();
+ $('mapStatus').textContent=message;
+}
+function clearGpsSelection(message){
+ selectedGpsOrder=null;
+ gpsRevision++;
+ showOrderFix(null,message);
+}
+async function refreshOrderGps(){
+ const id=selectedGpsOrder;
+ if(!id)return;
+ const revision=++gpsRevision;
+ try{
+   const response=await fetch('/dispatch/orders/'+encodeURIComponent(id)+'/gps',{
+     credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(4500)
+   });
+   if(!response.ok)throw new Error();
+   const fix=await response.json();
+   if(revision!==gpsRevision)return;
+   const valid=fix.available===true && Number.isFinite(fix.latitude) && Math.abs(fix.latitude)<=90
+     && Number.isFinite(fix.longitude) && Math.abs(fix.longitude)<=180;
+   const point=valid?[fix.latitude,fix.longitude]:null;
+   const first=point&&!pilotPoint;
+   showOrderFix(point,point?'Пилот выбранного заказа на карте.':'Координаты пилота пока недоступны.');
+   if(first)focusMap([fix.longitude,fix.latitude]);
+ }catch{
+   if(revision===gpsRevision)showOrderFix(null,'Не удалось обновить координаты пилота.');
+ }
+}
+{% endif %}
 function renderPersistentOrders(){
  if(!lastOrders)return;
  const items=lastOrders;
@@ -277,13 +314,36 @@ function renderPersistentOrders(){
  {% if not pilot_availability_enabled %}countOnline:0,{% endif %}countDone:items.filter(o=>['finished','cancelled'].includes(o.status)).length})){
    $(id).textContent=n;
  }
+ {% if order_gps_enabled %}
+ if(selectedGpsOrder&&!chosen.some(o=>o.id===selectedGpsOrder&&activeTrip(o.status))){
+   clearGpsSelection('Выбери активный заказ, чтобы увидеть пилота на карте.');
+ }
+ {% endif %}
  const cards=chosen.map(order=>{
    const card=document.createElement('article');card.className='card';
    const route=document.createElement('strong');route.textContent=order.origin+' → '+order.destination;
    const info=document.createElement('p');
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
      ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
-   card.append(route,info);return card;
+   card.append(route,info);
+   {% if order_gps_enabled %}
+   if(activeTrip(order.status)){
+     const button=document.createElement('button');
+     button.type='button';button.className='btn';button.textContent='Пилот на карте';
+     button.setAttribute('aria-pressed',String(order.id===selectedGpsOrder));
+     card.append(button);
+     card.addEventListener('click',()=>{
+       if(selectedGpsOrder===order.id)return;
+       selectedGpsOrder=order.id;
+       showOrderFix(null,'Запрашиваем координаты пилота…');
+       for(const item of $('ordersList').querySelectorAll('[aria-pressed]')){
+         item.setAttribute('aria-pressed',String(item===button));
+       }
+       refreshOrderGps();
+     });
+   }
+   {% endif %}
+   return card;
  });
  $('ordersList').replaceChildren(...(cards.length?cards:['Заказов пока нет']));
 }
@@ -295,8 +355,10 @@ async function pollPersistentOrders(){
    const body=await response.json();
    if(!body.persistent||!Array.isArray(body.orders))throw new Error('Invalid response');
    lastOrders=body.orders;renderPersistentOrders();
+   {% if order_gps_enabled %}await refreshOrderGps();{% endif %}
    $('syncStatus').textContent='Постоянное хранилище подключено.';
  }catch{
+   {% if order_gps_enabled %}clearGpsSelection('Нет связи с сервером заказов.');{% endif %}
    $('syncStatus').textContent='Сервер недоступен. Последние данные не обновлялись.';
  }finally{setTimeout(pollPersistentOrders,5000)}
 }
@@ -543,10 +605,10 @@ function drawPilot(){
             pilotMarkers.delete(id);
         }
     }
-    for(const {id,position} of pilotPoints){
+    for(const {id,position,label:orderLabel} of pilotPoints){
         const [lat,lng]=position;
         let marker=pilotMarkers.get(id);
-        const label=id==='pilot_test_2'?'Тестовый пилот 2':'Тестовый пилот';
+        const label=orderLabel||(id==='pilot_test_2'?'Тестовый пилот 2':'Тестовый пилот');
         if(vector){
             if(!marker){
                 const arrow=document.createElement('span');
@@ -598,6 +660,13 @@ function drawPassenger(){
 }
 
 function updateSharedPositions(snapshot){
+    {% if order_gps_enabled %}
+    if(selectedGpsOrder){
+        passengerPoint=snapshot.passenger_position??null;
+        drawPassenger();
+        return;
+    }
+    {% endif %}
     pilotPoints=(snapshot.pilots??[]).filter(p=>Array.isArray(p.position));
     if(!pilotPoints.length&&Array.isArray(snapshot.pilot_position)){
         pilotPoints=[{id:'pilot_test',position:snapshot.pilot_position}];

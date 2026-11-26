@@ -1,4 +1,5 @@
 """Exercise the staging map template against the pinned QA29 loopback fixture."""
+import argparse
 import base64
 from collections import Counter
 import json
@@ -21,7 +22,7 @@ from playwright.sync_api import sync_playwright
 import qa29_gps_integration as fixture
 
 
-def run():
+def run(android_apk=None):
     oid = fixture.OID_FILE.read_text().strip()
     read_path = f"/dispatch/orders/{oid}/gps"
     write_path = f"/native-pilot-orders/{oid}/gps"
@@ -100,18 +101,42 @@ def run():
             return positions
 
         fixes = [(54.6872, 25.2797), (54.6906, 25.2980)]
-        for index, (lat, lon) in enumerate(fixes):
-            fix = dict(enabled=True, latitude=lat, longitude=lon, captured_at=int(time.time()))
-            fixture.request(write_path, "POST", fix, pilot)
-            gps = fixture.request(read_path, headers=admin)
-            assert gps["available"] and (gps["latitude"], gps["longitude"]) == (lat, lon)
-            observe(f"order_fix_{index+1}")
+        if android_apk:
+            from android_map_probe import is_asleep, start_pilot, verify_android_fix
+            assert fixture.request(read_path, headers=admin) == {"available": False}
+            assert markers.count() == 0
+            lat, lon = fixes[0]
+            fixture.adb("emu", "geo", "fix", str(lon), str(lat))
+            start_pilot(android_apk, oid)
+            first_timestamp = verify_android_fix(page, oid, *fixes[0], 0)
+            observe("order_fix_1")
+            fixture.adb("shell", "input", "keyevent", "KEYCODE_HOME")
+            fixture.adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
+            fixture.poll(is_asleep, bool, "Android screen asleep")
+            verify_android_fix(page, oid, *fixes[1], first_timestamp)
+            assert is_asleep(), "Emulator woke up during the second GPS check"
+            observe("order_fix_2")
+        else:
+            for index, (lat, lon) in enumerate(fixes):
+                fix = dict(enabled=True, latitude=lat, longitude=lon, captured_at=int(time.time()))
+                fixture.request(write_path, "POST", fix, pilot)
+                gps = fixture.request(read_path, headers=admin)
+                assert gps["available"] and (gps["latitude"], gps["longitude"]) == (lat, lon)
+                observe(f"order_fix_{index+1}")
         for action in ("approach", "start", "finish"):
             status = fixture.request("/native-pilot-orders", "PATCH", {"order_id": oid, "action": action}, pilot)
         assert status["status"] == "finished"
         assert fixture.request(read_path, headers=admin) == {"available": False}
         observe("order_finished")
         assert "Завершён" in card.inner_text()
+
+        if android_apk:
+            import psycopg
+            assert page.request.get(web_url + read_path).json() == {"available": False}
+            with psycopg.connect(fixture.DSN) as db:
+                assert db.execute("SELECT count(*) FROM public.pd_qa27_gps WHERE order_id=%s", (oid,)).fetchone()[0] == 0
+            assert markers.count() == 0
+            print(f"PASS: finished {oid}, no stored fix, browser GPS unavailable and marker removed", flush=True)
 
         # Independent positive control for the same offline renderer.
         for index, fix in enumerate(fixes):
@@ -132,4 +157,6 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--android-apk", type=Path)
+    run(parser.parse_args().android_apk)

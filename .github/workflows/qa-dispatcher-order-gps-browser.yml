@@ -1,13 +1,22 @@
 name: QA dispatcher order GPS in Chromium
 on:
   push:
-    branches: [qa/dispatcher-order-gps-browser]
+    branches: [qa/dispatcher-order-gps-browser, qa/android-dispatcher-map-e2e]
+  workflow_dispatch:
+    inputs:
+      apk_run:
+        description: Successful QA29 run containing the debug APK
+        type: string
+        default: '45839158308'
+        required: true
 permissions:
   contents: read
+  actions: read
 jobs:
   map:
+    if: github.ref == 'refs/heads/qa/android-dispatcher-map-e2e' || github.ref == 'refs/heads/qa/dispatcher-order-gps-browser'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16
@@ -44,16 +53,30 @@ jobs:
           curl -fsS --retry 3 https://unpkg.com/leaflet@1.9.4/dist/leaflet.js -o leaflet.js
           curl -fsS --retry 3 https://unpkg.com/leaflet@1.9.4/dist/leaflet.css -o leaflet.css
       - name: Observe assigned order, two fixes, finish and renderer control
-        shell: bash
+        if: github.ref == 'refs/heads/qa/dispatcher-order-gps-browser'
+        run: bash ops/qa/run_dispatcher_map_browser.sh
+      - name: Download the verified QA29 debug package
+        if: github.ref == 'refs/heads/qa/android-dispatcher-map-e2e'
+        uses: actions/download-artifact@v4
+        with:
+          name: private-drive-gps-qa29-apk
+          path: qa_apk
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.apk_run || '45839158308' }}
+      - name: Verify the package and enable the Android emulator
+        if: github.ref == 'refs/heads/qa/android-dispatcher-map-e2e'
         run: |
-          set -euo pipefail
-          export PYTHONPATH="$PWD:$PWD/qa_android/flutter_app/tool"
-          python -u -m qa29_gps_integration serve qa_server > "$RUNNER_TEMP/map-api.log" 2>&1 &
-          server=$!
-          trap 'kill "$server" 2>/dev/null || true; tail -n 30 "$RUNNER_TEMP/map-api.log"' EXIT
-          for attempt in {1..40}; do
-            if curl -s -o /dev/null http://127.0.0.1:18729/dispatch/orders/state; then break; fi
-            kill -0 "$server"
-            sleep 1
-          done
-          python -u ops/qa/dispatcher_order_gps_browser.py
+          (cd qa_apk && sha256sum --check SHA256SUMS)
+          grep -F "name='lt.privatedrive.private_drive.gps_qa29'" qa_apk/badging.txt
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify foreground, screen-off and completed order in Chromium
+        if: github.ref == 'refs/heads/qa/android-dispatcher-map-e2e'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: bash ops/qa/run_dispatcher_map_browser.sh --android-apk qa_apk/PRIVATE-DRIVE-GPS-QA29.apk

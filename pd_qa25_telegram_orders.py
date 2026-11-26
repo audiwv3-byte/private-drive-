@@ -31,6 +31,8 @@ def telegram_order(uid, data):
     import json
     digest = fingerprint((values, json.dumps(data, sort_keys=True, ensure_ascii=False)))
     oid = str(uuid.uuid4())
+    qa26 = os.getenv("PD_QA26_ASSIGNMENT") == "1"
+    status = "requested"
     import psycopg
     try:
         with psycopg.connect(os.environ["PD_DISPATCH_ORDERS_DATABASE_URL"], connect_timeout=4) as db:
@@ -39,12 +41,17 @@ def telegram_order(uid, data):
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT(source,source_order_id) DO NOTHING RETURNING id""",
                 (oid,values[0],values[1],digest,*values[2:])).fetchone()
+            if row and qa26:
+                db.execute("INSERT INTO public.pd_telegram_order_owners(order_id,telegram_id) VALUES (%s,%s)", (oid,uid))
             if not row:
-                old = db.execute("""SELECT id,fingerprint FROM public.pd_dispatch_orders
+                old = db.execute("""SELECT id,fingerprint,status FROM public.pd_dispatch_orders
                     WHERE source=%s AND source_order_id=%s""", values[:2]).fetchone()
                 if not old or old[1] != digest:
                     return jsonify(error="request_conflict"), 409
                 oid = str(old[0])
-        return jsonify(ok=True,order_id=oid,status="Новая",price="",replayed=not bool(row))
+                status = old[2]
+                if qa26 and not db.execute("SELECT 1 FROM public.pd_telegram_order_owners WHERE order_id=%s AND telegram_id=%s",(oid,uid)).fetchone():
+                    return jsonify(error="request_conflict"), 409
+        return jsonify(ok=True,order_id=oid,status=status if qa26 else "Новая",price="",replayed=not bool(row))
     except psycopg.Error:
         return jsonify(error="storage_unavailable"), 503

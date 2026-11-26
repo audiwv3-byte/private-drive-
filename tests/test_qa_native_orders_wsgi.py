@@ -67,7 +67,9 @@ def test_real_sms_wsgi_order_chain(monkeypatch):
                 "INSERT INTO native_auth_sessions(token_hash,user_id,created_at,expires_at) VALUES (%s,%s,%s,%s)",
                 (hashlib.sha256((char * 48).encode()).hexdigest(), uid, now, now + 600)
             )
-    api_dsn = DSN.replace("postgres:isolated-test@", "qa_native_orders:synthetic-api@")
+    # Real native-auth WSGI initializes its schema at startup; use the synthetic DB owner.
+    # Restricted order-role privileges are covered by the shared API CI job.
+    api_dsn = DSN
     for key, value in {**REQUIRED, "DATABASE_URL": api_dsn, "PD_DISPATCH_ORDERS_DATABASE_URL": api_dsn,
                        "PD_NATIVE_PILOT_ASSIGNMENT": "0", "TWILIO_VERIFY_ENABLED": "false",
                        "PD_NATIVE_SMS_TEST_PHONE": "", "PD_NATIVE_SMS_LIVE": "NO"}.items():

@@ -1,0 +1,59 @@
+name: Android isolated release AAB API 36
+on:
+  push:
+    branches: [qa/pre-release-security-20261126]
+permissions:
+  contents: read
+jobs:
+  android-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PD_NATIVE_SMS_LIVE: "NO"
+      PD_PAYMENT_MODE: disabled
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Generate isolated Android scaffold
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive.qa --project-name=private_drive qa_android
+          cp -R flutter_app/lib/. qa_android/lib/
+          cp -R flutter_app/assets qa_android/assets
+          cp flutter_app/pubspec.yaml qa_android/
+          if test -f flutter_app/pubspec.lock; then cp flutter_app/pubspec.lock qa_android/; fi
+          python3 ops/qa/prepare_android_release.py qa_android
+          mkdir -p "$HOME/.android"
+          rm -f "$HOME/.android/debug.keystore"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 30 -dname "CN=PRIVATE DRIVE isolated QA,O=QA,C=LT"
+      - name: Build release-mode AAB using ephemeral QA key
+        working-directory: qa_android
+        run: |
+          flutter pub get
+          flutter build appbundle --release --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid
+          test -s build/app/outputs/bundle/release/app-release.aab
+          jarsigner -verify build/app/outputs/bundle/release/app-release.aab
+      - name: Verify packaged manifest and SDK
+        run: |
+          curl --fail --silent --show-error --location --retry 3 https://github.com/google/bundletool/releases/download/1.18.2/bundletool-all-1.18.2.jar -o "$RUNNER_TEMP/bundletool.jar"
+          java -jar "$RUNNER_TEMP/bundletool.jar" validate --bundle=qa_android/build/app/outputs/bundle/release/app-release.aab
+          java -jar "$RUNNER_TEMP/bundletool.jar" dump manifest --bundle=qa_android/build/app/outputs/bundle/release/app-release.aab > "$RUNNER_TEMP/manifest.xml"
+          python3 ops/qa/check_android_release.py "$RUNNER_TEMP/manifest.xml"
+          mkdir -p qa_aab
+          cp qa_android/build/app/outputs/bundle/release/app-release.aab qa_aab/PRIVATE-DRIVE-QA-ONLY.aab
+          cp "$RUNNER_TEMP/manifest.xml" qa_aab/manifest.xml
+          (cd qa_aab && sha256sum PRIVATE-DRIVE-QA-ONLY.aab > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-isolated-release-aab-not-for-store
+          path: qa_aab/
+          retention-days: 3

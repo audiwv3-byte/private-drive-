@@ -13,7 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - name: Check GitHub Actions secret binding
+        env:
+          SECRET_AVAILABLE: ${{ secrets.PD_STAGING_MIGRATION_DSN != '' }}
+          VARIABLE_DEFINED: ${{ vars.PD_STAGING_MIGRATION_DSN != '' }}
+        run: |
+          printf 'migration_secret_available=%s\n' "$SECRET_AVAILABLE"
+          printf 'same_name_variable_defined=%s\n' "$VARIABLE_DEFINED"
       - name: Check the isolated database identity and migration rights
+        if: ${{ success() }}
         env:
           MIGRATION_DSN: ${{ secrets.PD_STAGING_MIGRATION_DSN }}
         shell: bash --noprofile --norc -e -o pipefail {0}
@@ -83,6 +91,7 @@ jobs:
           print("Verified TLS and migration privileges for private_drive_test")
           PY
       - name: Check credential access to the two existing staging services
+        if: ${{ always() }}
         env:
           RENDER_TOKEN: ${{ secrets.RENDER_API_KEY }}
         shell: bash --noprofile --norc -e -o pipefail {0}

@@ -25,4 +25,15 @@ CREATE TABLE IF NOT EXISTS public.pd_native_order_owners (
  user_id TEXT NOT NULL REFERENCES public.native_auth_users(id)
 );
 CREATE INDEX IF NOT EXISTS pd_native_order_owners_user ON public.pd_native_order_owners(user_id);
+CREATE TABLE IF NOT EXISTS public.pd_native_order_quotes (
+ order_id UUID PRIMARY KEY REFERENCES public.pd_dispatch_orders(id),
+ details JSONB NOT NULL,
+ quoted_total_cents INTEGER CHECK (quoted_total_cents >= 0),
+ quote_required BOOLEAN NOT NULL,
+ currency TEXT NOT NULL DEFAULT 'EUR' CHECK (currency = 'EUR'),
+ CHECK ((quote_required AND quoted_total_cents IS NULL)
+     OR (NOT quote_required AND quoted_total_cents IS NOT NULL))
+);
+REVOKE ALL ON TABLE public.pd_native_order_quotes FROM PUBLIC;
+
 COMMIT;

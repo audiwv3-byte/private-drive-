@@ -247,7 +247,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
         showCockpit: widget.showPilotCockpit,
         showIdentityCheck: widget.showPilotIdentityCheck,
         enableMapTiles: widget.enableMapTiles,
-        tripStore: _trip,
+        tripStore: widget.pilotApi == null ? _trip : null,
         onSignOut: widget.onSignOut,
         onBackToCabinets: widget.onBackToCabinets,
       );
@@ -289,7 +289,7 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
         child: PassengerRideEntry(
           ordersApi: widget.ordersApi,
           enableMapTiles: widget.enableMapTiles,
-          tripStore: _trip,
+          tripStore: widget.ordersApi == null ? _trip : null,
           onSignOut: widget.onSignOut,
           onBackToCabinets: widget.onBackToCabinets,
         ),

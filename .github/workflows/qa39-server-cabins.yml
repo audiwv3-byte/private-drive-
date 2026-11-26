@@ -1,0 +1,23 @@
+name: QA39 server cabins
+on:
+  push:
+    branches: [qa/qa39-server-cabins]
+permissions:
+  contents: read
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+      - run: flutter pub get
+      - run: flutter test test/qa39_server_cabins_test.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --reporter expanded

@@ -147,7 +147,7 @@ Stream<QaGpsFix> qaAndroidPositions() =>
       distanceFilter: 0,
       intervalDuration: const Duration(seconds: 5),
       foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: 'PRIVATE DRIVE QA',
+        notificationTitle: 'PRIVATE DRIVE',
         notificationText: 'GPS назначенной поездки передаётся диспетчеру',
         enableWakeLock: true,
         setOngoing: true,

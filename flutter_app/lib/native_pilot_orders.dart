@@ -107,7 +107,17 @@ class NativePilotOrdersApi {
   static const qa29Base = 'http://127.0.0.1:18729';
   bool get _qa29Allowed => qa29Loopback && baseUrl == qa29Base &&
       token.startsWith('qa29-synthetic-') && token.length >= 40;
-  bool get _allowed => qaIosGps ? _qaIosAllowed : (qa29Loopback ? _qa29Allowed : baseUrl == stage);
+  static const configuredOrigin = String.fromEnvironment('PD_NATIVE_AUTH_API_URL');
+  bool get _configuredAllowed {
+    final uri = Uri.tryParse(baseUrl);
+    return configuredOrigin.isNotEmpty && baseUrl == configuredOrigin &&
+        uri != null && uri.scheme == 'https' && uri.host.isNotEmpty &&
+        uri.userInfo.isEmpty && uri.port == 443 && !uri.hasQuery &&
+        !uri.hasFragment && (uri.path.isEmpty || uri.path == '/');
+  }
+  bool get _allowed => qaIosGps ? _qaIosAllowed : (qa29Loopback ? _qa29Allowed :
+      _configuredAllowed || baseUrl == stage);
+  bool get gpsEnabled => _configuredAllowed || (qaGpsEnabled && _allowed);
 
   Uri _endpoint(String path) {
     if (!_allowed) throw const FormatException('Unapproved pilot API');
@@ -116,9 +126,9 @@ class NativePilotOrdersApi {
   }
 
   Future<void> publishGps(String orderId, QaGpsFix? fix, int capturedAt) async {
-    if (!qaGpsEnabled || !_allowed ||
+    if (!gpsEnabled || !_allowed ||
         !PilotAssignedOrder._uuid.hasMatch(orderId)) {
-      throw const FormatException('GPS requires isolated QA and assigned order');
+      throw const FormatException('GPS requires configured API and assigned order');
     }
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
       throw const PdHttpStatusException(401);
@@ -162,7 +172,7 @@ class NativePilotOrdersApi {
 
   Future<bool> availability([bool? desiredOnline]) async {
     if (!_allowed) {
-      throw const FormatException('Pilot availability requires staging');
+      throw const FormatException('Pilot availability requires configured API');
     }
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
       throw const PdHttpStatusException(401);
@@ -203,8 +213,8 @@ class NativePilotOrdersApi {
   }
 
   Future<Map<String, dynamic>> action(String orderId, String action) async {
-    if (!_allowed || (!qaIosGps && baseUrl != stage)) {
-      throw const FormatException('Pilot trip actions require staging');
+    if (!_allowed) {
+      throw const FormatException('Pilot trip actions require configured API');
     }
     if (token.length < 40 || token.length > 256 || RegExp(r'\s').hasMatch(token)) {
       throw const PdHttpStatusException(401);
@@ -470,7 +480,7 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
     final api = widget.api;
     setState(() { _gpsStarting = true; _error = null; });
     try {
-      if (defaultTargetPlatform == TargetPlatform.iOS) {
+      {
         final consent = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -545,7 +555,7 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
         oldWidget.visible != widget.visible) {
       if (oldWidget.api.baseUrl != widget.api.baseUrl ||
           oldWidget.api.token != widget.api.token ||
-          (NativePilotOrdersApi.qaIosGps && !widget.visible)) {
+          !widget.visible) {
         final old = _gpsPublisher;
         _gpsPublisher = null;
         if (old != null) unawaited(old.stop());
@@ -598,7 +608,7 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
           PdHttpStatusException(statusCode: 403) =>
             'Доступ закрыт. Проверь роль и фотоконтроль.',
           PdHttpStatusException(statusCode: 503) =>
-            'Тестовый сервер назначений пока недоступен.',
+            'Сервер назначений пока недоступен.',
           _ => 'Не удалось загрузить назначения.',
         };
       });
@@ -631,7 +641,7 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
       padding: const EdgeInsets.all(20),
       children: [
         const Text('Назначенные заказы'),
-        const Text('Тестовый сервер · Без оплаты'),
+        const Text('Оплата пока недоступна'),
         TextButton.icon(
           key: const Key('pilot-server-orders-refresh'),
           onPressed: _loading ? null : _refresh,
@@ -653,9 +663,9 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
                   children: [
                     Text('${order.date} ${order.time} · ${order.statusLabel}'),
                     SelectableText('ID заказа: ${order.orderId}'),
-                    if (NativePilotOrdersApi.qaGpsEnabled && !kIsWeb &&
+                    if (widget.api.gpsEnabled && !kIsWeb &&
                         (defaultTargetPlatform == TargetPlatform.android ||
-                         (NativePilotOrdersApi.qaIosGps && defaultTargetPlatform == TargetPlatform.iOS)))
+                         defaultTargetPlatform == TargetPlatform.iOS))
                       OutlinedButton(
                         key: ValueKey('qa28-gps-${order.orderId}'),
                         onPressed: _gpsStarting || _actingOrderId != null ||
@@ -664,10 +674,10 @@ class _PilotAssignedOrdersPanelState extends State<PilotAssignedOrdersPanel>
                             ? null : () => _toggleGps(order),
                         child: Text(_gpsPublisher?.orderId == order.orderId
                             ? 'Остановить передачу GPS'
-                            : 'Передавать GPS диспетчеру · QA'),
+                            : 'Передавать GPS диспетчеру'),
                       ),
                     if (order.waitingSeconds > 0 || order.waitingActive)
-                      Text('Остановка: ${order.waitingSeconds} сек · QA: ${(order.stopChargeCents / 100).toStringAsFixed(2)} €'),
+                      Text('Остановка: ${order.waitingSeconds} сек · Стоимость: ${(order.stopChargeCents / 100).toStringAsFixed(2)} €'),
                     FilledButton(
                       key: ValueKey('pilot-trip-control-${order.orderId}'),
                       onPressed: _actingOrderId != null || _loading ? null : () async {

@@ -1963,8 +1963,8 @@ class _PassengerDemoState extends State<PassengerDemo> {
               key: const Key('passenger-drawer-history'),
               leading: const Icon(Icons.history),
               title: Text(pdTr(context, 'История', 'Istorija', 'History')),
-              enabled: widget.tripStore != null,
-              onTap: widget.tripStore == null ? null : () {
+              enabled: widget.ordersApi != null || widget.tripStore != null,
+              onTap: widget.ordersApi == null && widget.tripStore == null ? null : () {
                 Navigator.pop(context);
                 _openOrders();
               },
@@ -2042,7 +2042,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
         title: Text(pdLabel(context, 'PRIVATE DRIVE · Пассажир')),
         actions: [
           const PdLanguageMenu(),
-          if (widget.tripStore != null)
+          if (widget.ordersApi != null || widget.tripStore != null)
             IconButton(
               key: const Key('passenger-orders-button'),
               tooltip: pdLabel(context, 'Мои заказы'),

@@ -1,0 +1,63 @@
+name: PRIVATE DRIVE staging PostgreSQL access check
+
+on:
+  push:
+    branches: [qa/render-pg-access-20261126]
+    paths: [.github/workflows/pd-staging-postgres-access.yml]
+
+permissions: {}
+
+jobs:
+  access:
+    if: github.repository == 'audiwv3-byte/private-drive-' && github.ref == 'refs/heads/qa/render-pg-access-20261126'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      RENDER_TOKEN: ${{ secrets.RENDER_API_KEY }}
+    steps:
+      - name: Check access to the isolated PostgreSQL instance
+        shell: bash --noprofile --norc -e -o pipefail {0}
+        run: |
+          python3 -I - <<'PY'
+          import json
+          import os
+          from urllib.error import HTTPError
+          from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *_args, **_kwargs):
+                  return None
+
+          token = os.environ.get("RENDER_TOKEN", "").strip()
+          if not token:
+              raise SystemExit("Render API credential is unavailable")
+          opener = build_opener(NoRedirect())
+          instance_id = "dpg-dc00pubm8hqs7397rblg-a"
+          instance_url = "https://api.render.com/v1/postgres/" + instance_id
+
+          def inspect(url, *, read_body):
+              request = Request(url, headers={"Authorization": "Bearer " + token,
+                                             "Accept": "application/json"})
+              try:
+                  with opener.open(request, timeout=12) as response:
+                      return response.status, json.load(response) if read_body else None
+              except HTTPError as error:
+                  with error:
+                      return error.code, None
+
+          status, metadata = inspect(instance_url, read_body=True)
+          exact = (
+              status == 200 and isinstance(metadata, dict)
+              and metadata.get("id") == instance_id
+              and metadata.get("databaseName") == "private_drive_test"
+              and metadata.get("name") == "private-drive-test-db"
+          )
+          print("metadata_http_status:", status)
+          print("isolated_instance_verified:", exact)
+          if not exact:
+              raise SystemExit(1)
+
+          status, _ = inspect(instance_url + "/connection-info", read_body=False)
+          print("connection_info_http_status:", status)
+          raise SystemExit(0 if status == 200 else 1)
+          PY

@@ -45,7 +45,7 @@ def create_application():
         user = uid()
         if user not in passengers:
             return jsonify(error="passenger_required"), 403
-        return telegram_order(user, request.get_json())
+        return telegram_order(user, request.get_json(silent=True))
 
     def authorized():
         try:

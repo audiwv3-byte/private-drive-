@@ -3,6 +3,7 @@ import 'native_orders_api.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'passenger_ride_entry.dart';
@@ -130,7 +131,10 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
   Future<void> _requestPilotLocation() async {
     if (!widget.enableMapTiles) return;
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return;
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _schedulePilotGpsRetry();
+        return;
+      }
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -188,9 +192,21 @@ class _PrivateDriveDemoState extends State<PrivateDriveDemo> with WidgetsBinding
           permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) return;
       _pilotLocationStream = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high, distanceFilter: 5,
-        ),
+        locationSettings: !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+            ? AndroidSettings(
+                accuracy: LocationAccuracy.high,
+                distanceFilter: 5,
+                intervalDuration: const Duration(seconds: 5),
+                foregroundNotificationConfig: const ForegroundNotificationConfig(
+                  notificationTitle: 'PRIVATE DRIVE',
+                  notificationText: 'Рабочая смена активна',
+                  enableWakeLock: true,
+                  setOngoing: true,
+                ),
+              )
+            : const LocationSettings(
+                accuracy: LocationAccuracy.high, distanceFilter: 5,
+              ),
       ).listen((position) {
         if (mounted && _trip.pilotOnline) {
           _trip.updatePilotLocation(position.latitude, position.longitude);

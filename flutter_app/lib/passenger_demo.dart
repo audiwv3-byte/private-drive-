@@ -13,6 +13,7 @@ import 'demo_rating_panel.dart';
 import 'company_info.dart';
 import 'passenger_orders_demo.dart';
 import 'remote_sync_demo.dart';
+import 'native_orders_api.dart';
 import 'passenger_extra_services.dart';
 import 'pd_pilot_assignment_waiting.dart';
 import 'passenger_preferences_storage.dart';
@@ -34,8 +35,9 @@ class PassengerDemo extends StatefulWidget {
       this.initialAdvanceBooking = false,
       this.initialAdvanceDate, this.initialAdvanceTime,
       this.mapConnectivityCheck, this.currentPositionLoader, this.passengerMapController,
-      this.onIncomingMessageVoice});
+      this.onIncomingMessageVoice, this.ordersApi});
 
+  final NativeOrdersApi? ordersApi;
   final bool enableMapTiles;
   final String initialRideType;
   final bool initialAdvanceBooking;
@@ -632,6 +634,47 @@ class _PassengerDemoState extends State<PassengerDemo> {
         initialTo: _to.text.trim(),
       ),
     ));
+  }
+
+  bool _sendingServerOrder = false;
+
+  Future<void> _submitServerOrder() async {
+    final api = widget.ordersApi;
+    if (api == null || !_canCreateLocalTrip || _sendingServerOrder) return;
+    setState(() => _sendingServerOrder = true);
+    try {
+      final date = _date ?? DateUtils.dateOnly(DateTime.now());
+      final time = _time ?? TimeOfDay.now();
+      final response = await api.call({
+        'request_id': NativeOrdersApi.requestId(),
+        'from': _from.text.trim(), 'to': _to.text.trim(),
+        'trip_date': '${date.year.toString().padLeft(4, '0')}-'
+            '${date.month.toString().padLeft(2, '0')}-'
+            '${date.day.toString().padLeft(2, '0')}',
+        'trip_time': '${time.hour.toString().padLeft(2, '0')}:'
+            '${time.minute.toString().padLeft(2, '0')}',
+      });
+      final id = response['order_id'];
+      if (id is! String || id.isEmpty) throw const FormatException('Missing order ID');
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (dialog) => AlertDialog(
+        title: const Text('Заявка получена диспетчерской'),
+        content: Text('Номер заявки: $id'),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialog),
+            child: const Text('Закрыть'))],
+      ));
+    } catch (_) {
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (dialog) => AlertDialog(
+        title: const Text('Заявка не отправлена'),
+        content: const Text('Сервер не подтвердил заявку. '
+            'Локальный заказ не создавался. Проверь соединение и повтори.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialog),
+            child: const Text('Закрыть'))],
+      ));
+    } finally {
+      if (mounted) setState(() => _sendingServerOrder = false);
+    }
   }
 
   void _createLocalTrip() {
@@ -1830,11 +1873,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ],
             FilledButton(
               key: const Key('passenger-book-disabled'),
-              onPressed: _canCreateLocalTrip
-                  ? (const bool.fromEnvironment('PD_INTERNAL_QA')
-                      ? _openServerBookingQa : _createLocalTrip)
+              onPressed: _canCreateLocalTrip && !_sendingServerOrder
+                  ? (widget.ordersApi != null ? _submitServerOrder
+                      : (const bool.fromEnvironment('PD_INTERNAL_QA')
+                          ? _openServerBookingQa : _createLocalTrip))
                   : null,
-              child: Text(widget.tripStore == null
+              child: Text(widget.ordersApi != null
+                  ? (_sendingServerOrder ? 'Отправляем заявку…' : 'Отправить заявку диспетчеру')
+                  : widget.tripStore == null
                   ? pdTr(context, 'Заказать поездку — недоступно в демоверсии',
                       'Užsakyti kelionę — demo versijoje nepasiekiama',
                       'Book ride — unavailable in demo')

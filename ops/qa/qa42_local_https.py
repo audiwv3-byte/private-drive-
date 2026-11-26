@@ -50,6 +50,10 @@ def prepare():
         db.execute("""
             GRANT EXECUTE ON FUNCTION public.pd_validate_native_session(text,bigint),
                 public.pd_assign_native_order(uuid,text,text,bigint),
+                public.pd_pilot_assignment_candidates(bigint),
+                public.pd_revoke_current_session(text,bigint),
+                public.pd_qa27_write_gps(text,uuid,boolean,double precision,double precision,bigint,bigint),
+                public.pd_qa27_dispatch_gps(uuid,bigint),
                 public.pd_native_pilot_order_state(text,bigint),
                 public.pd_native_pilot_trip_action(text,text,text,bigint) TO qa39_cabin_api
         """)
@@ -79,6 +83,8 @@ def prepare():
         "PD_QA26_ASSIGNMENT": "1",
         "PD_QA26_CSRF": csrf,
         "PD_QA33_TRIP": "1",
+        "PD_QA27_GPS": "1",
+        "PD_NATIVE_SESSION_FUNCTIONS": "1",
         "PD_DISPATCH_STAGING_ONLY": "1",
         "PD_DISPATCH_PERSISTENT_QUEUE": "1",
         "PD_NATIVE_PILOT_ASSIGNMENT": "1",

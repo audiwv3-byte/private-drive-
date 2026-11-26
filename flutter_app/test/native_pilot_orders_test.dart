@@ -80,6 +80,28 @@ void main() {
     expect(requestCount, 2);
   });
 
+  test('pilot trip actions require staging Bearer and server acknowledgement', () async {
+    final api = NativePilotOrdersApi(
+      baseUrl: NativePilotOrdersApi.stage,
+      token: token,
+      client: MockClient((request) async {
+        expect(request.method, 'PATCH');
+        expect(request.url.path, '/native-pilot-orders');
+        expect(request.followRedirects, isFalse);
+        expect(request.headers['authorization'], 'Bearer $token');
+        final body = jsonDecode(request.body);
+        expect(body, {'order_id': orderId, 'action': 'approach'});
+        return http.Response(jsonEncode({
+          'order_id': orderId, 'status': 'approaching',
+          'payment_mode': 'disabled', 'waiting_seconds': 0,
+        }), 200);
+      }),
+    );
+    expect((await api.action(orderId, 'approach'))['status'], 'approaching');
+    await expectLater(api.action(orderId, 'pay'), throwsFormatException);
+    await expectLater(api.action('bad-order', 'approach'), throwsFormatException);
+  });
+
   test('refuses other hosts and data outside the no-payment contract', () async {
     final other = NativePilotOrdersApi(
       baseUrl: 'https://elsewhere.invalid',

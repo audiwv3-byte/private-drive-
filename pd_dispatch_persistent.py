@@ -133,13 +133,20 @@ def register(app, authorized):
             return reply({"error":"persistent_queue_disabled"},503)
         try:
             with connect() as db:
-                rows = db.execute("""SELECT id,source,source_order_id,origin,destination,
-                     trip_date,trip_time,status,created_at
-                     FROM public.pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()
+                rows = db.execute("""SELECT o.id,o.source,o.source_order_id,
+                     o.origin,o.destination,o.trip_date,o.trip_time,
+                     o.status,o.created_at,q.details,q.quoted_total_cents,
+                     q.quote_required
+                     FROM public.pd_dispatch_orders o
+                     LEFT JOIN public.pd_native_order_quotes q ON q.order_id=o.id
+                     ORDER BY o.created_at DESC LIMIT 100""").fetchall()
             orders = [{"id":str(row[0]),"source":row[1],"source_order_id":row[2],
                        "origin":row[3],"destination":row[4],
                        "trip_date":row[5],"trip_time":row[6],
-                       "status":row[7],"created_at":row[8].isoformat()} for row in rows]
+                       "status":row[7],"created_at":row[8].isoformat(),
+                       "details":row[9],"quoted_total_cents":row[10],
+                       "quote_required":row[11] if row[11] is not None else True,
+                       "currency":"EUR"} for row in rows]
             return reply({"orders":orders,"persistent":True})
         except Exception:
             app.logger.exception("Persistent dispatcher order read unavailable")

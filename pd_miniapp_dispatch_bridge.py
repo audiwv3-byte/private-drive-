@@ -17,9 +17,14 @@ class DispatchBridgeUnavailable(Exception):
     """The local order exists, but central dispatch did not acknowledge it."""
 
 
+def central_delivery_required():
+    """An isolated staging order must not be acknowledged as centrally delivered locally."""
+    return os.getenv("PD_DISPATCH_STAGING_ONLY") == "1"
+
+
 def bridge_enabled():
-    return (os.getenv("PD_MINIAPP_DISPATCH_BRIDGE") == "1"
-            and os.getenv("PD_DISPATCH_STAGING_ONLY") == "1"
+    return (central_delivery_required()
+            and os.getenv("PD_MINIAPP_DISPATCH_BRIDGE") == "1"
             and os.getenv("PD_PAYMENT_MODE") == "disabled")
 
 

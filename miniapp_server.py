@@ -102,7 +102,7 @@ def qa_shared_order_bridge():
             return jsonify(error='invalid_order'), 400
         body = dict(body)
         date = body.get('trip_date')
-        if isinstance(date, str) and re.fullmatch(r'[0-9]{2}\\.[0-9]{2}\\.20[0-9]{2}', date):
+        if isinstance(date, str) and re.fullmatch(r'[0-9]{2}[.][0-9]{2}[.]20[0-9]{2}', date):
             day, month, year = date.split('.')
             try:
                 from datetime import date as _date

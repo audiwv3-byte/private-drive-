@@ -1,0 +1,66 @@
+name: PRIVATE DRIVE selective QA29 Android integration
+on:
+  push:
+    branches:
+      - qa/store-blockers-unified-20261126
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qa29-android-isolated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Build new isolated QA-only Flutter scaffold
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive --project-name=private_drive qa_merge_android
+          cp -R flutter_app/lib/. qa_merge_android/lib/
+          cp -R flutter_app/assets qa_merge_android/assets
+          cp -R flutter_app/test/. qa_merge_android/test/
+          cp flutter_app/pubspec.yaml qa_merge_android/pubspec.yaml
+          cp flutter_app/analysis_options.yaml qa_merge_android/analysis_options.yaml
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle=Path('qa_merge_android/android/app/build.gradle.kts')
+          text=gradle.read_text()
+          assert 'applicationId = "lt.privatedrive.private_drive"' in text
+          gradle.write_text(text.replace('applicationId = "lt.privatedrive.private_drive"',
+              'applicationId = "lt.privatedrive.private_drive.merged_qa"'))
+          manifest=Path('qa_merge_android/android/app/src/main/AndroidManifest.xml')
+          source=manifest.read_text()
+          source=source.replace('android:label="private_drive"', 'android:label="PRIVATE DRIVE MERGED QA"')
+          permissions=('INTERNET','ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION',
+              'FOREGROUND_SERVICE','FOREGROUND_SERVICE_LOCATION','WAKE_LOCK','POST_NOTIFICATIONS')
+          source=source.replace('<application',
+              ''.join('<uses-permission android:name="android.permission.'+p+'"/>\n' for p in permissions)
+              +'<application',1)
+          manifest.write_text(source)
+          PY
+      - name: Run isolated GPS and pilot API regression tests
+        working-directory: qa_merge_android
+        run: |
+          flutter pub get
+          flutter test --no-pub --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true test/qa28_pilot_gps_test.dart test/qa29_loopback_test.dart test/native_pilot_orders_test.dart
+      - name: Build QA-only debug APK with a distinct package ID
+        working-directory: qa_merge_android
+        run: |
+          flutter build apk --debug --target lib/qa29_gps_main.dart --build-name=0.2.43 --build-number=2026112602 --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true --dart-define=PD_QA29_LOOPBACK=true
+          APK=build/app/outputs/flutter-apk/app-debug.apk
+          test -s "$APK"
+          mkdir -p ../qa_merge_apk
+          cp "$APK" ../qa_merge_apk/PRIVATE-DRIVE-MERGED-QA.apk
+          (cd ../qa_merge_apk && sha256sum PRIVATE-DRIVE-MERGED-QA.apk > SHA256SUMS)
+      - name: Upload QA-only build (not a release, never installed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-merged-qa-debug-apk
+          path: qa_merge_apk/
+          retention-days: 3

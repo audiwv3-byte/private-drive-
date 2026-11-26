@@ -1,0 +1,31 @@
+name: QA28 Android pilot GPS client
+on:
+  push:
+    branches: [qa/pilot-background-gps-0.2.43]
+    paths: ['.github/workflows/qa28-android-gps.yml','flutter_app/lib/qa_pilot_gps.dart','flutter_app/lib/native_pilot_orders.dart','flutter_app/test/qa28_pilot_gps_test.dart']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qa28:
+    if: github.ref == 'refs/heads/qa/pilot-background-gps-0.2.43'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: flutter_app
+    env:
+      PD_NATIVE_SMS_LIVE: 'NO'
+      PD_PAYMENT_MODE: disabled
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - run: flutter pub get
+      - run: flutter test --no-pub --reporter expanded --dart-define=PD_INTERNAL_QA=true --dart-define=PD_QA28_GPS=true test/qa28_pilot_gps_test.dart
+      - run: flutter test --no-pub --reporter expanded test/native_pilot_orders_test.dart

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'demo_trip_store.dart';
 import 'passenger_demo.dart';
+import 'native_orders_api.dart';
 import 'passenger_extra_services.dart';
 import 'vilnius_evening_backdrop.dart';
 import 'brand_logo.dart';
@@ -13,12 +14,14 @@ class PassengerRideEntry extends StatelessWidget {
     super.key,
     this.enableMapTiles = true,
     required this.tripStore,
+    this.ordersApi,
     this.onSignOut,
     this.onBackToCabinets,
   });
 
   final bool enableMapTiles;
   final DemoTripStore tripStore;
+  final NativeOrdersApi? ordersApi;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
 
@@ -29,6 +32,7 @@ class PassengerRideEntry extends StatelessWidget {
         child: PassengerDemo(
           enableMapTiles: enableMapTiles,
           tripStore: tripStore,
+          ordersApi: ordersApi,
           initialRideType: type,
           initialAdvanceBooking: advanceBooking,
           initialAdvanceDate: advanceDate,

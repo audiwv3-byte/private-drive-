@@ -120,7 +120,8 @@ def register_dispatch_assignment(app, authorized, valid_csrf, admin_id, *, clock
 
 def make_native_pilot_orders_app(next_app, database_url, *, clock=time.time):
     def app(environ, start_response):
-        if environ.get("PATH_INFO") != "/native-pilot-orders":
+        path = environ.get("PATH_INFO")
+        if path not in ("/native-pilot-orders", "/native-pilot-availability"):
             return next_app(environ, start_response)
 
         def reply(status, data):
@@ -147,6 +148,35 @@ def make_native_pilot_orders_app(next_app, database_url, *, clock=time.time):
         if not digest or any(c.isspace() for c in token):
             return reply("401 Unauthorized", {"error": "invalid_session"})
         try:
+            if path == "/native-pilot-availability":
+                requested = None
+                if method == "PATCH":
+                    try:
+                        length = int(environ.get("CONTENT_LENGTH", "0"))
+                        if not 0 < length <= 128 or environ.get("CONTENT_TYPE", "").split(";")[0] != "application/json":
+                            raise ValueError()
+                        payload = json.loads(environ["wsgi.input"].read(length))
+                        if not isinstance(payload, dict) or set(payload) != {"online"} or type(payload["online"]) is not bool:
+                            raise ValueError()
+                        requested = payload["online"]
+                    except (ValueError, TypeError, KeyError, AttributeError):
+                        return reply("400 Bad Request", {"error": "invalid_availability"})
+                with _connect(database_url) as db:
+                    result = db.execute(
+                        "SELECT public.pd_native_pilot_availability_state(%s,%s,%s)",
+                        (digest, int(clock()), requested),
+                    ).fetchone()[0]
+                if not isinstance(result, dict):
+                    return reply("503 Service Unavailable", {"error": "storage_unavailable"})
+                if "error" in result:
+                    status = ("401 Unauthorized" if result["error"] == "invalid_session"
+                              else "403 Forbidden" if result["error"] in (
+                                  "pilot_required", "identity_approval_required")
+                              else "503 Service Unavailable")
+                    return reply(status, result)
+                if result.get("payment_mode") != "disabled" or type(result.get("online")) is not bool:
+                    return reply("503 Service Unavailable", {"error": "unsafe_availability"})
+                return reply("200 OK", result)
             if method == "PATCH":
                 try:
                     size = int(environ.get("CONTENT_LENGTH", "0"))

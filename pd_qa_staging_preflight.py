@@ -1,6 +1,6 @@
-"""QA-only staging readiness: distinguish disabled API from unavailable storage.
+"""QA-only staging readiness: classify staging configuration and schema failures.
 
-Never disclose credentials or database addresses to callers.
+The response contains only fixed reason codes, never connection strings or secrets.
 """
 import os
 
@@ -12,6 +12,16 @@ REQUIRED = {
     "PD_NATIVE_SMS_ISOLATED": "YES",
     "PD_NATIVE_SMS_LIVE": "NO",
 }
+
+# These objects are used by the shared WSGI's Telegram, native and dispatch routes.
+BASE_RELATIONS = (
+    "public.pd_dispatch_orders",
+    "public.pd_native_order_owners",
+)
+QA26_RELATIONS = (
+    "public.pd_telegram_order_owners",
+    "public.pd_native_order_assignments",
+)
 
 
 def check(*, connect=None, environment=None):
@@ -29,6 +39,15 @@ def check(*, connect=None, environment=None):
             row = db.execute("SELECT 1").fetchone()
             if row != (1,):
                 return {"ready": False, "reason": "database_healthcheck_failed"}
+            relations = BASE_RELATIONS + (QA26_RELATIONS if env.get("PD_QA26_ASSIGNMENT") == "1" else ())
+            for relation in relations:
+                if db.execute("SELECT to_regclass(%s)", (relation,)).fetchone()[0] is None:
+                    return {"ready": False, "reason": "database_schema_missing"}
+            if db.execute(
+                "SELECT to_regprocedure(%s)",
+                ("public.pd_validate_native_session(text,bigint)",)
+            ).fetchone()[0] is None:
+                return {"ready": False, "reason": "database_schema_missing"}
     except Exception:
         return {"ready": False, "reason": "database_unavailable"}
     return {"ready": True, "reason": "ok"}

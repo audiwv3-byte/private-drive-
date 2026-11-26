@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 
 /// Actual sensor fix, never synthesized from a route or map marker.
 class QaGpsFix {
@@ -129,7 +130,7 @@ class QaPilotGpsPublisher {
   }
 }
 
-/// Start only from a visible Android screen after user consent/permission.
+/// Start from the visible pilot cabin after explicit consent/permission.
 /// The persistent OS notification remains visible while the stream is active.
 Future<bool> qaGpsPermission() async {
   if (!await Geolocator.isLocationServiceEnabled()) return false;
@@ -142,12 +143,21 @@ Future<bool> qaGpsPermission() async {
 }
 
 Stream<QaGpsFix> qaAndroidPositions() =>
-    Geolocator.getPositionStream(locationSettings: AndroidSettings(
+    Geolocator.getPositionStream(locationSettings:
+    defaultTargetPlatform == TargetPlatform.iOS
+      ? AppleSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 0,
+          pauseLocationUpdatesAutomatically: false,
+          showBackgroundLocationIndicator: true,
+          allowBackgroundLocationUpdates: true,
+        )
+      : AndroidSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 0,
       intervalDuration: const Duration(seconds: 5),
       foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: 'PRIVATE DRIVE QA',
+        notificationTitle: 'PRIVATE DRIVE',
         notificationText: 'GPS назначенной поездки передаётся диспетчеру',
         enableWakeLock: true,
         setOngoing: true,

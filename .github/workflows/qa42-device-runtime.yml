@@ -43,12 +43,11 @@ jobs:
           script: |
             adb shell pm list packages
             adb emu geo fix 25.2797 54.6872
-            cd qa_android
-            flutter build apk --debug --target=integration_test/qa42_device_runtime_test.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid
-            adb install -r build/app/outputs/flutter-apk/app-debug.apk
+            cd qa_android && flutter build apk --debug --target=integration_test/qa42_device_runtime_test.dart --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid
+            adb install -r qa_android/build/app/outputs/flutter-apk/app-debug.apk
             adb shell pm grant lt.privatedrive.qa.private_drive android.permission.ACCESS_FINE_LOCATION
             adb shell pm grant lt.privatedrive.qa.private_drive android.permission.ACCESS_COARSE_LOCATION
-            flutter test integration_test/qa42_device_runtime_test.dart -d emulator-5554 --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --reporter expanded
+            cd qa_android && flutter test integration_test/qa42_device_runtime_test.dart -d emulator-5554 --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --reporter expanded
   ios-runtime:
     runs-on: macos-15
     timeout-minutes: 45

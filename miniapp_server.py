@@ -109,7 +109,7 @@ def qa_shared_order_bridge():
                 body['trip_date'] = _date(int(year), int(month), int(day)).isoformat()
             except ValueError:
                 return jsonify(error='invalid_departure'), 400
-        response = telegram_order(uid, body)
+        response = app.make_response(telegram_order(uid, body))
         # The common contract stores route/date/time, not optional pricing,
         # payments or preferences. Never indicate these are saved.
         if response.status_code in (200, 201):

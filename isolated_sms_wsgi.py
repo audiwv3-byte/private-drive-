@@ -7,6 +7,7 @@ import os
 import json
 import threading
 
+from pd_native_pilot_assignment import make_native_pilot_orders_app
 from pd_native_auth_postgres_http import make_app
 from pd_native_identity_http import make_identity_app
 
@@ -43,6 +44,8 @@ application = make_app(
 )
 application = make_identity_app(application, database_url, sms_enabled=live,
     telegram_enabled=telegram is not None, session_resume_enabled=True)
+
+application = make_native_pilot_orders_app(application, database_url)
 
 def _report_sms_setup():
     from pd_twilio_setup_diagnostics import inspect_setup

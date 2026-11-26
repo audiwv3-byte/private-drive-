@@ -21,7 +21,7 @@ class PassengerRideEntry extends StatelessWidget {
 
   final NativeOrdersApi? ordersApi;
   final bool enableMapTiles;
-  final DemoTripStore tripStore;
+  final DemoTripStore? tripStore;
   final VoidCallback? onSignOut;
   final VoidCallback? onBackToCabinets;
 
@@ -43,11 +43,13 @@ class PassengerRideEntry extends StatelessWidget {
   }
 
   void _openDelivery(BuildContext context) {
+    final local = tripStore;
+    if (ordersApi != null || local == null) return;
     Navigator.push(context, MaterialPageRoute<void>(
       builder: (_) => PdPassengerLanguageScope(
         child: PassengerExtraServices(
           type: ExtraServiceType.delivery,
-          tripStore: tripStore,
+          tripStore: local,
         ),
       ),
     ));
@@ -189,10 +191,10 @@ class PassengerRideEntry extends StatelessWidget {
               subtitle: Text(pdTr(context, 'Доставка товаров · 20 €',
                   'Prekių pristatymas · 20 €', 'Goods delivery · €20')),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => _openDelivery(context),
+              onTap: ordersApi != null || tripStore == null ? null : () => _openDelivery(context),
             )),
             const SizedBox(height: 20),
-            Text(pdLabel(context, 'Тестовый режим. Реальные заказы и оплата выключены.'),
+            Text(pdLabel(context, ordersApi == null ? 'Тестовый режим. Реальные заказы и оплата выключены.' : 'Заказы через сервер. Оплата выключена.'),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 12)),
           ])),

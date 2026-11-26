@@ -328,6 +328,31 @@ function renderPersistentOrders(){
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
      ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
    card.append(route,info);
+   // Customer-provided metadata is always rendered as text, never as HTML.
+   const details=order.booking_details||{};
+   const extras=Array.isArray(details.extras)?details.extras:[];
+   const notes=document.createElement('p');
+   notes.className='booking-details';
+   const fields=[
+     details.ride_type&&'Тип: '+details.ride_type,
+     details.tariff&&'Тариф: '+details.tariff,
+     typeof details.round_trip==='boolean'&&
+       (details.round_trip?'Туда и обратно':'В одну сторону'),
+     details.advance_booking&&'Предварительное бронирование',
+     details.passengers&&'Пассажиров: '+details.passengers,
+     details.luggage&&'Багаж: '+details.luggage,
+     extras.length&&'Услуги: '+extras.join(', '),
+     details.wishes&&'Пожелания: '+details.wishes,
+     details.preferences?.radio&&'Радио: '+details.preferences.radio,
+     details.preferences?.temperature!=null&&
+       'Температура: '+details.preferences.temperature+' °C',
+     details.preferences?.tracks?.length&&
+       'Музыка: '+details.preferences.tracks.join(', '),
+     typeof details.fare_preview_eur==='number'&&
+       'Предварительная стоимость: '+details.fare_preview_eur+' € (не оплачено)',
+     details.fare_requires_quote&&'Цена по согласованию'
+   ].filter(Boolean);
+   if(fields.length){notes.textContent=fields.join(' · ');card.append(notes)}
    {% if order_gps_enabled %}
    if(activeTrip(order.status)){
      const button=document.createElement('button');

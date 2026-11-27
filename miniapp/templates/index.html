@@ -382,7 +382,9 @@ function pdOpenPassengerMenu(){
 }
 function pdClosePassengerMenu(){
  const menu=$('pdPassengerMenu');
- if(menu?.open)menu.close();
+ if(!menu?.open)return;
+ menu.close();
+ $('pdPassengerMenuToggle').setAttribute('aria-expanded','false');
 }
 function pdPassengerMenuBackdrop(event){
  if(event.target===$('pdPassengerMenu'))pdClosePassengerMenu();
@@ -391,7 +393,9 @@ function pdPassengerNavigate(step){
  pdClosePassengerMenu();
  go(step);
 }
-$('pdPassengerMenu').addEventListener('close',()=>$('pdPassengerMenuToggle').setAttribute('aria-expanded','false'));
+$('pdPassengerMenu').addEventListener('close',event=>{
+ if(!event.currentTarget.open)$('pdPassengerMenuToggle').setAttribute('aria-expanded','false');
+});
 function go(n){if(n===9&&!pdRegistered&&!admin){message(pdL("Карточка пилота и документы доступны после регистрации"),true);n=11;setTimeout(pdbEditProfile,0)}if((n===10||n===13)&&!admin)return message(pdL("Нет доступа к панели администратора"),true);if(n===3 && (!v('origin')||!v('destination')))return message(pdL("Укажите оба адреса"),true);if(n===5 && (!v('date')||!v('time')))return message(pdL("Укажите дату и время"),true);step=n;document.querySelectorAll('section[id^="step"]').forEach(x=>x.classList.add('hidden'));$('step'+n).classList.remove('hidden');$('bar').style.width=(Math.min(n,10)+1)*9+'%';if(n===2)setTimeout(initMap,80);if(n===5)showEstimate();if(n===6)showSummary();if(n===9)pdLoadPilot();if(n===8)loadOrders();if(n===10)loadAdmin();if(n===13)pdDriverLoad();if(n===12)pdBonusLoad();window.scrollTo(0,0)}
 function setRound(b){roundtrip=b;$('oneway').classList.toggle('selected',!b);$('twoway').classList.toggle('selected',b);routeInfo=null}
 function initMap(){if(!window.L)return message(pdL("Карта временно недоступна. Адреса можно ввести вручную."),true);if(!map){map=L.map('map').setView([54.6872,25.2797],8);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);map.on('click',e=>{if(!v('origin')){$('origin').value=e.latlng.lat.toFixed(5)+','+e.latlng.lng.toFixed(5)}else{$('destination').value=e.latlng.lat.toFixed(5)+','+e.latlng.lng.toFixed(5)};message(pdL("Точка выбрана. Для точного адреса укажите улицу и номер дома."))})}map.invalidateSize()}

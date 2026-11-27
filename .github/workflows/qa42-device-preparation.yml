@@ -46,7 +46,6 @@ jobs:
           flutter pub deps --json > "$RUNNER_TEMP/qa41-deps.json"
           flutter build apk --release --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false
           test -s build/app/outputs/flutter-apk/app-release.apk
-          jarsigner -verify build/app/outputs/bundle/release/app-release.aab
       - name: Verify actual APK identity, manifest and signature
         run: |
           set -euo pipefail

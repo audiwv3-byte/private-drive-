@@ -1,0 +1,45 @@
+name: QA42.2 shared device HTTPS browser
+on:
+  push:
+    branches: [qa/qa42-2-device-https]
+    paths:
+      - 'ops/qa/qa42_device*.py'
+      - 'tests/test_qa42_device_https.py'
+      - '.github/workflows/qa42-2-device-https.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-https:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PD_QA42_LOCAL: '1'
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+      PD_NATIVE_SMS_LIVE: 'NO'
+      PD_PAYMENT_MODE: disabled
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-sms-render.txt flask pytest playwright
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libnss3-tools
+          python -m playwright install --with-deps chromium
+      - run: sudo sysctl -w net.ipv4.ip_unprivileged_port_start=443
+      - run: python -m pytest -vs tests/test_qa42_device_https.py

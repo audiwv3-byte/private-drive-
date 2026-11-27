@@ -571,6 +571,7 @@ class _PilotDemoState extends State<PilotDemo> with SingleTickerProviderStateMix
   /// browser or WebView). Do not fallback to HTTPS: that may open inside PD.
   /// The demo has no verified destination coordinates yet.
   Future<void> _openWaze() async {
+    if (const bool.fromEnvironment('PD_ISOLATED_DEVICE_QA')) return;
     try {
       final opened = await launchUrl(
         privateDriveWazeAppUri,

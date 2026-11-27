@@ -1,0 +1,106 @@
+name: QA42 isolated device packages
+on:
+  push:
+    branches: [qa/qa42-device-testing]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PD_NATIVE_SMS_LIVE: "NO"
+      PD_PAYMENT_MODE: disabled
+      QA_API_URL: https://qa.invalid
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Verify fail-closed QA endpoint
+        run: test "$QA_API_URL" = https://qa.invalid
+      - name: Generate isolated Android scaffold
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive.qa --project-name=private_drive qa_android
+          cp -R flutter_app/lib/. qa_android/lib/
+          cp -R flutter_app/assets qa_android/assets
+          cp flutter_app/pubspec.yaml qa_android/
+          if test -f flutter_app/pubspec.lock; then cp flutter_app/pubspec.lock qa_android/; fi
+          python3 ops/qa/prepare_android_release.py qa_android
+          mkdir -p "$HOME/.android"
+          rm -f "$HOME/.android/debug.keystore"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 30 -dname "CN=PRIVATE DRIVE isolated QA,O=QA,C=LT"
+      - name: Build installable release APK using ephemeral QA key
+        working-directory: qa_android
+        run: |
+          flutter pub get
+          flutter pub deps --json > "$RUNNER_TEMP/qa41-deps.json"
+          flutter build apk --release --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=${{ env.QA_API_URL }} --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false
+          test -s build/app/outputs/flutter-apk/app-release.apk
+      - name: Verify APK signature and package identity
+        run: |
+          SDK_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          APK=qa_android/build/app/outputs/flutter-apk/app-release.apk
+          "$SDK_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          "$SDK_TOOLS/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/badging.txt"
+          grep -F "package: name='lt.privatedrive.qa.private_drive'" "$RUNNER_TEMP/badging.txt"
+          mkdir -p qa_apk
+          cp "$APK" qa_apk/PRIVATE-DRIVE-QA42-ONLY.apk
+          cp "$RUNNER_TEMP/badging.txt" qa_apk/
+          (cd qa_apk && sha256sum PRIVATE-DRIVE-QA42-ONLY.apk > SHA256SUMS && cat SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-qa42-apk-not-for-store
+          path: qa_apk/
+          retention-days: 14
+  ios-device-release:
+    runs-on: macos-15
+    env:
+      QA_API_URL: https://qa.invalid
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Verify fail-closed QA endpoint
+        run: test "$QA_API_URL" = https://qa.invalid
+      - name: Build arm64 device Release without signing
+        working-directory: flutter_app
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          python3 -c 'from pathlib import Path; p=Path("pubspec.yaml"); s=p.read_text(); old="  integration_test:\n    sdk: flutter\n"; assert s.count(old)==1; p.write_text(s.replace(old,""))'
+          flutter pub get
+          flutter pub deps --json > "$RUNNER_TEMP/qa41-deps.json"
+          test -s "$RUNNER_TEMP/qa41-deps.json"
+          flutter build ios --release --no-codesign --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=${{ env.QA_API_URL }} --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false
+      - name: Validate device binary and packaged privacy configuration
+        run: |
+          plutil -lint flutter_app/build/ios/iphoneos/Runner.app/Info.plist
+          plutil -lint flutter_app/build/ios/iphoneos/Runner.app/PrivacyInfo.xcprivacy
+          python3 ops/qa/check_ios_qa41_release.py flutter_app/build/ios/iphoneos/Runner.app
+          mkdir -p qa_ios
+          cp "$RUNNER_TEMP/qa41-deps.json" qa_ios/dependencies.json
+          cp flutter_app/build/ios/iphoneos/Runner.app/Info.plist qa_ios/
+          cp flutter_app/build/ios/iphoneos/Runner.app/PrivacyInfo.xcprivacy qa_ios/
+          ditto -c -k --keepParent flutter_app/build/ios/iphoneos/Runner.app qa_ios/PRIVATE-DRIVE-QA-UNSIGNED.zip
+          (cd qa_ios && shasum -a 256 PRIVATE-DRIVE-QA-UNSIGNED.zip > SHA256SUMS && cat SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-qa42-ios-unsigned-not-for-store
+          path: qa_ios/
+          retention-days: 14

@@ -13,9 +13,15 @@
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#f6efdf}
 button,a{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:3px}a{color:var(--gold)}
 body{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-header{padding:5px 16px;border-bottom:1px solid var(--line);background:#12100d}
-header summary{cursor:pointer;color:var(--gold);padding:5px 0;touch-action:pan-x}
-.header-content{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;flex-wrap:wrap}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);background:#12100d}
+#dispatchMenuToggle{min-width:44px;min-height:44px;font-size:22px;line-height:1}
+#dispatchMenu{position:fixed;inset:0 0 0 auto;margin:0;width:min(88vw,340px);height:100dvh;max-height:none;max-width:none;overflow:auto;padding:0;background:#17130f;color:#f6efdf;border:0;border-left:1px solid var(--line)}
+#dispatchMenu::backdrop{background:#0009}
+#dispatchMenu h2{margin:0;color:var(--gold)}
+#dispatchMenu nav{display:grid;gap:12px;padding:16px}
+#dispatchMenu nav .btn,#dispatchMenu nav form{width:100%}
+#dispatchMenu nav a{display:block;padding:8px 10px}
+#dispatchMenu nav form{margin:0}
 .brand{display:flex;align-items:center;gap:11px;text-decoration:none;font-weight:750;color:var(--gold);letter-spacing:.08em}.brand img{width:43px;height:43px;object-fit:contain}.brand small{display:block;color:var(--soft);letter-spacing:.03em;font-size:11px;font-weight:400}
 .workspace-controls{display:flex;gap:8px;padding:6px 16px;border-bottom:1px solid var(--line)}
 .workspace-controls [aria-expanded="true"]{border-color:var(--gold);color:var(--gold)}
@@ -25,7 +31,7 @@ aside.right{grid-column:3;border-right:0;border-left:1px solid var(--line)}
 .directory-card{display:block;width:100%;text-align:left;margin:7px 0}
 #tripChat input{width:100%;font:inherit;padding:9px;margin-bottom:8px;border-radius:6px;border:1px solid var(--line)}
 #chatMessages{max-height:15rem;overflow:auto;overflow-wrap:anywhere;padding-left:20px}
-.toolbar form{margin:0}.test-order strong{overflow-wrap:anywhere}.test-order button{margin-top:5px}
+.test-order strong{overflow-wrap:anywhere}.test-order button{margin-top:5px}
 .pilot-marker{border:1px solid #ffe2a3;border-radius:50%;background:#1b1713;color:#ffd889;display:grid;place-items:center;width:35px;height:35px;font-size:22px;box-shadow:0 2px 8px #000a}
 .passenger-marker{border:2px solid #fff;border-radius:50%;background:#1684d8;color:#fff;display:grid;place-items:center;width:32px;height:32px;font-size:18px;box-shadow:0 2px 8px #000a}
 #glMap,#rasterMap{position:absolute;inset:0;background:#10100f}
@@ -42,7 +48,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 #map{grid-column:2;grid-row:1;min-width:0;min-height:0;background:#24231f;position:relative;overflow:hidden;isolation:isolate}
 #mapNotice{position:absolute;z-index:500;left:16px;top:16px;right:16px;max-width:445px;border-radius:10px;background:#15120fe8;border:1px solid #8a7049;padding:12px 15px;pointer-events:none}
 #mapNotice b{display:block;color:var(--gold)}#mapNotice span{font-size:12px;color:#f2e6d2}
-.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.notice{padding:12px;background:#282016;border:1px solid #8b6a39;border-radius:9px}.notice strong{color:var(--gold)}.empty{margin:16px 0;padding:20px 12px;border:1px dashed #675438;border-radius:10px;text-align:center;color:var(--soft)}
+.notice{padding:12px;background:#282016;border:1px solid #8b6a39;border-radius:9px}.notice strong{color:var(--gold)}.empty{margin:16px 0;padding:20px 12px;border:1px dashed #675438;border-radius:10px;text-align:center;color:var(--soft)}
 .status{font-size:12px;color:var(--gold);margin:10px 0}.legend{display:flex;gap:8px;flex-wrap:wrap}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:#e2b86e}
 .autopilot-switch{display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:9px 13px;border-radius:10px;border:1px solid #725c3b;background:#241b11;color:#f5d9a1}
 .autopilot-switch:disabled{opacity:.65;cursor:default}
@@ -63,9 +69,12 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 </style></head>
 <body>
 <header>
-<details id="topSheet" open><summary>Панель диспетчерской</summary><div class="header-content">
 <a class="brand" href="/dispatch"><img src="/pd-logo-transparent.png" alt=""><span>PRIVATE DRIVE<small>Диспетчерская · тестовый интерфейс</small></span></a>
-<div class="toolbar">
+<button class="btn" type="button" id="dispatchMenuToggle" aria-label="Открыть меню диспетчерской" aria-haspopup="dialog" aria-controls="dispatchMenu" aria-expanded="false">☰</button>
+</header>
+<dialog id="dispatchMenu" aria-labelledby="dispatchMenuTitle">
+<header><h2 id="dispatchMenuTitle">Меню</h2><button class="btn" type="button" id="dispatchMenuClose" aria-label="Закрыть меню" autofocus>×</button></header>
+<nav aria-label="Разделы диспетчерской">
 {% if test_sync_enabled or persistent_queue_enabled %}
 <a href="#ordersTitle">Заказы</a>
 <a href="#pilotsTitle">Пилоты</a>
@@ -78,8 +87,8 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 {% if telegram_test_enabled %}<a class="btn" href="/dispatch/test-miniapp">Тест заявки из Telegram</a>{% endif %}
 <form method="post" action="/dispatch/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Выйти</button></form>
 {% else %}<span class="label">Доступ к заказам закрыт</span><a class="btn" href="/dispatch">В панель управления</a>{% endif %}
-</div></div></details>
-</header>
+</nav>
+</dialog>
 <nav class="workspace-controls" aria-label="Боковые панели диспетчерской">
 <button class="btn" type="button" aria-expanded="true" aria-controls="ordersPanel">Заказы</button>
 <button class="btn" type="button" aria-expanded="true" aria-controls="peoplePanel">Пилоты и пассажиры</button>
@@ -176,23 +185,32 @@ function showPanel(button){
 }
 if(compact.matches){
     panels.forEach(button=>setPanel(button,false));
-    $('topSheet').open=false;
 }
 panels.forEach(button=>button.addEventListener('click',()=>{
     if(button.getAttribute('aria-expanded')==='true')setPanel(button,false);
     else showPanel(button);
 }));
-const sheetHandle=$('topSheet').querySelector('summary');
-let sheetTouch=null;
-sheetHandle.addEventListener('touchstart',event=>sheetTouch=event.changedTouches[0].clientY,{passive:true});
-sheetHandle.addEventListener('touchend',event=>{
-    if(sheetTouch===null)return;
-    const offset=event.changedTouches[0].clientY-sheetTouch;
-    sheetTouch=null;
-    if(Math.abs(offset)>30){
-        $('topSheet').open=offset>0;
-        if(event.cancelable)event.preventDefault();
-    }
+const dispatchMenu=$('dispatchMenu');
+const dispatchMenuToggle=$('dispatchMenuToggle');
+dispatchMenuToggle.addEventListener('click',()=>{
+    dispatchMenu.showModal();
+    dispatchMenuToggle.setAttribute('aria-expanded','true');
+});
+$('dispatchMenuClose').addEventListener('click',()=>dispatchMenu.close());
+dispatchMenu.addEventListener('close',()=>{
+    dispatchMenuToggle.setAttribute('aria-expanded','false');
+    dispatchMenuToggle.focus();
+});
+dispatchMenu.addEventListener('click',event=>{
+    if(event.target===dispatchMenu && event.clientX<dispatchMenu.getBoundingClientRect().left)dispatchMenu.close();
+});
+dispatchMenu.querySelectorAll('a[href^="#"]').forEach(link=>{
+    link.addEventListener('click',()=>{
+        const target=$(link.hash.slice(1));
+        const panel=panels.find(button=>button.getAttribute('aria-controls')===target?.closest('aside')?.id);
+        if(panel)showPanel(panel);
+        dispatchMenu.close();
+    });
 });
 const directoryTabs=[...document.querySelectorAll('[data-directory]')];
 function showDirectory(id){

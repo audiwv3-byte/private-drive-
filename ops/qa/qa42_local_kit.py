@@ -8,6 +8,7 @@ import os
 import secrets
 import ssl
 import time
+import threading
 from pathlib import Path
 from urllib.parse import urlencode
 import psycopg
@@ -15,7 +16,7 @@ from werkzeug.serving import make_server
 from pd_native_auth_postgres_http import initialize_database
 from pd_qa25_wsgi import create_application
 
-def prepare():
+def prepare(*, mobile_codes=None):
     if os.environ.get("PD_QA42_LOCAL") != "YES":
         raise RuntimeError("Explicit QA42 gate required")
     if os.environ.get("PD_AUTH_TEST_DATABASE_URL") != "postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test":
@@ -99,10 +100,14 @@ def prepare():
     from pd_native_auth_postgres_http import session_request, reply
     from werkzeug.wrappers import Request
     orders = create_application()
+    from ops.qa.qa42_mobile_login import MobileLogin
+    login = MobileLogin(mobile_codes, tokens) if mobile_codes is not None else None
     def app(environ, start_response):
         req = Request(environ)
         if req.path in ("/native-auth/session", "/native-auth/sign-out") and req.method == "POST":
             return session_request(api_dsn, environ, start_response, req.path, int(time.time()))
+        if login is not None and req.path in ("/native-auth/request-code", "/native-auth/verify-code") and req.method == "POST":
+            return login.handle(environ, start_response)
         if req.path.startswith("/native-auth/"):
             return reply(start_response, "503 Service Unavailable", {"error": "external_auth_disabled"})
         if req.path.startswith("/payment") or req.path.startswith("/v1/"):
@@ -124,14 +129,16 @@ def main():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(args.cert, args.key)
-    app, tokens, telegram_token, csrf = prepare()
+    from ops.qa.qa42_mobile_login import new_codes
+    codes = new_codes()
+    app, tokens, telegram_token, csrf = prepare(mobile_codes=codes)
     values = {"auth_date":str(int(time.time())), "user":json.dumps({"id":201})}
     key = hmac.digest(b"WebAppData", telegram_token.encode(), "sha256")
     fields = "\n".join(f"{k}={v}" for k,v in sorted(values.items()))
     values["hash"] = hmac.new(key, fields.encode(), hashlib.sha256).hexdigest()
     fd = os.open(args.credentials, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd,"w") as f:
-        json.dump({"tokens":tokens,"dispatcher_init_data":urlencode(values),"csrf":csrf},f)
+        json.dump({"mobile_codes":codes,"dispatcher_init_data":urlencode(values),"csrf":csrf},f)
     try:
         server = make_server(args.bind,443,app,ssl_context=context)
         try:

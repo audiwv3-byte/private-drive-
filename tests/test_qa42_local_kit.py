@@ -21,7 +21,9 @@ from ops.qa.qa42_local_kit import prepare
 
 def test_local_kit(monkeypatch, tmp_path):
     monkeypatch.setenv("PD_QA42_LOCAL","YES")
-    app,tokens,telegram_token,csrf = prepare()
+    from ops.qa.qa42_mobile_login import new_codes
+    codes = new_codes()
+    app,tokens,telegram_token,csrf = prepare(mobile_codes=codes)
     from werkzeug.test import Client
     from werkzeug.wrappers import Response
     c=Client(app,Response)
@@ -30,7 +32,17 @@ def test_local_kit(monkeypatch, tmp_path):
         assert response.status_code==200
         assert response.json["role"]==role
     assert c.post("/native-auth/session").status_code==401
-    assert c.post("/native-auth/request-code",json={}).status_code==503
+    assert c.post("/native-auth/request-code",json={}).status_code==403
+    for phone,role in (("+12025550101","passenger"),("+12025550102","pilot")):
+        req=c.post("/native-auth/request-code",json={"channel":"phone","destination":phone})
+        assert req.status_code==202
+        cid=req.json["challenge_id"]
+        assert c.post("/native-auth/verify-code",json={"challenge_id":cid,"code":"xxxxxx"}).status_code==401
+        verified=c.post("/native-auth/verify-code",json={"challenge_id":cid,"code":codes[phone]})
+        assert verified.status_code==200 and verified.json["role"]==role
+        assert c.post("/native-auth/verify-code",json={"challenge_id":cid,"code":codes[phone]}).status_code==401
+        assert c.post("/native-auth/session",headers={"Authorization":"Bearer "+verified.json["access_token"]}).json["role"]==role
+    print("PASS existing mobile OTP contract, server roles, single use and session validation")
     assert c.get("/payment/paysera").status_code==403
     assert c.get("/dispatch/orders/state").status_code==401
     import pytest

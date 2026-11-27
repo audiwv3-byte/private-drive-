@@ -65,7 +65,7 @@ jobs:
         working-directory: flutter_app
         run: |
           flutter pub get
-          flutter test test/pd_http_api_test.dart test/native_orders_api_test.dart test/native_pilot_orders_test.dart test/qa39_gps_test.dart
+          flutter test test/pd_http_api_test.dart test/native_orders_api_test.dart test/native_pilot_orders_test.dart test/qa39_gps_test.dart --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid
       - name: Prepare disposable Android project
         run: |
           flutter create --platforms=android --org=lt.privatedrive.qa --project-name=private_drive qa_android

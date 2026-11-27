@@ -2,7 +2,7 @@ name: PRIVATE DRIVE passenger Mini App welcome
 
 on:
   push:
-    branches: [qa/passenger-miniapp-welcome-integrated, qa/telegram-applications-postgres, qa/miniapp-auto-route-quotes]
+    branches: [qa/passenger-miniapp-welcome-integrated, qa/telegram-applications-postgres, qa/miniapp-auto-route-quotes, qa/miniapp-compact-booking]
 
 permissions:
   contents: read

@@ -148,6 +148,7 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
             browser = playwright.chromium.launch(executable_path=os.environ.get("QA_CHROMIUM"),
                                                  args=["--no-sandbox"])
             page = browser.new_context(**playwright.devices["iPhone 13"]).new_page()
+            page.set_viewport_size({"width": 360, "height": 640})
             configure_page(page, 101)
             for lang, labels in {
                 "en": ["Book a trip", "My trips", "Book in advance", "Sober driver", "Wheel of fortune", "Become a driver"],
@@ -216,6 +217,20 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
                 expect(page.locator("#step11")).to_be_visible()
                 if service == "Предзаказ":
                     expect(page.locator("#pdbDate")).to_be_focused()
+                    page.locator('[data-pdb-target="route"]').click()
+                else:
+                    for panel in ("route", "time", "details", "payment"):
+                        page.locator(f'[data-pdb-target="{panel}"]').click()
+                        expect(page.locator(f'[data-pdb-page="{panel}"]')).to_be_visible()
+                        height, viewport = page.evaluate("() => [document.documentElement.scrollHeight, innerHeight]")
+                        assert height <= viewport * 1.5, (panel, height, viewport)
+                        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), panel
+                    page.locator('[data-pdb-target="route"]').click()
+                    page.locator("#pdbMapOpen").click()
+                    expect(page.locator("#pdbMapDialog")).to_be_visible()
+                    page.locator("#pdbMapClose").click()
+                    expect(page.locator("#pdbMapDialog")).to_be_hidden()
+                    page.locator(".pd-booking-optional summary").filter(has_text="Быстрый выбор").click()
                 expect(page.locator(".pd-route-calculate")).to_have_count(0)
                 if service == "Поездка":
                     popular = page.locator("#pdbPopular").get_by_role("button", name="Тракай")
@@ -254,8 +269,18 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
                 assert estimate.value.request.post_data_json["destination"] == "QA destination " + service
                 assert estimate.value.json()["road_coordinates"] == coordinates
                 expect(page.locator("#pdbRouteStatus")).to_contain_text("12 км")
+                if service == "Поездка":
+                    page.locator(".pd-booking-optional[open] summary").filter(has_text="Быстрый выбор").click()
+                page.locator("#pdbBookingNext").click()
                 page.locator("#pdbDate").fill(day)
                 page.locator("#pdbTime").fill(time)
+                page.locator("#pdbBookingNext").click()
+                page.locator("#pdbBookingNext").click()
+                expect(page.locator("#pdbSummary")).to_contain_text("QA pickup A")
+                page.locator('#pdbPays [data-method="Банковский перевод"]').click()
+                expect(page.locator("#pdbSummary")).to_contain_text("Банковский перевод")
+                # The isolated order bridge deliberately submits synthetic unpaid orders only.
+                page.locator('#pdbPays [data-method="Наличными"]').click()
                 page.locator("#pdbAgree").check()
                 with page.expect_response(lambda r: r.url == base + "/api/order") as result:
                     page.locator("#pdbSend").click()

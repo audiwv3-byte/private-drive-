@@ -50,6 +50,8 @@ void main() {
       expect((await pilot.load()).single.orderId,id);
       var consent = false;
       var sensorEvents = 0;
+      Object? sensorError;
+      var sensorClosed = false;
       await tester.pumpWidget(const MaterialApp(home: Scaffold(body: Center(child: Text('QA42 GPS runtime')))));
       await tester.pump();
       final publisher = QaPilotGpsPublisher(send:pilot.publishGps,
@@ -58,7 +60,18 @@ void main() {
           sensorEvents++;
           debugPrint('QA42 OS fix #$sensorEvents ageSeconds=${DateTime.now().millisecondsSinceEpoch ~/ 1000 - fix.capturedAt}');
           return fix;
-        }), onStopped: () => debugPrint('QA42 publisher stopped; OS fixes=$sensorEvents'));
+        }).transform(StreamTransformer<QaGpsFix, QaGpsFix>.fromHandlers(
+          handleError: (error, stack, sink) {
+            sensorError = error;
+            debugPrint('QA42 OS stream error: $error');
+            sink.addError(error, stack);
+          },
+          handleDone: (sink) {
+            sensorClosed = true;
+            debugPrint('QA42 OS stream closed');
+            sink.close();
+          },
+        )), onStopped: () => debugPrint('QA42 publisher stopped; OS fixes=$sensorEvents'));
       try {
         expect(await publisher.start(id),false);
         expect(gps,isEmpty);
@@ -66,15 +79,20 @@ void main() {
         consent = true;
         expect(await publisher.start(id),true);
         debugPrint('QA42 subscribed: permission=${await Geolocator.checkPermission()} service=${await Geolocator.isLocationServiceEnabled()}');
-        final deadline = DateTime.now().add(const Duration(seconds:60));
-        while(gps.isEmpty && DateTime.now().isBefore(deadline)) {
-          await Future<void>.delayed(const Duration(seconds:1));
+        final wait = Stopwatch()..start();
+        while (!gps.any((payload) => payload['enabled'] == true) &&
+            publisher.orderId != null &&
+            wait.elapsed < const Duration(seconds: 60)) {
+          await Future<void>.delayed(const Duration(milliseconds: 250));
         }
-        expect(sensorEvents, greaterThan(0), reason:'Native OS stream must emit a fix');
-        expect(gps,isNotEmpty,reason:'OS location stream must produce a fix accepted by publisher');
-        expect(gps.first['enabled'],true);
-        expect(gps.first['latitude'], closeTo(54.6872, 0.01));
-        expect(gps.first['longitude'], closeTo(25.2797, 0.01));
+        expect(sensorError, isNull, reason: 'Native GPS stream produced an error');
+        expect(sensorClosed, false, reason: 'Native GPS stream closed while sharing');
+        expect(publisher.orderId, id, reason: 'Publisher stopped while sharing');
+        expect(sensorEvents, greaterThan(0), reason: 'Native OS stream must emit a fix');
+        final enabled = gps.where((payload) => payload['enabled'] == true).toList();
+        expect(enabled, isNotEmpty, reason: 'Publisher must send an enabled GPS payload');
+        expect(enabled.first['latitude'], closeTo(54.6872, 0.01));
+        expect(enabled.first['longitude'], closeTo(25.2797, 0.01));
         await publisher.stop();
         expect(gps.last['enabled'],false);
         final count = gps.length;

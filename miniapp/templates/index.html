@@ -924,7 +924,7 @@ async function pdbRegisterTelegram(){
  if(!initData){status.textContent=pdL("Для регистрации через Telegram откройте бота PRIVATE DRIVE.");const a=document.createElement('a');a.href='https://t.me/EuroBalticTransferBot?start=register';a.textContent=pdL('Открыть Telegram-бот PRIVATE DRIVE →');a.target='_blank';a.rel='noopener noreferrer';a.style.cssText='display:inline-block;padding:12px;margin-top:8px;border:1px solid #d6b467;border-radius:10px;color:#f4d38d';status.append(document.createElement('br'),a);return}
  if(!tg?.isVersionAtLeast?.('6.9')||typeof tg.requestContact!=='function'){status.textContent=pdL("В этой версии Telegram недоступна передача контакта. Укажите данные вручную.");pdbEditProfile();return}
  pdbProfileBusy=true;$('pdbTelegramRegister').disabled=true;
- try{const prepared=await api('/api/register/telegram');if(prepared.registered){pdbUpdateProfile(prepared);return}
+ try{const prepared=await api('/api/register/telegram',{});if(prepared.registered){pdbUpdateProfile(prepared);return}
   $('pdbName').value=prepared.name;status.textContent=pdL("Разрешите Telegram передать ваш телефон для регистрации.");
   const allowed=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(pdL("Передача контакта не завершена. Попробуйте ещё раз или введите данные вручную."))),45000);try{tg.requestContact(ok=>{clearTimeout(timer);resolve(ok)})}catch(e){clearTimeout(timer);reject(e)}});
   if(!allowed){status.textContent=pdL("Телефон не передан. Можно повторить или заполнить данные вручную.");pdbEditProfile();return}

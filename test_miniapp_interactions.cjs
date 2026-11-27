@@ -16,6 +16,58 @@ function element(tag='div'){
   append(...c){this.children.push(...c)},replaceChildren(...c){this.children=[...c]},
   addEventListener(type,cb){(this.events??={})[type]=cb},close(){this.events?.close?.()}};
 }
+
+async function testTelegramRegistration(){
+ const handlers=[...html.matchAll(/^async function (?:api|pdbRegisterTelegram)\([^\n]*\)\{[\s\S]*?^\}/gm)];
+ assert.equal(handlers.length,2,'Missing Mini App API or registration handler');
+ const registrationScript=new vm.Script(handlers.map(([source])=>source).join('\n')+'\npdbRegisterTelegram()');
+ const testInitData='test-telegram-init-data';
+ const botUrl='https://t.me/EuroBalticTransferBot?start=register';
+ const passenger={registered:true,name:'QA Passenger',phone:'+37060000000'};
+ const routes=new Map([
+  ['/api/register/telegram',{registered:false,name:passenger.name}],
+  ['/api/me',passenger],
+  ['/api/register/telegram/cancel',{ok:true}],
+ ]);
+
+ async function register(initData){
+  const elements=new Map(['pdbProfileStatus','pdbTelegramRegister','pdbName'].map(id=>[id,element()]));
+  const calls=[];
+  let contactPrompts=0,updatedProfile;
+  await registrationScript.runInNewContext({
+   initData,pdbProfileBusy:false,
+   $:id=>elements.get(id),document:{createElement:element},pdL:text=>text,pdReleaseText:text=>text,
+   tg:{isVersionAtLeast:()=>true,requestContact(callback){contactPrompts++;callback(true)}},
+   setTimeout(){},clearTimeout(){},
+   pdbUpdateProfile(profile){updatedProfile=profile},
+   pdbEditProfile(){},
+   async fetch(path,{method,headers,body}){
+    calls.push({path,method,initData:headers['X-Telegram-Init-Data'],body});
+    return {ok:routes.has(path),json:async()=>routes.get(path)};
+   },
+  });
+  return {calls,contactPrompts,updatedProfile,status:elements.get('pdbProfileStatus')};
+ }
+
+ const inside=await register(testInitData);
+ assert.deepEqual(inside.calls,[
+  {path:'/api/register/telegram',method:'POST',initData:testInitData,body:'{}'},
+  {path:'/api/me',method:'GET',initData:testInitData,body:undefined},
+  {path:'/api/register/telegram/cancel',method:'POST',initData:testInitData,body:'{}'},
+ ]);
+ assert.equal(inside.contactPrompts,1);
+ assert.deepEqual(inside.updatedProfile,passenger);
+ console.log('PASS Telegram registration: test initData sends POST and updates the test passenger profile');
+
+ const outside=await register('');
+ assert.deepEqual(outside.calls,[]);
+ assert.equal(outside.contactPrompts,0);
+ const botLink=outside.status.children.find(child=>child.tag==='a');
+ assert.equal(botLink?.href,botUrl);
+ assert.match(botLink.textContent,/Открыть Telegram-бот/);
+ console.log('PASS Telegram registration: missing initData shows the bot link and sends no request');
+}
+
 const requests=[],messages=[],cleared=[];
 const document={hidden:false,listeners:{},createElement:element,getElementById:()=>null,querySelectorAll:()=>[],addEventListener(k,cb){this.listeners[k]=cb}};
 const state={status:'Подтверждена',role:'pilot',arrived_at:null,started_at:null,server_now:1700000000,lat:null,lon:null,accuracy:0,extras:[],final_cents:null,base_cents:10000,wait_cents:0,wait_accepted_at:1700000000,capture:null,card_capture_available:false};
@@ -40,6 +92,7 @@ const buttons=()=>{const out=[];const scan=n=>{if(n.tag==='button')out.push(n);f
 const button=label=>buttons().find(n=>n.textContent.includes(label));
 async function click(label){const b=button(label);assert.ok(b,'Missing button '+label);await b.onclick();assert.equal(b.disabled,false,'Button remained disabled '+label)}
 (async()=>{
+ await testTelegramRegistration();
  await window.pdOpenLiveTripV4(42);
  assert.ok(button('Прибыл'));assert.ok(button('Передавать мою геопозицию'));assert.equal(button('Поездка завершена'),undefined);
  await click('Передавать мою геопозицию');

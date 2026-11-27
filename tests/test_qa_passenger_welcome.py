@@ -1,14 +1,17 @@
 """Mobile Chromium with a synthetic Telegram SDK, real Flask apps and local PostgreSQL."""
+import hashlib
 import io
 import json
 import os
 import re
+from time import time as unix_time
+from pathlib import Path
 from datetime import timedelta
 from threading import Thread
 from unittest.mock import MagicMock
 
 import psycopg
-from PIL import Image
+from PIL import Image, ImageDraw
 from playwright.sync_api import expect, sync_playwright
 from werkzeug.security import generate_password_hash
 from werkzeug.serving import make_server
@@ -19,13 +22,22 @@ from test_qa_actual_miniapp_postgres import DSN, ROOT, TOKEN, signed
 
 def test_passenger_welcome(monkeypatch, tmp_path):
     assert os.environ["PD_AUTH_TEST_DATABASE_URL"] == DSN
-    password = "qa-browser-dispatcher-password"
+    password = "qa-browser-admin-password"
+    dispatcher_password = "qa-browser-operator-password"
+    pilot_token = "qa-synthetic-pilot-token-" * 3
+    passenger_token = "qa-synthetic-passenger-token-" * 3
     for name, value in {
         "BOT_TOKEN": TOKEN,
         "ORS_API_KEY": "",
         "PD_QA_MINIAPP_POSTGRES": "1",
         "PD_QA25_WSGI": "1",
         "PD_QA26_ASSIGNMENT": "1",
+        "PD_QA27_GPS": "1",
+        "PD_NATIVE_PILOT_ASSIGNMENT": "1",
+        "PD_PILOT_ASSIGNMENT_DATABASE_URL": DSN,
+        "PD_QA_DISPATCHER_ID": "202",
+        "PD_QA_DISPATCHER_PASSWORD_HASH": generate_password_hash(dispatcher_password),
+        "PD_DISPATCH_TEST_SYNC": "0",
         "PD_DISPATCH_STAGING_ONLY": "1",
         "PD_DISPATCH_PERSISTENT_QUEUE": "1",
         "PD_DISPATCH_ORDERS_DATABASE_URL": DSN,
@@ -41,8 +53,19 @@ def test_passenger_welcome(monkeypatch, tmp_path):
     initialize_database(DSN)
     with psycopg.connect(DSN, autocommit=True) as db:
         for name in ("native_auth_session_functions.sql", "native_dispatch_orders.sql",
-                     "native_pilot_identity.sql", "qa26_pilot_assignment.sql"):
+                     "native_pilot_identity.sql", "qa26_pilot_assignment.sql", "qa27_pilot_gps.sql"):
             db.execute((ROOT / "migrations" / name).read_text())
+
+        now = int(unix_time())
+        for role, token in (("pilot", pilot_token), ("passenger", passenger_token)):
+            uid = "qa-dispatch-" + role
+            db.execute("INSERT INTO native_auth_users VALUES (%s,'phone',%s,0)", (uid, uid))
+            db.execute("INSERT INTO native_auth_roles VALUES (%s,%s)", (uid, role))
+            db.execute("""INSERT INTO native_auth_sessions(token_hash,user_id,created_at,expires_at)
+                VALUES (%s,%s,%s,%s)""", (hashlib.sha256(token.encode()).hexdigest(), uid, now, now + 600))
+        db.execute("""INSERT INTO native_identity_checks(id,user_id,status,created_at,expires_at,decided_at)
+            VALUES ('qa-dispatch-check','qa-dispatch-pilot','approved',%s,%s,%s)""",
+            (now - 5, now + 600, now - 1))
 
     import telebot
     monkeypatch.setattr(telebot, "TeleBot", lambda *args, **kwargs: MagicMock())
@@ -52,6 +75,10 @@ def test_passenger_welcome(monkeypatch, tmp_path):
     core.initialize()
     import miniapp_server
     from pd_dispatcher_staging_wsgi import create_app
+    from flask import Flask
+    from pd_qa27_gps import register_gps
+    pilot_api = Flask("qa_dispatch_gps")
+    register_gps(pilot_api, lambda: False, DSN)
     miniapp = miniapp_server.app
     dispatcher = create_app()
     dispatcher.config["PD_QA_TELEGRAM_USERS_DB"] = core.USERS_DB
@@ -64,13 +91,24 @@ def test_passenger_welcome(monkeypatch, tmp_path):
 
     def application(environ, start_response):
         path = environ["PATH_INFO"]
-        app = dispatcher if path.startswith("/dispatch") else miniapp
+        if path.startswith("/native-pilot-orders/"):
+            return pilot_api(environ, start_response)
+        app = dispatcher if path.startswith(("/dispatch", "/pd-logo-transparent.png")) else miniapp
         return app(environ, start_response)
 
     server = make_server("127.0.0.1", 0, application, threaded=True)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base = f"http://127.0.0.1:{server.server_port}"
+
+    leaflet_dir = os.environ.get("QA_LEAFLET_DIR")
+    tile = io.BytesIO()
+    picture = Image.new("RGB", (256, 256), "#dedbce")
+    draw = ImageDraw.Draw(picture)
+    for start in (44, 116, 203):
+        draw.line((0, start, 256, start - 18), fill="#c3bd9d", width=4)
+        draw.line((start, 0, start + 26, 256), fill="#c3bd9d", width=4)
+    picture.save(tile, format="PNG")
 
     def configure_page(page, uid=None):
         def offline_routes(route):
@@ -81,6 +119,15 @@ def test_passenger_welcome(monkeypatch, tmp_path):
                 route.fulfill(content_type="application/javascript", body=(
                     "window.Telegram={WebApp:{initData:" + json.dumps(init_data)
                     + ",initDataUnsafe:{},ready(){},expand(){}}};"))
+            elif leaflet_dir and route.request.url in (
+                "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+                "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+            ):
+                path = Path(leaflet_dir) / route.request.url.rsplit("/", 1)[1]
+                route.fulfill(path=str(path), content_type=(
+                    "application/javascript" if path.suffix == ".js" else "text/css"))
+            elif leaflet_dir and route.request.url.startswith("https://tile.openstreetmap.org/"):
+                route.fulfill(content_type="image/png", body=tile.getvalue())
             else:
                 route.abort()
         page.route("**/*", offline_routes)
@@ -199,21 +246,100 @@ def test_passenger_welcome(monkeypatch, tmp_path):
             assert me["driver_application"]["status"] == "pending"
             assert client.get("/api/me", headers=signed(102)).json["driver_application"] is None
 
-            dispatch = browser.new_page()
+            def login(page, secret):
+                page.goto(base + "/dispatch/map")
+                expect(page).to_have_url(base + "/dispatch/login")
+                page.locator("input[name=password]").fill(secret)
+                page.locator("form").filter(has=page.locator("input[name=password]")).get_by_role(
+                    "button", name="Войти").click()
+                expect(page).to_have_url(base + "/dispatch")
+
+            for bearer, uid in ((passenger_token, 101), (pilot_token, 103)):
+                auth = {**signed(uid), "Authorization": "Bearer " + bearer}
+                forbidden = dispatcher.test_client()
+                assert forbidden.get("/dispatch", headers=auth).location.endswith("/dispatch/login")
+                assert forbidden.get("/dispatch/orders/state", headers=auth).status_code == 401
+                assert forbidden.get("/dispatch/telegram-candidates", headers=auth).location.endswith("/dispatch/login")
+                assert forbidden.post("/dispatch/orders/" + requests["Поездка"][0] + "/assign",
+                                      headers=auth, data={"pilot_id": "qa-dispatch-pilot"}).status_code == 401
+
+            admin = browser.new_page()
+            configure_page(admin)
+            login(admin, password)
+            assert admin.request.get(base + "/dispatch/orders/state").ok
+            admin.close()
+
+            dispatch = browser.new_page(viewport={"width": 1440, "height": 900})
             configure_page(dispatch)
-            dispatch.goto(base + "/dispatch/telegram-candidates")
-            assert dispatch.url.endswith("/dispatch/login")
-            dispatch.locator("input[name=password]").fill(password)
-            dispatch.locator("form").filter(has=dispatch.locator("input[name=password]")).get_by_role("button", name="Войти").click()
-            expect(dispatch).to_have_url(base + "/dispatch")
+            baseline = os.environ.get("QA_DISPATCH_BASELINE")
+            screenshots = os.environ.get("QA_DISPATCH_SCREENSHOTS")
+            if baseline and screenshots:
+                baseline_html = Path(baseline).read_text(encoding="utf-8")
+                original_read = Path.read_text
+                def read_baseline(path, *args, **kwargs):
+                    if path.name == "pd_dispatcher_mapbox.html":
+                        return baseline_html
+                    return original_read(path, *args, **kwargs)
+                with monkeypatch.context() as before:
+                    before.setattr(Path, "read_text", read_baseline)
+                    login(dispatch, dispatcher_password)
+                    expect(dispatch.locator("#topSheet")).to_be_visible()
+                    expect(dispatch.locator("#ordersList .card").first).to_be_visible()
+                    dispatch.screenshot(path=str(Path(screenshots) / "PRIVATE-DRIVE-Dispatcher-Before.png"))
+                dispatch.reload()
+            else:
+                login(dispatch, dispatcher_password)
+
             assert dispatch.request.get(base + "/dispatch/orders/state").ok
-            for service, (oid, time) in requests.items():
+            alias = dispatch.request.get(base + "/dispatch/map", max_redirects=0)
+            assert alias.status == 302 and alias.headers["location"] == "/dispatch"
+            for service, (oid, time_slot) in requests.items():
                 card = dispatch.locator("#ordersList .card").filter(has_text=oid)
                 expect(card).to_contain_text(service)
-                expect(card).to_contain_text(day + " " + time)
-            dispatch.get_by_role("link", name="Анкеты из Telegram").click()
+                expect(card).to_contain_text(day + " " + time_slot)
+
+            dispatch.get_by_role("button", name="Пассажиры", exact=True).click()
+            expect(dispatch.locator("#passengerDirectory")).to_be_visible()
+            dispatch.locator("#dispatchMenuToggle").click()
+            menu = dispatch.locator("#dispatchMenu")
+            expect(menu).to_be_visible()
+            menu.get_by_role("link", name="Пилоты", exact=True).click()
+            expect(menu).to_be_hidden()
+            expect(dispatch.locator("#pilotDirectory")).to_be_visible()
+
+            order_id = requests["Поездка"][0]
+            card = dispatch.locator("#ordersList .card").filter(has_text=order_id)
+            card.locator("select").select_option("qa-dispatch-pilot")
+            card.get_by_role("button", name="Назначить пилота").click()
+            card.get_by_role("button", name="Пилот на карте").click()
+            fix = {"enabled": True, "captured_at": int(unix_time()),
+                   "latitude": 54.6872, "longitude": 25.2797}
+            gps_url = base + "/native-pilot-orders/" + order_id + "/gps"
+            assert dispatch.request.post(gps_url, data=fix, headers={
+                "Authorization": "Bearer " + passenger_token}).status == 403
+            assert dispatch.request.post(gps_url, data=fix, headers={
+                "Authorization": "Bearer " + pilot_token}).ok
+            gps = dispatch.request.get(base + "/dispatch/orders/" + order_id + "/gps").json()
+            assert (gps["latitude"], gps["longitude"]) == (54.6872, 25.2797)
+            marker = dispatch.locator(".leaflet-marker-pane .pilot-marker")
+            expect(marker).to_be_visible(timeout=12_000)
+            with psycopg.connect(DSN) as db:
+                assert db.execute("SELECT assigned_by FROM pd_native_order_assignments WHERE order_id=%s",
+                                  (order_id,)).fetchone() == ("202",)
+            if screenshots:
+                dispatch.screenshot(path=str(Path(screenshots) / "PRIVATE-DRIVE-Dispatcher-After.png"))
+                dispatch.locator("#dispatchMenuToggle").click()
+                dispatch.screenshot(path=str(Path(screenshots) / "PRIVATE-DRIVE-Dispatcher-Menu.png"))
+                dispatch.keyboard.press("Escape")
+            off = {"enabled": False, "captured_at": fix["captured_at"] + 1}
+            assert dispatch.request.post(gps_url, data=off, headers={
+                "Authorization": "Bearer " + pilot_token}).ok
+            expect(marker).to_have_count(0, timeout=12_000)
+            dispatch.locator("#dispatchMenuToggle").click()
+            menu.get_by_role("link", name="Анкеты из Telegram").click()
             expect(dispatch.get_by_text("QA Passenger")).to_be_visible()
             expect(dispatch.get_by_text("На проверке")).to_be_visible()
+            print("PASS dispatcher and administrator access, passenger/pilot denied, menu, Telegram order, assignment, GPS shown and cleared")
             browser.close()
     finally:
         server.shutdown()

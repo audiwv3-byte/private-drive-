@@ -37,7 +37,9 @@ def main():
     assert csrf
     login = client.post("/dispatch/login",data={"csrf":csrf.group(1),"password":password},base_url=base)
     assert login.status_code in (301,302,303)
-    map_page = client.get("/dispatch/map",base_url=base)
+    old_map = client.get("/dispatch/map",base_url=base)
+    assert old_map.status_code == 302 and old_map.location == "/dispatch"
+    map_page = client.get("/dispatch",base_url=base)
     assert map_page.status_code == 200, map_page.get_data(as_text=True)[:1000]
     html=map_page.get_data(as_text=True)
     assert 'id="rasterMap"' in html

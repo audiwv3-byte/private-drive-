@@ -13,9 +13,7 @@
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#f6efdf}
 button,a{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:3px}a{color:var(--gold)}
 body{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-header{padding:5px 16px;border-bottom:1px solid var(--line);background:#12100d}
-header summary{cursor:pointer;color:var(--gold);padding:5px 0;touch-action:pan-x}
-.header-content{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;flex-wrap:wrap}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);background:#12100d}
 .brand{display:flex;align-items:center;gap:11px;text-decoration:none;font-weight:750;color:var(--gold);letter-spacing:.08em}.brand img{width:43px;height:43px;object-fit:contain}.brand small{display:block;color:var(--soft);letter-spacing:.03em;font-size:11px;font-weight:400}
 .workspace-controls{display:flex;gap:8px;padding:6px 16px;border-bottom:1px solid var(--line)}
 .workspace-controls [aria-expanded="true"]{border-color:var(--gold);color:var(--gold)}
@@ -25,7 +23,7 @@ aside.right{grid-column:3;border-right:0;border-left:1px solid var(--line)}
 .directory-card{display:block;width:100%;text-align:left;margin:7px 0}
 #tripChat input{width:100%;font:inherit;padding:9px;margin-bottom:8px;border-radius:6px;border:1px solid var(--line)}
 #chatMessages{max-height:15rem;overflow:auto;overflow-wrap:anywhere;padding-left:20px}
-.toolbar form{margin:0}.test-order strong{overflow-wrap:anywhere}.test-order button{margin-top:5px}
+.test-order strong{overflow-wrap:anywhere}.test-order button{margin-top:5px}
 .pilot-marker{border:1px solid #ffe2a3;border-radius:50%;background:#1b1713;color:#ffd889;display:grid;place-items:center;width:35px;height:35px;font-size:22px;box-shadow:0 2px 8px #000a}
 .passenger-marker{border:2px solid #fff;border-radius:50%;background:#1684d8;color:#fff;display:grid;place-items:center;width:32px;height:32px;font-size:18px;box-shadow:0 2px 8px #000a}
 #glMap,#rasterMap{position:absolute;inset:0;background:#10100f}
@@ -42,7 +40,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 #map{grid-column:2;grid-row:1;min-width:0;min-height:0;background:#24231f;position:relative;overflow:hidden;isolation:isolate}
 #mapNotice{position:absolute;z-index:500;left:16px;top:16px;right:16px;max-width:445px;border-radius:10px;background:#15120fe8;border:1px solid #8a7049;padding:12px 15px;pointer-events:none}
 #mapNotice b{display:block;color:var(--gold)}#mapNotice span{font-size:12px;color:#f2e6d2}
-.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.notice{padding:12px;background:#282016;border:1px solid #8b6a39;border-radius:9px}.notice strong{color:var(--gold)}.empty{margin:16px 0;padding:20px 12px;border:1px dashed #675438;border-radius:10px;text-align:center;color:var(--soft)}
+.notice{padding:12px;background:#282016;border:1px solid #8b6a39;border-radius:9px}.notice strong{color:var(--gold)}.empty{margin:16px 0;padding:20px 12px;border:1px dashed #675438;border-radius:10px;text-align:center;color:var(--soft)}
 .status{font-size:12px;color:var(--gold);margin:10px 0}.legend{display:flex;gap:8px;flex-wrap:wrap}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:#e2b86e}
 .autopilot-switch{display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:9px 13px;border-radius:10px;border:1px solid #725c3b;background:#241b11;color:#f5d9a1}
 .autopilot-switch:disabled{opacity:.65;cursor:default}
@@ -60,27 +58,37 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
  aside{left:0}aside.right{left:auto;right:0}
  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+#dispatchMenuToggle{min-width:44px;min-height:44px;font-size:22px;line-height:1}
+#dispatchMenu{position:fixed;inset:0 0 0 auto;margin:0;width:min(88vw,340px);height:100dvh;max-height:none;max-width:none;overflow:auto;padding:0;background:#17130f;color:#f6efdf;border:0;border-left:1px solid var(--line)}
+#dispatchMenu::backdrop{background:#0009}
+#dispatchMenu h2{margin:0;color:var(--gold)}
+#dispatchMenu nav{display:grid;gap:12px;padding:16px}
+#dispatchMenu nav .btn,#dispatchMenu nav form{width:100%}
+#dispatchMenu nav a{display:block;padding:8px 10px}
+#dispatchMenu nav form{margin:0}
 </style></head>
 <body>
 <header>
-<details id="topSheet" open><summary>Панель диспетчерской</summary><div class="header-content">
 <a class="brand" href="/dispatch"><img src="/pd-logo-transparent.png" alt=""><span>PRIVATE DRIVE<small>Диспетчерская · тестовый интерфейс</small></span></a>
-<div class="toolbar">
-{% if test_sync_enabled or persistent_queue_enabled %}
+<button class="btn" type="button" id="dispatchMenuToggle" aria-label="Открыть меню диспетчерской" aria-haspopup="dialog" aria-controls="dispatchMenu" aria-expanded="false">☰</button>
+</header>
+<dialog id="dispatchMenu" aria-labelledby="dispatchMenuTitle">
+<header><h2 id="dispatchMenuTitle">Меню</h2><button class="btn" type="button" id="dispatchMenuClose" aria-label="Закрыть меню" autofocus>×</button></header>
+<nav aria-label="Разделы диспетчерской">
 <a href="#ordersTitle">Заказы</a>
 <a href="#pilotsTitle">Пилоты</a>
+{% if use_test_queue and persistent_queue_configured %}<a href="{{ url_for('pd_dispatch_home') }}">Основная очередь</a>{% endif %}
 {% if test_queue_link %}<a href="{{ test_queue_link }}">Тестовые заказы</a>{% endif %}
-<a href="/dispatch/accounts">Пассажиры и пилоты</a>
+{% if staging_registry %}<a href="/dispatch/accounts">Пассажиры и пилоты</a>{% endif %}
 {% if analytics_enabled %}<a href="/dispatch/analytics">Воронка сайта</a>{% endif %}
-<a href="/pilot-registration">Регистрация пилота</a>
-<a href="/dispatch/pilot-applications">Анкеты пилотов (QA)</a>
+{% if pilot_intake_enabled %}<a href="{{ pilot_add_url }}">Регистрация пилота</a>{% endif %}
+{% if pilot_applications_enabled %}<a href="/dispatch/pilot-applications">Анкеты пилотов (QA)</a>{% endif %}
 {% if telegram_candidates_enabled %}<a href="/dispatch/telegram-candidates">Анкеты из Telegram</a>{% endif %}
 {% if test_sync_enabled %}<a class="btn" href="/dispatch/test-sync">Тестовая связь</a>{% endif %}
 {% if telegram_test_enabled %}<a class="btn" href="/dispatch/test-miniapp">Тест заявки из Telegram</a>{% endif %}
 <form method="post" action="/dispatch/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Выйти</button></form>
-{% else %}<span class="label">Доступ к заказам закрыт</span><a class="btn" href="/dispatch">В панель управления</a>{% endif %}
-</div></div></details>
-</header>
+</nav>
+</dialog>
 <nav class="workspace-controls" aria-label="Боковые панели диспетчерской">
 <button class="btn" type="button" aria-expanded="true" aria-controls="ordersPanel">Заказы</button>
 <button class="btn" type="button" aria-expanded="true" aria-controls="peoplePanel">Пилоты и пассажиры</button>
@@ -101,7 +109,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 <div class="stats" aria-label="Показатели"><div class="stat"><b id="countNew">—</b><span>Новые</span></div><div class="stat"><b id="countActive">—</b><span>Активные</span></div><div class="stat"><b id="countOnline">—</b><span>На линии</span></div><div class="stat"><b id="countDone">—</b><span>Завершены</span></div></div>
 <div class="tabs" role="group" aria-label="Фильтр заказов"><button class="tab active" data-filter="all" aria-pressed="true">Все</button><button class="tab" data-filter="new" aria-pressed="false">Новые</button><button class="tab" data-filter="active" aria-pressed="false">В пути</button><button class="tab" data-filter="done" aria-pressed="false">История</button></div>
 <h2 id="ordersTitle">Все заказы</h2>
-{% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">Назначение пилотов включим после серверной проверки ролей.</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
+{% if persistent_queue_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status">{% if pilot_availability_enabled %}Выбери пилота в карточке нового заказа.{% else %}Назначение пилотов пока недоступно.{% endif %}</p>{% elif test_sync_enabled %}<div id="ordersList"></div><p id="assignmentStatus" role="status"></p>{% else %}<div class="empty" id="ordersEmpty">Нет подключённых данных.<br>После авторизации здесь будут заказы с сайта, приложения и Telegram-бота.</div>
 <p class="muted">Создать заказ, назначить пилота или изменить стоимость можно будет только через защищённый сервер.</p>{% endif %}
 </aside>
 <section id="map" aria-label="Интерактивная карта диспетчерской">
@@ -177,23 +185,37 @@ function showPanel(button){
 }
 if(compact.matches){
     panels.forEach(button=>setPanel(button,false));
-    $('topSheet').open=false;
 }
 panels.forEach(button=>button.addEventListener('click',()=>{
     if(button.getAttribute('aria-expanded')==='true')setPanel(button,false);
     else showPanel(button);
 }));
-const sheetHandle=$('topSheet').querySelector('summary');
-let sheetTouch=null;
-sheetHandle.addEventListener('touchstart',event=>sheetTouch=event.changedTouches[0].clientY,{passive:true});
-sheetHandle.addEventListener('touchend',event=>{
-    if(sheetTouch===null)return;
-    const offset=event.changedTouches[0].clientY-sheetTouch;
-    sheetTouch=null;
-    if(Math.abs(offset)>30){
-        $('topSheet').open=offset>0;
-        if(event.cancelable)event.preventDefault();
-    }
+const dispatchMenu=$('dispatchMenu');
+const dispatchMenuToggle=$('dispatchMenuToggle');
+dispatchMenuToggle.addEventListener('click',()=>{
+    dispatchMenu.showModal();
+    dispatchMenuToggle.setAttribute('aria-expanded','true');
+});
+$('dispatchMenuClose').addEventListener('click',()=>dispatchMenu.close());
+dispatchMenu.addEventListener('close',()=>{
+    dispatchMenuToggle.setAttribute('aria-expanded','false');
+    dispatchMenuToggle.focus({preventScroll:true});
+});
+dispatchMenu.addEventListener('click',event=>{
+    if(event.target===dispatchMenu && event.clientX<dispatchMenu.getBoundingClientRect().left)dispatchMenu.close();
+});
+dispatchMenu.querySelectorAll('a[href^="#"]').forEach(link=>{
+    link.addEventListener('click',()=>{
+        const target=$(link.hash.slice(1));
+        const panel=panels.find(button=>button.getAttribute('aria-controls')===target?.closest('aside')?.id);
+        if(panel)showPanel(panel);
+        if(target?.id==='pilotsTitle')showDirectory('pilotDirectory');
+        dispatchMenu.close();
+        if(target){
+            target.setAttribute('tabindex','-1');
+            requestAnimationFrame(()=>target.focus({preventScroll:true}));
+        }
+    });
 });
 const directoryTabs=[...document.querySelectorAll('[data-directory]')];
 function showDirectory(id){
@@ -241,6 +263,54 @@ const labels={all:'Все заказы',new:'Новые заказы',active:'З
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});orderFilter=b.dataset.filter;$('ordersTitle').textContent=labels[orderFilter];document.dispatchEvent(new Event('pd-test-filter'));}));
 ['allPilots','onlinePilots'].forEach(id=>$(id).addEventListener('click',()=>{['allPilots','onlinePilots'].forEach(k=>{$(k).classList.toggle('active',k===id);$(k).setAttribute('aria-pressed',String(k===id))});document.dispatchEvent(new Event('pd-test-filter'));}));
 {% if pilot_availability_enabled %}
+let eligiblePilots=[];
+const chosenPilots=new Map();
+let savingOrder=null;
+const pilotCsrf={{ csrf|tojson }};
+async function assignPersistentOrder(order, select, button){
+ if(savingOrder||!select.value)return;
+ savingOrder=order.id;button.disabled=true;
+ const outcome=$('assignmentStatus');
+ try{
+   const body=new URLSearchParams({pilot_id:select.value,csrf:pilotCsrf});
+   const response=await fetch('/dispatch/orders/'+encodeURIComponent(order.id)+'/assign',{
+     method:'POST',body,credentials:'same-origin',signal:AbortSignal.timeout(7000)});
+   const result=await response.json();
+   if(response.status===409){
+     outcome.textContent='Заказ уже изменился или пилот больше не допущен. Обновляем список.';
+     return;
+   }
+   if(!response.ok||result.order_id!==order.id)throw new Error('assignment');
+   const saved=lastOrders?.find(row=>row.id===order.id);
+   if(saved)saved.status=result.status;
+   chosenPilots.delete(order.id);
+   outcome.textContent='Пилот назначен.';
+ }catch{
+   outcome.textContent='Нет подтверждения назначения. Проверь статус заказа перед повтором.';
+ }finally{savingOrder=null;renderPersistentOrders();}
+}
+function appendAssignmentControl(card,order){
+ if(order.status!=='requested'||!['android','ios','website','telegram_miniapp'].includes(order.source)||!eligiblePilots.length)return;
+ const select=document.createElement('select');
+ select.setAttribute('aria-label','Пилот для заказа '+order.id);
+ const placeholder=new Option('Выбрать пилота','');
+ select.append(placeholder);
+ for(const pilot of eligiblePilots){
+   const label='Пилот '+pilot.id.slice(0,8)+'…'+pilot.id.slice(-4);
+   select.append(new Option(label,pilot.id));
+ }
+ const remembered=chosenPilots.get(order.id);
+ if(remembered&&eligiblePilots.some(p=>p.id===remembered))select.value=remembered;
+ const submit=document.createElement('button');
+ submit.type='button';submit.className='btn';submit.textContent='Назначить пилота';
+ submit.disabled=!select.value||savingOrder!==null;
+ select.addEventListener('change',()=>{
+   chosenPilots.set(order.id,select.value);
+   submit.disabled=!select.value||savingOrder!==null;
+ });
+ submit.addEventListener('click',()=>assignPersistentOrder(order,select,submit));
+ card.append(select,submit);
+}
 async function refreshAvailablePilots(){
     const list = $('availablePilotList');
     try {
@@ -249,6 +319,9 @@ async function refreshAvailablePilots(){
         });
         if (!response.ok) throw new Error();
         const {pilots} = await response.json();
+        const changed = JSON.stringify(eligiblePilots) !== JSON.stringify(pilots);
+        eligiblePilots = pilots;
+        {% if persistent_queue_enabled %}if(changed&&lastOrders)renderPersistentOrders();{% endif %}
         const rows = pilots.map(pilot => {
             const row = document.createElement('p');
             row.textContent = pilot.id;
@@ -257,6 +330,7 @@ async function refreshAvailablePilots(){
         list.replaceChildren(...(rows.length ? rows : ['Нет доступных пилотов']));
         {% if not test_sync_enabled %}$('countOnline').textContent = String(rows.length);{% endif %}
     } catch {
+        eligiblePilots=[];
         list.textContent = 'Нет связи со списком пилотов';
         {% if not test_sync_enabled %}$('countOnline').textContent = '—';{% endif %}
     } finally {
@@ -356,6 +430,7 @@ function renderPersistentOrders(){
      details.fare_requires_quote&&'Цена по согласованию'
    ].filter(Boolean);
    if(fields.length){notes.textContent=fields.join(' · ');card.append(notes)}
+   {% if pilot_availability_enabled %}appendAssignmentControl(card,order);{% endif %}
    {% if order_gps_enabled %}
    if(activeTrip(order.status)){
      const button=document.createElement('button');

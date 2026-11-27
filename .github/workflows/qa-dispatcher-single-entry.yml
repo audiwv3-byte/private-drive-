@@ -1,0 +1,52 @@
+name: QA dispatcher single entry
+
+on:
+  push:
+    branches: [qa/dispatcher-single-entry]
+
+permissions:
+  contents: read
+
+jobs:
+  dispatcher-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: private_drive_test
+          POSTGRES_PASSWORD: isolated-test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+      QA_DISPATCH_BASELINE: /tmp/pd-dispatch-before.html
+      QA_DISPATCH_SCREENSHOTS: qa-dispatch-screenshots
+      QA_LEAFLET_DIR: /tmp/pd-dispatch-leaflet/node_modules/leaflet/dist
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated test dependencies
+        run: python -m pip install -r requirements-runtime.lock.txt 'psycopg[binary]' pytest playwright 'PyJWT[crypto]>=2.12,<3'
+      - name: Prepare screenshots and offline map assets
+        run: |
+          mkdir -p "$QA_DISPATCH_SCREENSHOTS"
+          git show 'db621219edb839ba75b6b4e3587241df5e557787:pd_dispatcher_mapbox.html' > "$QA_DISPATCH_BASELINE"
+          npm install --prefix /tmp/pd-dispatch-leaflet --no-audit --no-fund --ignore-scripts leaflet@1.9.4
+          echo "QA_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+      - name: Test roles, dispatcher navigation, real QA order, assignment and GPS
+        run: python -m pytest -q -s tests/test_qa_passenger_welcome.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dispatcher-before-after
+          path: qa-dispatch-screenshots/
+          if-no-files-found: error

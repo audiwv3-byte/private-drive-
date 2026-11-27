@@ -152,6 +152,7 @@ def register(app, core):
     if (len(secret) < 32 or not valid_admin or not configured
             or existing_secret not in (None, secret)):
         @app.get("/dispatch")
+        @app.get("/dispatch/map")
         @app.get("/dispatch/login")
         def pd_dispatch_disabled():
             return auth_page(app, status=503, error="Вход пока недоступен.")
@@ -167,6 +168,16 @@ def register(app, core):
                       SESSION_COOKIE_SAMESITE="Strict",
                       PERMANENT_SESSION_LIFETIME=timedelta(hours=8))
     admin_id = int(raw_admin)
+    operator_id = None
+    operator_hash = os.environ.get("PD_QA_DISPATCHER_PASSWORD_HASH", "")
+    raw_operator = os.environ.get("PD_QA_DISPATCHER_ID", "")
+    if (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
+            and os.environ.get("PD_NATIVE_SMS_LIVE") == "NO"
+            and os.environ.get("PD_PAYMENT_MODE") == "disabled"
+            and re.fullmatch(r"[1-9][0-9]{0,17}", raw_operator)
+            and int(raw_operator) != admin_id
+            and operator_hash.startswith(("scrypt:", "pbkdf2:"))):
+        operator_id = int(raw_operator)
     attempts = defaultdict(deque)
 
     def csrf():
@@ -179,19 +190,28 @@ def register(app, core):
         supplied = request.form.get("csrf", "")
         return bool(value) and secrets.compare_digest(value, supplied)
 
+    def credentials():
+        result = {}
+        if core.is_admin(admin_id):
+            credential = passwords.read(admin_id) if passwords else password_hash
+            if credential:
+                result[admin_id] = credential
+        if operator_id is not None:
+            result[operator_id] = operator_hash
+        return result
+
     def authorized():
-        if not (session.get("pd_dispatch_authenticated") is True
-                and session.get("pd_dispatch_admin_id") == admin_id
-                and core.is_admin(admin_id)):
+        actor_id = session.get("pd_dispatch_admin_id")
+        if session.get("pd_dispatch_authenticated") is not True or type(actor_id) is not int:
             return False
         try:
-            credential = passwords.read(admin_id) if passwords else password_hash
+            credential = credentials().get(actor_id)
         except Exception as exc:
             app.logger.error("Dispatcher credential unavailable (%s)", type(exc).__name__)
             return False
-        return bool(credential) and secrets.compare_digest(
-            session.get("pd_dispatch_credential_version", ""),
-            hashlib.sha256(credential.encode()).hexdigest(),
+        version = session.get("pd_dispatch_credential_version")
+        return bool(credential) and isinstance(version, str) and secrets.compare_digest(
+            version, hashlib.sha256(credential.encode()).hexdigest(),
         )
 
     def within_attempt_limit(kind):
@@ -294,16 +314,19 @@ def register(app, core):
             failure = verify_form("login")
             if failure:
                 return failure
+            supplied_password = request.form.get("password", "")
             try:
-                credential = passwords.read(admin_id) if passwords else password_hash
+                matching = [(actor, digest) for actor, digest in credentials().items()
+                            if check_password_hash(digest, supplied_password)]
             except Exception as exc:
                 app.logger.error("Dispatcher credential unavailable (%s)", type(exc).__name__)
                 return auth_page(app, status=503, error="Вход временно недоступен.")
-            if credential and check_password_hash(credential, request.form.get("password", "")) and core.is_admin(admin_id):
+            if len(matching) == 1:
+                actor, credential = matching[0]
                 session.clear()
                 session.permanent = True
                 session["pd_dispatch_authenticated"] = True
-                session["pd_dispatch_admin_id"] = admin_id
+                session["pd_dispatch_admin_id"] = actor
                 session["pd_dispatch_credential_version"] = hashlib.sha256(credential.encode()).hexdigest()
                 csrf()
                 attempts.pop(("login", request.remote_addr or "unknown"), None)
@@ -320,7 +343,8 @@ def register(app, core):
     from pd_dispatch_persistent import register as register_persistent_queue
     register_persistent_queue(app, authorized)
     from pd_native_pilot_assignment import dispatcher_list_enabled, register_dispatch_assignment
-    register_dispatch_assignment(app, authorized, valid_csrf, admin_id)
+    register_dispatch_assignment(
+        app, authorized, valid_csrf, lambda: session["pd_dispatch_admin_id"])
     persistent_queue_enabled = persistent_queue_ready()
 
     test_sync_enabled = (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
@@ -388,19 +412,6 @@ def register(app, core):
 
     @app.get("/dispatch")
     def pd_dispatch_home():
-        if test_sync_enabled or persistent_queue_enabled:
-            return pd_dispatch_map()
-        if not authorized():
-            return redirect(url_for("pd_dispatch_login"))
-        dashboard = Path(__file__).with_name("pd_dispatcher_dashboard.html").read_text(encoding="utf-8")
-        response = app.make_response(render_template_string(dashboard, csrf=csrf(),
-                                     analytics_enabled="pd_site_analytics" in app.view_functions))
-        response.headers["Cache-Control"] = "private, no-store"
-        return response
-
-    @app.get("/dispatch/map")
-    def pd_dispatch_map():
-        """Mapbox dashboard shares the existing authenticated dispatcher session."""
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
         token = os.environ.get("MAPBOX_WEB_PUBLIC_TOKEN", "").strip()
@@ -416,11 +427,14 @@ def register(app, core):
             pilot_availability_enabled=dispatcher_list_enabled(),
             gps_sync_enabled=test_sync_enabled,
             order_gps_enabled=persistent_queue_enabled and not use_test_queue and order_gps_enabled(),
-            test_queue_link=url_for("pd_dispatch_map", queue="test")
+            test_queue_link=url_for("pd_dispatch_home", queue="test")
                 if test_sync_enabled and not use_test_queue else None,
             telegram_test_enabled=telegram_test_ready,
             analytics_enabled="pd_site_analytics" in app.view_functions,
-            csrf=csrf() if test_sync_enabled or persistent_queue_enabled else "",
+            csrf=csrf(),
+            use_test_queue=use_test_queue,
+            persistent_queue_configured=persistent_queue_enabled,
+            pilot_applications_enabled="qa_pilot_review_page" in app.view_functions,
             pilot_intake_enabled=pilot_intake_available,
             telegram_candidates_enabled=telegram_candidates_enabled,
             pilot_add_url="/pilot-registration" if pilot_intake_available else None,
@@ -442,6 +456,12 @@ def register(app, core):
             ),
         })
         return response
+
+    @app.get("/dispatch/map")
+    def pd_dispatch_map():
+        if request.args.get("queue") == "test" and test_sync_enabled:
+            return redirect(url_for("pd_dispatch_home", queue="test"))
+        return redirect(url_for("pd_dispatch_home"))
 
     @app.post("/dispatch/logout")
     def pd_dispatch_logout():

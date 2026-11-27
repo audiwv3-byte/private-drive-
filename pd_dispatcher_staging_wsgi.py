@@ -26,6 +26,7 @@ def create_app():
     # Staging is deliberately unavailable without an explicit environment gate.
     if os.environ.get("PD_DISPATCH_STAGING_ONLY") != "1":
         @app.get("/dispatch")
+        @app.get("/dispatch/map")
         @app.get("/dispatch/login")
         @app.route("/dispatch/register", methods=["GET", "POST"])
         def staging_unavailable():

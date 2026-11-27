@@ -1,0 +1,83 @@
+name: QA42 isolated installable Android APK
+on:
+  push:
+    branches: [qa/qa42-device-preparation]
+permissions:
+  contents: read
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PD_NATIVE_SMS_LIVE: "NO"
+      PD_PAYMENT_MODE: disabled
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Audit public entry gates
+        run: python3 ops/qa/qa38_release_audit.py
+      - name: Generate isolated Android scaffold
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive.qa --project-name=private_drive qa_android
+          cp -R flutter_app/lib/. qa_android/lib/
+          cp -R flutter_app/assets qa_android/assets
+          cp flutter_app/pubspec.yaml qa_android/
+          if test -f flutter_app/pubspec.lock; then cp flutter_app/pubspec.lock qa_android/; fi
+          python3 ops/qa/prepare_android_release.py qa_android
+          sed -i 's/applicationId = "lt.privatedrive.qa.private_drive"/applicationId = "lt.privatedrive.qa.device42"/' qa_android/android/app/build.gradle.kts
+          grep -F 'applicationId = "lt.privatedrive.qa.device42"' qa_android/android/app/build.gradle.kts
+          mkdir -p "$HOME/.android"
+          rm -f "$HOME/.android/debug.keystore"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 30 -dname "CN=PRIVATE DRIVE isolated QA,O=QA,C=LT"
+      - name: Build release-mode APK using ephemeral QA key
+        working-directory: qa_android
+        run: |
+          flutter pub get
+          flutter pub deps --json > "$RUNNER_TEMP/qa41-deps.json"
+          flutter build apk --release --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          jarsigner -verify build/app/outputs/bundle/release/app-release.aab
+      - name: Verify actual APK identity, manifest and signature
+        run: |
+          set -euo pipefail
+          APK=qa_android/build/app/outputs/flutter-apk/app-release.apk
+          TOOLS=$(find "${ANDROID_HOME:?}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          test -x "$TOOLS/apksigner"
+          test -x "$TOOLS/aapt"
+          mkdir -p qa_apk
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee qa_apk/signature.txt
+          "$TOOLS/aapt" dump badging "$APK" | tee qa_apk/badging.txt
+          grep -F "package: name='lt.privatedrive.qa.device42'" qa_apk/badging.txt
+          grep -F "targetSdkVersion:'36'" qa_apk/badging.txt
+          ! grep -q '^application-debuggable' qa_apk/badging.txt
+          "$TOOLS/aapt" dump xmltree "$APK" AndroidManifest.xml > qa_apk/manifest.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s = Path("qa_apk/manifest.txt").read_text()
+          for k in ("usesCleartextTraffic", "allowBackup"):
+              assert re.search(r"android:" + k + r"[^\n]*\(type 0x12\)0x0\b", s), k
+          for k in ("INTERNET", "ACCESS_FINE_LOCATION", "FOREGROUND_SERVICE_LOCATION"):
+              assert "android.permission." + k + '"' in s, k
+          for k in ("ACCESS_BACKGROUND_LOCATION", "SEND_SMS", "READ_SMS", "READ_CONTACTS"):
+              assert "android.permission." + k + '"' not in s, k
+          print("PASS APK identity, API 36, TLS-only, no backup and permitted GPS configuration")
+          PY
+          cp "$APK" qa_apk/PRIVATE-DRIVE-QA42-ONLY.apk
+          cp "$RUNNER_TEMP/qa41-deps.json" qa_apk/dependencies.json
+          (cd qa_apk && sha256sum PRIVATE-DRIVE-QA42-ONLY.apk > SHA256SUMS && sha256sum -c SHA256SUMS && cat SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-qa42-installable-apk-offline-only
+          path: qa_apk/
+          retention-days: 7

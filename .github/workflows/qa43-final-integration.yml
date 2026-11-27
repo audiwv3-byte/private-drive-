@@ -65,7 +65,7 @@ jobs:
         working-directory: flutter_app
         run: |
           flutter pub get
-          flutter test test/pd_http_api_test.dart test/native_orders_api_test.dart test/native_pilot_orders_test.dart test/qa39_gps_test.dart --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid
+          flutter test test/pd_http_api_test.dart test/native_orders_api_test.dart test/native_pilot_orders_test.dart test/qa39_gps_test.dart test/qa42_external_links_test.dart --no-pub --dart-define=PD_NATIVE_AUTH_API_URL=https://qa.invalid --dart-define=PD_ISOLATED_DEVICE_QA=true
       - name: Prepare disposable Android project
         run: |
           flutter create --platforms=android --org=lt.privatedrive.qa --project-name=private_drive qa_android
@@ -131,8 +131,8 @@ jobs:
         run: |
           flutter pub get
           flutter pub deps --json > "$RUNNER_TEMP/qa43-deps.json"
-          flutter build apk --release --no-pub --dart-define="PD_NATIVE_AUTH_API_URL=$QA_API_URL" --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false
-          flutter build appbundle --release --no-pub --dart-define="PD_NATIVE_AUTH_API_URL=$QA_API_URL" --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false
+          flutter build apk --release --no-pub --dart-define="PD_NATIVE_AUTH_API_URL=$QA_API_URL" --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false --dart-define=PD_ISOLATED_DEVICE_QA=true
+          flutter build appbundle --release --no-pub --dart-define="PD_NATIVE_AUTH_API_URL=$QA_API_URL" --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false --dart-define=PD_ISOLATED_DEVICE_QA=true
           test -s build/app/outputs/flutter-apk/app-release.apk
       - name: Verify APK signature, manifest, and package identity
         run: |
@@ -193,7 +193,7 @@ jobs:
           flutter pub get
           flutter pub deps --json > "$RUNNER_TEMP/qa43-deps.json"
           test -s "$RUNNER_TEMP/qa43-deps.json"
-          flutter build ios --release --no-codesign --no-pub --dart-define="PD_NATIVE_AUTH_API_URL=$QA_API_URL" --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false
+          flutter build ios --release --no-codesign --no-pub --dart-define="PD_NATIVE_AUTH_API_URL=$QA_API_URL" --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false --dart-define=PD_ISOLATED_DEVICE_QA=true
       - name: Validate device binary and packaged privacy configuration
         run: |
           plutil -lint flutter_app/build/ios/iphoneos/Runner.app/Info.plist

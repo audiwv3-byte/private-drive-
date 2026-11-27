@@ -146,6 +146,9 @@ def register(app, core, auth):
             conn.execute('INSERT INTO pd_invoice_files(order_id,serial,pdf,sha256,snapshot,created_at) VALUES(?,?,?,?,?,?)',(oid,serial,pdf,hashlib.sha256(pdf).hexdigest(),json.dumps(meta,ensure_ascii=False),meta['issued_at']))
         return jsonify(ok=True,number=serial,existing=False)
 
+    with core.db(core.ORDERS_DB) as conn:
+        schema(conn)
+
     def invoice_bytes(oid):
         uid,_=auth()
         with core.db(core.ORDERS_DB) as conn:

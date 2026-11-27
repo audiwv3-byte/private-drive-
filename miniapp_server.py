@@ -156,6 +156,12 @@ def private_response_cache(response):
     return response
 
 
+def qa_card_booking_available(uid):
+    from pd_prepayment_v3 import qa_checkout_return
+    available = app.config.get('PD_PREPAYMENT_AVAILABLE')
+    return bool(qa_checkout_return() and available and available(uid))
+
+
 # Passenger checkout remains unavailable until a live payment integration is enabled.
 @app.before_request
 def pd_release_payment_gate():
@@ -168,8 +174,9 @@ def pd_release_payment_gate():
     if request.method == 'POST' and path == '/api/order':
         body = request.get_json(silent=True) or {}
         if body.get('payment_method') in ('Банковская карта', 'Онлайн (Stripe)'):
-            auth()
-            return jsonify(error='Оплата картой пока недоступна. Выберите банковский перевод.'), 503
+            uid, _ = auth()
+            if body['payment_method'] != 'Банковская карта' or not qa_card_booking_available(uid):
+                return jsonify(error='Оплата картой пока недоступна. Выберите банковский перевод.'), 503
 
 @app.after_request
 def pd_release_hide_card_links(response):
@@ -206,7 +213,14 @@ def index():
 def me():
     uid, telegram = auth()
     user = core.user_record(uid)
-    return jsonify(id=uid, first_name=telegram.get('first_name'), registered=bool(user), name=user['name'] if user else '', phone=user['phone'] if user else '', admin=core.is_admin(uid))
+    return jsonify(id=uid, first_name=telegram.get('first_name'), registered=bool(user), name=user['name'] if user else '', phone=user['phone'] if user else '', admin=core.is_admin(uid),
+                   telegram_registration=bool(user and dict(user).get('registration_source') == 'telegram'),
+                   card_booking_enabled=qa_card_booking_available(uid))
+
+
+@app.get('/assets/pd-passenger-avatars.webp')
+def passenger_avatars():
+    return send_file(ROOT / 'miniapp' / 'static' / 'passenger-avatars.webp', mimetype='image/webp')
 
 
 @app.post('/api/register')
@@ -586,7 +600,7 @@ def admin_cash_receipts_pd():
 def payment(oid):
     uid,_=auth(); r=core.order_find(oid)
     if not r or (r['telegram_id']!=uid and not core.is_admin(uid)):raise PermissionError('Нет доступа')
-    return jsonify(id=oid,price=r['price'],status=r['status'],payment_status=r['payment_status'],
+    return jsonify(id=oid,price=r['price'],status=r['status'],payment_status=r['payment_status'],payment_method=r['payment_method'],
        card_link=r['card_payment_url'] if r['status']=='Подтверждена' else '',
        currencies=['USDC','BTC','ETH'], addresses={c: core.CRYPTO_ADDRESSES.get(c, '') if r['status']=='Подтверждена' and r['crypto_currency']==c and r['crypto_amount'] else '' for c in core.PAYMENT_CURRENCIES}, crypto_currency=r['crypto_currency'], crypto_amount=r['crypto_amount'] if r['status']=='Подтверждена' else '')
 

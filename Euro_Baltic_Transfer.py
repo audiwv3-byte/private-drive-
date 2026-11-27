@@ -114,6 +114,7 @@ def initialize():
         conn.execute('''CREATE TABLE IF NOT EXISTS users (
             telegram_id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)''')
+        ensure_columns(conn, 'users', {'registration_source': "TEXT NOT NULL DEFAULT ''"})
         conn.execute('''CREATE TABLE IF NOT EXISTS dialogue_states (
             telegram_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL)''')
     with db(ORDERS_DB) as conn:
@@ -153,11 +154,13 @@ def user_record(uid):
         return conn.execute('SELECT * FROM users WHERE telegram_id=?', (uid,)).fetchone()
 
 
-def save_user(uid, name, phone):
+def save_user(uid, name, phone, *, via_telegram=False):
     with db(USERS_DB) as conn:
-        conn.execute('''INSERT INTO users(telegram_id,name,phone) VALUES(?,?,?)
-            ON CONFLICT(telegram_id) DO UPDATE SET name=excluded.name,phone=excluded.phone''',
-            (uid, name, phone))
+        conn.execute('''INSERT INTO users(telegram_id,name,phone,registration_source) VALUES(?,?,?,?)
+            ON CONFLICT(telegram_id) DO UPDATE SET name=excluded.name,phone=excluded.phone,
+            registration_source=CASE WHEN excluded.registration_source='telegram' THEN 'telegram'
+                                     ELSE users.registration_source END''',
+            (uid, name, phone, 'telegram' if via_telegram else ''))
 
 
 def state_get(uid):
@@ -477,7 +480,7 @@ def process(message):
         if not phone:
             say(message.chat.id, 'Неверный телефон. Используйте международный формат, например +37061234567.')
             return
-        save_user(uid, st['name'], phone)
+        save_user(uid, st['name'], phone, via_telegram=True)
         resume = st.get('resume_order', False)
         state_clear(uid)
         say(message.chat.id, '✅ Регистрация завершена.', menu())

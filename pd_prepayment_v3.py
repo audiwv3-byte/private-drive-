@@ -4,6 +4,7 @@ No card details are stored. Real mode requires reviewed settings and live creden
 import json,os,time
 from decimal import Decimal,ROUND_HALF_UP
 from pathlib import Path
+from urllib.parse import urlsplit
 import stripe
 from flask import request,jsonify,send_file,Response
 POLICY='PD-PREPAY-20261027-v1'
@@ -20,6 +21,27 @@ def plain(value):
 
 def mode():return os.getenv('PD_PAYMENT_MODE','disabled').strip()
 def is_live():return mode()=='live'
+def qa_checkout_return():
+    if (mode() != 'test' or os.getenv('PD_MINIAPP_PAYMENT_QA') != '1'
+            or os.getenv('PD_QA_MINIAPP_POSTGRES') == '1'):
+        return ''
+    url = os.getenv('PD_QA_PAYMENT_RETURN_URL', '')
+    try:
+        parsed = urlsplit(url)
+        if (parsed.scheme == 'https' and parsed.hostname
+                and parsed.hostname not in ('privatedrive.lt', 'www.privatedrive.lt', 'wilsonpark.pythonanywhere.com')
+                and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment
+                and parsed.path in ('', '/') and url.isascii()):
+            return url.rstrip('/') + '/'
+    except ValueError:
+        pass
+    return ''
+
+
+def qa_payment_tester(uid):
+    return bool(qa_checkout_return() and str(uid) in os.getenv('PD_QA_PAYMENT_TEST_USERS', '').split(','))
+
+
 def configure():
     m=mode();key=os.getenv('STRIPE_SECRET_KEY','').strip()
     if m not in ('test','live') or not key.startswith('sk_live_' if m=='live' else 'sk_test_'):
@@ -77,10 +99,10 @@ def register(app,core,auth,cents):
         return uid
     def access():
         uid,_=auth();m=configure()
-        if m=='test' and not core.is_admin(uid):raise PermissionError('Тестовые платежи доступны только администратору')
+        if m=='test' and not (core.is_admin(uid) or qa_payment_tester(uid)):raise PermissionError('Тестовые платежи доступны только администратору')
         return uid,m
     def available(uid):
-        try:configure();return is_live() or core.is_admin(uid)
+        try:configure();return is_live() or core.is_admin(uid) or qa_payment_tester(uid)
         except ValueError:return False
     def other_refunds(c,oid):
         rows=c.execute("SELECT amount_eur FROM pd_adjustments WHERE order_id=? AND kind='refund' AND status!='Отменено'",(oid,)).fetchall()
@@ -125,7 +147,10 @@ def register(app,core,auth,cents):
                 raise ValueError('Оплата уже получена или обрабатывается')
             if any(r[k] for k in ('crypto_currency','crypto_amount','crypto_txid')):
                 raise ValueError('Для заказа уже выбран другой платёж')
+            if qa_checkout_return() and r['payment_method']=='Криптовалюта':
+                raise ValueError('Для заказа выбрана криптовалюта')
             amount=cents(r['price'])
+            checkout_return=qa_checkout_return() if r['payment_method']=='Банковская карта' else ''
             existing=c.execute('SELECT * FROM pd_prepayments WHERE order_id=?',(oid,)).fetchone()
             if existing:
                 if existing['amount_cents']!=amount or existing['extra_limit_cents']!=extra_cents or existing['mode']!=m:
@@ -145,7 +170,16 @@ def register(app,core,auth,cents):
           success_url='https://wilsonpark.pythonanywhere.com/?payment=return',cancel_url='https://wilsonpark.pythonanywhere.com/?payment=cancel',
           idempotency_key=f'pd-{m}-prepay-{oid}-{amount}-{extra_cents}-v3')
         if extra_cents:params['payment_intent_data']={'setup_future_usage':'off_session'}
-        try:sess=plain(stripe.checkout.Session.create(**params))
+        try:
+            if checkout_return:
+                params.pop('payment_method_types')
+                key=params.pop('idempotency_key')
+                params.update(success_url=checkout_return+'?payment=return',
+                              cancel_url=checkout_return+'?payment=cancel')
+                client=stripe.StripeClient(os.environ['STRIPE_SECRET_KEY'].strip(), max_network_retries=1)
+                sess=plain(client.checkout.sessions.create(params, options={'idempotency_key':key}))
+            else:
+                sess=plain(stripe.checkout.Session.create(**params))
         except stripe.error.StripeError:
             raise ValueError('Платёжный сервис временно недоступен. Повторите попытку: повторное списание защищено.') from None
         if bool(sess.get('livemode'))!=(m=='live') or not str(sess.get('url','')).startswith('https://checkout.stripe.com/'):

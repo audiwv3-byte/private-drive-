@@ -72,5 +72,22 @@ async function pdInvoiceArchiveRefresh(){
 }
 const pdInvoicePreviousRender=pdRenderCurrent;pdRenderCurrent=function(){pdInvoicePreviousRender();pdInvoiceAdminButtons()};
 const pdInvoicePreviousReload=pdReload;pdReload=async function(){await pdInvoicePreviousReload();await pdInvoiceArchiveRefresh()};
-const pdInvoicePreviousOrders=loadOrders;loadOrders=async function(){await pdInvoicePreviousOrders();try{const rows=(await api('/api/invoices')).invoices||[];const ids=new Set(rows.map(r=>Number(r.order_id)));document.querySelectorAll('#orders article').forEach(row=>{const match=row.textContent.match(/№\s*(\d+)/);if(!match||!ids.has(Number(match[1]))||row.querySelector('[data-pd-invoice-download]'))return;const id=Number(match[1]),b=pdInvoiceButton(pdIT('Скачать счёт PDF','Download invoice PDF','Atsisiųsti PDF sąskaitą'),()=>pdDownloadInvoice(id));b.dataset.pdInvoiceDownload='1';row.append(b)})}catch(e){message(pdL(e.message),true)}};
+function pdOrderDocuments(orderId){
+ const order=pdPassengerOrders.find(row=>row.id===orderId);
+ if(!order)return;
+ const dialog=pdSimpleDialog(pdIT('Документы по заказу №','Documents for order #','Užsakymo dokumentai Nr. ')+orderId);
+ const invoice=document.createElement('section'),receipt=document.createElement('section');
+ const description=(section,title,text)=>{
+  const heading=document.createElement('h3'),body=document.createElement('p');
+  heading.textContent=title;body.textContent=text;section.append(heading,body);
+ };
+ description(invoice,pdIT('Счёт-фактура','Invoice','Sąskaita faktūra'),
+  order.invoice_available?pdIT('Документ выпущен','Invoice issued','Sąskaita išrašyta'):
+  pdIT('Счёт появится после выпуска','Available after issuance','Bus pateikta po išrašymo'));
+ if(order.invoice_available)invoice.append(pdInvoiceButton('PDF',()=>pdDownloadInvoice(orderId)));
+ description(receipt,pdIT('Подтверждение оплаты','Payment confirmation','Mokėjimo patvirtinimas'),
+  order.payment_status==='Оплачено'?order.price+' € · '+pdL(order.payment_method):
+  pdIT('Ожидается подтверждение оплаты','Awaiting payment confirmation','Laukiama mokėjimo patvirtinimo'));
+ dialog.append(invoice,receipt);
+}
 pdInvoiceAdminButtons();

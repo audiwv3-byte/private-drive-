@@ -19,7 +19,7 @@ def telegram_order(uid, data, *, service_type=None, sober_fare=None):
         return jsonify(error="orders_disabled"), 503
     if not isinstance(data, dict):
         return jsonify(error="invalid_order"), 400
-    if data.get("payment_method", "Наличными") != "Наличными":
+    if data.get("payment_method", "Наличными") not in ("Наличными", "Банковский перевод", "Криптовалюта"):
         return jsonify(error="payment_disabled"), 503
     key = data.get("request_key")
     if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9_-]{16,80}", key):
@@ -50,6 +50,10 @@ def telegram_order(uid, data, *, service_type=None, sober_fare=None):
                 details["fare_requires_quote"] = True
             else:
                 details["ride_type"] = "Предзаказ" if service_type == "preorder" else "Поездка"
+        # Record the requested method for the dispatcher; no payment is created here.
+        if data.get("payment_method") in ("Банковский перевод", "Криптовалюта"):
+            details["preferences"] = {**(details.get("preferences") or {}),
+                                      "payment_method": data["payment_method"]}
         details = normalize_details(details)
     except (TypeError, ValueError):
         return jsonify(error="invalid_booking_details"), 400

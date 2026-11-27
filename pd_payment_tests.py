@@ -39,6 +39,41 @@ def run(server,core,client,call,signed,check):
             check(call(path,{'confirm':True,'reason':'Test cancellation'},uid=999),200)
             assert create.call_count==1
         return result
+    qa_card = order(uid=101)
+    core.save_user(102, 'QA Other Passenger', '+37060000002')
+    with core.db(core.ORDERS_DB) as c:
+        c.execute("UPDATE orders SET payment_method='Банковская карта' WHERE id=?", (qa_card,))
+    qa_settings = {
+        'PD_MINIAPP_PAYMENT_QA': '1',
+        'PD_QA_PAYMENT_RETURN_URL': 'https://qa.private-drive.example/',
+        'PD_QA_PAYMENT_TEST_USERS': '101',
+    }
+    with patch.dict(os.environ, qa_settings), patch.object(mod.stripe, 'StripeClient') as client_factory:
+        create = client_factory.return_value.checkout.sessions.create
+        create.return_value = session(qa_card)
+        assert check(call('/api/me'),200)['card_booking_enabled']
+        check(call(f'/api/payment/{qa_card}/checkout',body,uid=102),503)
+        payload = check(call(f'/api/payment/{qa_card}/checkout',body),200)
+        assert payload['test_mode']
+        params = create.call_args.args[0]
+        assert 'payment_method_types' not in params
+        assert params['success_url'] == 'https://qa.private-drive.example/?payment=return'
+        assert params['line_items'][0]['price_data']['unit_amount'] == 10000
+        assert core.order_find(qa_card)['payment_status'] != 'Оплачено'
+    assert not check(call('/api/me'),200)['card_booking_enabled']
+    print('PASS isolated Stripe Checkout: selected tester, confirmed fare, dynamic payment methods and QA return URL')
+    crypto_order = order(uid=101)
+    with core.db(core.ORDERS_DB) as c:
+        c.execute("UPDATE orders SET payment_method='Криптовалюта' WHERE id=?", (crypto_order,))
+    crypto_path = f'/api/admin/crypto-payment/{crypto_order}'
+    with patch.dict(core.CRYPTO_ADDRESSES, {'ETH': '0x' + 'a' * 40}):
+        assert check(call(crypto_path,uid=999),200)['price'] == '115.00'
+        crypto = {'currency': 'ETH', 'amount': '0.05'}
+        check(call(crypto_path,crypto,uid=999),200)
+        assert check(call(crypto_path,crypto,uid=999),200)['replayed']
+        assert check(call(crypto_path,uid=999),200)['price'] == '115.00'
+        assert core.order_find(crypto_order)['price'] == '115.00'
+    print('PASS crypto surcharge: server-calculated 15%, stable across retries')
     # Real-mode and consent gates fail closed without invoking Stripe.
     oid=order()
     with patch.object(mod.stripe.checkout.Session,'create') as create:

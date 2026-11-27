@@ -151,9 +151,9 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
             page.set_viewport_size({"width": 360, "height": 640})
             configure_page(page, 101)
             for lang, labels in {
-                "en": ["Book a trip", "My trips", "Book in advance", "Sober driver", "Wheel of fortune", "Become a driver"],
-                "lt": ["Užsakyti kelionę", "Mano kelionės", "Išankstinis užsakymas", "Blaivus vairuotojas", "Laimės ratas", "Tapti vairuotoju"],
-                "ru": ["Заказать поездку", "Мои поездки", "Предзаказ", "Трезвый водитель", "Колесо фортуны", "Стать водителем"],
+                "en": ["Book a trip", "My trips", "Book in advance", "Sober driver", "Rewards and invitations", "Become a pilot"],
+                "lt": ["Užsakyti kelionę", "Mano kelionės", "Išankstinis užsakymas", "Blaivus vairuotojas", "Premijos ir kvietimai", "Tapti pilotu"],
+                "ru": ["Заказать поездку", "Мои поездки", "Предзаказ", "Трезвый водитель", "Бонусы и приглашения", "Стать пилотом"],
             }.items():
                 page.goto(f"{base}/?lang={lang}")
                 welcome = page.locator("#step0")
@@ -170,6 +170,29 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
             with page.expect_response(lambda r: r.url == base + "/api/register/telegram") as login:
                 page.evaluate("pdbRegisterTelegram()")
             assert login.value.request.method == "POST" and login.value.json()["registered"]
+            slow_page = browser.new_page(reduced_motion="reduce")
+            configure_page(slow_page, 101)
+            slow_page.add_init_script("""(() => {
+                const fetchNow = window.fetch.bind(window);
+                let shown = false;
+                const observer = new MutationObserver(() => {
+                    const startup = document.getElementById('pdStartup');
+                    if (startup && !startup.hidden) {
+                        shown = getComputedStyle(startup.querySelector('.pd-startup-scene')).animationName === 'none';
+                        observer.disconnect();
+                    }
+                });
+                observer.observe(document, {subtree: true, attributes: true, attributeFilter: ['hidden']});
+                window.qaStartupShown = () => shown;
+                window.fetch = (url, options) => String(url).endsWith('/api/me')
+                    ? new Promise(resolve => setTimeout(resolve, 1000)).then(() => fetchNow(url, options))
+                    : fetchNow(url, options);
+            })();""")
+            slow_page.goto(base + "/?lang=ru")
+            expect(slow_page.locator("#step0")).to_be_visible()
+            assert slow_page.evaluate("qaStartupShown()")
+            expect(slow_page.locator("#pdStartup")).to_be_hidden()
+            slow_page.close()
             outside_telegram = browser.new_page()
             configure_page(outside_telegram)
             outside_login_requests = []
@@ -244,7 +267,7 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
                     with page.expect_response(lambda r: r.url == base + "/api/route") as fixed_quote:
                         fixed.click()
                     assert fixed_quote.value.json()["price_only"]
-                    expect(page.locator("#pdbPrice")).to_have_text("110.00 €")
+                    expect(page.locator("#pdbBookingNext #pdbNextPrice")).to_have_text("110.00 €")
                     with page.expect_response(lambda r: r.url == base + "/api/route") as round_trip:
                         page.locator("#pdbTripMode").select_option("roundtrip")
                     assert round_trip.value.request.post_data_json["roundtrip"]
@@ -279,8 +302,16 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
                 expect(page.locator("#pdbSummary")).to_contain_text("QA pickup A")
                 page.locator('#pdbPays [data-method="Банковский перевод"]').click()
                 expect(page.locator("#pdbSummary")).to_contain_text("Банковский перевод")
-                # The isolated order bridge deliberately submits synthetic unpaid orders only.
-                page.locator('#pdbPays [data-method="Наличными"]').click()
+                expect(page.locator('#pdbPays [data-method="Наличными"]')).to_have_count(0)
+                expect(page.locator('#pdbCardChoice')).to_be_hidden()
+                if service == "Предзаказ":
+                    page.locator('#pdbPays [data-method="Криптовалюта"]').click()
+                    expect(page.locator("#pdbSummary")).to_contain_text("Криптовалюта")
+                    expect(page.locator("#pdbPetPriceNote")).to_contain_text("+15%")
+                    base_price = core.quote(12, 21)
+                    from pd_crypto_manual import total_with_crypto_surcharge
+                    cents = total_with_crypto_surcharge(miniapp_server.cents_for_order(base_price))
+                    expect(page.locator("#pdbSend #pdbPrice")).to_have_text(f"{cents / 100:.2f} €")
                 page.locator("#pdbAgree").check()
                 with page.expect_response(lambda r: r.url == base + "/api/order") as result:
                     page.locator("#pdbSend").click()
@@ -321,20 +352,47 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
                 expect(card).to_contain_text(service)
                 expect(card).to_contain_text(day + " " + time)
             expect(passenger.locator("article").filter(has_text=requests["Трезвый водитель"][0])).to_contain_text(price + " €")
+            saved = {order["order_id"]: order for order in client.get("/api/orders", headers=signed(101)).json["orders"]}
+            for service, method in (("Поездка", "Банковский перевод"), ("Предзаказ", "Криптовалюта")):
+                order = saved[requests[service][0]]
+                assert order["booking_details"]["preferences"]["payment_method"] == method
             foreign_history = client.get("/api/orders", headers=signed(102)).json
             assert foreign_history == {"orders": []}
 
             before = client.get("/api/orders", headers=signed(101)).json
             page.locator("#pdPassengerMenuToggle").click()
             page.locator("#pdPassengerMenu").get_by_role("button", name="Главная").click()
-            page.locator("#step0").get_by_role("button", name="Колесо фортуны").click()
+            expect(page.locator("#step0 #pdWelcomeWheel")).to_have_count(0)
+            page.locator("#step0").get_by_role("link", name="Бонусы и приглашения").click()
+            expect(page.locator("#step12")).to_be_visible()
             expect(page.locator("#pdWelcomeWheel")).to_contain_text("Демо")
             assert page.locator("#pdWheelDisk span").all_text_contents() == ["5%", "10%", "15%", "20%"]
             page.get_by_role("button", name="Крутить").click()
             expect(page.locator("#pdWheelResult")).to_have_text(re.compile(r"(5|10|15|20)%$"))
             assert client.get("/api/orders", headers=signed(101)).json == before
 
-            page.get_by_role("link", name="Стать водителем").click()
+            page.locator("#pdPassengerMenuToggle").click()
+            page.locator("#pdPassengerMenu").get_by_role("button", name="Профиль").click()
+            expect(page.locator("#pdbAvatars button")).to_have_count(4)
+            expect(page.locator("#pdbTelegramIdentity")).to_be_hidden()
+            page.locator("#pdbAvatars [data-avatar=luna]").click()
+            page.locator("#pdbEmail").fill("qa-invoice@example.test")
+            with page.expect_response(lambda r: r.url.endswith("/api/profile/details")) as profile:
+                page.locator("#pdbSaveProfile").click()
+            assert profile.value.json()["profile"]["avatar"] == "luna"
+            page.reload()
+            page.locator("#pdPassengerMenuToggle").click()
+            page.locator("#pdPassengerMenu").get_by_role("button", name="Профиль").click()
+            expect(page.locator("#pdbAvatars [data-avatar=luna]")).to_have_attribute("aria-pressed", "true")
+            expect(page.locator("#pdbEmail")).to_have_value("qa-invoice@example.test")
+            core.save_user(101, "QA Passenger", "+37060000000", via_telegram=True)
+            page.reload()
+            page.locator("#pdPassengerMenuToggle").click()
+            page.locator("#pdPassengerMenu").get_by_role("button", name="Профиль").click()
+            expect(page.locator("#pdbTelegramIdentity")).to_contain_text("Telegram")
+            page.locator("#pdPassengerMenuToggle").click()
+            page.locator("#pdPassengerMenu").get_by_role("button", name="Главная").click()
+            page.get_by_role("button", name="Стать пилотом").click()
             expect(page.locator("#pdObDriver")).to_be_visible()
             expect(page.locator("#pdObDriverName")).to_have_value("QA Passenger")
             for element, value in {"City": "Vilnius", "Vehicle": "Toyota RAV4", "Year": "2024", "Plate": "QA 101"}.items():
@@ -393,7 +451,7 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
                 """).fetchall()
             assert len(original) == 1 and original[0][0] == 101 and original[0][3] == "pending"
 
-            page.locator("#step0").get_by_role("link", name="Стать водителем").click()
+            page.locator("#step0").get_by_role("button", name="Стать пилотом").click()
             page.locator("#pdObReceived").get_by_role("button", name="Изменить данные").click()
             page.locator("#pdObDriverCity").fill("Kaunas")
             set_candidates_available(False)

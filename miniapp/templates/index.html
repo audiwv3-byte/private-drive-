@@ -6,7 +6,7 @@ function pdSwitchLanguage(lang){
  if(!['ru','lt','en'].includes(lang)||lang===window.PD_LANG)return;
  if(typeof pdbOrderBusy!=='undefined'&&pdbOrderBusy){alert(pdL('Дождитесь завершения отправки заявки.'));document.getElementById('pdLangSelect').value=window.PD_LANG;return}
  const fields={};document.querySelectorAll('input[id],textarea[id],select[id]').forEach(e=>{if(e.id==='pdLangSelect'||e.readOnly||['password','file','hidden'].includes(e.type))return;fields[e.id]={value:e.value,checked:e.checked}});
- const draft={at:Date.now(),fields,bookingPage:typeof pdBookingPage==='string'?pdBookingPage:'route',advance:typeof pdAdvanceBooking!=='undefined'&&pdAdvanceBooking,step:typeof step==='number'?step:0,extras:typeof pdbChosen!=='undefined'?[...pdbChosen]:[],pay:typeof pdbPay!=='undefined'?pdbPay:'Наличными',points:typeof pdbSelectedPoints!=='undefined'?pdbSelectedPoints:{},roundtrip:typeof roundtrip==='boolean'?roundtrip:false};
+ const draft={at:Date.now(),fields,bookingPage:typeof pdBookingPage==='string'?pdBookingPage:'route',advance:typeof pdAdvanceBooking!=='undefined'&&pdAdvanceBooking,step:typeof step==='number'?step:0,extras:typeof pdbChosen!=='undefined'?[...pdbChosen]:[],avatar:typeof pdbAvatar==='string'?pdbAvatar:'',pay:typeof pdbPay!=='undefined'?pdbPay:'Наличными',points:typeof pdbSelectedPoints!=='undefined'?pdbSelectedPoints:{},roundtrip:typeof roundtrip==='boolean'?roundtrip:false};
  try{sessionStorage.setItem('pdLanguageDraft',JSON.stringify(draft))}catch(_){alert(pdL('Не удалось сохранить форму. Проверьте настройки памяти браузера и повторите попытку.'));document.getElementById('pdLangSelect').value=window.PD_LANG;return}
  try{localStorage.setItem('pdLanguage',lang)}catch(_){}
  const u=new URL(location.href);u.searchParams.set('lang',lang);location.assign(u.href);
@@ -19,8 +19,9 @@ function pdMaybeRestoreLanguageDraft(){
  if(typeof go==='function')go(Number.isInteger(d.step)&&d.step>=0&&d.step<=15?d.step:0);
  for(const[id,v]of Object.entries(d.fields)){const e=document.getElementById(id);if(!e||e.readOnly||['password','file','hidden'].includes(e.type))continue;e.value=v.value;if(['checkbox','radio'].includes(e.type))e.checked=id==='pdbAgree'?false:Boolean(v.checked)}
  if(typeof pdbChosen!=='undefined'&&Array.isArray(d.extras)){const known=[...document.querySelectorAll('#pdbExtras button')].map(e=>e.dataset.extra);pdbChosen=new Set(d.extras.filter(v=>known.includes(v)));if(!pdbChosen.size)pdbChosen.add('Без пожеланий');document.querySelectorAll('#pdbExtras button').forEach(e=>e.classList.toggle('active',pdbChosen.has(e.dataset.extra)))}
- if(typeof pdbPay!=='undefined'&&[...document.querySelectorAll('#pdbPays button')].some(e=>e.dataset.method===d.pay)){pdbPay=d.pay;document.querySelectorAll('#pdbPays button').forEach(e=>e.classList.toggle('active',e.dataset.method===pdbPay))}
+ if(typeof pdbPay!=='undefined'&&[...document.querySelectorAll('#pdbPays button')].some(e=>e.dataset.method===d.pay&&!e.disabled)){pdbPay=d.pay;document.querySelectorAll('#pdbPays button').forEach(e=>e.classList.toggle('active',e.dataset.method===pdbPay))}
  if(typeof pdbSelectedPoints!=='undefined')pdbSelectedPoints=d.points||{};
+ if(typeof pdbSelectAvatar==='function'&&typeof d.avatar==='string')pdbSelectAvatar(d.avatar);
  if(typeof pdRestoreStop==='function')pdRestoreStop(d.fields.pdbStop?.value||'');
  if(typeof roundtrip!=='undefined')roundtrip=Boolean(d.roundtrip);
  if(d.step===11&&typeof pdShowBookingPage==='function')pdShowBookingPage(d.bookingPage,false);
@@ -168,7 +169,7 @@ body.pd-passenger-view:not(.admin-home) .pd-booking-dock{bottom:0;padding-bottom
 body.pd-passenger-view #pdTopMenuButton{display:none!important}
 .pd-welcome-actions{display:grid;gap:8px}
 .pd-welcome-actions button{width:100%;margin:0;min-height:46px}
-.pd-welcome-candidate{display:grid;place-items:center;min-height:44px;color:#f2d498;text-decoration:underline}
+.pd-welcome-candidate,.pd-welcome-bonuses{display:grid;place-items:center;min-height:44px;color:#f2d498}.pd-welcome-bonuses{text-decoration:underline}
 #pdWelcomeWheel{margin-top:18px;text-align:center}
 .pd-wheel-frame{position:relative;width:min(200px,85%);aspect-ratio:1;margin:16px auto}
 .pd-wheel-frame::after{content:"";position:absolute;top:-3px;left:calc(50% - 8px);border:8px solid transparent;border-top:14px solid #f6ebd3}
@@ -180,6 +181,24 @@ body.pd-passenger-view #pdTopMenuButton{display:none!important}
 #pdWheelDisk span:nth-child(4){top:50%;left:22%}
 @media(prefers-reduced-motion:reduce){ #pdWheelDisk{transition:none}}
 </style><style>
+#pdStartup{position:fixed;inset:0;z-index:2000;display:grid;place-content:center;overflow:hidden;background:#08090b;color:#f9e3a9;text-align:center}
+#pdStartup[hidden]{display:none}
+.pd-startup-art{position:relative;width:min(100vw,900px);aspect-ratio:1916/821;overflow:hidden}
+.pd-startup-scene{position:absolute;inset:0;background:url('/assets/private-drive-night.png') center/contain no-repeat;transform-origin:64% 57%;animation:pd-arrival 2.15s ease-out both}
+@keyframes pd-arrival{from{transform:scale(.77)}to{transform:scale(1.26)}}
+.pd-startup-lights{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 8% 10% at 64% 57%,#fff9ddc9,transparent),radial-gradient(ellipse 5% 9% at 46.4% 58%,#f3f7ffb0,transparent);animation:pd-headlights 1.25s .33s ease-out 1 both}
+@keyframes pd-headlights{0%,100%{opacity:.23}45%{opacity:.85}}
+#pdStartup strong{margin:15px 0 3px;font-size:clamp(23px,6vw,36px);letter-spacing:.1em}
+#pdStartup p{margin:0;color:#e9ddc5}
+@media(prefers-reduced-motion:reduce){.pd-startup-scene{animation:none}.pd-startup-lights{animation:none;opacity:.25}}
+.pdb-avatar-picker{border:0;padding:0;margin:8px 0 12px}
+.pdb-avatar-options{display:flex;flex-wrap:wrap;gap:8px}
+.pdb-avatar-options button,.pdb-avatar-preview{width:48px;height:48px;margin:0;padding:0;border-radius:50%;background-image:url('/assets/pd-passenger-avatars.webp');background-size:200% 200%;border:2px solid #6d593b}
+.pdb-avatar-options button[aria-pressed=true]{border-color:#ffe4a1;outline:2px solid #ffe4a1;outline-offset:1px}
+[data-avatar=orbit]{background-position:0 0}
+[data-avatar=spark]{background-position:100% 0}
+[data-avatar=luna]{background-position:0 100%}
+[data-avatar=nova]{background-position:100% 100%}
 body.pdb-active .brand.pd-branded-header{min-height:0;margin-bottom:8px;padding:8px 10px}
 body.pdb-active .brand.pd-branded-header #pdTipsAlways,
 body.pdb-active .brand.pd-branded-header .pd-privacy-bar,
@@ -202,13 +221,19 @@ body.pdb-active .shell{padding-bottom:140px}
 #step11 .pd-booking-optional[open]{max-height:46dvh;overflow:auto}
 #step11 .pd-booking-controls{display:flex;align-items:center;gap:6px}
 #step11 .pd-booking-controls button{width:auto;min-height:44px;margin:0;padding:8px;white-space:normal}
-#step11 .pd-booking-total{min-width:0}
+#step11 .pd-booking-controls{width:100%}
+#step11 .pd-booking-controls .pdb-primary{display:grid;flex:1;gap:3px;place-items:center}
+#step11 .pd-booking-action-price{font-size:16px;font-weight:750}
+#step11 #pdbPetPriceNote{color:inherit;margin:0!important;font-size:11px;font-weight:600}
 #step11 .pd-booking-dock{justify-content:space-between;gap:8px;padding:8px 10px max(8px,env(safe-area-inset-bottom))}
 #step11 .pd-booking-map-dialog{width:min(96vw,600px);max-height:calc(100dvh - 24px);overflow:auto;padding:12px;background:#151617;color:var(--text);border:1px solid #8c744c;border-radius:16px}
 #step11 .pd-booking-map-dialog::backdrop{background:#000b}
 #step11 .pd-booking-map-dialog .pdb-map{height:clamp(200px,45dvh,360px)}
 </style>
-</head><body class="pd-onboarding-active"><main class="shell"><header class="brand pd-branded-header"><button type="button" id="pdTopMenuButton" class="secondary pd-top-menu-button" aria-label="Открыть меню PRIVATE DRIVE" aria-controls="pdTopMenuPanel" aria-expanded="false" onclick="pdToggleTopMenu()">☰ <span>Меню</span></button><button type="button" id="pdPassengerMenuToggle" aria-label="Открыть меню" aria-haspopup="dialog" aria-controls="pdPassengerMenu" aria-expanded="false" onclick="pdOpenPassengerMenu()">
+</head><body class="pd-onboarding-active"><div id="pdStartup" role="status" hidden>
+<div class="pd-startup-art" aria-hidden="true"><div class="pd-startup-scene"><div class="pd-startup-lights"></div></div></div>
+<strong>PRIVATE DRIVE</strong><p>Загрузка…</p>
+</div><main class="shell"><header class="brand pd-branded-header"><button type="button" id="pdTopMenuButton" class="secondary pd-top-menu-button" aria-label="Открыть меню PRIVATE DRIVE" aria-controls="pdTopMenuPanel" aria-expanded="false" onclick="pdToggleTopMenu()">☰ <span>Меню</span></button><button type="button" id="pdPassengerMenuToggle" aria-label="Открыть меню" aria-haspopup="dialog" aria-controls="pdPassengerMenu" aria-expanded="false" onclick="pdOpenPassengerMenu()">
   <span class="pd-passenger-menu-icon" aria-hidden="true"><span></span><span></span><span></span></span>
 </button><div class="pd-brand-lockup"><img class="pd-monogram pd-official-logo" src="/assets/private-drive-official-logo.jpeg" alt="Фирменный логотип PD — privatdrive" width="76" height="76" fetchpriority="high"><div class="pd-brand-wordmark"><strong>privatdrive</strong><span>EURO BALTIC TRANSFER</span></div></div><small>Premium Transfers</small><button type="button" class="secondary" id="pdTipsAlways" onclick="pdOpenTipInfo()" style="flex:none;padding:10px 12px;font-size:13px">💛 Чаевые</button><div class="pd-language-switch"><label for="pdLangSelect" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">Язык</label><select id="pdLangSelect" onchange="pdSwitchLanguage(this.value)"><option value="en" lang="en">🇬🇧 EN</option><option value="lt" lang="lt">🇱🇹 LT</option><option value="ru" lang="ru">🇷🇺 RU</option></select></div><div class="pd-privacy-bar"><a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="/legal" target="_blank" rel="noopener noreferrer">Условия поездки и оплаты</a> · <a href="mailto:eurobaltictransfer@gmail.com" data-pd-contact="true">Связаться с нами</a></div></header><nav id="pdTopMenuPanel" class="pd-top-menu-panel hidden" aria-label="Меню PRIVATE DRIVE" aria-hidden="true">
   <div class="pd-top-menu-heading"><strong>PRIVATE DRIVE</strong><button type="button" class="secondary" aria-label="Закрыть меню" onclick="pdToggleTopMenu(false)">✕</button></div>
@@ -252,17 +277,10 @@ body.pdb-active .shell{padding-bottom:140px}
     <button type="button" class="secondary" onclick="go(8)">Мои поездки</button>
     <button type="button" class="secondary" onclick="pdOpenBooking(true)">Предзаказ</button>
     <button type="button" class="secondary" onclick="pdOpenSoberDriver()">Трезвый водитель</button>
-    {% if demo_wheel %}<button type="button" class="secondary" aria-controls="pdWelcomeWheel" aria-expanded="false" onclick="pdToggleWelcomeWheel(this)">Колесо фортуны</button>{% endif %}
-    <a class="pd-welcome-candidate" href="#pdObDriver" onclick="pdOpenCandidate(event)">Стать водителем</a>
+    <a class="pd-welcome-bonuses" href="#step12" onclick="event.preventDefault();go(12)">Бонусы и приглашения</a>
+    <button type="button" class="secondary pd-welcome-candidate" onclick="pdOpenCandidate()">Стать пилотом</button>
   </div>
-  {% if demo_wheel %}<div id="pdWelcomeWheel" class="hidden">
-    <p>Демо. Результат не применяется к цене поездки.</p>
-    <div class="pd-wheel-frame" aria-label="5%, 10%, 15%, 20%" role="img"><div id="pdWheelDisk">
-      <span>5%</span><span>10%</span><span>15%</span><span>20%</span>
-    </div></div>
-    <button type="button" class="secondary" onclick="pdSpinWelcomeWheel()">Крутить</button>
-    <p id="pdWheelResult" role="status"></p>
-  </div>{% endif %}
+
 </section>
 <template id="pdSoberDriverForm">
   <form class="pd-sober-form">
@@ -313,13 +331,26 @@ body.pdb-active .shell{padding-bottom:140px}
 <div class="pdb-grid"><div><label id="pdbPassengersLabel" for="pdbPassengers">Пассажиры</label><select id="pdbPassengers"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div><div><label id="pdbLuggageLabel" for="pdbLuggage">Багаж</label><select id="pdbLuggage"><option value="Не указано">Не указано</option><option value="Без багажа">Без багажа</option><option value="1 чемодан">1 чемодан</option><option value="2 чемодана">2 чемодана</option><option value="3+ чемодана">3+ чемодана</option></select></div></div>
 </div><div class="pdb-card pd-booking-page" data-pdb-page="details" hidden="hidden"><h2 tabindex="-1">Дополнительно</h2><label>Что сделает дорогу удобнее?</label><div class="pdb-opts" id="pdbExtras"><button type="button" class="active" data-extra="Без пожеланий">✓ Без пожеланий</button><button type="button" data-extra="Дополнительная остановка">Доп. остановка</button><button type="button" data-extra="Встреча с табличкой">+ Встреча с табличкой · 15 €</button><button type="button" data-extra="Трезвый водитель">Трезвый водитель · ×2</button><button type="button" data-extra="Перевозка животного">🐾 С питомцем</button><button type="button" data-extra="Тишина в салоне">+ Тишина</button></div>
 <label>Дополнительный комментарий</label><textarea id="pdbWishes" maxlength="550" placeholder="Номер рейса, пожелания по времени, адресу подачи…"></textarea>
-</div><div class="pdb-card pd-booking-page" data-pdb-page="payment" hidden="hidden"><h2 tabindex="-1">Оплата</h2><label>Как хотите оплатить?</label><div class="pdb-pay" id="pdbPays"><button type="button" class="active" data-method="Наличными">💶 Наличными</button><button type="button" data-method="Банковский перевод">🏦 Банковский перевод</button><button type="button" data-method="Криптовалюта">₿ Крипто</button></div>
+</div><div class="pdb-card pd-booking-page" data-pdb-page="payment" hidden="hidden"><h2 tabindex="-1">Оплата</h2><label>Как хотите оплатить?</label><div class="pdb-pay" id="pdbPays"><button type="button" id="pdbCardChoice" data-method="Банковская карта" hidden disabled>Карта / Apple Pay · Stripe</button><button type="button" class="active" data-method="Банковский перевод">🏦 Банковский перевод</button><button type="button" data-method="Криптовалюта">Криптовалюта +15%</button></div>
 <div class="pdb-price"><span>Ваша поездка</span><div id="pdbSummary" class="pdb-preview">Укажите маршрут и дату</div><hr style="border:0;border-top:1px solid #53644d"></div>
-<details id="pdbBookingProfile" class="pd-booking-optional"><summary>Контакты пассажира</summary><div id="pdBookingProfileHome"><div class="pdb-price" id="pdbProfile"><h3>Ваш профиль</h3><p id="pdbProfileSummary">Зарегистрируйтесь через Telegram или укажите данные вручную.</p><p class="pdb-note pd-privacy-notice">Имя, телефон и сведения о поездке используются для регистрации и выполнения заказа. Email, город и постоянные пожелания необязательны. <a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="/legal" target="_blank" rel="noopener noreferrer">Условия поездки и оплаты</a>. Обращения о данных: <a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a> · <a href="https://t.me/PrivatDraiv" target="_blank" rel="noopener noreferrer" data-pd-telegram-contact="true">@PrivatDraiv</a>.</p><button type="button" id="pdbTelegramRegister" class="pay-choice" onclick="pdbRegisterTelegram()">Продолжить с Telegram</button><button type="button" class="secondary pay-choice" onclick="pdbEditProfile()">Изменить данные</button><div id="pdbProfileFields" class="hidden"><label for="pdbName">Ваше имя</label><input id="pdbName" autocomplete="name" placeholder="Имя"><label for="pdbPhone">Телефон</label><input id="pdbPhone" autocomplete="tel" type="tel" placeholder="+370..."><details class="pd-profile-details"><summary>Дополнить профиль (необязательно)</summary><p>Контакты и пожелания для связи по вашим поездкам. Эти данные видны администратору и водителю сервиса. Дополнительные поля необязательны. История изменений доступна только администратору. По вопросам удаления данных свяжитесь с нами.</p><label for="pdbEmail">Электронная почта</label><input id="pdbEmail" type="email" maxlength="254" autocomplete="email" placeholder="name@example.com"><label for="pdbHomeCity">Ваш город</label><input id="pdbHomeCity" maxlength="120" autocomplete="address-level2"><label for="pdbPreferences">Постоянные пожелания к поездкам</label><textarea id="pdbPreferences" maxlength="1000" placeholder="Например: тишина в салоне"></textarea><p>Для конкретного заказа укажите пожелания также в деталях поездки.</p></details><button type="button" class="pay-choice" id="pdbSaveProfile" onclick="pdbSaveProfile()">Сохранить данные</button></div><p id="pdbProfileStatus" class="pdb-note" role="status">Телефон передаётся только с вашего разрешения. Данные можно изменить.</p></div></div>
+<details id="pdbBookingProfile" class="pd-booking-optional"><summary>Контакты пассажира</summary><div id="pdBookingProfileHome"><div class="pdb-price" id="pdbProfile"><h3>Ваш профиль</h3><div id="pdbAvatarPreview" class="pdb-avatar-preview" hidden></div><p id="pdbTelegramIdentity" hidden></p><p id="pdbProfileSummary">Зарегистрируйтесь через Telegram или укажите данные вручную.</p><p class="pdb-note pd-privacy-notice">Имя, телефон и сведения о поездке используются для регистрации и выполнения заказа. Email, город и постоянные пожелания необязательны. <a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="/legal" target="_blank" rel="noopener noreferrer">Условия поездки и оплаты</a>. Обращения о данных: <a href="mailto:eurobaltictransfer@gmail.com">eurobaltictransfer@gmail.com</a> · <a href="https://t.me/PrivatDraiv" target="_blank" rel="noopener noreferrer" data-pd-telegram-contact="true">@PrivatDraiv</a>.</p><button type="button" id="pdbTelegramRegister" class="pay-choice" onclick="pdbRegisterTelegram()">Продолжить с Telegram</button><button type="button" class="secondary pay-choice" onclick="pdbEditProfile()">Изменить данные</button><div id="pdbProfileFields" class="hidden"><label for="pdbName">Ваше имя</label><input id="pdbName" autocomplete="name" placeholder="Имя"><label for="pdbPhone">Телефон</label><input id="pdbPhone" autocomplete="tel" type="tel" placeholder="+370..."><label for="pdbEmail">Email для счетов</label><input id="pdbEmail" type="email" maxlength="254" autocomplete="email" placeholder="name@example.com"><fieldset class="pdb-avatar-picker"><legend>Аватар</legend><div id="pdbAvatars" class="pdb-avatar-options">
+<button type="button" data-avatar="orbit" aria-label="Орбит" aria-pressed="false"></button>
+<button type="button" data-avatar="spark" aria-label="Спарк" aria-pressed="false"></button>
+<button type="button" data-avatar="luna" aria-label="Луна" aria-pressed="false"></button>
+<button type="button" data-avatar="nova" aria-label="Нова" aria-pressed="false"></button>
+</div></fieldset><details class="pd-profile-details"><summary>Дополнить профиль (необязательно)</summary><p>Контакты и пожелания для связи по вашим поездкам. Эти данные видны администратору и водителю сервиса. Дополнительные поля необязательны. История изменений доступна только администратору. По вопросам удаления данных свяжитесь с нами.</p><label for="pdbHomeCity">Ваш город</label><input id="pdbHomeCity" maxlength="120" autocomplete="address-level2"><label for="pdbPreferences">Постоянные пожелания к поездкам</label><textarea id="pdbPreferences" maxlength="1000" placeholder="Например: тишина в салоне"></textarea><p>Для конкретного заказа укажите пожелания также в деталях поездки.</p></details><button type="button" class="pay-choice" id="pdbSaveProfile" onclick="pdbSaveProfile()">Сохранить данные</button></div><p id="pdbProfileStatus" class="pdb-note" role="status">Телефон передаётся только с вашего разрешения. Данные можно изменить.</p></div></div>
 </details><label><input type="checkbox" class="pdb-checkbox" id="pdbAgree">Подтверждаю отправку заявки с указанными данными</label>
 <div id="pdbFeedback" class="pdb-feedback" role="status"></div><button type="button" id="pdBookedPilot" class="secondary hidden" onclick="go(9)">Карточка пилота</button><button type="button" class="secondary pay-choice hidden" id="pdbNewRequest" onclick="pdbNewRequest()">Создать новую заявку</button><p class="pdb-note">Оплата сейчас не списывается. Цена окончательно подтверждается пилотом.</p><p id="pdPrivateContact" class="pdb-note pd-registered-only hidden"></p>
-</div></div><div class="pd-booking-dock"><div class="pd-booking-total"><span>Предварительная стоимость</span><strong id="pdbPrice" aria-live="polite">—</strong></div><div class="pd-booking-controls"><button type="button" id="pdbBookingBack" hidden="hidden" class="secondary">Назад</button><button type="button" id="pdbBookingNext" class="pdb-primary">Далее</button><button type="button" class="pdb-primary" id="pdbSend" onclick="pdbSendOrder()" hidden="hidden">Заказать поездку →</button></div></div></div></section>
-<section class="panel hidden" id="step12"><h1>🎁 Бонусы и приглашения</h1><p>Приглашайте друзей в privatdrive и следите за начислениями.</p><div id="pdBonusSummary" role="status">Загрузка…</div><label for="pdReferralLink">Ваша личная ссылка</label><input id="pdReferralLink" readonly aria-label="Ваша личная ссылка"><div class="actions"><a id="pdShareLink" class="chip hidden" target="_blank" rel="noopener noreferrer">Пригласить друга</a><button class="secondary" type="button" onclick="pdBonusCopy()">Скопировать ссылку</button><button class="secondary" type="button" onclick="pdBonusLoad()">Обновить</button></div><p>1 балл за первую завершённую и оплаченную поездку нового друга. Баллы не являются деньгами. Автоматическая скидка пока не включена. Тестовые платежи Stripe не учитываются.</p><h2>Промокод</h2><label for="pdPromoCode">Введите промокод</label><input id="pdPromoCode" maxlength="32" autocomplete="off" autocapitalize="characters" placeholder="Например: PRIVATE"><button type="button" id="pdPromoSubmit" class="pay-choice" onclick="pdBonusRedeem()">Активировать промокод</button><p id="pdBonusFeedback" role="status"></p><p class="muted">Один промокод можно активировать один раз. У каждого промокода есть общий лимит использований.</p></section>
+</div></div><div class="pd-booking-dock"><div class="pd-booking-controls"><button type="button" id="pdbBookingBack" hidden="hidden" class="secondary">Назад</button><button type="button" id="pdbBookingNext" class="pdb-primary"><span id="pdbNextLabel">Далее</span><span id="pdbNextPrice" class="pd-booking-action-price" hidden></span></button><button type="button" class="pdb-primary" id="pdbSend" onclick="pdbSendOrder()" hidden="hidden"><span id="pdbSendLabel">Заказать поездку →</span><span id="pdbPrice" class="pd-booking-action-price" aria-live="polite" hidden></span></button></div></div></div></section>
+<section class="panel hidden" id="step12"><h1>🎁 Бонусы и приглашения</h1><p>Приглашайте друзей в privatdrive и следите за начислениями.</p><div id="pdBonusSummary" role="status">Загрузка…</div><label for="pdReferralLink">Ваша личная ссылка</label><input id="pdReferralLink" readonly aria-label="Ваша личная ссылка"><div class="actions"><a id="pdShareLink" class="chip hidden" target="_blank" rel="noopener noreferrer">Пригласить друга</a><button class="secondary" type="button" onclick="pdBonusCopy()">Скопировать ссылку</button><button class="secondary" type="button" onclick="pdBonusLoad()">Обновить</button></div><p>1 балл за первую завершённую и оплаченную поездку нового друга. Баллы не являются деньгами. Автоматическая скидка пока не включена. Тестовые платежи Stripe не учитываются.</p><h2>Промокод</h2><label for="pdPromoCode">Введите промокод</label><input id="pdPromoCode" maxlength="32" autocomplete="off" autocapitalize="characters" placeholder="Например: PRIVATE"><button type="button" id="pdPromoSubmit" class="pay-choice" onclick="pdBonusRedeem()">Активировать промокод</button><p id="pdBonusFeedback" role="status"></p><p class="muted">Один промокод можно активировать один раз. У каждого промокода есть общий лимит использований.</p>{% if demo_wheel %}<div id="pdWelcomeWheel">
+    <h2>Колесо фортуны</h2>
+    <p>Демо. Результат не применяется к цене поездки.</p>
+    <div class="pd-wheel-frame" aria-label="5%, 10%, 15%, 20%" role="img"><div id="pdWheelDisk">
+      <span>5%</span><span>10%</span><span>15%</span><span>20%</span>
+    </div></div>
+    <button type="button" class="secondary" onclick="pdSpinWelcomeWheel()">Крутить</button>
+    <p id="pdWheelResult" role="status"></p>
+  </div>{% endif %}</section>
 <section class="panel hidden" id="step13"><h2>Рабочее место водителя</h2><p>Новые заявки, предстоящие и текущие поездки; завершённые за сегодня. Полное управление оплатами и документами доступно в админпанели.</p><button type="button" class="secondary" onclick="pdDriverLoad()">Обновить поездки</button><label for="pdDriverFilter">Показать поездки</label><select id="pdDriverFilter" onchange="pdDriverLoad()"><option value="all">Все рабочие поездки</option><option value="Новая">Новые заявки</option><option value="Подтверждена">Предстоящие</option><option value="В пути">В пути</option><option value="Выполнена">Завершённые сегодня</option></select><div id="pdDriverOrders"></div></section><section id="pdPilotWork" class="panel hidden"><h1 id="pdPilotWorkTitle">Мои поездки</h1><button type="button" id="pdPilotWorkRefresh" class="secondary" onclick="pdPilotWork()">Обновить</button><button type="button" id="pdPilotPassenger" class="secondary hidden" onclick="pdPilotPassenger()">Как пассажир</button><div id="pdPilotWorkList" role="status"></div></section><section class="panel hidden" id="step14"><h1>Мой профиль</h1><p class="pdb-note"><a href="/privacy" target="_blank" rel="noopener noreferrer">Политика конфиденциальности</a> · <a href="/legal" target="_blank" rel="noopener noreferrer">Условия поездки и оплаты</a> · <a href="mailto:eurobaltictransfer@gmail.com">Вопросы и удаление данных</a> · <a href="https://t.me/PrivatDraiv" target="_blank" rel="noopener noreferrer" data-pd-telegram-contact="true">@PrivatDraiv</a></p><p>Ваши контакты и пожелания для поездок с privatdrive. Основные данные можно изменить, дополнительные поля — заполнить по желанию.</p><div id="pdProfilePageHome"></div><div class="pd-registered-only hidden"><h2>Сервис и контакты</h2><div class="pd-contact-email"></div></div></section><section class="panel hidden" id="step15" aria-labelledby="pdAboutTitle">
   <h1 id="pdAboutTitle">О нас</h1>
   <p>PRIVATE DRIVE</p>
@@ -505,7 +536,7 @@ function showEstimate(){$('estimate').innerHTML=routeInfo?.available?pdTpl`<stro
 function showSummary(){$('summary').innerHTML=`<div class="item">🚘 ${roundtrip?pdL("Туда и обратно"):pdL("В одну сторону")}</div><div class="item">📍 ${escapeHtml(v('origin'))} → ${escapeHtml(v('destination'))}</div><div class="item">📅 ${escapeHtml(v('date'))} ${escapeHtml(v('time'))}</div><div class="item">📝 ${escapeHtml(v('wishes')||pdL("Нет пожеланий"))}</div><div class="item">💶 ${routeInfo?.price?escapeHtml(routeInfo.price)+' €':pdL("По согласованию")}</div>`;}
 async function submitOrder(){if(!initData)return message(pdL("Откройте приложение через кнопку Telegram-бота"),true);let b=$('submitButton');b.disabled=true;try{let name=v('name'),phone=v('phone');await api('/api/register',{name,phone});let date=v('date').split('-').reverse().join('.');let payload={origin:v('origin'),destination:v('destination'),trip_date:date,trip_time:v('time'),roundtrip,details:v('wishes'),payment_method:v('payMethod')};let r=await api('/api/order',{...payload,request_key:await pdbRequestKey(payload)});lastOrder=r.order_id;$('done').textContent=pdTpl`Заявка №${r.order_id} принята. Цена: ${r.price?r.price+' €':pdL("по согласованию")}. Ожидайте подтверждения пилотом.`;go(7)}catch(e){message(pdL(e.message),true)}finally{b.disabled=false}}
 async function loadOrders(){try{let r=await api('/api/orders');$('orders').innerHTML=r.orders.length?r.orders.map(o=>pdTpl`<div class="item"><b>№${o.id}</b> · ${escapeHtml(pdL(o.status))}<br>${escapeHtml(o.origin)} → ${escapeHtml(o.destination)}<br>${escapeHtml(o.trip_date)} ${escapeHtml(o.trip_time)} · ${escapeHtml(o.price||pdL("Цена уточняется"))} €<br><small>${escapeHtml(pdL(o.payment_status))}</small><br><button class="secondary" onclick="openPay(${o.id})">Оплата / детали</button></div>`).join(''):pdL("Заказов пока нет")}catch(e){message(pdL(e.message),true)}}
-async function openPay(id){try{let p=await api('/api/payment/'+id);$('paymentBox').classList.remove('hidden');let x=$('paymentContent');if(p.status!=='Подтверждена'){x.textContent=pdL("Ожидайте подтверждения пилотом");return}if(!p.price){x.textContent=pdL("Цена ещё не согласована");return}x.innerHTML=pdTpl`<p>Заказ №${id} · ${escapeHtml(p.price)} €</p><button class="pay-choice" onclick="cashNotice()">💶 Наличными</button><button class="pay-choice" onclick="cryptoNotice(${id})">₿ Криптовалютой</button><div id="paymentDetail"></div>`;window.currentPayment=p}catch(e){message(pdL(e.message),true)}}
+async function openPay(id){try{let p=await api('/api/payment/'+id);$('paymentBox').classList.remove('hidden');let x=$('paymentContent');if(p.status!=='Подтверждена'){x.textContent=pdL("Ожидайте подтверждения пилотом");return}if(!p.price){x.textContent=pdL("Цена ещё не согласована");return}x.innerHTML=pdTpl`<p>Заказ №${id} · ${escapeHtml(p.price)} €</p>${['Наличные','Наличными'].includes(p.payment_method)?'<button class="pay-choice" onclick="cashNotice()">💶 '+pdL('Наличными')+'</button>':''}${p.payment_method==='Банковская карта'||p.payment_method==='Онлайн (Stripe)'?'':'<button class="pay-choice" onclick="cryptoNotice('+Number(id)+')">₿ '+pdL('Криптовалюта')+'</button>'}<div id="paymentDetail"></div>`;window.currentPayment=p}catch(e){message(pdL(e.message),true)}}
 async function cashNotice(){let p=window.currentPayment,box=$('paymentDetail');if(!p)return;box.textContent=pdL("Подтверждаем выбор наличных…");try{await api('/api/payment/'+p.id+'/cash',{});box.textContent=pdL("💶 Оплата наличными пилоту при поездке. Пилот подтвердит получение денег.")}catch(e){box.textContent=pdL(e.message);message(pdL(e.message),true)}}
 async function cardNotice(){let p=window.currentPayment;let box=$('paymentDetail');box.textContent=pdL("Создаём защищённую тестовую оплату…");try{let r=await api('/api/payment/'+p.id+'/checkout',{});if(!r.url?.startsWith('https://checkout.stripe.com/'))throw Error(pdL("Некорректная ссылка Stripe"));box.innerHTML='<a target="_blank" rel="noopener" href="'+escapeHtml(r.url)+pdL("\">💳 Перейти к тестовой оплате Stripe</a><p>Это тестовый платёж. Деньги не списываются.</p>")}catch(e){box.textContent=pdL(e.message);message(pdL(e.message),true)}}
 function cryptoNotice(){let p=window.currentPayment;if(!p)return;let buttons=['USDC','BTC','ETH'].map(c=>`<button class="chip" onclick="showWallet('${c}')">${c}</button>`).join(' ');$('paymentDetail').innerHTML=pdTpl`<p>Выберите валюту: ${buttons}</p><div id="wallet"></div>`}
@@ -519,7 +550,15 @@ async function bootstrap(){
  $('name').value=r.name||r.first_name||'';$('phone').value=r.phone||'';
  pdbUpdateProfile(r);pdReviewNotice(r.pending_reviews);pdInitRoles();pdOnboardingStart(r);
  }catch(e){message(pdL(e.message),true)}
-}bootstrap().finally(()=>{if(!window.pdOnboardingStarted)pdOnboardingStart(null);window.pdBootstrapDone=true;pdMaybeRestoreLanguageDraft()});
+}
+const pdStartup=$('pdStartup');
+const pdStartupTimer=initData?setTimeout(()=>{pdStartup.hidden=false},120):null;
+const pdStartupLimit=setTimeout(()=>{pdStartup.hidden=true},4000);
+bootstrap().finally(()=>{
+ clearTimeout(pdStartupTimer);clearTimeout(pdStartupLimit);pdStartup.hidden=true;
+ if(!window.pdOnboardingStarted)pdOnboardingStart(null);
+ window.pdBootstrapDone=true;pdMaybeRestoreLanguageDraft();
+});
 
 // privatdrive admin tabs v3; server remains authoritative for all changes.
 let pdTab='orders',pdOrdersCache=[],pdCustomerCache=[],pdLoaded=false;
@@ -819,7 +858,7 @@ pdAdjustmentReload=async function(){
 
 
 // Booking dashboard: uses the existing signed Telegram API, no extra tariffs invented.
-let pdbMap=null,pdbRoute=null,pdbLayers=[],pdbPay='Наличными';let pdbChosen=new Set(['Без пожеланий']);
+let pdbMap=null,pdbRoute=null,pdbLayers=[],pdbPay='Банковский перевод';let pdbChosen=new Set(['Без пожеланий']);
 const pdBookingPages=['route','time','details','payment'];
 let pdBookingPage='route';
 function pdShowBookingPage(key,focus=true){
@@ -861,7 +900,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  }
  $('pdbPagesNav').setAttribute('aria-label',pdReleaseText('Шаги заказа','Booking steps','Užsakymo žingsniai'));
  $('pdbBookingProfile').querySelector('summary').textContent=pdReleaseText('Контакты пассажира','Passenger contact','Keleivio kontaktai');
- $('pdbBookingNext').textContent=pdReleaseText('Далее','Continue','Toliau');
+ $('pdbNextLabel').textContent=pdReleaseText('Далее','Continue','Toliau');
  const mapTitle=pdReleaseText('Карта маршрута','Route map','Maršruto žemėlapis');
  $('pdbMapOpen').textContent=mapTitle;
  $('pdbMapHeading').textContent=mapTitle;
@@ -889,17 +928,26 @@ function pdbInit(){
  pdbSummary();
 }
 
+function pdbDisplayPrice(value){
+ for(const id of ['pdbPrice','pdbNextPrice']){
+  const amount=$(id);
+  amount.textContent=value;
+  amount.hidden=!value;
+ }
+}
 function pdbUpdatePetPrice(){
  if(!pdbRoute?.available)return;
  const base=Number(String(pdbRoute.base_price??pdbRoute.price).replace(',','.'));
  const hasPet=pdbChosen.has('Перевозка животного');
  const sober=pdbChosen.has('Трезвый водитель');
  const meet=pdbChosen.has('Встреча с табличкой');
- const total=Math.round((base*(hasPet?1.10:1)*(sober?2:1)+(meet?15:0)+Number.EPSILON)*100)/100;
- $('pdbPrice').textContent=total.toFixed(2)+' €';
+ const crypto=pdbPay==='Криптовалюта';
+ const subtotal=Math.round((base*(hasPet?1.10:1)*(sober?2:1)+(meet?15:0)+Number.EPSILON)*100);
+ const total=(crypto?Math.round(subtotal*115/100):subtotal)/100;
+ pdbDisplayPrice(total.toFixed(2)+' €');
  let note=$('pdbPetPriceNote');
- if(!note){note=document.createElement('p');note.id='pdbPetPriceNote';note.className='pdb-note';note.setAttribute('role','status');$('pdbPrice').parentElement.append(note)}
- note.textContent=[hasPet?pdL("Питомец: +10%"):null,sober?pdL("Трезвый водитель: ×2"):null,meet?pdL("Встреча с табличкой: +15 €"):null].filter(Boolean).join(' · ');
+ if(!note){note=document.createElement('span');note.id='pdbPetPriceNote';note.className='pdb-note';note.setAttribute('role','status');$('pdbPrice').parentElement.append(note)}
+ note.textContent=[crypto?pdReleaseText('Криптовалюта: +15%','Cryptocurrency: +15%','Kriptovaliuta: +15%'):null,hasPet?pdL("Питомец: +10%"):null,sober?pdL("Трезвый водитель: ×2"):null,meet?pdL("Встреча с табличкой: +15 €"):null].filter(Boolean).join(' · ');
 }
 
 function pdbSummary(){ pdbUpdatePetPrice(); $('pdbSummary').innerHTML='<div>📍 '+escapeHtml($('pdbOrigin').value||pdL("Откуда"))+($('pdbStop').value.trim()?' → '+escapeHtml($('pdbStop').value.trim()):'')+' → '+escapeHtml($('pdbDest').value||pdL("Куда"))+(pdIsRoundtrip()?' · '+escapeHtml(pdBookingText('return')):'')+'</div><div>📅 '+escapeHtml($('pdbDate').value||pdL("Дата"))+' · '+escapeHtml($('pdbTime').value)+'</div><div>💳 '+escapeHtml(pdL(pdbPay))+'</div>';}
@@ -919,7 +967,7 @@ function pdbQueueRoute(){
 function pdbInvalidate(){
  for(const id of ['pdbOrigin','pdbDest'])pdbSuggestClose(id);pdbRefreshSelectedMarkers();
  clearTimeout(pdbRouteTimer);
- pdbRouteVersion++;pdbRoute=null;$('pdbPrice').textContent='—';
+ pdbRouteVersion++;pdbRoute=null;pdbDisplayPrice('');
  $('pdbRouteStatus').textContent=pdRouteAddressesReady(v('pdbOrigin'),v('pdbDest'))?'':pdL("Укажите два разных адреса");
  const priceNote=$('pdbPetPriceNote');if(priceNote)priceNote.textContent='';
  if(pdbMap)pdbLayers.forEach(x=>pdbMap.removeLayer(x));pdbLayers=[];
@@ -935,10 +983,10 @@ async function pdbCalculate(){
  try{const data=await api('/api/route',{origin:a,destination:b,...stop,roundtrip:pdIsRoundtrip(),extras:[...pdbChosen].filter(x=>x!=='Без пожеланий'),...pdbPointPayload()});
   if(version!==pdbRouteVersion)return;
   pdbRoute=data;
-  if(!data.available){$('pdbPrice').textContent=pdL("По согласованию");$('pdbRouteStatus').textContent=pdL("Маршрут не рассчитан — стоимость подтвердит пилот");return}
+  if(!data.available){pdbDisplayPrice(pdL("По согласованию"));$('pdbRouteStatus').textContent=pdL("Маршрут не рассчитан — стоимость подтвердит пилот");return}
   pdbUpdatePetPrice();$('pdbRouteStatus').textContent=data.price_only?pdBookingText('fixed'):String(data.km)+pdL(" км · ")+pdDuration(data.time_text)+pdL(" · ориентировочно, без пробок");
   pdbMapInit();if(pdbMap&&data.road_coordinates?.length){const line=L.polyline(data.road_coordinates.map(x=>[x[1],x[0]]),{color:'#e8c47c',weight:5}).addTo(pdbMap);pdbLayers.push(line);if($('pdbMapDialog').open)pdbMap.fitBounds(line.getBounds().pad(.15))}
- }catch(e){if(version!==pdbRouteVersion)return;$('pdbRouteStatus').textContent=pdL(e.message);$('pdbPrice').textContent=pdL("По согласованию")}
+ }catch(e){if(version!==pdbRouteVersion)return;$('pdbRouteStatus').textContent=pdL(e.message);pdbDisplayPrice(pdL("По согласованию"))}
 }
 let pdbOrderBusy=false,pdbRequestCache=null;
 async function pdbRequestKey(payload){
@@ -953,7 +1001,7 @@ async function pdbRequestKey(payload){
 }
 function pdbNewRequest(){
  if(pdbOrderBusy)return;pdbRequestCache=null;try{sessionStorage.removeItem('pdBookingRequest')}catch(e){}
- $('pdbAgree').checked=false;$('pdbFeedback').textContent=pdL("Новая заявка: проверьте данные и подтвердите отправку");$('pdbNewRequest').classList.add('hidden');$('pdBookedPilot').classList.add('hidden');$('pdbSend').textContent=pdL("Оформить заявку →");
+ $('pdbAgree').checked=false;$('pdbFeedback').textContent=pdL("Новая заявка: проверьте данные и подтвердите отправку");$('pdbNewRequest').classList.add('hidden');$('pdBookedPilot').classList.add('hidden');$('pdbSendLabel').textContent=pdL("Оформить заявку →");
 }
 async function pdbSendOrder(){
  if(pdbOrderBusy)return;const feedback=$('pdbFeedback');feedback.textContent='';
@@ -993,7 +1041,7 @@ async function pdbSendOrder(){
   const res=await api('/api/order',{...payload,request_key});
   feedback.textContent=(res.replayed?pdL("Заявка №")+res.order_id+pdL(" уже была получена. Дубликат не создан."):pdL("Заявка №")+res.order_id+pdL(" успешно отправлена. Ожидайте подтверждения пилотом."));
    if(res.details_saved)feedback.textContent+=' '+pdL('Пожелания и дополнительные услуги сохранены у диспетчера. Предварительная стоимость не является оплатой.');
-  $('pdbNewRequest').classList.remove('hidden');$('pdBookedPilot').classList.remove('hidden');btt.textContent=pdL("Проверить отправленную заявку");message(pdL("✅ Заявка №")+res.order_id+pdL(" получена"));
+  $('pdbNewRequest').classList.remove('hidden');$('pdBookedPilot').classList.remove('hidden');$("pdbSendLabel").textContent=pdL("Проверить отправленную заявку");message(pdL("✅ Заявка №")+res.order_id+pdL(" получена"));
  }catch(e){feedback.textContent=pdL("Не удалось подтвердить отправку: ")+pdL(e.message)+pdL(". Повторите попытку — защита от дублей включена.");message(pdL(e.message),true)}
  finally{pdbOrderBusy=false;btt.disabled=false}
 }
@@ -1161,9 +1209,29 @@ async function pdLoadPilot(){
 }
 
 
-let pdbProfileBusy=false;
+let pdbProfileBusy=false,pdbAvatar='';
+function pdbSelectAvatar(avatar){
+ pdbAvatar=avatar;
+ const preview=$('pdbAvatarPreview');preview.hidden=!avatar;preview.dataset.avatar=avatar;
+ for(const button of $('pdbAvatars').querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.avatar===avatar));
+}
+$('pdbAvatars').addEventListener('click',event=>{
+ const button=event.target.closest('button[data-avatar]');
+ if(button)pdbSelectAvatar(button.dataset.avatar===pdbAvatar?'':button.dataset.avatar);
+});
 function pdbUpdateProfile(r){
  pdRegistrationAccess(r);
+ if(r.card_booking_enabled!==undefined){
+  $('pdbCardChoice').hidden=!r.card_booking_enabled;
+  $('pdbCardChoice').disabled=!r.card_booking_enabled;
+ }
+ if(r.telegram_registration!==undefined){
+  const identity=$('pdbTelegramIdentity');
+  identity.hidden=!r.telegram_registration;
+  identity.textContent= r.telegram_registration
+   ? 'Telegram · '+(r.profile?.username?'@'+r.profile.username:pdReleaseText('Подключён','Connected','Susietas')):'';
+ }
+ if(r.profile)pdbSelectAvatar(r.profile.avatar||'');
  if(r.profile){$('pdbEmail').value=r.profile.email||'';$('pdbHomeCity').value=r.profile.home_city||'';$('pdbPreferences').value=r.profile.preferences||''}
  if(r.name||r.first_name)$('pdbName').value=r.name||r.first_name;
  if(r.phone)$('pdbPhone').value=r.phone;
@@ -1175,7 +1243,7 @@ function pdbUpdateProfile(r){
 function pdbEditProfile(){$('pdbProfileFields').classList.remove('hidden');$('pdbName').focus()}
 async function pdbSaveProfile(){
  if(pdbProfileBusy)return;pdbProfileBusy=true;$('pdbSaveProfile').disabled=true;
- try{await api('/api/register',{name:v('pdbName'),phone:v('pdbPhone')});await api('/api/profile/details',{email:v('pdbEmail'),home_city:v('pdbHomeCity'),preferences:v('pdbPreferences')});const r=await api('/api/me');pdbUpdateProfile(r);$('pdbProfileStatus').textContent=pdL("Данные сохранены. Их можно изменить в любой момент.")}
+ try{await api('/api/register',{name:v('pdbName'),phone:v('pdbPhone')});await api('/api/profile/details',{email:v('pdbEmail'),home_city:v('pdbHomeCity'),preferences:v('pdbPreferences'),avatar:pdbAvatar});const r=await api('/api/me');pdbUpdateProfile(r);$('pdbProfileStatus').textContent=pdL("Данные сохранены. Их можно изменить в любой момент.")}
  catch(e){$('pdbProfileStatus').textContent=pdL(e.message)}finally{pdbProfileBusy=false;$('pdbSaveProfile').disabled=false}
 }
 async function pdbRegisterTelegram(){
@@ -1283,7 +1351,7 @@ async function loadOrders(append=false){
     }).join('');
     return;
   }
- $('orders').innerHTML=pdPassengerOrders.length?pdPassengerOrders.map(o=>'<article class="item"><b>№'+Number(o.id)+'</b> · '+escapeHtml(pdL(o.status))+'<p>'+pdTripRouteText(o)+'</p><small>'+pdTripTypeText(o)+'</small><div>'+escapeHtml(o.trip_date)+' '+escapeHtml(o.trip_time)+' · '+escapeHtml(o.price||pdL('Цена уточняется'))+' €</div><small>'+escapeHtml(pdBankStatusText(o))+'</small><div class="actions"><button class="secondary" onclick="openPay('+Number(o.id)+')">'+escapeHtml(pdL('Оплата / детали'))+'</button><button type="button" class="secondary" onclick="go(9)">'+escapeHtml(pdL('Карточка пилота'))+'</button></div>'+(o.status==='Выполнена'?pdStarsMarkup(o): '')+(o.review_comment?'<p>'+escapeHtml(o.review_comment)+'</p>':'')+'</article>').join(''):pdL('<p>Заказов пока нет</p>');
+ $('orders').innerHTML=pdPassengerOrders.length?pdPassengerOrders.map(o=>'<article class="item"><b>№'+Number(o.id)+'</b> · '+escapeHtml(pdL(o.status))+'<p>'+pdTripRouteText(o)+'</p><small>'+pdTripTypeText(o)+'</small><div>'+escapeHtml(o.trip_date)+' '+escapeHtml(o.trip_time)+' · '+escapeHtml(o.price||pdL('Цена уточняется'))+' €</div><small>'+escapeHtml(pdBankStatusText(o))+'</small><div class="actions"><button class="secondary" onclick="openPay('+Number(o.id)+')">'+escapeHtml(pdL('Оплата / детали'))+'</button><button type="button" class="secondary" onclick="go(9)">'+escapeHtml(pdL('Карточка пилота'))+'</button><button type="button" class="secondary" onclick="pdOrderDocuments('+Number(o.id)+')">'+escapeHtml(pdReleaseText('Документы','Documents','Dokumentai'))+'</button></div>' +(o.status==='Выполнена'?pdStarsMarkup(o): '')+(o.review_comment?'<p>'+escapeHtml(o.review_comment)+'</p>':'')+'</article>').join(''):pdL('<p>Заказов пока нет</p>');
  if(pdOrdersBefore)$('orders').insertAdjacentHTML('beforeend','<button class="secondary pay-choice" onclick="loadOrders(true)">'+escapeHtml(pdL('Показать более ранние поездки'))+'</button>');
  }catch(e){message(pdL(e.message),true)}finally{pdOrderListBusy=false}
 }
@@ -1354,7 +1422,7 @@ function pdBT(ru,en,lt){return window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt
 function pdBankLabel(){return pdBT('🏦 Банковский перевод','🏦 Bank transfer','🏦 Bankinis pavedimas')}
 Object.assign(window.PD_UI,{'Банковский перевод':pdBT('Банковский перевод','Bank transfer','Bankinis pavedimas'),'Ожидается банковский перевод':pdBT('Ожидается банковский перевод','Awaiting bank transfer','Laukiama bankinio pavedimo'),'Перевод на проверке':pdBT('Перевод на проверке','Transfer under review','Pavedimas tikrinamas')});
 const pdBankOldOpenPay=openPay;
-openPay=async function(id){window.currentPayment=null;await pdBankOldOpenPay(id);const p=window.currentPayment;if(!p||p.id!==id)return;if(p.payment_status==='Оплачено'){$('paymentContent').textContent=pdBT('Оплата получена','Payment received','Mokėjimas gautas');return}if(p.bank_transfer_active){$('paymentContent').innerHTML='<div id="paymentDetail"></div>';await pdBankDetails(id,false);return}if(p.status==='Подтверждена'&&p.price){const b=document.createElement('button');b.className='pay-choice';b.textContent=pdBankLabel();b.onclick=()=>pdBankDetails(id,true);$('paymentContent').insertBefore(b,$('paymentDetail'))}};
+openPay=async function(id){window.currentPayment=null;await pdBankOldOpenPay(id);const p=window.currentPayment;if(!p||p.id!==id)return;if(p.payment_status==='Оплачено'){$('paymentContent').textContent=pdBT('Оплата получена','Payment received','Mokėjimas gautas');return}if(p.bank_transfer_active){$('paymentContent').innerHTML='<div id="paymentDetail"></div>';await pdBankDetails(id,false);return}if(p.status==='Подтверждена'&&p.price&&!['Банковская карта','Онлайн (Stripe)','Криптовалюта'].includes(p.payment_method)){const b=document.createElement('button');b.className='pay-choice';b.textContent=pdBankLabel();b.onclick=()=>pdBankDetails(id,true);$('paymentContent').insertBefore(b,$('paymentDetail'))}};
 async function pdBankDetails(id,select,accountId){
 if(select&&!accountId){const box=$('paymentDetail');if(!box)return;box.textContent=pdBT('Загрузка…','Loading…','Įkeliama…');try{const r=await api('/api/payment/'+id+'/bank/accounts');box.replaceChildren();const title=document.createElement('h3');title.textContent=pdBT('Выбери банк для перевода','Choose a bank for transfer','Pasirinkite banką pavedimui');box.append(title);for(const a of r.accounts){const button=document.createElement('button');button.type='button';button.className='secondary pay-choice';button.textContent=a.bank;button.onclick=()=>pdBankDetails(id,true,a.id);box.append(button)}}catch(e){box.textContent=pdL(e.message)}return}
 const box=$('paymentDetail');if(!box)return;box.textContent=pdBT('Загрузка…','Loading…','Įkeliama…');try{const b=await api('/api/payment/'+id+'/bank',select?{account_id:accountId}:undefined);$('paymentContent').querySelectorAll(':scope > button').forEach(button=>button.remove());box.innerHTML='<h3>'+pdBankLabel()+'</h3><p><b>'+escapeHtml(b.amount)+' EUR</b> · №'+Number(id)+'</p><p>'+escapeHtml(b.recipient)+'<br>'+escapeHtml(b.bank)+'<br><b style="overflow-wrap:anywhere">'+escapeHtml(b.iban)+'</b><br>SWIFT/BIC: '+escapeHtml(b.bic)+'</p><p>'+pdBT('Назначение платежа','Payment reference','Mokėjimo paskirtis')+': <b>'+escapeHtml(b.reference)+'</b></p><div class="actions"><button type="button" class="secondary" id="pdBankCopyIban">'+pdBT('Копировать IBAN','Copy IBAN','Kopijuoti IBAN')+'</button><button type="button" class="secondary" id="pdBankCopyReference">'+pdBT('Копировать назначение','Copy reference','Kopijuoti paskirtį')+'</button></div><p>'+pdBT('Переведи полную сумму в EUR и укажи номер заказа в назначении. Поступление проверяет администратор. Доплаты и возвраты проводятся отдельно.','Transfer the full amount in EUR using this reference. The administrator verifies receipt. Additional payments and refunds are handled separately.','Perveskite visą sumą EUR ir nurodykite šią mokėjimo paskirtį. Gavimą patikrina administratorius. Priemokos ir grąžinimai atliekami atskirai.')+'</p><button type="button" class="pay-choice" id="pdBankClaim" '+(b.claimed||b.received?'disabled':'')+'>'+ (b.received?pdBT('Оплата получена','Payment received','Mokėjimas gautas'):b.claimed?pdBT('Перевод на проверке','Transfer under review','Pavedimas tikrinamas'):pdBT('Я оплатил','I have paid','Apmokėjau'))+'</button><p id="pdBankFeedback" role="status"></p>';$('pdBankCopyIban').onclick=()=>pdBankCopy(b.iban);$('pdBankCopyReference').onclick=()=>pdBankCopy(b.reference);$('pdBankClaim').onclick=async function(){this.disabled=true;try{await api('/api/payment/'+id+'/bank/claimed',{});this.textContent=pdBT('Перевод на проверке','Transfer under review','Pavedimas tikrinamas');$('pdBankFeedback').textContent=pdBT('Сообщение отправлено. Ожидай проверки поступления.','Message sent. Awaiting verification of receipt.','Pranešimas išsiųstas. Laukite gavimo patikrinimo.');await loadOrders()}catch(e){this.disabled=false;message(e.message,true)}}}catch(e){box.textContent=pdL(e.message)}}
@@ -1371,9 +1439,8 @@ pdbSummary();
 // Only available payment methods appear in the passenger journey.
 function pdReleaseText(ru,en,lt){return window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru}
 function pdReleasePaymentUI(){
- document.querySelectorAll('#pdbPays button[data-method="Банковская карта"]').forEach(e=>{e.hidden=true;e.disabled=true;e.style.setProperty('display','none','important')});
  document.querySelectorAll('#payMethod option[value="Банковская карта"]').forEach(e=>{e.hidden=true;e.disabled=true});
- if(['Банковская карта'].includes(pdbPay)){pdbPay='Банковский перевод';document.querySelectorAll('#pdbPays button').forEach(e=>e.classList.toggle('active',e.dataset.method===pdbPay));pdbSummary()}
+ if($('pdbCardChoice').disabled&&pdbPay==='Банковская карта'){pdbPay='Банковский перевод';document.querySelectorAll('#pdbPays button').forEach(e=>e.classList.toggle('active',e.dataset.method===pdbPay));pdbSummary()}
  const select=document.getElementById('payMethod');if(select&&['Банковская карта'].includes(select.value))select.value='Банковский перевод';
  const content=document.getElementById('paymentContent');if(content)content.querySelectorAll('button').forEach(e=>{const action=e.getAttribute('onclick')||'';if(/cardNotice/.test(action)){e.hidden=true;e.disabled=true;e.style.setProperty('display','none','important')}});
 }
@@ -1449,7 +1516,7 @@ function pdMenuNavigate(target){
  if(typeof go!=='function')return;
  go(11);
  pdShowBookingPage(({extras:'details',tariffs:'route',payment:'payment',preferences:'details'})[target],false);
- const targetIds={extras:'pdbExtras',tariffs:'pdbPrice',payment:'pdbPays',preferences:'pdbWishes'};
+ const targetIds={extras:'pdbExtras',tariffs:'pdbBookingNext',payment:'pdbPays',preferences:'pdbWishes'};
  const el=document.getElementById(targetIds[target]);
  if(!el)return;
  requestAnimationFrame(()=>{
@@ -1473,17 +1540,10 @@ function pdOpenBooking(advance){
  date.focus({preventScroll:true});
  $('pdbDeparture').scrollIntoView({block:'center'});
 }
-function pdOpenCandidate(event){
- event.preventDefault();
+function pdOpenCandidate(){
  if(!window.pdOnboardingUser?.registered)return;
  pdPassengerApplying=true;
  pdShowOnboarding(window.pdOnboardingUser.driver_application?'received':'driver');
-}
-function pdToggleWelcomeWheel(button){
- const wheel=$('pdWelcomeWheel');
- const open=!wheel.classList.toggle('hidden');
- button.setAttribute('aria-expanded',String(open));
- if(open)wheel.scrollIntoView({block:'nearest'});
 }
 let pdWheelRotation=0;
 function pdSpinWelcomeWheel(){

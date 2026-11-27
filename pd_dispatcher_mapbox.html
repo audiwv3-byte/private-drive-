@@ -346,6 +346,7 @@ function renderPersistentOrders(){
      details.luggage&&'Багаж: '+details.luggage,
      extras.length&&'Услуги: '+extras.join(', '),
      details.wishes&&'Пожелания: '+details.wishes,
+     details.preferences?.payment_method&&'Способ оплаты: '+details.preferences.payment_method,
      details.preferences?.radio&&'Радио: '+details.preferences.radio,
      details.preferences?.temperature!=null&&
        'Температура: '+details.preferences.temperature+' °C',

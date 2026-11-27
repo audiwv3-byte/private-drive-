@@ -13,6 +13,7 @@ def register(app, core, auth):
             last_seen_at TEXT NOT NULL, email TEXT NOT NULL DEFAULT '',
             home_city TEXT NOT NULL DEFAULT '', preferences TEXT NOT NULL DEFAULT '',
             updated_at TEXT NOT NULL DEFAULT '')''')
+        core.ensure_columns(c, 'pd_passenger_profile', {'avatar': "TEXT NOT NULL DEFAULT ''"})
     with core.db(core.ORDERS_DB) as c:
         c.execute('''CREATE TABLE IF NOT EXISTS pd_service_reviews (
             order_id INTEGER PRIMARY KEY, telegram_id INTEGER NOT NULL,
@@ -83,10 +84,13 @@ def register(app, core, auth):
             out[k] = value.strip()
         if out['email'] and not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', out['email']):
             raise ValueError('Проверьте электронную почту')
+        avatar = d.get('avatar')
+        if 'avatar' in d and (not isinstance(avatar, str) or avatar not in ('', 'orbit', 'spark', 'luna', 'nova')):
+            raise ValueError('Выберите аватар из списка')
         remember(uid, t)
         with core.db(core.USERS_DB) as c:
-            c.execute('''UPDATE pd_passenger_profile SET email=?,home_city=?,preferences=?,updated_at=?
-                WHERE telegram_id=?''', (*out.values(), core.now().isoformat(), uid))
+            c.execute('''UPDATE pd_passenger_profile SET email=?,home_city=?,preferences=?,avatar=COALESCE(?,avatar),updated_at=?
+                WHERE telegram_id=?''', (*out.values(), avatar, core.now().isoformat(), uid))
         return jsonify(ok=True, profile=profile(uid))
 
     def reviewed_orders():
@@ -96,7 +100,9 @@ def register(app, core, auth):
         args = (uid, before) if before else (uid,)
         with core.db(core.ORDERS_DB) as c:
             rows = c.execute('''SELECT o.id,o.origin,o.destination,o.stop_address,o.order_type,o.service_type,o.trip_date,o.trip_time,o.status,
-                o.price,o.payment_method,o.payment_status,r.stars AS review_stars,
+                o.price,o.payment_method,o.payment_status,
+                EXISTS(SELECT 1 FROM pd_invoice_files f WHERE f.order_id=o.id) AS invoice_available,
+                r.stars AS review_stars,
                 r.comment AS review_comment,r.updated_at AS review_updated_at
                 FROM orders o LEFT JOIN pd_service_reviews r ON r.order_id=o.id
                 WHERE ''' + where + ' ORDER BY o.id DESC LIMIT 31', args).fetchall()

@@ -346,10 +346,9 @@ def register(app, core):
         from pd_pilot_qa_intake import register as register_qa_pilots
         register_qa_pilots(app, authorized, csrf, valid_csrf)
 
-    telegram_candidates_enabled = (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
-                                   and os.environ.get("PD_QA_MINIAPP_POSTGRES") == "1"
-                                   and os.environ.get("PD_PAYMENT_MODE") == "disabled"
-                                   and os.environ.get("PD_NATIVE_SMS_LIVE") == "NO")
+    from pd_qa_telegram_candidates import CandidateStore, CandidateStoreUnavailable, enabled
+    telegram_candidates_enabled = enabled()
+    candidate_store = CandidateStore() if telegram_candidates_enabled else None
 
     @app.get("/dispatch/telegram-candidates")
     def pd_dispatch_telegram_candidates():
@@ -358,15 +357,9 @@ def register(app, core):
         if not authorized():
             return redirect(url_for("pd_dispatch_login"))
 
-        import sqlite3
-        from contextlib import closing
-        db_file = Path(app.config.get("PD_QA_TELEGRAM_USERS_DB", Path(__file__).with_name("users.db")))
         try:
-            with closing(sqlite3.connect(db_file.resolve().as_uri() + "?mode=ro", uri=True)) as db:
-                db.row_factory = sqlite3.Row
-                candidates = db.execute("""SELECT name,phone,city,vehicle,vehicle_year,plate,status
-                    FROM pd_driver_applications ORDER BY updated_at DESC LIMIT 200""").fetchall()
-        except sqlite3.Error:
+            candidates = candidate_store.recent()
+        except CandidateStoreUnavailable:
             app.logger.warning("Telegram candidate intake is unavailable")
             return "Не удалось загрузить анкеты Telegram", 503, {"Cache-Control": "private, no-store"}
 

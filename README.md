@@ -23,6 +23,20 @@ Run the Telegram bot with `python Euro_Baltic_Transfer.py`. The WSGI entry point
 
 This snapshot contains source and static assets. It contains no customer databases, driver documents, issued invoices or secret environment file. Back up those separately through the hosting account. Database schemas initialize through the application.
 
+## Telegram applications in isolated QA
+
+Apply `migrations/qa_telegram_candidates.sql` to the shared QA PostgreSQL database.
+Set `PD_QA_TELEGRAM_CANDIDATES_DATABASE_URL` on the Mini App and dispatcher to
+PostgreSQL URLs for that database. The Mini App database role needs SELECT,
+INSERT and UPDATE on `public.pd_qa_telegram_candidates`. The dispatcher role
+needs SELECT. Install `psycopg[binary]` on both QA instances.
+
+The bridge requires `PD_QA_MINIAPP_POSTGRES=1`, `PD_DISPATCH_STAGING_ONLY=1`,
+`PD_PAYMENT_MODE=disabled` and `PD_NATIVE_SMS_LIVE=NO`. An existing application
+is published when the applicant resubmits it from the same Telegram account.
+Photos stay in the Mini App document store. If PostgreSQL is temporarily
+unavailable, the Mini App returns HTTP 503 and the user can submit again.
+
 ## Launch status
 
 - Existing deployment: https://wilsonpark.pythonanywhere.com/

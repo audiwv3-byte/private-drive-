@@ -326,25 +326,25 @@ def route():
         price = sober_driver_price(with_sober_extra(d))
         return jsonify(available=bool(price), price=price)
     pd_stops.address(d)
-    result = {'available': False, 'message':'Предварительная цена по согласованию'}
-    try:
-        feature,start,end=pd_stops.directions(core,pd_map_points,d,o,dest)
-        summary = feature['properties']['summary']
-        km, minutes = float(summary['distance'])/1000, float(summary['duration'])/60
-        fixed_base=pd_fixed_prices.base(d)
-        base_price = fixed_base or core.quote(km, minutes, bool(d.get('roundtrip')))
-        price = pd_pet_price(base_price, d)
-        return jsonify(available=True, km=round(km,2), minutes=round(minutes),
-                      time_text=core.duration_display(minutes), price=price, base_price=base_price, pet_surcharge_percent=10 if pd_pet_extras(d) else 0,
-                      start_coordinates=start, end_coordinates=end,
-                      road_coordinates=feature['geometry']['coordinates'],
-                      note='Приблизительный дорожный маршрут, без учёта пробок')
-    except Exception:
-        core.LOG.exception('Mini App route service unavailable')
-        fixed_base=pd_fixed_prices.base(d)
-        if fixed_base:
-            return jsonify(available=True,price_only=True,price=pd_pet_price(fixed_base,d),base_price=fixed_base,road_coordinates=[],km=None,time_text='',fixed_price=True)
-        return jsonify(result)
+    if core.ORS_API_KEY:
+        try:
+            feature,start,end=pd_stops.directions(core,pd_map_points,d,o,dest)
+            summary = feature['properties']['summary']
+            km, minutes = float(summary['distance'])/1000, float(summary['duration'])/60
+            fixed_base=pd_fixed_prices.base(d)
+            base_price = fixed_base or core.quote(km, minutes, bool(d.get('roundtrip')))
+            price = pd_pet_price(base_price, d)
+            return jsonify(available=True, km=round(km,2), minutes=round(minutes),
+                          time_text=core.duration_display(minutes), price=price, base_price=base_price, pet_surcharge_percent=10 if pd_pet_extras(d) else 0,
+                          start_coordinates=start, end_coordinates=end,
+                          road_coordinates=feature['geometry']['coordinates'],
+                          note='Приблизительный дорожный маршрут, без учёта пробок')
+        except Exception:
+            core.LOG.exception('Mini App route service unavailable')
+    fixed_base=pd_fixed_prices.base(d)
+    if fixed_base:
+        return jsonify(available=True,price_only=True,price=pd_pet_price(fixed_base,d),base_price=fixed_base,road_coordinates=[],km=None,time_text='',fixed_price=True)
+    return jsonify(available=False, message='Предварительная цена по согласованию')
 
 
 @app.post('/api/order')

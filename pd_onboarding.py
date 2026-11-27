@@ -1,5 +1,6 @@
 """Separate driver connection applications. Decisions and records stay in the admin cabinet."""
 import json,re,io,warnings,hashlib
+from contextlib import contextmanager, nullcontext
 from PIL import Image,ImageOps,UnidentifiedImageError
 from flask import Response
 SIDES=("license_front","license_back","registration_front","registration_back","ltsa","activity","insurance","portrait","car_front","car_rear","car_interior")
@@ -7,6 +8,7 @@ ACTIVE_SIDES=("license_front","license_back","car_front","car_rear","car_interio
 MAX_PHOTO=10*1024*1024
 from flask import request,jsonify
 import pd_languages
+import pd_qa_telegram_candidates
 
 def ensure_tables(core):
     with core.db(core.USERS_DB) as c:
@@ -43,6 +45,31 @@ def read_photos():
 
 def register(app,core,auth):
     ensure_tables(core)
+    candidate_store = (pd_qa_telegram_candidates.CandidateStore()
+                       if pd_qa_telegram_candidates.enabled() else None)
+
+    @app.errorhandler(pd_qa_telegram_candidates.CandidateStoreUnavailable)
+    def candidate_store_unavailable(exc):
+        app.logger.warning("Telegram candidate publication unavailable")
+        return jsonify(error="Анкета временно не доставлена. Повторите отправку."), 503, {
+            "Cache-Control": "private, no-store",
+        }
+
+    @contextmanager
+    def application_write(applicant):
+        shared = candidate_store.transaction() if candidate_store else nullcontext()
+        # Keep the SQLite write lock until the PostgreSQL upsert runs. Commit
+        # local documents first so a visible application has its documents.
+        with shared as postgres, core.db(core.USERS_DB) as local:
+            local.execute('BEGIN IMMEDIATE')
+            yield local
+            if postgres is not None:
+                application = local.execute(
+                    'SELECT * FROM pd_driver_applications WHERE telegram_id=?', (applicant,)
+                ).fetchone()
+                if application:
+                    candidate_store.publish(postgres, application)
+
     app.config['MAX_CONTENT_LENGTH']=82*1024*1024
     @app.errorhandler(413)
     def pd_documents_too_large(exc):return jsonify(error='Файлы слишком большие. Максимум 10 МБ на фото'),413
@@ -97,8 +124,7 @@ def register(app,core,auth):
         photos=read_photos()
         core.initialize()
         now=core.now().isoformat()
-        with core.db(core.USERS_DB) as c:
-            c.execute('BEGIN IMMEDIATE')
+        with application_write(uid) as c:
             stored={r['side'] for r in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(uid,))}
             if set(ACTIVE_SIDES)-stored-set(photos):raise ValueError('Добавьте все обязательные фотографии документов')
             car_rows={x['side']:bytes(x['image']) for x in c.execute("SELECT side,image FROM pd_driver_documents WHERE telegram_id=? AND side IN ('car_front','car_rear','car_interior')",(uid,))}
@@ -129,8 +155,7 @@ def register(app,core,auth):
         if not core.is_admin(uid):raise PermissionError('Нет доступа')
         d=request.get_json(silent=True);target=d.get('status') if isinstance(d,dict) else None
         if target not in ('pending','approved','rejected'):raise ValueError('Некорректный статус заявки')
-        with core.db(core.USERS_DB) as c:
-            c.execute('BEGIN IMMEDIATE')
+        with application_write(applicant) as c:
             r=c.execute('SELECT status FROM pd_driver_applications WHERE telegram_id=?',(applicant,)).fetchone()
             if not r:return jsonify(error='Заявка не найдена'),404
             if target=='approved' and r['status']!='approved':

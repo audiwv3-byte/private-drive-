@@ -138,15 +138,25 @@ def sign_in(page, origin, phone, code, role):
     return token
 
 
-def wait_for_marker(page, latitude, longitude):
+def wait_for_marker(page, first, current):
+    # The dispatcher centers the first fix at zoom 13, then moves the marker
+    # in place as new fixes arrive. Check the rendered icon's pixel position.
     page.wait_for_function(
-        """([latitude, longitude]) => {
-            const marker = document.querySelector('.leaflet-marker-pane .pilot-marker');
-            return marker && L.DomUtil.getPosition(marker)?.equals(
-                raster.latLngToLayerPoint([latitude, longitude])
-            );
+        """({first, current}) => {
+            const map = document.querySelector('#rasterMap');
+            const marker = map.querySelector('.leaflet-marker-pane .pilot-marker');
+            if (!marker || map.querySelector('.leaflet-zoom-anim') ||
+                map.classList.contains('leaflet-zoom-anim')) return false;
+            const project = ({latitude, longitude}) =>
+                L.CRS.EPSG3857.latLngToPoint(L.latLng(latitude, longitude), 13).round();
+            const delta = project(current).subtract(project(first));
+            const box = map.getBoundingClientRect();
+            const icon = marker.getBoundingClientRect();
+            const x = icon.x + icon.width / 2 - (box.x + box.width / 2);
+            const y = icon.y + icon.height / 2 - (box.y + box.height / 2);
+            return Math.abs(x - delta.x) < 3 && Math.abs(y - delta.y) < 3;
         }""",
-        arg=[latitude, longitude], timeout=15_000,
+        arg={"first": first, "current": current}, timeout=15_000,
     )
 
 
@@ -198,13 +208,13 @@ def test_android_chromium_ios_webkit_and_dispatcher_gps(lab):
         api(passenger_page, gps_write, 403, token=passenger, data=fix)
         api(pilot_page, gps_write, 401, data=fix)
         assert api(pilot_page, gps_write, 200, token=pilot, data=fix)["available"]
-        wait_for_marker(desk, **first)
+        wait_for_marker(desk, first, first)
         api(pilot_page, gps_write, 409, token=pilot, data=fix)
         assert api(
             pilot_page, gps_write, 200, token=pilot,
             data={"enabled": True, "captured_at": stamp + 1, **moved},
         )["available"]
-        wait_for_marker(desk, **moved)
+        wait_for_marker(desk, first, moved)
         assert api(
             pilot_page, gps_write, 200, token=pilot,
             data={"enabled": False, "captured_at": int(time.time()) + 2},

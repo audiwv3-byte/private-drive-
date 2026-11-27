@@ -52,6 +52,14 @@ def create_app():
     @app.get("/")
     def home_preview():
         page = Path(__file__).with_name("pd_public_home_preview.html").read_text(encoding="utf-8")
+        from pd_first_ride_wheel import enabled
+        if enabled():
+            card = Path(__file__).with_name("assets") / "pd-first-ride-wheel.html"
+            page = page.replace("<!-- first-ride-wheel -->", card.read_text(encoding="utf-8"))
+            page = page.replace("<!-- first-ride-wheel-style -->",
+                                '<link rel="stylesheet" href="/assets/pd-first-ride-wheel.css">')
+            page = page.replace("<!-- first-ride-wheel-script -->",
+                                '<script src="/assets/pd-first-ride-wheel.js"></script>')
         return Response(page, content_type="text/html; charset=utf-8",
                         headers={"Cache-Control": "no-store",
                                  "X-Content-Type-Options": "nosniff",

@@ -1,7 +1,7 @@
 """Staging-only unified accounts schema. No auto-migration and no HTTP writes.
 
 Canonical user ID is native_auth_users.id. Telegram subject binding requires a
-server-verified OIDC identity AND explicit account-link authorization; never
+server-verified Telegram identity AND explicit account-link authorization; never
 auto-merge users by unverified phone or allow role self-assignment.
 """
 import re

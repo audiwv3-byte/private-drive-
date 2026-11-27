@@ -49,7 +49,8 @@ class Markup(HTMLParser):
     def handle_decl(self,s):self.parts.append('<!'+s+'>')
 def render_index():
     lang=language()
-    content=render_template('index.html',pd_lang=lang,pd_ui=UI.get(lang,{}))
+    from pd_first_ride_wheel import enabled
+    content=render_template('index.html',pd_lang=lang,pd_ui=UI.get(lang,{}),pd_wheel=enabled())
     parser=Markup(lang);parser.feed(content);parser.close()
     return response_for(''.join(parser.parts),lang)
 def render_document(kind):

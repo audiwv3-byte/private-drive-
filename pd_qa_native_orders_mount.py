@@ -46,7 +46,7 @@ def mount_if_synthetic(next_app, database_url):
     orders_app = make_orders_app(next_app, database_url)
 
     def guarded(environ, start_response):
-        if environ.get("PATH_INFO") == "/native-orders" and not permitted(database_url):
+        if environ.get("PATH_INFO") in ("/native-orders", "/native-first-ride-wheel") and not permitted(database_url):
             data = json.dumps({"error": "orders_disabled"}).encode("utf-8")
             start_response("503 Service Unavailable", [
                 ("Content-Type", "application/json; charset=utf-8"),

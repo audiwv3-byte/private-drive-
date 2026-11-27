@@ -3,9 +3,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import '../lib/first_ride_wheel.dart';
 import '../lib/native_orders_api.dart';
 
 void main() {
+  testWidgets('first ride spins with an authenticated request and opens booking',
+      (tester) async {
+    final methods = <String>[];
+    var openedBooking = false;
+    final api = NativeOrdersApi('https://example.invalid', 'test-token',
+      client: MockClient((request) async {
+        methods.add(request.method);
+        expectSync(request.url.path, '/native-first-ride-wheel');
+        expectSync(request.headers['authorization'], 'Bearer test-token');
+        expectSync(request.body, isEmpty);
+        return http.Response(request.method == 'GET'
+          ? '{"state":"ready"}'
+          : '{"state":"available","percent":15,"expires_at":2040000000}', 200);
+      }),
+    );
+    await tester.pumpWidget(MaterialApp(home: Scaffold(
+      body: FirstRideWheel(api: api, onBook: () => openedBooking = true),
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Крутить колесо'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Твоя скидка — 15%'), findsOneWidget);
+    expect(methods, ['GET', 'POST']);
+    expect(find.text('Крутить колесо'), findsNothing);
+    await tester.tap(find.text('Заказать со скидкой'));
+    expect(openedBooking, true);
+  });
+
   test('POST sends bearer and request ID without payment data', () async {
     final api = NativeOrdersApi('https://example.invalid', 'test-token',
       client: MockClient((request) async {

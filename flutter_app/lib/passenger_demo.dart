@@ -1,3 +1,4 @@
+import 'first_ride_wheel.dart';
 import 'native_orders_api.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -1981,7 +1982,24 @@ class _PassengerDemoState extends State<PassengerDemo> {
               leading: const Icon(Icons.card_giftcard_outlined),
               title: Text(pdTr(context, 'Бонусы и промокоды',
                 'Premijos ir nuolaidų kodai', 'Rewards and promo codes')),
-              enabled: false,
+              enabled: widget.ordersApi != null,
+              onTap: widget.ordersApi == null ? null : () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute<void>(
+                  builder: (context) => Scaffold(
+                    appBar: AppBar(title: const Text('Мои бонусы')),
+                    body: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        FirstRideWheel(
+                          api: widget.ordersApi!,
+                          onBook: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                ));
+              },
             ),
 
             ListTile(

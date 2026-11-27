@@ -8,11 +8,14 @@ import uuid
 import psycopg
 from pd_dispatch_persistent import validated_order, fingerprint
 from pd_native_order_quote import validated_details
+import pd_first_ride_wheel as wheel
 from pd_native_auth_postgres_session_lifecycle import _digest
 
 def make_orders_app(next_app, database_url, *, clock=time.time):
     def app(environ, start_response):
-        if environ.get("PATH_INFO") != "/native-orders":
+        path = environ.get("PATH_INFO")
+        wheel_request = path == "/native-first-ride-wheel" and wheel.enabled()
+        if path != "/native-orders" and not wheel_request:
             return next_app(environ, start_response)
 
         def reply(code, data):
@@ -28,7 +31,7 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                 or os.getenv("PD_DISPATCH_ORDERS_DATABASE_URL") != database_url):
             return reply("503 Service Unavailable", {"error":"orders_disabled"})
         method = environ.get("REQUEST_METHOD")
-        if method not in ("GET", "POST", "PATCH"):
+        if method not in (("GET", "POST") if wheel_request else ("GET", "POST", "PATCH")):
             return reply("405 Method Not Allowed", {"error":"method_not_allowed"})
         auth = environ.get("HTTP_AUTHORIZATION", "")
         token = auth[7:] if auth.startswith("Bearer ") else ""
@@ -44,7 +47,16 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                 if not session:
                     return reply("401 Unauthorized", {"error":"invalid_session"})
                 uid, role = session
-                if role != "passenger":
+                wheel_active = wheel.enabled()
+                if wheel_request:
+                    account = wheel.session_account(db, token, int(clock()))
+                    if not account:
+                        return reply("403 Forbidden", {"error":"verified_phone_required"})
+                    result = wheel.reward(db, uid, int(clock()), spin=method == "POST")
+                    db.commit()
+                    return reply("200 OK", result)
+                pilot_booking = wheel_active and role in ("pilot", "pilot_dispatcher")
+                if role != "passenger" and not pilot_booking:
                     return reply("403 Forbidden", {"error":"passenger_required"})
                 # Explicit migration is required; no runtime schema changes.
                 if method == "GET":
@@ -58,6 +70,13 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                         return reply("200 OK", {"payment_mode":"disabled","orders":[
                             dict(zip(("order_id","from","to","trip_date","trip_time","status"),
                                      (str(r[0]), *r[1:]))) for r in rows]})
+                    if wheel_active:
+                        discounts = dict(db.execute("""
+                            SELECT r.order_id,r.percent FROM public.pd_first_ride_rewards r
+                            WHERE r.user_id=%s AND r.order_id IS NOT NULL
+                        """, (uid,)).fetchall())
+                    else:
+                        discounts = {}
                     rows = db.execute("""SELECT o.id,o.origin,o.destination,o.trip_date,
                         o.trip_time,o.status,q.details,q.quoted_total_cents,q.quote_required
                         FROM public.pd_dispatch_orders o
@@ -68,7 +87,7 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                     return reply("200 OK", {"payment_mode":"disabled","orders":[
                         {"order_id":str(r[0]),"from":r[1],"to":r[2],
                          "trip_date":r[3],"trip_time":r[4],"status":r[5],
-                         "details":r[6],"quoted_total_cents":r[7],
+                         "details":r[6],"quoted_total_cents":wheel.discounted_cents(r[7], discounts.get(r[0])),
                          "quote_required":r[8] if r[8] is not None else True,
                          "currency":"EUR"} for r in rows]})
                 if method == "PATCH":
@@ -131,6 +150,7 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                 fp = fingerprint(values) if quote is None else fingerprint(
                     [*values, quote])
                 order_id = str(uuid.uuid4())
+                eligible = wheel_active and wheel.prepare_order(db, uid)
                 inserted = db.execute("""INSERT INTO public.pd_dispatch_orders
                     (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
@@ -148,6 +168,7 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                                 ensure_ascii=False),
                              quote["quoted_total_cents"],quote["quote_required"]))
                     status = "requested"
+                    discount = wheel.redeem(db, uid, order_id, eligible=eligible) if wheel_active else None
                 else:
                     existing = db.execute("""SELECT o.id,o.fingerprint,o.status
                         FROM public.pd_dispatch_orders o JOIN public.pd_native_order_owners n ON n.order_id=o.id
@@ -156,11 +177,16 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                     if not existing or existing[1] != fp:
                         return reply("409 Conflict", {"error":"request_conflict"})
                     order_id, status = str(existing[0]), existing[2]
+                    discount = wheel.order_discount(db, order_id) if wheel_active else None
+            cents = quote["quoted_total_cents"] if quote is not None else None
+            result = dict(order_id=order_id, status=status, payment_mode="disabled",
+                          quoted_total_cents=wheel.discounted_cents(cents, discount),
+                          quote_required=quote["quote_required"] if quote is not None else True,
+                          currency="EUR")
+            if discount is not None:
+                result["discount_percent"] = discount
             return reply("201 Created" if inserted else "200 OK",
-                         {"order_id":order_id,"status":status,"payment_mode":"disabled",
-                          "quoted_total_cents":quote["quoted_total_cents"] if quote is not None else None,
-                          "quote_required":quote["quote_required"] if quote is not None else True,
-                          "currency":"EUR"})
+                         result)
         except psycopg.Error:
             return reply("503 Service Unavailable", {"error":"storage_unavailable"})
     return app

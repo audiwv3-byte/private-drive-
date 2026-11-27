@@ -376,6 +376,14 @@ function renderPersistentOrders(){
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
      ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
    card.append(route,info);
+   if(order.discount_percent){
+     const price=document.createElement('p');
+     price.textContent='Скидка первой поездки: '+order.discount_percent+'% · '+
+       (Number.isInteger(order.quoted_total_cents)
+         ? (order.quoted_total_cents/100).toFixed(2)+' €'
+         : 'Учесть при расчёте цены');
+     card.append(price);
+   }
    if(order.website_contact){
      const contact=document.createElement('p');
      contact.textContent='Телефон пассажира: '+order.website_contact;

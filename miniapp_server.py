@@ -19,6 +19,8 @@ import pd_languages
 import pd_stops
 import pd_fixed_prices
 import pd_dispatch_persistent as dispatch
+import pd_first_ride_wheel as wheel
+from pd_first_ride_wheel_flask import register as register_first_ride_wheel
 TIMEZONE = ZoneInfo('Europe/Vilnius')
 MAX_AGE = 86400
 
@@ -29,6 +31,9 @@ def telegram_user(init_data):
 
 def auth():
     return telegram_user(request.headers.get('X-Telegram-Init-Data', ''))
+
+
+register_first_ride_wheel(app, '/api', telegram_auth=auth)
 
 
 @app.errorhandler(PermissionError)
@@ -248,13 +253,19 @@ def acknowledge_order(uid, row, replayed=False):
                 'trip_date': datetime.strptime(row['trip_date'], '%d.%m.%Y').date().isoformat(),
                 'trip_time': row['trip_time'],
             })
-            result = dispatch.store_order(values, telegram_id=uid)
+            cents = cents_for_order(row['price']) if wheel.enabled() and row['price'] else None
+            result = dispatch.store_order(values, telegram_id=uid, base_cents=cents)
         except ValueError:
             return jsonify(error='Данные заказа расходятся с записью диспетчерской.'), 409
         except Exception:
             app.logger.exception('Mini App dispatch queue unavailable')
             return jsonify(error='Получение заявки не подтверждено. Повторите отправку.'), 503
         response['dispatch_order_id'] = result['order_id']
+        if result['discount_percent'] is not None:
+            response['discount_percent'] = result['discount_percent']
+            total = result['quoted_total_cents']
+            if total is not None:
+                response['price'] = f'{Decimal(total) / 100:.2f}'
     return jsonify(response)
 
 

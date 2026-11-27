@@ -45,6 +45,30 @@ class NativeOrdersApi {
     }
   }
 
+  Future<Map<String, dynamic>?> firstRideWheel({bool spin = false}) async {
+    final client = _client ?? http.Client();
+    try {
+      final request = http.Request(spin ? 'POST' : 'GET',
+          PdHttpApi.secureUri(baseUrl, '/native-first-ride-wheel'))
+        ..followRedirects = false
+        ..headers['Authorization'] = 'Bearer $token';
+      final response = await http.Response.fromStream(
+        await client.send(request).timeout(const Duration(seconds: 15)))
+        .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 404) return null;
+      if (response.statusCode != 200) throw PdHttpStatusException(response.statusCode);
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      if (data is! Map<String, dynamic> ||
+          !const {'ready', 'available', 'expired', 'used', 'ineligible'}
+              .contains(data['state'])) {
+        throw const FormatException('Invalid first-ride reward');
+      }
+      return data;
+    } finally {
+      if (_client == null) client.close();
+    }
+  }
+
   Future<Map<String,dynamic>> call([Map<String,dynamic>? payload]) async {
     final uri = PdHttpApi.secureUri(baseUrl, '/native-orders');
     final client = _client ?? http.Client();

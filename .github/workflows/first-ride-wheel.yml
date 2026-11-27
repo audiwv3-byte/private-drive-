@@ -1,0 +1,48 @@
+name: First-ride wheel QA
+on:
+  push:
+    branches: [qa/first-ride-wheel]
+permissions:
+  contents: read
+jobs:
+  wheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements-miniapp.txt -r requirements-sms-render.txt reportlab stripe==11.4.1 pytest playwright
+      - run: python -m playwright install chromium --only-shell
+      - run: python -m pytest -q tests/test_passenger_channels.py
+      - run: python -m pytest -q tests/test_first_ride_wheel.py tests/test_native_order_quote.py
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test --no-pub test/native_orders_api_test.dart test/passenger_demo_test.dart

@@ -93,11 +93,24 @@ def connect():
                            connect_timeout=4, options="-c statement_timeout=4000")
 
 
-def store_order(values, *, telegram_id=None, website_contact=None):
+def store_order(values, *, telegram_id=None, website_contact=None,
+                account_token=None, base_cents=None):
     """Insert a validated booking or return the matching earlier submission."""
     source, original, *route = values
     digest = fingerprint(values if website_contact is None else (*values, website_contact))
     with connect() as db:
+        import pd_first_ride_wheel as wheel
+        user_id = None
+        if wheel.enabled():
+            if telegram_id is not None:
+                user_id = wheel.telegram_account(db, telegram_id)
+            elif account_token is not None:
+                account = wheel.session_account(db, account_token, int(time.time()))
+                if account is None:
+                    raise PermissionError("invalid_passenger_session")
+                user_id, website_contact = account
+                digest = fingerprint((*values, user_id))
+        eligible = user_id is not None and wheel.prepare_order(db, user_id)
         row = db.execute("""INSERT INTO public.pd_dispatch_orders
             (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time,website_contact)
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
@@ -107,13 +120,29 @@ def store_order(values, *, telegram_id=None, website_contact=None):
         if created and telegram_id is not None:
             db.execute("INSERT INTO public.pd_telegram_order_owners(order_id,telegram_id) VALUES (%s,%s)",
                        (row[0], telegram_id))
+        if created and user_id is not None:
+            db.execute("INSERT INTO public.pd_native_order_owners(order_id,user_id) VALUES (%s,%s)",
+                       (row[0], user_id))
+            wheel.redeem(db, user_id, row[0], eligible=eligible)
+            db.execute("""
+                INSERT INTO public.pd_native_order_quotes
+                    (order_id,details,quoted_total_cents,quote_required)
+                VALUES (%s,'{}'::jsonb,%s,%s)
+            """, (row[0], base_cents, base_cents is None))
         if not created:
             row = db.execute("""SELECT id,status,fingerprint FROM public.pd_dispatch_orders
                 WHERE source=%s AND source_order_id=%s""", (source, original)).fetchone()
             if not row or row[2] != digest:
                 raise ValueError("source_order_conflict")
+        discount = wheel.order_discount(db, row[0]) if user_id is not None else None
+        if discount is not None and not created:
+            quote = db.execute("""
+                SELECT quoted_total_cents FROM public.pd_native_order_quotes WHERE order_id=%s
+            """, (row[0],)).fetchone()
+            base_cents = quote[0] if quote else None
     return dict(order_id=str(row[0]), source=source, source_order_id=original,
-                status=row[1], created=created, payment_mode="disabled")
+                status=row[1], created=created, payment_mode="disabled",
+                discount_percent=discount, quoted_total_cents=wheel.discounted_cents(base_cents, discount))
 
 
 def register(app, authorized):
@@ -181,10 +210,24 @@ def register(app, authorized):
                 rows = db.execute("""SELECT id,source,source_order_id,origin,destination,
                      trip_date,trip_time,status,created_at,website_contact
                      FROM public.pd_dispatch_orders ORDER BY created_at DESC LIMIT 100""").fetchall()
+                from pd_first_ride_wheel import enabled as wheel_enabled, discounted_cents
+                discounts = {}
+                if wheel_enabled():
+                    discounts = {row[0]: row[1:] for row in db.execute("""
+                        SELECT r.order_id,r.percent,q.quoted_total_cents
+                        FROM public.pd_first_ride_rewards r
+                        LEFT JOIN public.pd_native_order_quotes q ON q.order_id=r.order_id
+                        WHERE r.order_id = ANY(%s)
+                    """, ([row[0] for row in rows],)).fetchall()}
             orders = [{"id":str(row[0]),"source":row[1],"source_order_id":row[2],
                        "origin":row[3],"destination":row[4],
                        "trip_date":row[5],"trip_time":row[6],
                        "status":row[7],"created_at":row[8].isoformat(),"website_contact":row[9]} for row in rows]
+            for row, order in zip(rows, orders):
+                if row[0] in discounts:
+                    percent, cents = discounts[row[0]]
+                    order.update(discount_percent=percent,
+                                 quoted_total_cents=discounted_cents(cents, percent))
             return reply({"orders":orders,"persistent":True})
         except Exception:
             app.logger.exception("Persistent dispatcher order read unavailable")

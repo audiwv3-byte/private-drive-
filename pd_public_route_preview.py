@@ -260,6 +260,12 @@ def estimate(km, minutes, route_data):
 
 
 def register(app):
+    from pd_first_ride_wheel import enabled as wheel_enabled
+    from pd_first_ride_wheel_flask import bearer, register as register_wheel
+    from pd_native_order_quote import validated_details
+
+    register_wheel(app, "/preview/api")
+
     @app.post("/preview/api/qa-booking")
     def website_booking():
         if not dispatch.enabled():
@@ -283,13 +289,23 @@ def register(app):
         except (TypeError, ValueError):
             return jsonify(error="invalid_order"), 400
         try:
-            order = dispatch.store_order(values, website_contact=phone)
+            token = bearer() if wheel_enabled() else ""
+            cents = (validated_details(None, origin=values[2], destination=values[3])["quoted_total_cents"]
+                     if token else None)
+            order = dispatch.store_order(values, website_contact=phone,
+                                         account_token=token or None, base_cents=cents)
+        except PermissionError:
+            return jsonify(error="invalid_passenger_session"), 401
         except ValueError:
             return jsonify(error="source_order_conflict"), 409
         except Exception:
             app.logger.exception("Website booking queue unavailable")
             return jsonify(error="storage_unavailable"), 503
-        return jsonify(qa_only=True, trip={"id": order["order_id"]}), 201 if order["created"] else 200
+        trip = {"id": order["order_id"]}
+        if order["discount_percent"] is not None:
+            trip.update(discount_percent=order["discount_percent"],
+                        quoted_total_cents=order["quoted_total_cents"])
+        return jsonify(qa_only=True, trip=trip), 201 if order["created"] else 200
 
 
     @app.get("/preview/api/suggest")

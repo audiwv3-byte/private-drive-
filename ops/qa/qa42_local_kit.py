@@ -16,12 +16,12 @@ from werkzeug.serving import make_server
 from pd_native_auth_postgres_http import initialize_database
 from pd_qa25_wsgi import create_application
 
-def prepare(*, mobile_codes=None):
+def prepare(*, mobile_codes=None, dispatcher_password=None):
     if os.environ.get("PD_QA42_LOCAL") != "YES":
         raise RuntimeError("Explicit QA42 gate required")
     if os.environ.get("PD_AUTH_TEST_DATABASE_URL") != "postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test":
         raise RuntimeError("Only disposable loopback database allowed")
-    if any(k.startswith(("PG","TWILIO","STRIPE","PAYPAL","PAYSERA")) for k in os.environ):
+    if any(k.startswith(("PG","TWILIO","STRIPE","PAYPAL","PAYSERA","PD_PILOT_QA_","MAPBOX")) or k in ("PD_DISPATCH_DATABASE_URL","PD_DISPATCH_INVITE_CODE","PD_DISPATCH_INVITE_SHA256","PD_DISPATCH_RECOVERY_SHA256","PD_DISPATCH_ORDERS_INGEST_SECRET") for k in os.environ):
         raise RuntimeError("Unexpected provider or database override environment")
     if any(os.environ.get(k) != v for k,v in {"PD_NATIVE_SMS_ISOLATED":"YES","PD_NATIVE_SMS_LIVE":"NO","PD_PAYMENT_MODE":"disabled"}.items()):
         raise RuntimeError("Isolation flags required")
@@ -54,6 +54,7 @@ def prepare(*, mobile_codes=None):
         db.execute("""
             GRANT EXECUTE ON FUNCTION public.pd_validate_native_session(text,bigint),
                 public.pd_assign_native_order(uuid,text,text,bigint),
+                public.pd_pilot_assignment_candidates(bigint),
                 public.pd_native_pilot_order_state(text,bigint),
                 public.pd_native_pilot_trip_action(text,text,text,bigint),
                 public.pd_revoke_current_session(text,bigint),
@@ -100,6 +101,17 @@ def prepare(*, mobile_codes=None):
     from pd_native_auth_postgres_http import session_request, reply
     from werkzeug.wrappers import Request
     orders = create_application()
+    web = None
+    if dispatcher_password is not None:
+        from flask import Flask
+        from types import SimpleNamespace
+        from werkzeug.security import generate_password_hash
+        from pd_web_dispatcher import register
+        os.environ.update(PD_DISPATCH_SESSION_SECRET=secrets.token_hex(32), PD_DISPATCH_PASSWORD_HASH=generate_password_hash(dispatcher_password), PD_DISPATCH_ADMIN_ID="201", PD_DISPATCH_TEST_SYNC="0")
+        web = Flask("qa42_browser_dispatcher")
+        web.config.update(SESSION_COOKIE_NAME="pd_qa42_session", SESSION_COOKIE_PATH="/dispatch")
+        if not register(web, SimpleNamespace(ADMIN_IDS=frozenset({201}), is_admin=lambda uid: uid==201)):
+            raise RuntimeError("QA42 dispatcher initialization failed")
     from ops.qa.qa42_mobile_login import MobileLogin
     login = MobileLogin(mobile_codes, tokens) if mobile_codes is not None else None
     def app(environ, start_response):
@@ -112,6 +124,8 @@ def prepare(*, mobile_codes=None):
             return reply(start_response, "503 Service Unavailable", {"error": "external_auth_disabled"})
         if req.path.startswith("/payment") or req.path.startswith("/v1/"):
             return reply(start_response, "403 Forbidden", {"error": "external_service_disabled"})
+        if web is not None and (req.path == "/dispatch" or req.path.startswith("/dispatch/")):
+            return web(environ, start_response)
         return orders(environ, start_response)
 
     return app, tokens, telegram_token, csrf
@@ -131,14 +145,15 @@ def main():
     context.load_cert_chain(args.cert, args.key)
     from ops.qa.qa42_mobile_login import new_codes
     codes = new_codes()
-    app, tokens, telegram_token, csrf = prepare(mobile_codes=codes)
+    dispatcher_password = secrets.token_urlsafe(24)
+    app, tokens, telegram_token, csrf = prepare(mobile_codes=codes, dispatcher_password=dispatcher_password)
     values = {"auth_date":str(int(time.time())), "user":json.dumps({"id":201})}
     key = hmac.digest(b"WebAppData", telegram_token.encode(), "sha256")
     fields = "\n".join(f"{k}={v}" for k,v in sorted(values.items()))
     values["hash"] = hmac.new(key, fields.encode(), hashlib.sha256).hexdigest()
     fd = os.open(args.credentials, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd,"w") as f:
-        json.dump({"mobile_codes":codes,"dispatcher_init_data":urlencode(values),"csrf":csrf},f)
+        json.dump({"mobile_codes":codes,"dispatcher_password":dispatcher_password},f)
     try:
         server = make_server(args.bind,443,app,ssl_context=context)
         try:

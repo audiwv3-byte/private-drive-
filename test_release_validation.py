@@ -36,6 +36,12 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     core.bot.answer_callback_query=lambda *args,**kwargs:None
     server.app.config['TESTING']=True
     client=server.app.test_client()
+    for lang in ('ru', 'lt', 'en'):
+        response = client.get('/', query_string={'lang': lang})
+        assert response.status_code == 200, lang
+        assert response.headers['Content-Language'] == lang
+        assert b'id="pdPassengerMenu"' in response.data
+    print('PASS Mini App passenger menu template renders in RU, LT and EN')
     def signed(uid=101,**overrides):
         data={'auth_date':str(int(time.time())),'user':json.dumps({'id':uid,'first_name':'Test'})}
         data.update(overrides)

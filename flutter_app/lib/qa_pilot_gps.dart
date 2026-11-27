@@ -141,8 +141,22 @@ Future<bool> qaGpsPermission() async {
       permission == LocationPermission.whileInUse;
 }
 
-Stream<QaGpsFix> qaAndroidPositions() =>
+Stream<QaGpsFix> qaAndroidPositions() async* {
+  try {
+    await for (final fix in _androidPositions(forceLocationManager: false)) {
+      yield fix;
+    }
+  } on LocationServiceDisabledException {
+    // Google Play services can reject a request while Android location is on.
+    // Keep the persistent location notification on the platform GNSS fallback.
+    if (!await Geolocator.isLocationServiceEnabled()) rethrow;
+    yield* _androidPositions(forceLocationManager: true);
+  }
+}
+
+Stream<QaGpsFix> _androidPositions({required bool forceLocationManager}) =>
     Geolocator.getPositionStream(locationSettings: AndroidSettings(
+      forceLocationManager: forceLocationManager,
       accuracy: LocationAccuracy.high,
       distanceFilter: 0,
       intervalDuration: const Duration(seconds: 5),

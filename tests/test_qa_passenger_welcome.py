@@ -192,7 +192,9 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
 
             def ors_response(request, timeout):
                 assert core.ORS_API_KEY == "synthetic-ors-key"
-                if "/geocode/search?" in request.full_url:
+                if "/geocode/autocomplete?" in request.full_url:
+                    payload = {"features": []}
+                elif "/geocode/search?" in request.full_url:
                     index = int("destination" in request.full_url)
                     payload = {"features": [{"geometry": {"coordinates": coordinates[index]}}]}
                 else:
@@ -214,20 +216,44 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
                 expect(page.locator("#step11")).to_be_visible()
                 if service == "Предзаказ":
                     expect(page.locator("#pdbDate")).to_be_focused()
-                page.locator("#pdbOrigin").fill("QA pickup A")
-                page.locator("#pdbDest").fill("QA destination B")
+                expect(page.locator(".pd-route-calculate")).to_have_count(0)
                 if service == "Поездка":
-                    calculate = page.locator(".pd-route-calculate")
+                    popular = page.locator("#pdbPopular").get_by_role("button", name="Тракай")
                     with page.expect_response(lambda r: r.url == base + "/api/route") as unavailable:
-                        calculate.click()
+                        popular.click()
+                    assert unavailable.value.request.post_data_json["destination"] == "Trakai, Lithuania"
                     assert unavailable.value.json()["available"] is False
-                    ors_transport.assert_not_called()
                     expect(page.locator("#pdbPrice")).to_have_text("По согласованию")
+
+                    fixed = page.locator('#pdbPopular button[data-dest="Kaunas, Lithuania"]')
+                    with page.expect_response(lambda r: r.url == base + "/api/route") as fixed_quote:
+                        fixed.click()
+                    assert fixed_quote.value.json()["price_only"]
+                    expect(page.locator("#pdbPrice")).to_have_text("110.00 €")
+                    with page.expect_response(lambda r: r.url == base + "/api/route") as round_trip:
+                        page.locator("#pdbTripMode").select_option("roundtrip")
+                    assert round_trip.value.request.post_data_json["roundtrip"]
+                    expect(page.locator("#pdbPrice")).to_have_text("200.00 €")
+                    with page.expect_response(lambda r: r.url == base + "/api/route"):
+                        page.locator("#pdbTripMode").select_option("oneway")
+                    ors_transport.assert_not_called()
                     monkeypatch.setattr(core, "ORS_API_KEY", "synthetic-ors-key")
-                    with page.expect_response(lambda r: r.url == base + "/api/route") as estimate:
-                        calculate.click()
-                    assert estimate.value.json()["road_coordinates"] == coordinates
-                    expect(page.locator("#pdbRouteStatus")).to_contain_text("12 км")
+
+                with page.expect_response(lambda r: r.url == base + "/api/route") as estimate:
+                    origin = page.locator("#pdbOrigin")
+                    destination = page.locator("#pdbDest")
+                    # Successive edits must be coalesced into one request.
+                    page.evaluate("""() => {
+                        const origin = document.querySelector('#pdbOrigin');
+                        origin.value = 'QA typing draft';
+                        origin.dispatchEvent(new Event('input', {bubbles: true}));
+                    }""")
+                    origin.fill("QA pickup A")
+                    destination.fill("QA destination " + service)
+                assert estimate.value.request.post_data_json["origin"] == "QA pickup A"
+                assert estimate.value.request.post_data_json["destination"] == "QA destination " + service
+                assert estimate.value.json()["road_coordinates"] == coordinates
+                expect(page.locator("#pdbRouteStatus")).to_contain_text("12 км")
                 page.locator("#pdbDate").fill(day)
                 page.locator("#pdbTime").fill(time)
                 page.locator("#pdbAgree").check()
@@ -241,18 +267,18 @@ def test_passenger_welcome(monkeypatch, tmp_path, candidates_database, dispatche
             opening = page.locator("#step0").get_by_role("button", name="Трезвый водитель")
             opening.click()
             sober = page.locator(".pd-sober-form")
+            expect(sober.get_by_role("button", name="Рассчитать стоимость")).to_have_count(0)
             sober.locator("[name=origin]").fill("QA sober pickup")
-            sober.locator("[name=destination]").fill("QA sober destination")
             sober.locator("[name=trip_date]").fill(day)
             sober.locator("[name=trip_time]").fill("14:20")
-            expect(sober.get_by_text("Стоимость подтвердит диспетчер")).to_be_visible()
             monkeypatch.setattr(core, "ORS_API_KEY", "")
             with page.expect_response(lambda r: r.url == base + "/api/route") as unavailable:
-                sober.get_by_role("button", name="Рассчитать стоимость").click()
+                sober.locator("[name=destination]").fill("QA sober destination A")
             assert unavailable.value.json()["available"] is False
+            expect(sober.get_by_text("Стоимость подтвердит диспетчер")).to_be_visible()
             monkeypatch.setattr(core, "ORS_API_KEY", "synthetic-ors-key")
             with page.expect_response(lambda r: r.url == base + "/api/route") as estimate:
-                sober.get_by_role("button", name="Рассчитать стоимость").click()
+                sober.locator("[name=destination]").fill("QA sober destination B")
             price = estimate.value.json()["price"]
             assert price == miniapp_server.pd_pet_price(core.quote(12, 21), {"extras": ["Трезвый водитель"]})
             expect(sober.get_by_text(price + " €")).to_be_visible()

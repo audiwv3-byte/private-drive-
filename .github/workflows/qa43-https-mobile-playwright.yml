@@ -1,0 +1,78 @@
+name: QA43 HTTPS mobile Playwright
+on:
+  push:
+    branches: [qa/qa43-https-mobile-playwright]
+permissions:
+  contents: read
+jobs:
+  https-mobile-playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test
+          POSTGRES_DB: private_drive_test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+      PD_NATIVE_SMS_ISOLATED: 'YES'
+      PD_NATIVE_SMS_LIVE: 'NO'
+      PD_PAYMENT_MODE: disabled
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser dependencies and stage offline map assets
+        run: |
+          python -m pip install -r requirements-sms-render.txt flask pytest playwright
+          python -m playwright install --with-deps chromium webkit
+          sudo apt-get install -y libnss3-tools
+          mkdir -p "$RUNNER_TEMP/qa43"
+          for asset in leaflet.js leaflet.css; do
+            curl --fail --silent --show-error --retry 3 --max-time 30 "https://unpkg.com/leaflet@1.9.4/dist/$asset" -o "$RUNNER_TEMP/qa43/$asset"
+          done
+      - name: Create and trust an ephemeral QA certificate
+        run: |
+          cd "$RUNNER_TEMP/qa43"
+          umask 077
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=Private Drive QA43 CA' \
+            -addext 'basicConstraints=critical,CA:TRUE,pathlen:0' \
+            -addext 'keyUsage=critical,keyCertSign,cRLSign' -keyout root.key -out root.crt
+          openssl req -new -newkey rsa:2048 -nodes -subj '/CN=127.0.0.1' -keyout server.key -out server.csr
+          cat > server.ext <<'EXT'
+          basicConstraints=critical,CA:FALSE
+          keyUsage=critical,digitalSignature,keyEncipherment
+          extendedKeyUsage=serverAuth
+          subjectAltName=IP:127.0.0.1
+          EXT
+          openssl x509 -req -in server.csr -CA root.crt -CAkey root.key -CAcreateserial \
+            -days 1 -sha256 -extfile server.ext -out server.crt
+          mkdir -p "$HOME/.pki/nssdb"
+          if ! test -f "$HOME/.pki/nssdb/cert9.db"; then
+            certutil -N --empty-password -d "sql:$HOME/.pki/nssdb"
+          fi
+          certutil -A -d "sql:$HOME/.pki/nssdb" -n 'Private Drive QA43 CA' -t 'C,,' -i root.crt
+          sudo install -m 0644 root.crt /usr/local/share/ca-certificates/private-drive-qa43.crt
+          sudo update-ca-certificates
+      - name: Test TLS, Android and iOS browser sessions, and dispatcher GPS
+        run: |
+          mkdir -p qa43-results
+          QA43_FIXTURES="$RUNNER_TEMP/qa43" python -m pytest -v --capture=tee-sys --tb=short \
+            --junitxml=qa43-results/junit.xml tests/test_qa43_https_mobile_playwright.py \
+            2>&1 | tee qa43-results/pytest.log
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa43-https-mobile-playwright-logs
+          path: qa43-results/
+          retention-days: 14

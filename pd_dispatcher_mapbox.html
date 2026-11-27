@@ -209,6 +209,7 @@ dispatchMenu.querySelectorAll('a[href^="#"]').forEach(link=>{
         const target=$(link.hash.slice(1));
         const panel=panels.find(button=>button.getAttribute('aria-controls')===target?.closest('aside')?.id);
         if(panel)showPanel(panel);
+        if(target?.id==='pilotsTitle')showDirectory('pilotDirectory');
         dispatchMenu.close();
     });
 });

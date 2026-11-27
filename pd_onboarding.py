@@ -41,7 +41,23 @@ def read_photos():
             raise ValueError('Не удалось прочитать фото. Выберите другой снимок')
     return photos
 
-def register(app,core,auth):
+def register(app,core,auth,qa_enabled=None):
+    def publish_candidate(application):
+        if qa_enabled is None or not qa_enabled():
+            return True
+        import pd_qa_telegram_candidates as candidate_queue
+
+        dsn = candidate_queue.database_url()
+        if dsn is not None:
+            try:
+                candidate_queue.publish(dsn, application)
+                return True
+            except candidate_queue.Error:
+                app.logger.warning("Could not publish Telegram candidate to the QA dispatcher")
+        return False
+
+    def candidate_unavailable():
+        return jsonify(error='Сервис недоступен'), 503
     ensure_tables(core)
     app.config['MAX_CONTENT_LENGTH']=82*1024*1024
     @app.errorhandler(413)
@@ -96,9 +112,9 @@ def register(app,core,auth):
         if not all(ch.isalnum() or ch in ' -' for ch in plate):raise ValueError('Проверьте номер автомобиля')
         photos=read_photos()
         core.initialize()
-        now=core.now().isoformat()
         with core.db(core.USERS_DB) as c:
             c.execute('BEGIN IMMEDIATE')
+            now=core.now().isoformat()
             stored={r['side'] for r in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(uid,))}
             if set(ACTIVE_SIDES)-stored-set(photos):raise ValueError('Добавьте все обязательные фотографии документов')
             car_rows={x['side']:bytes(x['image']) for x in c.execute("SELECT side,image FROM pd_driver_documents WHERE telegram_id=? AND side IN ('car_front','car_rear','car_interior')",(uid,))}
@@ -113,6 +129,10 @@ def register(app,core,auth):
               vehicle_year=excluded.vehicle_year,plate=excluded.plate,seats=excluded.seats,
               status='pending',updated_at=excluded.updated_at''',
               (uid,out['name'],phone,out['city'],out['vehicle'],year,plate,seats,now,now))
+            application = dict(c.execute(
+                'SELECT * FROM pd_driver_applications WHERE telegram_id=?', (uid,)).fetchone())
+        if not publish_candidate(application):
+            return candidate_unavailable()
         return jsonify(ok=True,submitted=True)
 
     @app.get('/api/admin/driver-applications')
@@ -131,7 +151,7 @@ def register(app,core,auth):
         if target not in ('pending','approved','rejected'):raise ValueError('Некорректный статус заявки')
         with core.db(core.USERS_DB) as c:
             c.execute('BEGIN IMMEDIATE')
-            r=c.execute('SELECT status FROM pd_driver_applications WHERE telegram_id=?',(applicant,)).fetchone()
+            r=c.execute('SELECT * FROM pd_driver_applications WHERE telegram_id=?',(applicant,)).fetchone()
             if not r:return jsonify(error='Заявка не найдена'),404
             if target=='approved' and r['status']!='approved':
                 stored={x['side'] for x in c.execute('SELECT side FROM pd_driver_documents WHERE telegram_id=?',(applicant,))}
@@ -141,6 +161,11 @@ def register(app,core,auth):
                 now=core.now().isoformat()
                 c.execute('UPDATE pd_driver_applications SET status=?,updated_at=? WHERE telegram_id=?',(target,now,applicant))
                 c.execute('INSERT INTO pd_driver_application_decisions(telegram_id,admin_id,old_status,new_status,decided_at) VALUES(?,?,?,?,?)',(applicant,uid,r['status'],target,now))
+                application = dict(r, status=target, updated_at=now)
+            else:
+                application = dict(r)
+        if not publish_candidate(application):
+            return candidate_unavailable()
         # Reviewing an application never grants administrator access or exposes customer orders.
         return jsonify(ok=True)
 

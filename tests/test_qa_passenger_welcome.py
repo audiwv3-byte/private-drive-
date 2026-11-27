@@ -53,7 +53,8 @@ def test_passenger_welcome(monkeypatch, tmp_path):
     initialize_database(DSN)
     with psycopg.connect(DSN, autocommit=True) as db:
         for name in ("native_auth_session_functions.sql", "native_dispatch_orders.sql",
-                     "native_pilot_identity.sql", "qa26_pilot_assignment.sql", "qa27_pilot_gps.sql"):
+                     "native_pilot_identity.sql", "qa26_pilot_assignment.sql", "qa27_pilot_gps.sql",
+                     "qa_telegram_candidates.sql"):
             db.execute((ROOT / "migrations" / name).read_text())
 
         now = int(unix_time())
@@ -81,25 +82,29 @@ def test_passenger_welcome(monkeypatch, tmp_path):
     register_gps(pilot_api, lambda: False, DSN)
     miniapp = miniapp_server.app
     dispatcher = create_app()
-    dispatcher.config["PD_QA_TELEGRAM_USERS_DB"] = core.USERS_DB
     assert miniapp_server.qa_shared_orders_enabled()
     client = miniapp.test_client()
     for uid in (101, 102):
+        response = client.post("/api/register/telegram", json={},
+                               headers=signed(uid, first_name="QA Passenger"))
+        assert response.status_code == 200, response.json
+        assert response.json == {"name": "QA Passenger", "registered": False}
         response = client.post("/api/register", json={"name": "QA Passenger", "phone": "+37060000000"},
                                headers=signed(uid))
         assert response.status_code == 200, response.json
 
-    def application(environ, start_response):
-        path = environ["PATH_INFO"]
-        if path.startswith("/native-pilot-orders/"):
-            return pilot_api(environ, start_response)
-        app = dispatcher if path.startswith(("/dispatch", "/pd-logo-transparent.png")) else miniapp
+    def dispatch_application(environ, start_response):
+        app = pilot_api if environ["PATH_INFO"].startswith("/native-pilot-orders/") else dispatcher
         return app(environ, start_response)
 
-    server = make_server("127.0.0.1", 0, application, threaded=True)
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    base = f"http://127.0.0.1:{server.server_port}"
+    miniapp_server_http = make_server("127.0.0.1", 0, miniapp, threaded=True)
+    dispatcher_server_http = make_server("127.0.0.1", 0, dispatch_application, threaded=True)
+    servers = (miniapp_server_http, dispatcher_server_http)
+    threads = [Thread(target=server.serve_forever, daemon=True) for server in servers]
+    for thread in threads:
+        thread.start()
+    base = f"http://127.0.0.1:{miniapp_server_http.server_port}"
+    dispatch_base = f"http://127.0.0.1:{dispatcher_server_http.server_port}"
 
     leaflet_dir = os.environ.get("QA_LEAFLET_DIR")
     tile = io.BytesIO()
@@ -112,7 +117,7 @@ def test_passenger_welcome(monkeypatch, tmp_path):
 
     def configure_page(page, uid=None):
         def offline_routes(route):
-            if route.request.url.startswith(base + "/"):
+            if route.request.url.startswith((base + "/", dispatch_base + "/")):
                 route.continue_()
             elif route.request.url.startswith("https://telegram.org/js/"):
                 init_data = signed(uid)["X-Telegram-Init-Data"] if uid else ""
@@ -150,6 +155,7 @@ def test_passenger_welcome(monkeypatch, tmp_path):
                 expect(page.locator("#pdLangSelect")).to_have_value(lang)
                 for label in labels:
                     expect(welcome.get_by_text(label, exact=True)).to_be_visible()
+                expect(page.locator("#mainNav").get_by_text(labels[1], exact=True)).to_have_count(1)
                 page.locator("#pdPassengerMenuToggle").click()
                 expect(page.locator("#pdPassengerMenu").get_by_role("button", name=labels[1])).to_be_visible()
                 page.keyboard.press("Escape")
@@ -203,7 +209,11 @@ def test_passenger_welcome(monkeypatch, tmp_path):
             assert result.value.ok, result.value.text()
             requests["Трезвый водитель"] = (result.value.json()["order_id"], "14:20")
 
+            page.locator("#pdPassengerMenuToggle").click()
+            page.locator("#pdPassengerMenu").get_by_role("button", name="Главная").click()
+            page.locator("#step0").get_by_role("button", name="Мои поездки").click()
             passenger = page.locator("#step8")
+            expect(passenger).to_be_visible()
             for service, (oid, time) in requests.items():
                 card = passenger.locator("article").filter(has_text=oid)
                 expect(card).to_contain_text(service)
@@ -246,13 +256,29 @@ def test_passenger_welcome(monkeypatch, tmp_path):
             assert me["driver_application"]["status"] == "pending"
             assert client.get("/api/me", headers=signed(102)).json["driver_application"] is None
 
+            page.get_by_role("link", name="Стать водителем").click()
+            expect(page.locator("#pdObDriverCity")).to_have_value("Vilnius")
+            page.locator("#pdObDriverCity").fill("Kaunas")
+            with page.expect_response(lambda r: r.url == base + "/api/driver/application") as repeated:
+                page.locator("#pdObDriverSubmit").click()
+            assert repeated.value.ok, repeated.value.text()
+            assert not client.get("/api/me", headers=signed(101)).json["pilot_access"]
+            with psycopg.connect(DSN) as db:
+                assert db.execute("""
+                    SELECT telegram_id, city, status FROM pd_qa_telegram_candidates
+                """).fetchall() == [(101, "Kaunas", "pending")]
+            photo_path = "/api/driver/documents/101/license_front"
+            own_photo = client.get(photo_path, headers=signed(101))
+            assert own_photo.status_code == 200 and own_photo.mimetype == "image/jpeg"
+            assert client.get(photo_path, headers=signed(102)).status_code == 401
+
             def login(page, secret):
-                page.goto(base + "/dispatch/map")
-                expect(page).to_have_url(base + "/dispatch/login")
+                page.goto(dispatch_base + "/dispatch/map")
+                expect(page).to_have_url(dispatch_base + "/dispatch/login")
                 page.locator("input[name=password]").fill(secret)
                 page.locator("form").filter(has=page.locator("input[name=password]")).get_by_role(
                     "button", name="Войти").click()
-                expect(page).to_have_url(base + "/dispatch")
+                expect(page).to_have_url(dispatch_base + "/dispatch")
 
             for bearer, uid in ((passenger_token, 101), (pilot_token, 103)):
                 auth = {**signed(uid), "Authorization": "Bearer " + bearer}
@@ -266,7 +292,7 @@ def test_passenger_welcome(monkeypatch, tmp_path):
             admin = browser.new_page()
             configure_page(admin)
             login(admin, password)
-            assert admin.request.get(base + "/dispatch/orders/state").ok
+            assert admin.request.get(dispatch_base + "/dispatch/orders/state").ok
             admin.close()
 
             dispatch = browser.new_page(viewport={"width": 1440, "height": 900})
@@ -290,8 +316,8 @@ def test_passenger_welcome(monkeypatch, tmp_path):
             else:
                 login(dispatch, dispatcher_password)
 
-            assert dispatch.request.get(base + "/dispatch/orders/state").ok
-            alias = dispatch.request.get(base + "/dispatch/map", max_redirects=0)
+            assert dispatch.request.get(dispatch_base + "/dispatch/orders/state").ok
+            alias = dispatch.request.get(dispatch_base + "/dispatch/map", max_redirects=0)
             assert alias.status == 302 and alias.headers["location"] == "/dispatch"
             for service, (oid, time_slot) in requests.items():
                 card = dispatch.locator("#ordersList .card").filter(has_text=oid)
@@ -314,12 +340,12 @@ def test_passenger_welcome(monkeypatch, tmp_path):
             card.get_by_role("button", name="Пилот на карте").click()
             fix = {"enabled": True, "captured_at": int(unix_time()),
                    "latitude": 54.6872, "longitude": 25.2797}
-            gps_url = base + "/native-pilot-orders/" + order_id + "/gps"
+            gps_url = dispatch_base + "/native-pilot-orders/" + order_id + "/gps"
             assert dispatch.request.post(gps_url, data=fix, headers={
                 "Authorization": "Bearer " + passenger_token}).status == 403
             assert dispatch.request.post(gps_url, data=fix, headers={
                 "Authorization": "Bearer " + pilot_token}).ok
-            gps = dispatch.request.get(base + "/dispatch/orders/" + order_id + "/gps").json()
+            gps = dispatch.request.get(dispatch_base + "/dispatch/orders/" + order_id + "/gps").json()
             assert (gps["latitude"], gps["longitude"]) == (54.6872, 25.2797)
             marker = dispatch.locator(".leaflet-marker-pane .pilot-marker")
             expect(marker).to_be_visible(timeout=12_000)
@@ -337,10 +363,30 @@ def test_passenger_welcome(monkeypatch, tmp_path):
             expect(marker).to_have_count(0, timeout=12_000)
             dispatch.locator("#dispatchMenuToggle").click()
             menu.get_by_role("link", name="Анкеты из Telegram").click()
-            expect(dispatch.get_by_text("QA Passenger")).to_be_visible()
+            expect(dispatch.get_by_text("QA Passenger", exact=True)).to_have_count(1)
+            expect(dispatch.get_by_text("Kaunas", exact=False)).to_be_visible()
             expect(dispatch.get_by_text("На проверке")).to_be_visible()
-            print("PASS dispatcher and administrator access, passenger/pilot denied, menu, Telegram order, assignment, GPS shown and cleared")
+            with psycopg.connect(DSN, autocommit=True) as db:
+                db.execute("ALTER TABLE pd_qa_telegram_candidates RENAME TO pd_qa_telegram_candidates_offline")
+                try:
+                    offline = dispatch.request.get(dispatch_base + "/dispatch/telegram-candidates")
+                    assert offline.status == 503 and "no-store" in offline.headers["cache-control"]
+                    application = client.get("/api/me", headers=signed(101)).json["driver_application"]
+                    application["city"] = "Trakai"
+                    unavailable = client.post("/api/driver/application", json=application, headers=signed(101))
+                    assert unavailable.status_code == 503
+                finally:
+                    db.execute("ALTER TABLE pd_qa_telegram_candidates_offline RENAME TO pd_qa_telegram_candidates")
+            retried = client.post("/api/driver/application", json=application, headers=signed(101))
+            assert retried.status_code == 200
+            dispatch.reload()
+            expect(dispatch.get_by_text("Trakai", exact=False)).to_be_visible()
+            expect(dispatch.get_by_text("QA Passenger", exact=True)).to_have_count(1)
+            print("PASS independent Mini App and dispatcher WSGI, candidate upsert, private photos, roles, orders and GPS")
             browser.close()
     finally:
-        server.shutdown()
-        thread.join(timeout=5)
+        for server in servers:
+            server.shutdown()
+            server.server_close()
+        for thread in threads:
+            thread.join(timeout=5)

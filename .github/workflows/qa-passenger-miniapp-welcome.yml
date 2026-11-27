@@ -2,7 +2,7 @@ name: PRIVATE DRIVE passenger Mini App welcome
 
 on:
   push:
-    branches: [qa/passenger-miniapp-welcome-integrated]
+    branches: [qa/passenger-miniapp-welcome-integrated, qa/passenger-miniapp-welcome-review]
 
 permissions:
   contents: read

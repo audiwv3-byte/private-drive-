@@ -24,8 +24,8 @@ ROOT = Path(__file__).resolve().parents[1]
 TOKEN = "qa25-synthetic-telegram-api-contract-token"
 
 
-def signed(uid):
-    values = {"auth_date": str(int(time.time())), "user": json.dumps({"id": uid})}
+def signed(uid, **profile):
+    values = {"auth_date": str(int(time.time())), "user": json.dumps({"id": uid, **profile})}
     secret = hmac.new(b"WebAppData", TOKEN.encode(), hashlib.sha256).digest()
     plain = "\n".join(key+"="+val for key,val in sorted(values.items()))
     values["hash"] = hmac.new(secret, plain.encode(), hashlib.sha256).hexdigest()

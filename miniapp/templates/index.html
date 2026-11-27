@@ -1373,7 +1373,7 @@ function pdOpenCandidate(event){
  event.preventDefault();
  if(!window.pdOnboardingUser?.registered)return;
  pdPassengerApplying=true;
- pdShowOnboarding(window.pdOnboardingUser.driver_application?'received':'driver');
+ pdShowOnboarding(window.pdOnboardingUser.driver_application?.status==='approved'?'received':'driver');
 }
 function pdToggleWelcomeWheel(button){
  const wheel=$('pdWelcomeWheel');

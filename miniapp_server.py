@@ -1012,7 +1012,7 @@ pd_recent_routes.register(app, auth)
 
 # Separate first-entry forms and private driver applications.
 import pd_onboarding
-pd_onboarding.register(app, core, auth)
+pd_onboarding.register(app, core, auth, qa_enabled=qa_shared_orders_enabled)
 
 # Optional intermediate stop, preserving old orders and two-address routes.
 pd_stops.ensure_schema(core)

@@ -443,6 +443,11 @@ function message(s,error=false){let b=$('message');b.textContent=s;b.className=e
 async function api(url,body){
  let r;try{r=await fetch(url,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:body?JSON.stringify(body):undefined,cache:'no-store'})}catch(_){throw Error(pdReleaseText('Не удалось связаться с сервером. Проверьте интернет и повторите попытку.','Cannot reach the server. Check your connection and try again.','Nepavyko susisiekti su serveriu. Patikrinkite interneto ryšį ir bandykite dar kartą.'))}
  let d;try{d=await r.json()}catch(_){throw Error(pdReleaseText('Сервер временно недоступен. Повторите попытку.','The server is temporarily unavailable. Please try again.','Serveris laikinai nepasiekiamas. Bandykite dar kartą.'))}
+ if(r.status===409 && url==='/api/order' && d.error_code==='active_order_exists'){
+  throw Error(pdReleaseText('У вас уже есть активный заказ. Откройте «Мои поездки».',
+   'You already have an active booking. Open “My trips”.',
+   'Jau turite aktyvų užsakymą. Atidarykite „Mano kelionės“.'));
+ }
  if(!r.ok)throw Error(d.error||pdL("Сервис недоступен"));return d;
 }
 function pdOpenPassengerMenu(){

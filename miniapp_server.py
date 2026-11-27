@@ -414,13 +414,17 @@ def create_order():
         distance_km=km,duration_min=minutes,route_source='OpenRouteService' if km is not None else '',
         quote_status='Предварительная' if price else 'Не рассчитано')
     core.initialize()
+    try:
+        saved = core.order_save(uid, st, request_key, fingerprint, require_no_active_order=True)
+    except core.ActivePassengerOrderError as exc:
+        return jsonify(error=str(exc), error_code='active_order_exists', order_id=exc.order_id), 409
     if request_key:
-        oid,created=core.order_save(uid,st,request_key,fingerprint)
+        oid, created = saved
         if not created:
-            previous=core.order_find(oid)
+            previous = core.order_find(oid)
             return jsonify(ok=True,order_id=oid,status=previous['status'],price=previous['price'],replayed=True)
     else:
-        oid=core.order_save(uid,st)
+        oid = saved
     with core.db(core.ORDERS_DB) as conn:
         conn.execute('UPDATE orders SET stop_address=? WHERE id=? AND telegram_id=?',(stop_address,oid,uid))
     r=core.order_find(oid)

@@ -348,7 +348,13 @@ def estimate_costs(distance_km, is_roundtrip):
     return euro(driven), euro(cost)
 
 
-def order_save(uid, st, request_key=None, request_fingerprint=''):
+class ActivePassengerOrderError(Exception):
+    def __init__(self, order_id):
+        super().__init__('У вас уже есть активный заказ. Откройте «Мои поездки».')
+        self.order_id = order_id
+
+
+def order_save(uid, st, request_key=None, request_fingerprint='', *, require_no_active_order=False):
     with db(ORDERS_DB) as conn:
         conn.execute('BEGIN IMMEDIATE')
         if request_key:
@@ -357,6 +363,14 @@ def order_save(uid, st, request_key=None, request_fingerprint=''):
                 if existing['request_fingerprint']!=request_fingerprint:
                     raise ValueError('Состав заявки изменился. Начните новую заявку.')
                 return existing['id'],False
+        if require_no_active_order:
+            active = conn.execute(
+                "SELECT id FROM orders WHERE telegram_id=? "
+                "AND status IN ('Новая', 'Подтверждена', 'В пути') ORDER BY id DESC LIMIT 1",
+                (uid,),
+            ).fetchone()
+            if active:
+                raise ActivePassengerOrderError(active['id'])
         cur = conn.execute('''INSERT INTO orders
           (telegram_id,order_type,origin,destination,trip_date,trip_time,passengers,luggage,
           details,status,price,payment_method,distance_km,duration_min,route_source,quote_status,

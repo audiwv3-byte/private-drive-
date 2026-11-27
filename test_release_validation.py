@@ -1,6 +1,8 @@
 """Isolated release regression checks. Never uses production DBs, tokens or APIs."""
 import gc,hashlib,hmac,json,os,shutil,sys,tempfile,time,urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from threading import Barrier
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -141,6 +143,38 @@ with tempfile.TemporaryDirectory(prefix='pd-release-test-') as temp:
     assert orders[0]['review_stars']==5 and orders[0]['status']=='Выполнена'
     assert core.order_find(oid)['payment_status']=='Оплачено'
     print('PASS complete booking lifecycle through completed trip and passenger review')
+    active_booking = booking | {'request_key':'release_new_trip_123456'}
+    with patch.object(server.pd_stops,'directions',return_value=(feature,[25.28,54.68],[23.90,54.89])):
+        active = check(call('/api/order',active_booking),200)
+        with core.db(core.ORDERS_DB) as conn:
+            conn.execute("UPDATE orders SET payment_status='Оплачено' WHERE id=?", (active['order_id'],))
+        other_booking = active_booking | {'request_key':'release_other_trip_123456','trip_time':'16:00'}
+        for status in ('Новая', 'Подтверждена', 'В пути'):
+            if status != 'Новая':
+                check(call('/api/admin/status',{'id':active['order_id'],'status':status},uid=999),200)
+            conflict = check(call('/api/order',other_booking),409)
+            assert conflict['error_code']=='active_order_exists' and conflict['order_id']==active['order_id']
+            assert check(call('/api/order',active_booking),200)['replayed']
+        check(call('/api/admin/status',{'id':active['order_id'],'status':'Выполнена'},uid=999),200)
+        renewed = check(call('/api/order',other_booking),200)
+        check(call('/api/admin/status',{'id':renewed['order_id'],'status':'Отменена'},uid=999),200)
+        race_uid = 108
+        check(call('/api/register',{'name':'Parallel Test','phone':'+37060000008'},uid=race_uid),200)
+        barrier = Barrier(2)
+        def submit_parallel(i):
+            payload = active_booking | {'request_key':f'parallel_test_trip_{i}_123456'}
+            with server.app.test_client() as thread_client:
+                barrier.wait(timeout=5)
+                return thread_client.post('/api/order',json=payload,headers={'X-Telegram-Init-Data':signed(race_uid)})
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = sorted(pool.map(submit_parallel,range(2)),key=lambda response:response.status_code)
+        created = check(results[0],200)
+        conflict = check(results[1],409)
+        assert conflict['error_code']=='active_order_exists' and conflict['order_id']==created['order_id']
+        assert len(check(call('/api/orders',uid=race_uid),200)['orders'])==1
+        check(call('/api/admin/status',{'id':created['order_id'],'status':'Отменена'},uid=999),200)
+        assert check(call('/api/order',active_booking,uid=race_uid),200)['order_id']!=created['order_id']
+    print('PASS one active Mini App booking, parallel requests, safe replay and reopening after completion or cancellation')
     from pd_payment_tests import run
     run(server,core,client,call,signed,check)
     from pd_invoice_tests import run as invoice_checks

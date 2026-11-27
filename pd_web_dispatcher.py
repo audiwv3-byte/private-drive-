@@ -346,6 +346,46 @@ def register(app, core):
         from pd_pilot_qa_intake import register as register_qa_pilots
         register_qa_pilots(app, authorized, csrf, valid_csrf)
 
+    telegram_candidates_enabled = (os.environ.get("PD_DISPATCH_STAGING_ONLY") == "1"
+                                   and os.environ.get("PD_QA_MINIAPP_POSTGRES") == "1"
+                                   and os.environ.get("PD_PAYMENT_MODE") == "disabled"
+                                   and os.environ.get("PD_NATIVE_SMS_LIVE") == "NO")
+
+    @app.get("/dispatch/telegram-candidates")
+    def pd_dispatch_telegram_candidates():
+        if not telegram_candidates_enabled:
+            return "Раздел недоступен", 404
+        if not authorized():
+            return redirect(url_for("pd_dispatch_login"))
+
+        import sqlite3
+        from contextlib import closing
+        db_file = Path(app.config.get("PD_QA_TELEGRAM_USERS_DB", Path(__file__).with_name("users.db")))
+        try:
+            with closing(sqlite3.connect(db_file.resolve().as_uri() + "?mode=ro", uri=True)) as db:
+                db.row_factory = sqlite3.Row
+                candidates = db.execute("""SELECT name,phone,city,vehicle,vehicle_year,plate,status
+                    FROM pd_driver_applications ORDER BY updated_at DESC LIMIT 200""").fetchall()
+        except sqlite3.Error:
+            app.logger.warning("Telegram candidate intake is unavailable")
+            return "Не удалось загрузить анкеты Telegram", 503, {"Cache-Control": "private, no-store"}
+
+        page = render_template_string("""<!doctype html><html lang="ru"><meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>Анкеты из Telegram · PRIVATE DRIVE</title>
+            <link rel="stylesheet" href="/assets/pd-black-gold.css">
+            <main><p><a href="/dispatch">← Диспетчерская</a></p><h1>Анкеты из Telegram</h1>
+            {% for candidate in candidates %}
+            <article><h2>{{ candidate.name }}</h2>
+              <p>{{ candidate.phone }} · {{ candidate.city }}</p>
+              <p>{{ candidate.vehicle }} · {{ candidate.vehicle_year }} · {{ candidate.plate }}</p>
+              <p>{{ statuses.get(candidate.status, candidate.status) }}</p>
+            </article>
+            {% else %}<p>Анкет пока нет.</p>{% endfor %}</main></html>""", candidates=candidates,
+            statuses={"pending": "На проверке", "approved": "Одобрена", "rejected": "Отклонена"})
+        return page, 200, {"Cache-Control": "private, no-store", "X-Frame-Options": "DENY",
+                           "Referrer-Policy": "no-referrer"}
+
     @app.get("/dispatch")
     def pd_dispatch_home():
         if test_sync_enabled or persistent_queue_enabled:
@@ -382,6 +422,7 @@ def register(app, core):
             analytics_enabled="pd_site_analytics" in app.view_functions,
             csrf=csrf() if test_sync_enabled or persistent_queue_enabled else "",
             pilot_intake_enabled=pilot_intake_available,
+            telegram_candidates_enabled=telegram_candidates_enabled,
             pilot_add_url="/pilot-registration" if pilot_intake_available else None,
             staging_registry="dispatch_accounts_state" in app.view_functions,
         ))

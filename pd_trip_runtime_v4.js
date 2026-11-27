@@ -4,31 +4,51 @@
 const POLICY='pd-trip-v4-20261028';
 const label=(ru,en,lt)=>window.PD_LANG==='en'?en:window.PD_LANG==='lt'?lt:ru;
 const eur=c=>(Number(c||0)/100).toFixed(2)+' €';
-let active=null,dialog=null,body=null,map=null,marker=null,watch=null,watchOrder=null,lastPositionSent=0,polling=false,hubBusy=false;
+let active=null,dialog=null,body=null,map=null,marker=null,watch=null,watchOrder=null,watchEpoch=0,lastPositionSent=0,polling=false,hubBusy=false;
 const button=(text,action)=>{const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent=text;b.onclick=async()=>{b.disabled=true;try{await action()}catch(e){message(e.message,true)}finally{b.disabled=false}};return b};
 const p=(text,parent=body)=>{const e=document.createElement('p');e.textContent=text;parent.append(e);return e};
 const requestTrip=(id,suffix='',data)=>api('/api/trip/'+Number(id)+suffix,data);
-function stopPosition(){if(watch!==null)navigator.geolocation.clearWatch(watch);watch=null;watchOrder=null}
+function stopPosition(){
+ const previous=watch;
+ watch=null;watchOrder=null;watchEpoch++;
+ if(previous!==null)navigator.geolocation.clearWatch(previous);
+}
 function closing(activeTrip){try{if(activeTrip)window.Telegram?.WebApp?.enableClosingConfirmation();else window.Telegram?.WebApp?.disableClosingConfirmation()}catch(_){}}
 async function position(id){
+ if(active!==id||document.hidden)return;
  if(watchOrder===id){stopPosition();await refresh();return}
  if(!navigator.geolocation)throw Error(label('Геолокация недоступна','Geolocation is unavailable','Geolokacija nepasiekiama'));
  stopPosition();watchOrder=id;closing(true);
- watch=navigator.geolocation.watchPosition(async pos=>{
-  if(watchOrder!==id||document.hidden||Date.now()-lastPositionSent<5000)return;
-  lastPositionSent=Date.now();
-  try{await requestTrip(id,'/location',{lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy})}
-  catch(e){stopPosition();message(e.message,true)}
- },e=>{stopPosition();message(label('Нет доступа к геопозиции. Разрешите её в Telegram или браузере.','Location access denied. Allow it in Telegram or your browser.','Vietovės prieiga nesuteikta. Leiskite ją Telegram arba naršyklėje.'),true)},
- {enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+ const epoch=watchEpoch;
+ const current=()=>watchEpoch===epoch&&watchOrder===id&&active===id&&!document.hidden;
+ try{
+  const handle=navigator.geolocation.watchPosition(async pos=>{
+   if(!current()||Date.now()-lastPositionSent<5000)return;
+   lastPositionSent=Date.now();
+   try{await requestTrip(id,'/location',{lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy})}
+   catch(e){if(current()){stopPosition();message(e.message,true);await refresh()}}
+  },()=>{
+   if(!current())return;
+   stopPosition();
+   message(label('Нет доступа к геопозиции. Разрешите её в Telegram или браузере.','Location access denied. Allow it in Telegram or your browser.','Vietovės prieiga nesuteikta. Leiskite ją Telegram arba naršyklėje.'),true);
+   refresh();
+  },{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+  if(current())watch=handle;else navigator.geolocation.clearWatch(handle);
+ }catch(e){if(current())stopPosition();throw e}
  await refresh();
 }
-function cleanDialog(){if(map)map.remove();map=null;marker=null;dialog=null;body=null;active=null}
+function cleanDialog(closed){
+ if(!closed||dialog!==closed)return;
+ stopPosition();
+ if(map)map.remove();
+ map=null;marker=null;dialog=null;body=null;active=null;
+}
 window.pdOpenLiveTripV4=async function(id){
- if(dialog){dialog.close();cleanDialog()}
- dialog=pdSimpleDialog(label('Текущая поездка','Current trip','Dabartinė kelionė'));dialog.id='pdTripRuntimeV4';
+ if(dialog){const previous=dialog;previous.close();cleanDialog(previous)}
+ const opened=pdSimpleDialog(label('Текущая поездка','Current trip','Dabartinė kelionė'));
+ dialog=opened;dialog.id='pdTripRuntimeV4';
  body=document.createElement('div');dialog.append(body);active=Number(id);
- dialog.addEventListener('close',cleanDialog,{once:true});
+ dialog.addEventListener('close',()=>cleanDialog(opened),{once:true});
  await refresh();
 };
 async function action(name){await requestTrip(active,'/action',{action:name});await refresh();if(name==='finish'){stopPosition();closing(false);if(typeof pdCheckTripCompletion==='function')pdCheckTripCompletion()}}
@@ -45,11 +65,11 @@ async function offerExtra(){
 async function refresh(){
  if(!active||!body||polling)return;polling=true;
  try{
-  const id=active,r=await requestTrip(id);if(active!==id||!body)return;
+  const id=active,opened=dialog,r=await requestTrip(id);if(dialog!==opened||active!==id||!body)return;
   if(map)map.remove();map=null;marker=null;body.replaceChildren();
   p(label('Заказ №','Order #','Užsakymas Nr. ')+id+' · '+r.status);
   const live=['Подтверждена','В пути'].includes(r.status);closing(live);
-  if(!live&&watchOrder===id)stopPosition();
+  if((!live||r.role!=='pilot')&&watchOrder===id)stopPosition();
   if(r.role==='pilot'&&live){
    body.append(button(watchOrder===id?label('Остановить передачу геопозиции','Stop sharing location','Stabdyti vietovės bendrinimą'):label('Передавать мою геопозицию','Share my location','Bendrinti mano vietovę'),()=>position(id)));
    p(label('Геопозиция обновляется только при открытом приложении и разрешённом доступе. Не закрывайте Mini App до конца поездки.','Location updates require the app to stay open and location permission. Keep the Mini App open until the trip ends.','Vietovė atnaujinama tik atidarius programėlę ir leidus prieigą. Laikykite ją atidarytą iki kelionės pabaigos.'));

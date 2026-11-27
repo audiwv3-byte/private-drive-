@@ -14,7 +14,7 @@ def active():
 def safe():
     return enabled() and os.getenv("PD_NATIVE_SMS_ISOLATED") == "YES" and os.getenv("PD_NATIVE_SMS_LIVE") == "NO"
 
-def telegram_order(uid, data):
+def telegram_order(uid, data, *, service_type=None, sober_fare=None):
     if not safe():
         return jsonify(error="orders_disabled"), 503
     if not isinstance(data, dict):
@@ -41,10 +41,24 @@ def telegram_order(uid, data):
         if "luggage" in data: details["luggage"] = data["luggage"]
         if "extras" in data: details["extras"] = data["extras"]
         if "details" in data: details["wishes"] = data["details"]
+        if service_type:
+            details["advance_booking"] = service_type == "preorder"
+            if service_type == "sober_driver":
+                details["ride_type"] = "Трезвый водитель"
+                details["tariff"] = "Трезвый водитель"
+                details.pop("fare_preview_eur", None)
+                details["fare_requires_quote"] = True
+            else:
+                details["ride_type"] = "Предзаказ" if service_type == "preorder" else "Поездка"
         details = normalize_details(details)
     except (TypeError, ValueError):
         return jsonify(error="invalid_booking_details"), 400
     digest = fingerprint((values, json.dumps(data, sort_keys=True, ensure_ascii=False)))
+    if sober_fare is not None:
+        price = sober_fare()
+        if price:
+            details["fare_preview_eur"] = float(price)
+            details["fare_requires_quote"] = False
     oid = str(uuid.uuid4())
     qa26 = os.getenv("PD_QA26_ASSIGNMENT") == "1"
     status = "requested"

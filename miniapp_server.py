@@ -111,7 +111,20 @@ def qa_shared_order_bridge():
                 body['trip_date'] = _date(int(year), int(month), int(day)).isoformat()
             except ValueError:
                 return jsonify(error='invalid_departure'), 400
-        response = app.make_response(telegram_order(uid, body))
+        if 'service_type' in body:
+            validate_route_data(body)
+            service_type = miniapp_service_type(body)
+            try:
+                day = datetime.strptime(str(body.get('trip_date', '')), '%Y-%m-%d')
+            except ValueError:
+                return jsonify(error='invalid_departure'), 400
+            if not core.validate_departure(day.strftime('%d.%m.%Y'), str(body.get('trip_time', ''))):
+                return jsonify(error='invalid_departure'), 400
+            # The shared queue fingerprints request inputs independently of the quote.
+            sober_fare = (lambda: sober_driver_price(with_sober_extra(body))) if service_type == 'sober_driver' else None
+        else:
+            service_type, sober_fare = None, None
+        response = app.make_response(telegram_order(uid, body, service_type=service_type, sober_fare=sober_fare))
         # Booking notes, extras and fare preview are stored in PostgreSQL,
         # but map-point metadata is not part of this contract.
         if response.status_code in (200, 201):
@@ -186,7 +199,7 @@ def registered_pilot_card():
 
 @app.route('/')
 def index():
-    return pd_languages.render_index()
+    return pd_languages.render_index(demo_wheel=qa_shared_orders_enabled())
 
 
 @app.get('/api/me')
@@ -269,6 +282,38 @@ def pd_pet_price(base, data):
         amount += Decimal('15.00')
     return format(amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP), '.2f')
 
+def miniapp_service_type(data):
+    kind = data.get('service_type', 'ride')
+    if kind not in ('ride', 'preorder', 'sober_driver'):
+        raise ValueError('Некорректный тип услуги')
+    if kind == 'sober_driver' or 'Трезвый водитель' in (data.get('extras') or []):
+        return 'sober_driver'
+    return kind
+
+
+def sober_driver_price(data):
+    """Use the existing sober-driver multiplier and leave unavailable fares empty."""
+    fixed = pd_fixed_prices.base(data)
+    if fixed:
+        return pd_pet_price(fixed, data)
+    try:
+        route = core.route(
+            pd_map_points.route_address(data, 'origin', data['origin'].strip()),
+            pd_map_points.route_address(data, 'destination', data['destination'].strip()),
+        )
+        if route:
+            return pd_pet_price(core.quote(*route, bool(data.get('roundtrip'))), data)
+    except (OSError, ValueError, ArithmeticError, KeyError, TypeError):
+        core.LOG.warning('Sober driver route estimate unavailable')
+    return ''
+
+
+def with_sober_extra(data):
+    if miniapp_service_type(data) != 'sober_driver':
+        return data
+    return {**data, 'extras': list(dict.fromkeys([*(data.get('extras') or []), 'Трезвый водитель']))}
+
+
 @app.post('/api/route')
 def route():
     auth()
@@ -277,6 +322,9 @@ def route():
     o, dest = str(d.get('origin','')).strip(), str(d.get('destination','')).strip()
     if not (2 <= len(o) <= 200 and 2 <= len(dest) <= 200): raise ValueError('Укажите два адреса')
     if o.casefold() == dest.casefold(): raise ValueError('Начало и конец маршрута совпадают')
+    if d.get('service_type') == 'sober_driver':
+        price = sober_driver_price(with_sober_extra(d))
+        return jsonify(available=bool(price), price=price)
     pd_stops.address(d)
     result = {'available': False, 'message':'Предварительная цена по согласованию'}
     try:
@@ -320,6 +368,8 @@ def create_order():
             if previous['request_fingerprint']!=fingerprint:
                 raise ValueError('Состав заявки изменился. Начните новую заявку.')
             return jsonify(ok=True,order_id=previous['id'],status=previous['status'],price=previous['price'],replayed=True)
+    service_type = miniapp_service_type(d)
+    d = with_sober_extra(d)
     origin, dest = str(d.get('origin','')).strip(),str(d.get('destination','')).strip()
     if not (2 <= len(origin) <= 200 and 2 <= len(dest) <= 200) or origin.casefold() == dest.casefold():
         raise ValueError('Укажите корректный маршрут')
@@ -358,7 +408,7 @@ def create_order():
         if km is not None: price=pd_pet_price(fixed_base or core.quote(km,minutes,bool(d.get('roundtrip'))),d)
     except Exception:
         core.LOG.exception('Route not available during booking')
-    st=dict(order_type='Туда и обратно' if d.get('roundtrip') else 'В одну сторону',
+    st=dict(service_type=service_type,order_type='Туда и обратно' if d.get('roundtrip') else 'В одну сторону',
         origin=origin,destination=dest,trip_date=date,trip_time=hour,passengers=passenger_value,luggage=luggage,
         passenger_count_confirmed=int('passengers' in d),details=details,payment_method=method,price=price,
         distance_km=km,duration_min=minutes,route_source='OpenRouteService' if km is not None else '',

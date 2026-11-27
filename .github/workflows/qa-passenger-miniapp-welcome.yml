@@ -1,0 +1,46 @@
+name: PRIVATE DRIVE passenger Mini App welcome
+
+on:
+  push:
+    branches: [qa/passenger-miniapp-welcome-integrated]
+
+permissions:
+  contents: read
+
+jobs:
+  passenger-miniapp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: private_drive_test
+          POSTGRES_PASSWORD: isolated-test
+        ports: ['127.0.0.1:5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d private_drive_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PD_AUTH_TEST_DATABASE_URL: postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test
+      QA_WELCOME_SCREENSHOT: PRIVATE-DRIVE-MiniApp-QA.png
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install QA dependencies
+        run: python -m pip install -r requirements-runtime.lock.txt 'psycopg[binary]' pytest playwright 'PyJWT[crypto]>=2.12,<3'
+      - name: Check the passenger screen and the shared dispatcher in Chromium
+        run: |
+          export QA_CHROMIUM="$(command -v google-chrome)"
+          python -m pytest -q tests/test_qa_actual_miniapp_postgres.py tests/test_qa_booking_details.py
+          python -m pytest -q tests/test_qa_passenger_welcome.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-miniapp-qa
+          path: PRIVATE-DRIVE-MiniApp-QA.png

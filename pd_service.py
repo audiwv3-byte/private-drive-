@@ -95,7 +95,7 @@ def register(app, core, auth):
         where = 'o.telegram_id=?' + (' AND o.id<?' if before else '')
         args = (uid, before) if before else (uid,)
         with core.db(core.ORDERS_DB) as c:
-            rows = c.execute('''SELECT o.id,o.origin,o.destination,o.stop_address,o.order_type,o.trip_date,o.trip_time,o.status,
+            rows = c.execute('''SELECT o.id,o.origin,o.destination,o.stop_address,o.order_type,o.service_type,o.trip_date,o.trip_time,o.status,
                 o.price,o.payment_method,o.payment_status,r.stars AS review_stars,
                 r.comment AS review_comment,r.updated_at AS review_updated_at
                 FROM orders o LEFT JOIN pd_service_reviews r ON r.order_id=o.id

@@ -38,7 +38,8 @@ check(owner, 'client', {passengerView: true, adminControls: false, pilotControls
 check(pilot, 'driver', {passengerView: false, adminControls: false, pilotControls: true});
 check(pilot, 'client', {passengerView: true, adminControls: false, pilotControls: false});
 assert.equal(elements.get('pdPilotBack').hidden, true);
-check(applicant, '', {passengerView: false, adminControls: false, pilotControls: true});
+check(applicant, '', {passengerView: false, adminControls: false, pilotControls: false});
+check({...applicant, registered: true}, '', {passengerView: true, adminControls: false, pilotControls: false});
 // Changing to an ordinary passenger cannot retain another role's controls.
 check(passenger, '', {passengerView: true, adminControls: false, pilotControls: false});
 assert.ok(!html.includes('onclick="pdStartDriverRegistration()">Регистрация водителя</button>'));

@@ -74,6 +74,7 @@ h1,h2,h3{font-family:Georgia,serif;font-weight:400;color:var(--gold);margin:0 0 
 {% if analytics_enabled %}<a href="/dispatch/analytics">Воронка сайта</a>{% endif %}
 <a href="/pilot-registration">Регистрация пилота</a>
 <a href="/dispatch/pilot-applications">Анкеты пилотов (QA)</a>
+{% if telegram_candidates_enabled %}<a href="/dispatch/telegram-candidates">Анкеты из Telegram</a>{% endif %}
 {% if test_sync_enabled %}<a class="btn" href="/dispatch/test-sync">Тестовая связь</a>{% endif %}
 {% if telegram_test_enabled %}<a class="btn" href="/dispatch/test-miniapp">Тест заявки из Telegram</a>{% endif %}
 <form method="post" action="/dispatch/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">Выйти</button></form>
@@ -327,7 +328,9 @@ function renderPersistentOrders(){
    const info=document.createElement('p');
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
      ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
-   card.append(route,info);
+   const orderId=document.createElement('small');
+   orderId.textContent='ID заявки '+order.id;
+   card.append(route,info,orderId);
    // Customer-provided metadata is always rendered as text, never as HTML.
    const details=order.booking_details||{};
    const extras=Array.isArray(details.extras)?details.extras:[];

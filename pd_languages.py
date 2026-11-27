@@ -47,9 +47,9 @@ class Markup(HTMLParser):
     def handle_charref(self,n):self.parts.append('&#'+n+';')
     def handle_comment(self,s):self.parts.append('<!--'+s+'-->')
     def handle_decl(self,s):self.parts.append('<!'+s+'>')
-def render_index():
+def render_index(*, demo_wheel=False):
     lang=language()
-    content=render_template('index.html',pd_lang=lang,pd_ui=UI.get(lang,{}))
+    content=render_template('index.html',pd_lang=lang,pd_ui=UI.get(lang,{}),demo_wheel=demo_wheel)
     parser=Markup(lang);parser.feed(content);parser.close()
     return response_for(''.join(parser.parts),lang)
 def render_document(kind):

@@ -61,3 +61,57 @@ def choose_offer(db, order_id, passenger_id, pilot_id):
     if chosen is None or chosen[0] != pilot_id:
         raise ValueError("Выбор предложения недоступен")
     return chosen[1], bool(result.rowcount)
+
+
+def register(app, core, auth):
+    from flask import jsonify, request
+
+    with core.db(core.ORDERS_DB) as db:
+        initialize(db)
+
+    @app.post('/api/preorders/<int:order_id>/choose')
+    def accept_passenger_offer(order_id):
+        passenger_id, _ = auth()
+        selection = request.get_json(silent=True)
+        if not isinstance(selection, dict):
+            raise ValueError('Выберите предложение')
+        pilot_id = selection.get('pilot_id')
+        expected = selection.get('cents')
+        if type(pilot_id) is not int or type(expected) is not int or expected <= 0:
+            raise ValueError('Выберите предложение с указанной ценой')
+        cents = finalize_selection(core, order_id, passenger_id, pilot_id, expected)
+        return jsonify(order_id=order_id, pilot_id=pilot_id, cents=cents)
+
+
+def finalize_selection(core, order_id, passenger_id, pilot_id, expected):
+    with core.db(core.ORDERS_DB) as db:
+        db.execute('ATTACH DATABASE ? AS pilot_users', (str(core.USERS_DB),))
+        db.execute('BEGIN IMMEDIATE')
+        order = db.execute('SELECT * FROM orders WHERE id=? AND telegram_id=?',
+                           (order_id, passenger_id)).fetchone()
+        if not order:
+            raise PermissionError('Нет доступа к заказу')
+        cents, changed = choose_offer(db, order_id, passenger_id, pilot_id)
+        if cents != expected:
+            raise ValueError('Цена изменилась. Обновите предложения.')
+        if changed:
+            if (order['status'] != 'Новая' or order['payment_status'] not in ('', 'Не оплачено')
+                    or order['stripe_session_id'] or order['card_payment_url']):
+                raise ValueError('Заказ больше недоступен для выбора цены')
+            approved = db.execute("""SELECT 1 FROM pilot_users.pd_driver_applications
+                WHERE telegram_id=? AND status='approved'""", (pilot_id,)).fetchone()
+            if not approved:
+                raise ValueError('Пилот недоступен')
+            assigned = db.execute('SELECT 1 FROM pd_pilot_assignments WHERE order_id=?',
+                                  (order_id,)).fetchone()
+            if assigned:
+                raise ValueError('Пилот уже назначен. Обновите заказ.')
+            stamp = core.now().isoformat()
+            db.execute("""INSERT INTO pd_pilot_assignments
+                (order_id,pilot_id,assigned_by,assigned_at) VALUES(?,?,?,?)""",
+                (order_id, pilot_id, passenger_id, stamp))
+            fare = f'{cents // 100}.{cents % 100:02d}'
+            db.execute("""UPDATE orders SET price=?, status='Подтверждена',
+                quote_status='Согласовано пассажиром', updated_at=? WHERE id=?""",
+                (fare, stamp, order_id))
+    return cents

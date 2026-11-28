@@ -947,6 +947,8 @@ pd_bank_transfer.register(app, core, auth, cents_for_order)
 # Approved pilots may access only orders assigned to their Telegram identity.
 import pd_pilot_dispatch
 pd_pilot_dispatch.register(app,core,auth)
+import pd_preorder_offers
+pd_preorder_offers.register(app, core, auth)
 
 # Immutable PDF invoices, restricted to each passenger and administrators.
 import pd_invoice_v2

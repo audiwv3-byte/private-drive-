@@ -47,7 +47,12 @@ def render_pdf(meta):
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=(595,842), leftMargin=45,rightMargin=45,topMargin=42,bottomMargin=42)
     seller, buyer, money = meta['seller'], meta['buyer'], meta['amounts']
-    flow = [p('PRIVATE DRIVE',title),p('PVM SĄSKAITA FAKTŪRA / VAT INVOICE',bold),p(meta['serial'],bold),p('Išrašymo data / Issue date: '+meta['issued_at'][:10]),Spacer(1,10),p('PARDAVĖJAS / SELLER',bold),p(seller['seller_name']),p(seller['seller_address']),p('PVM kodas / VAT ID: '+seller['seller_vat']),p('Individualios veiklos pažymos Nr.: '+seller['seller_iv']),p('eurobaltictransfer@gmail.com | Telegram @PrivatDraiv'),Spacer(1,10),p('PIRKĖJAS / BUYER',bold),p(buyer['name']),p(buyer['address'])]
+    qa_preview = meta.get('qa_preview', False)
+    heading = 'BANDOMOJI SĄSKAITA / QA INVOICE' if qa_preview else 'PVM SĄSKAITA FAKTŪRA / VAT INVOICE'
+    flow = [p('PRIVATE DRIVE',title),p(heading,bold),p(meta['serial'],bold),p('Išrašymo data / Issue date: '+meta['issued_at'][:10]),Spacer(1,10),p('PARDAVĖJAS / SELLER',bold),p(seller['seller_name'])]
+    if not qa_preview:
+        flow += [p(seller['seller_address']),p('PVM kodas / VAT ID: '+seller['seller_vat']),p('Individualios veiklos pažymos Nr.: '+seller['seller_iv']),p('eurobaltictransfer@gmail.com | Telegram @PrivatDraiv')]
+    flow += [Spacer(1,10),p('PIRKĖJAS / BUYER',bold),p(buyer['name']),p(buyer['address'])]
     if buyer['code']: flow.append(p('Įmonės kodas / Company code: '+buyer['code']))
     if buyer['vat']: flow.append(p('PVM kodas / VAT ID: '+buyer['vat']))
     flow += [Spacer(1,10),p('Paslaugos data / Service date: '+meta['service_date']),p('Užsakymas / Order: '+str(meta['order_id'])),p('Maršrutas / Route: '+meta['origin']+' → '+meta['destination']),Spacer(1,12)]

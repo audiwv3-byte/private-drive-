@@ -231,8 +231,11 @@ def register(app, authorized):
                     details, cents = quotes[order["id"]]
                     if details.get("ride_type") in ("delivery", "jumpstart"):
                         order.update(service_type=details["ride_type"], service_notes=details.get("preferences", {}).get("wishes", ""), quoted_total_cents=cents)
-                    elif order["source"] == "telegram_miniapp" and cents is not None:
+                    elif cents is not None and (order["source"] == "telegram_miniapp"
+                            or "payment_method" in details):
                         order["quoted_total_cents"] = cents
+                    if "payment_method" in details:
+                        order["payment_method"] = details["payment_method"]
             if qa33:
                 for order,row in zip(orders,rows):
                     order.update(waiting_seconds=row[10],waiting_active=row[11],stop_charge_cents=row[12])

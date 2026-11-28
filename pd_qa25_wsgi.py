@@ -6,7 +6,7 @@ from pd_dispatch_persistent import register
 from pd_native_orders_http import make_orders_app
 from pd_qa25_telegram_orders import safe, telegram_order
 
-def create_application():
+def create_application(*, qa_booking=False):
     if os.getenv("PD_QA25_WSGI") != "1" or not safe():
         raise RuntimeError("QA25 isolation required")
     # QA identities must be explicitly provisioned, never production credentials.
@@ -55,7 +55,7 @@ def create_application():
 
     register(app, authorized)
     database_url = os.environ["PD_DISPATCH_ORDERS_DATABASE_URL"]
-    native = make_orders_app(app, database_url)
+    native = make_orders_app(app, database_url, qa_booking=qa_booking)
     if os.getenv("PD_QA26_ASSIGNMENT") != "1":
         return native
 

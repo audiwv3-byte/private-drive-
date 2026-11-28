@@ -34,14 +34,18 @@ ON_REQUEST_EXTRAS = frozenset({
 TEXT_PREFERENCES = frozenset({"radio", "tracks", "temperature", "wishes"})
 
 
-def validated_details(data, *, origin, destination):
+def validated_details(data, *, origin, destination, qa_booking=False):
     """Strictly validate optional booking details; no payments or client-set price."""
     if data is None:
         data = {}
-    if not isinstance(data, dict) or set(data) - {
-        "ride_type", "round_trip", "extras", "preferences"
-    }:
+    allowed = {"ride_type", "round_trip", "extras", "preferences"}
+    if qa_booking:
+        allowed.add("payment_method")
+    if not isinstance(data, dict) or set(data) - allowed:
         raise ValueError("invalid_details")
+    payment = data.get("payment_method")
+    if "payment_method" in data and payment not in ("card", "paypal", "bank", "crypto"):
+        raise ValueError("invalid_payment_method")
     kind = data.get("ride_type", "transfer")
     if kind not in ("transfer", "taxi", "delivery", "jumpstart"):
         raise ValueError("invalid_ride_type")
@@ -69,7 +73,7 @@ def validated_details(data, *, origin, destination):
         elif not isinstance(value, str) or len(value.strip()) > (500 if key == "wishes" else 100):
             raise ValueError("invalid_preference")
     if kind in ("delivery", "jumpstart"):
-        if round_trip or extras or set(preferences) - {"wishes"}:
+        if round_trip or extras or set(preferences) - {"wishes"} or payment is not None:
             raise ValueError("invalid_service_details")
         if kind == "jumpstart" and destination != "Помощь на месте":
             raise ValueError("invalid_service_destination")
@@ -92,11 +96,14 @@ def validated_details(data, *, origin, destination):
         base * (2 if "sober_driver" in extras else 1)
         + (1500 if "meet_sign" in extras else 0)
     )
+    if amount is not None and payment == "crypto":
+        amount = (amount * 115 + 50) // 100
     return {
         "ride_type": kind,
         "round_trip": round_trip,
         "extras": extras,
         "preferences": preferences,
+        **({"payment_method": payment} if payment is not None else {}),
         "quote_required": quote_required,
         "quoted_total_cents": amount,
         "currency": "EUR",

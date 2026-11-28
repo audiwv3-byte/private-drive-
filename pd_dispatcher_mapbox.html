@@ -376,7 +376,7 @@ function renderPersistentOrders(){
    const route=document.createElement('strong');route.textContent=order.origin+' → '+order.destination;
    const info=document.createElement('p');
    info.textContent=(liveStatusLabels[order.status]||order.status)+' · '+order.source+
-     ' №'+order.source_order_id+' · '+order.trip_date+' '+order.trip_time;
+     ' №'+(order.payment_method ? order.id : order.source_order_id)+' · '+order.trip_date+' '+order.trip_time;
    card.append(route,info);
    if(['delivery','jumpstart'].includes(order.service_type)){
      const service=document.createElement('p');

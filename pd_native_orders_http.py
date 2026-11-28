@@ -10,9 +10,11 @@ from pd_dispatch_persistent import validated_order, fingerprint
 from pd_native_order_quote import validated_details
 from pd_native_auth_postgres_session_lifecycle import _digest
 
-def make_orders_app(next_app, database_url, *, clock=time.time):
+def make_orders_app(next_app, database_url, *, clock=time.time, qa_booking=False):
     def app(environ, start_response):
-        if environ.get("PATH_INFO") != "/native-orders":
+        path = environ.get("PATH_INFO", "")
+        invoice = qa_booking and path.startswith("/native-orders/invoice/")
+        if path != "/native-orders" and not invoice:
             return next_app(environ, start_response)
 
         def reply(code, data):
@@ -28,7 +30,7 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                 or os.getenv("PD_DISPATCH_ORDERS_DATABASE_URL") != database_url):
             return reply("503 Service Unavailable", {"error":"orders_disabled"})
         method = environ.get("REQUEST_METHOD")
-        if method not in ("GET", "POST", "PATCH"):
+        if method not in (("GET",) if invoice else ("GET", "POST", "PATCH")):
             return reply("405 Method Not Allowed", {"error":"method_not_allowed"})
         auth = environ.get("HTTP_AUTHORIZATION", "")
         token = auth[7:] if auth.startswith("Bearer ") else ""
@@ -46,6 +48,9 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                 uid, role = session
                 if role != "passenger":
                     return reply("403 Forbidden", {"error":"passenger_required"})
+                if invoice:
+                    from ops.qa.qa43_native_invoice import invoice_response
+                    return invoice_response(db, path.rsplit("/", 1)[-1], uid, environ, start_response)
                 # Explicit migration is required; no runtime schema changes.
                 if method == "GET":
                     # Existing read-only deployments may only have the original history grant.
@@ -125,15 +130,23 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                     # Platform is client-reported metadata, never an authorization claim.
                     values = validated_order(dict(data, source=source, source_order_id=scoped))
                     quote = (validated_details(submitted_details, origin=data["from"],
-                                               destination=data["to"])
+                                               destination=data["to"], qa_booking=qa_booking)
                              if submitted_details is not None else None)
                 except (ValueError, TypeError, KeyError, AttributeError):
                     return reply("400 Bad Request", {"error":"invalid_order"})
                 source, original, origin, destination, date, clock_time = values
                 # Bind quote-relevant inputs to the idempotency fingerprint.
                 # Existing five-field callers keep the previous fingerprint.
-                fp = fingerprint(values) if quote is None else fingerprint(
-                    [*values, quote])
+                details = None if quote is None else {
+                    key: quote[key] for key in ("ride_type", "round_trip", "extras",
+                                                "preferences", "payment_method") if key in quote
+                }
+                has_payment = details is not None and "payment_method" in details
+                fp = fingerprint(values) if quote is None else fingerprint([
+                    *values, details if has_payment else quote,
+                ])
+                total = quote["quoted_total_cents"] if quote is not None else None
+                quote_required = quote["quote_required"] if quote is not None else True
                 order_id = str(uuid.uuid4())
                 inserted = db.execute("""INSERT INTO public.pd_dispatch_orders
                     (id,source,source_order_id,fingerprint,origin,destination,trip_date,trip_time)
@@ -147,10 +160,7 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                         db.execute("""INSERT INTO public.pd_native_order_quotes
                             (order_id,details,quoted_total_cents,quote_required)
                             VALUES (%s,%s::jsonb,%s,%s)""",
-                            (order_id,json.dumps({key: quote[key] for key in (
-                                "ride_type","round_trip","extras","preferences")},
-                                ensure_ascii=False),
-                             quote["quoted_total_cents"],quote["quote_required"]))
+                            (order_id, json.dumps(details, ensure_ascii=False), total, quote_required))
                     status = "requested"
                 else:
                     existing = db.execute("""SELECT o.id,o.fingerprint,o.status
@@ -160,10 +170,14 @@ def make_orders_app(next_app, database_url, *, clock=time.time):
                     if not existing or existing[1] != fp:
                         return reply("409 Conflict", {"error":"request_conflict"})
                     order_id, status = str(existing[0]), existing[2]
+                    if has_payment:
+                        total, quote_required = db.execute("""
+                            SELECT quoted_total_cents, quote_required
+                            FROM public.pd_native_order_quotes WHERE order_id=%s
+                        """, (order_id,)).fetchone()
             return reply("201 Created" if inserted else "200 OK",
                          {"order_id":order_id,"status":status,"payment_mode":"disabled",
-                          "quoted_total_cents":quote["quoted_total_cents"] if quote is not None else None,
-                          "quote_required":quote["quote_required"] if quote is not None else True,
+                          "quoted_total_cents":total, "quote_required":quote_required,
                           "currency":"EUR"})
         except psycopg.Error:
             return reply("503 Service Unavailable", {"error":"storage_unavailable"})

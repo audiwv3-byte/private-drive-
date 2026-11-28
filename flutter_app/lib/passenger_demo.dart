@@ -681,6 +681,17 @@ class _PassengerDemoState extends State<PassengerDemo> {
 
   bool _sendingOrder = false;
   Map<String,dynamic>? _pendingOrder;
+  int? _pendingOrderTotal;
+
+  bool get _qaCheckout => widget.ordersApi != null && NativeOrdersApi.qaCheckout;
+
+  int? get _checkoutTotal {
+    if (_pendingOrder != null) return _pendingOrderTotal;
+    final euros = _pricePreview;
+    if (euros == null || _requiresCustomQuote) return null;
+    return _payment == 'Криптовалюта' ? euros * 115 : euros * 100;
+  }
+
   void _openOrders() {
     final api = widget.ordersApi;
     if (api != null) {
@@ -699,16 +710,24 @@ class _PassengerDemoState extends State<PassengerDemo> {
     final date = _date ?? DateTime.now();
     final time = _time ?? TimeOfDay.now();
     String two(int n) => n.toString().padLeft(2, '0');
+    if (_qaCheckout && _pendingOrder == null) {
+      _pendingOrderTotal = _checkoutTotal;
+    }
     final payload = _pendingOrder ??= {
       'request_id': NativeOrdersApi.requestId(),
       'from': _from.text.trim(), 'to': _to.text.trim(),
       'trip_date': '${date.year}-${two(date.month)}-${two(date.day)}',
       'trip_time': '${two(time.hour)}:${two(time.minute)}',
-      // Only approved tariff rules are evaluated on the server. Never send
-      // a client-calculated amount or any payment instruction.
+      // The server computes the tariff. The selected method is QA quote data.
       'details': {
         'ride_type': _rideType == 'Такси' ? 'taxi' : 'transfer',
         'round_trip': _roundTrip,
+        if (_qaCheckout) 'payment_method': switch (_payment) {
+          'PayPal' => 'paypal',
+          'Банковский перевод' => 'bank',
+          'Криптовалюта' => 'crypto',
+          _ => 'card',
+        },
         'extras': <String>[
           if (_meetSign) 'meet_sign',
           if (_soberDriver) 'sober_driver',
@@ -734,6 +753,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
       final result = await widget.ordersApi!.call(payload);
       if (result['order_id'] is! String) throw const FormatException('Missing order ID');
       _pendingOrder = null;
+      _pendingOrderTotal = null;
       if (mounted) _openOrders();
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Заказ не подтверждён. Повтор отправит ту же заявку.')));
@@ -1105,6 +1125,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
     if (pilotPosition != null) _scheduleFollowPilot();
     final price = _pricePreview;
     final taxiPrice = _taxiPriceCents;
+    final checkoutTotal = _qaCheckout ? _checkoutTotal : null;
     final startMap = start != null && finish != null
         ? LatLng((start.latitude + finish.latitude) / 2,
             (start.longitude + finish.longitude) / 2)
@@ -1457,7 +1478,9 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ],
             Text(pdLabel(context, 'Тестовый заказ поездки'), style: TextStyle(fontSize: 22)),
             const SizedBox(height: 6),
-            Text(pdLabel(context, 'Демонстрация. Не отправляет заказы и не списывает деньги.')),
+            Text(_qaCheckout
+                ? 'Тестовый заказ появится в QA-диспетчерской. Оплата отключена.'
+                : pdLabel(context, 'Демонстрация. Не отправляет заказы и не списывает деньги.')),
             const SizedBox(height: 12),
             Text('${pdLabel(context, _rideType)} · ${pdLabel(context, 'выбранный тип поездки')}',
               key: const Key('passenger-selected-ride-type'),
@@ -1924,7 +1947,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
             ),
             const SizedBox(height: 12),
             ],
-            if (!widget.enableMapTiles || _menuSection == 'payments') ...[
+            if (_qaCheckout || !widget.enableMapTiles || _menuSection == 'payments') ...[
             Text(pdLabel(context, 'Способ оплаты · только выбор'), style: TextStyle(fontWeight: FontWeight.bold)),
             Wrap(
               spacing: 8,
@@ -1936,13 +1959,14 @@ class _PassengerDemoState extends State<PassengerDemo> {
                       ? pdTr(context, 'Карта', 'Kortelė', 'Card')
                       : pdLabel(context, method)),
                     selected: _payment == method,
-                    onSelected: widget.tripStore?.isActive == true ||
+                    onSelected: (_qaCheckout && _pendingOrder != null) ||
+                        widget.tripStore?.isActive == true ||
                         (_isAdvanceBooking && method == 'Наличные') ? null
                         : (_) => setState(() => _payment = method),
                   ),
               ],
             ),
-            TextButton.icon(
+            if (!_qaCheckout) TextButton.icon(
               key: const Key('passenger-paysera-info'),
               onPressed: _openPayseraPaymentInfo,
               icon: const Icon(Icons.open_in_new),
@@ -1958,7 +1982,7 @@ class _PassengerDemoState extends State<PassengerDemo> {
               ),
             const SizedBox(height: 12),
             ],
-            Text(
+            if (!_qaCheckout) Text(
               ( _rideType == 'Такси' ? taxiPrice == null : price == null )
                   ? pdTr(context,
                       'Стоимость по запросу · фиксированная цена не установлена',
@@ -2027,7 +2051,18 @@ class _PassengerDemoState extends State<PassengerDemo> {
                   ? (const bool.fromEnvironment('PD_INTERNAL_QA')
                       ? _openServerBookingQa : _createLocalTrip)
                   : null,
-              child: Text(widget.ordersApi != null
+              child: _qaCheckout ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_sendingOrder ? 'Отправка…' : _pendingOrder != null
+                      ? 'Повторить прежнюю заявку' : 'Заказать поездку'),
+                  Text(
+                    checkoutTotal == null ? 'Стоимость по запросу' : PdTaxiFare.euros(checkoutTotal),
+                    key: const Key('qa-checkout-total'),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ) : Text(widget.ordersApi != null
                   ? (_sendingOrder ? 'Отправка…' : _pendingOrder != null ? 'Повторить прежнюю заявку' : 'Заказать поездку')
                   : widget.tripStore == null
                   ? pdTr(context, 'Заказать поездку — недоступно в демоверсии',

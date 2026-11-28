@@ -3,3 +3,16 @@ Run from repository root in a dedicated disposable VM, never on production. Inst
 Set PD_QA42_LOCAL=YES, PD_AUTH_TEST_DATABASE_URL=postgresql://postgres:isolated-test@127.0.0.1:5432/private_drive_test, PD_NATIVE_SMS_ISOLATED=YES, PD_NATIVE_SMS_LIVE=NO, PD_PAYMENT_MODE=disabled. Use a clean environment. No provider keys.
 Generate a trusted lab TLS certificate with SAN matching explicit RFC1918 address; configure trust on test phones via approved lab CA, never bypass verification. Restrict host firewall to test devices only; no public exposure, port forwarding or tunnels. Port 443 must be permitted to unprivileged process in dedicated VM. Run python -m ops.qa.qa42_local_kit --bind 127.0.0.1 --cert /private/cert.pem --key /private/key.pem --credentials /private/session.json (replace bind with approved private IP for devices). Credentials file is mode 0600; never commit or share logs. Stop process and remove disposable container after session. Tokens expire after one hour; signed dispatcher identity has its own shorter validity.
 This kit exposes API and one-time synthetic phone login using the existing mobile request-code/verify-code contract. Read the randomly generated six-digit codes from the local mode-0600 credentials file; no SMS is sent. Codes expire after five minutes, five attempts maximum and one successful use. Browser dispatcher is available at /dispatch/login using the random dispatcher_password in the private credentials file. The current APK and iOS build point to qa.invalid. Before physical acceptance, rebuild against lab origin. iOS requires Apple signing. No installation or deployment performed here.
+
+## QA43 Android booking build
+
+Install `reportlab` and the DejaVu Sans fonts on the QA host for the test invoice PDF. The Android order, passenger history, browser dispatcher and invoice use the same PostgreSQL in this kit. The approved QA route Вильнюс → Алитус gives €100 with a card and €115 with crypto. Payment selection affects the quote only.
+
+After the QA checks pass, build against the private IPv4 address the phone can reach on the lab network. The public CA file must match the certificate installed on the QA HTTPS server. Keep the test signing key outside this checkout and retain it for future builds of this package.
+
+```bash
+python -m ops.qa.build_qa43_android --address <LAB_IPV4> --ca <PUBLIC_LAB_CA_PEM> \
+  --keystore <PRIVATE_QA_KEYSTORE> --output PRIVATE-DRIVE-QA43.apk
+```
+
+Verify the signed APK with Android `apksigner verify --verbose --print-certs` and check its manifest with `aapt dump badging`. The configured launcher label is PRIVATE DRIVE QA43, version 0.2.28, version code 2026112801. Package `lt.privatedrive.qa.booking.private_drive` installs separately from LOGIN 02.

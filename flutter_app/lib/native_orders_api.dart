@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:http/http.dart' as http;
 import 'pd_http_api.dart';
+import 'taxi_fare.dart';
 
 class NativeOrdersApi {
+  static const qaCheckout = bool.fromEnvironment('PD_QA43_NATIVE_BOOKING');
   NativeOrdersApi(this.baseUrl, this.token, {http.Client? client}) : _client = client;
   final String baseUrl, token;
   final http.Client? _client;
@@ -46,13 +48,20 @@ class NativeOrdersApi {
     }
   }
 
-  Future<Map<String,dynamic>> call([Map<String,dynamic>? payload]) async {
-    final uri = PdHttpApi.secureUri(baseUrl, '/native-orders');
+  Future<Map<String,dynamic>> call([Map<String,dynamic>? payload]) =>
+      _call('/native-orders', payload: payload);
+
+  Future<Map<String,dynamic>> invoice(String orderId) =>
+      _call('/native-orders/invoice/${Uri.encodeComponent(orderId)}');
+
+  Future<Map<String,dynamic>> _call(String path, {Map<String,dynamic>? payload}) async {
+    final uri = PdHttpApi.secureUri(baseUrl, path);
     final client = _client ?? http.Client();
     try {
       final request = http.Request(payload == null ? 'GET' : 'POST', uri)
         ..followRedirects = false
         ..headers['Authorization'] = 'Bearer $token'
+        ..headers['Accept'] = 'application/json'
         ..headers['Content-Type'] = 'application/json';
       if (payload != null) {
         request.headers['X-PD-Native-Platform'] =
@@ -87,6 +96,33 @@ class _NativeOrdersHistoryState extends State<NativeOrdersHistory>
   late Future<Map<String,dynamic>> result = widget.api.call();
   String? _cancelling;
   String? _errorMessage;
+
+  void _openQaInvoice(String orderId) {
+    final invoice = widget.api.invoice(orderId);
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Тестовый счёт'),
+        content: FutureBuilder<Map<String, dynamic>>(
+          future: invoice,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const LinearProgressIndicator();
+            }
+            final data = snapshot.data;
+            final cents = data?['total_cents'];
+            if (data?['order_id'] != orderId || data?['currency'] != 'EUR' || cents is! int) {
+              return const Text('Не удалось загрузить счёт.');
+            }
+            return Text('Заказ №$orderId\nВсего ${PdTaxiFare.euros(cents)}');
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Закрыть')),
+        ],
+      ),
+    );
+  }
 
   Future<void> _cancel(String orderId) async {
     if (_cancelling != null) return;
@@ -162,11 +198,20 @@ class _NativeOrdersHistoryState extends State<NativeOrdersHistory>
             subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text("${row['trip_date']} ${row['trip_time']} · ${row['status']}"),
+                if (NativeOrdersApi.qaCheckout && row['order_id'] is String)
+                  SelectableText("Заказ №${row['order_id']}"),
                 if (row['quote_required'] == true)
                   const Text('Стоимость по запросу'),
                 if (row['quoted_total_cents'] is int)
                   Text('Подтверждённый расчёт: '
                       '${((row['quoted_total_cents'] as int) / 100).toStringAsFixed(2)} €'),
+                if (NativeOrdersApi.qaCheckout && row['order_id'] is String &&
+                    row['quoted_total_cents'] is int && row['details'] is Map &&
+                    (row['details'] as Map)['payment_method'] is String)
+                  TextButton(
+                    onPressed: () => _openQaInvoice(row['order_id'] as String),
+                    child: const Text('Тестовый счёт'),
+                  ),
                 if (row['details'] is Map &&
                     (row['details'] as Map)['extras'] is List &&
                     ((row['details'] as Map)['extras'] as List).isNotEmpty)

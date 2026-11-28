@@ -100,16 +100,22 @@ def prepare(*, mobile_codes=None, dispatcher_password=None):
 
     from pd_native_auth_postgres_http import session_request, reply
     from werkzeug.wrappers import Request
-    orders = create_application()
+    orders = create_application(qa_booking=True)
     web = None
+    web_assets = ("/assets/pd-black-gold.css", "/pd-logo-transparent.png")
     if dispatcher_password is not None:
-        from flask import Flask
+        from flask import Flask, request, send_from_directory
         from types import SimpleNamespace
         from werkzeug.security import generate_password_hash
         from pd_web_dispatcher import register
         os.environ.update(PD_DISPATCH_SESSION_SECRET=secrets.token_hex(32), PD_DISPATCH_PASSWORD_HASH=generate_password_hash(dispatcher_password), PD_DISPATCH_ADMIN_ID="201", PD_DISPATCH_TEST_SYNC="0")
         web = Flask("qa42_browser_dispatcher")
         web.config.update(SESSION_COOKIE_NAME="pd_qa42_session", SESSION_COOKIE_PATH="/dispatch")
+        @web.get(web_assets[0])
+        @web.get(web_assets[1])
+        def dispatcher_asset():
+            return send_from_directory(Path(__file__).resolve().parents[2] / "assets",
+                                       Path(request.path).name)
         if not register(web, SimpleNamespace(ADMIN_IDS=frozenset({201}), is_admin=lambda uid: uid==201)):
             raise RuntimeError("QA42 dispatcher initialization failed")
     from ops.qa.qa42_mobile_login import MobileLogin
@@ -124,7 +130,8 @@ def prepare(*, mobile_codes=None, dispatcher_password=None):
             return reply(start_response, "503 Service Unavailable", {"error": "external_auth_disabled"})
         if req.path.startswith("/payment") or req.path.startswith("/v1/"):
             return reply(start_response, "403 Forbidden", {"error": "external_service_disabled"})
-        if web is not None and (req.path == "/dispatch" or req.path.startswith("/dispatch/")):
+        if web is not None and (req.path in web_assets or req.path == "/dispatch"
+                                or req.path.startswith("/dispatch/")):
             return web(environ, start_response)
         return orders(environ, start_response)
 

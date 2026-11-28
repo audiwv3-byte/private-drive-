@@ -2,15 +2,107 @@ import json
 import os
 import secrets
 import ssl
+import subprocess
 import threading
 import time
-from urllib.error import URLError
+import uuid
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import pytest
 
 from ops.qa.qa42_device_tls import generate
 from ops.qa.qa42_local_kit import make_tls_server, prepare
+
+
+def verify_native_booking(origin, trust, codes, password, certs, tmp_path, monkeypatch):
+    from pd_native_order_quote import APPROVED_TRANSFER_EUR
+    from playwright.sync_api import sync_playwright
+
+    def call(path, body=None, token=None, accept="application/json"):
+        headers = {"Accept": accept, "Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = "Bearer " + token
+        request = Request(origin + path, headers=headers,
+                          data=json.dumps(body).encode() if body is not None else None)
+        try:
+            with urlopen(request, context=trust, timeout=10) as result:
+                return result.status, json.load(result) if accept == "application/json" else result.read()
+        except HTTPError as exc:
+            return exc.code, exc.read()
+
+    def login(phone):
+        status, challenge = call("/native-auth/request-code", {"channel": "phone", "destination": phone})
+        assert status == 202, challenge
+        body = {"challenge_id": challenge["challenge_id"], "code": codes[phone]}
+        status, session = call("/native-auth/verify-code", body)
+        assert status == 200 and session["role"] == "passenger", session
+        assert call("/native-auth/verify-code", body)[0] == 401
+        return session["access_token"]
+
+    token = login("+12025550101")
+    other = login("+12025550103")
+    assert call("/native-auth/session", {}, token)[0] == 200
+    assert call("/native-orders")[0] == 401
+    assert call("/native-auth/telegram/start", {})[0] == 503
+    assert call("/payment/paysera")[0] == 403
+    bookings = {}
+    for method, cents in (("card", 10000), ("crypto", 11500)):
+        payload = {"request_id": str(uuid.uuid4()), "from": "Вильнюс", "to": "Алитус",
+                   "trip_date": "2030-01-01", "trip_time": "12:00",
+                   "details": {"payment_method": method}}
+        status, order = call("/native-orders", payload, token)
+        assert status == 201 and order["quoted_total_cents"] == cents, order
+        order_id = order["order_id"]
+        with monkeypatch.context() as patch:
+            patch.setitem(APPROVED_TRANSFER_EUR, "вильнюс|алитус", 120)
+            assert call("/native-orders", payload, token) == (200, order)
+        changed = {**payload, "details": {"payment_method": "bank"}}
+        assert call("/native-orders", changed, token)[0] == 409
+        invoice = f"/native-orders/invoice/{order_id}"
+        assert call(invoice, token=other)[0] == 404
+        assert call(invoice)[0] == 401
+        assert call(invoice, token=token) == (200, {
+            "order_id": order_id, "total_cents": cents, "currency": "EUR",
+            "payment_mode": "disabled",
+        })
+        status, pdf = call(invoice, token=token, accept="application/pdf")
+        assert status == 200 and pdf.startswith(b"%PDF")
+        extracted = subprocess.run(["pdftotext", "-", "-"], input=pdf,
+                                   capture_output=True, check=True).stdout.decode()
+        assert f"TOTAL: {cents / 100:.2f} EUR" in extracted and order_id in extracted
+        assert "QA INVOICE" in extracted
+        bookings[order_id] = cents
+
+    status, history = call("/native-orders", token=token)
+    assert status == 200 and len(history["orders"]) == len(bookings)
+    assert {row["order_id"]: row["quoted_total_cents"] for row in history["orders"]} == bookings
+    assert call("/native-orders", token=other)[1]["orders"] == []
+    home = tmp_path / "browser-home"
+    nss = home / ".pki" / "nssdb"
+    nss.mkdir(parents=True)
+    subprocess.run(["certutil", "-N", "--empty-password", "-d", "sql:" + str(nss)], check=True)
+    subprocess.run(["certutil", "-A", "-d", "sql:" + str(nss), "-n", "QA43 CA",
+                    "-t", "C,,", "-i", str(certs / "ca.pem")], check=True)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(
+            executable_path=os.environ.get("PD_QA_CHROMIUM"),
+            env={**os.environ, "HOME": str(home)},
+        )
+        page = browser.new_page()
+        page.route("**/*", lambda route: route.continue_()
+                   if route.request.url.startswith(origin + "/") else route.abort())
+        page.goto(origin + "/dispatch/login")
+        page.locator("input[name=password]").fill(password)
+        page.get_by_role("button", name="Войти", exact=True).click()
+        page.wait_for_url(origin + "/dispatch")
+        for order_id, cents in bookings.items():
+            card = page.locator("#ordersList article").filter(has_text=order_id)
+            card.get_by_text(f"Предварительная стоимость · {cents / 100:.2f} €").wait_for()
+            assert card.count() == 1
+        assert page.locator("#ordersList article").count() == len(bookings)
+        browser.close()
+    print(f"PASS HTTPS OTP, repeat without duplicates, history, browser and PDF: {bookings}")
 
 
 def test_local_kit(monkeypatch, tmp_path):
@@ -28,7 +120,7 @@ def test_local_kit(monkeypatch, tmp_path):
         assert response.json["role"]==role
     assert c.post("/native-auth/session").status_code==401
     assert c.post("/native-auth/request-code",json={}).status_code==403
-    for phone,role in (("+12025550101","passenger"),("+12025550102","pilot")):
+    for phone,role in (("+12025550102","pilot"),):
         req=c.post("/native-auth/request-code",json={"channel":"phone","destination":phone})
         assert req.status_code==202
         cid=req.json["challenge_id"]
@@ -61,6 +153,7 @@ def test_local_kit(monkeypatch, tmp_path):
         )
         with urlopen(session, context=trust, timeout=5) as result:
             assert json.load(result)["role"] == "pilot"
+        verify_native_booking(origin, trust, codes, password, certs, tmp_path, monkeypatch)
     finally:
         server.shutdown()
         thread.join(timeout=5)
@@ -68,7 +161,7 @@ def test_local_kit(monkeypatch, tmp_path):
     print("PASS trusted TLS dispatcher and native session; untrusted TLS rejected")
     assert c.get("/payment/paysera").status_code==403
     assert c.get("/dispatch/orders/state").status_code==401
-    import re, uuid
+    import re
     from werkzeug.test import Client
     browser = Client(app,Response)
     origin = "https://127.0.0.1"
@@ -93,7 +186,7 @@ def test_local_kit(monkeypatch, tmp_path):
     order=c.post("/native-orders",headers=h,json={"request_id":str(uuid.uuid4()),"from":"QA42 A","to":"QA42 B","trip_date":"2030-01-01","trip_time":"12:00"})
     assert order.status_code==201,order.json
     oid=order.json["order_id"]
-    assert browser.get("/dispatch/orders/state",base_url=origin).json["orders"][0]["id"]==oid
+    assert any(row["id"] == oid for row in browser.get("/dispatch/orders/state",base_url=origin).json["orders"])
     path="/dispatch/orders/"+oid+"/assign"
     assert browser.post(path,base_url=origin,data={"pilot_id":"qa39-pilot"}).status_code==403
     assigned=browser.post(path,base_url=origin,data={"pilot_id":"qa39-pilot","csrf":csrf_value})

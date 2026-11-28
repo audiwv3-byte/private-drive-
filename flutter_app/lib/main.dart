@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'native_server_cabin.dart';
 import 'native_pilot_orders.dart';
 import 'native_orders_api.dart';
@@ -152,7 +153,8 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
 
   Future<Map<String, dynamic>> post(String path, Map<String, String> payload) {
     final uri = PdHttpApi.secureUri(widget.authApiUrl, path);
-    return const PdHttpApi().postJson(uri, payload, client: widget.httpClient);
+    return const PdHttpApi().postJson(uri, payload, client: widget.httpClient,
+        timeout: const Duration(seconds: 60));
   }
 
   Future<void> requestCode() async {
@@ -206,14 +208,10 @@ class _NativeSignInScreenState extends State<NativeSignInScreen> {
             'Prisijungimo serveris laikinai nepasiekiamas. Bandyk vėliau.',
             'The sign-in server is temporarily unavailable. Try again later.'),
       });
-    } catch (_) {
-      if (mounted) setState(() => message = tr(
-          'Сервер входа не ответил вовремя. Повтори запрос позже или продолжи '
-              'как гость во внутренней сборке.',
-          'Prisijungimo serveris neatsakė laiku. Bandyk vėliau arba tęsk '
-              'kaip svečias vidinėje versijoje.',
-          'The sign-in server did not respond in time. Try again later or '
-              'continue as a guest in the internal build.'));
+    } on TimeoutException {
+      if (mounted) setState(() => message = 'QA: время ожидания ответа истекло · ${Uri.tryParse(widget.authApiUrl)?.host}');
+    } catch (error) {
+      if (mounted) setState(() => message = 'QA: ошибка входа · ${error.runtimeType} · ${Uri.tryParse(widget.authApiUrl)?.host}');
     } finally {
       if (mounted) setState(() => busy = false);
     }

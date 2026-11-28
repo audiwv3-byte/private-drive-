@@ -2,7 +2,7 @@ name: Android QA phone login
 on:
   push:
     branches: [qa/phone-passenger-login]
-    paths: [.github/workflows/qa-phone-login.yml]
+    paths: [.github/workflows/qa-phone-login.yml, flutter_app/lib/main.dart]
 permissions:
   contents: read
 jobs:
@@ -36,7 +36,8 @@ jobs:
           cp flutter_app/pubspec.yaml qa_android/
           if test -f flutter_app/pubspec.lock; then cp flutter_app/pubspec.lock qa_android/; fi
           python3 ops/qa/prepare_android_release.py qa_android
-          sed -i 's/applicationId = "lt.privatedrive.qa.private_drive"/applicationId = "lt.privatedrive.qa.phonelogin"/' qa_android/android/app/build.gradle.kts
+          sed -i 's/applicationId = "lt.privatedrive.qa.private_drive"/applicationId = "lt.privatedrive.qa.phonediag"/' qa_android/android/app/build.gradle.kts
+          sed -i 's/PRIVATE DRIVE QA ONLY/PRIVATE DRIVE LOGIN 02/' qa_android/android/app/src/main/AndroidManifest.xml
           mkdir -p "$HOME/.android"
           rm -f "$HOME/.android/debug.keystore"
           keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 30 -dname "CN=PRIVATE DRIVE isolated QA,O=QA,C=LT"
@@ -53,7 +54,7 @@ jobs:
           APK=qa_android/build/app/outputs/flutter-apk/app-release.apk
           "$SDK_TOOLS/apksigner" verify --verbose --print-certs "$APK"
           "$SDK_TOOLS/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/badging.txt"
-          grep -F "package: name='lt.privatedrive.qa.phonelogin'" "$RUNNER_TEMP/badging.txt"
+          grep -F "package: name='lt.privatedrive.qa.phonediag'" "$RUNNER_TEMP/badging.txt"
           grep -Fx "targetSdkVersion:'36'" "$RUNNER_TEMP/badging.txt"
           mkdir -p qa_apk
           cp "$APK" qa_apk/PRIVATE-DRIVE-QA43-ONLY.apk

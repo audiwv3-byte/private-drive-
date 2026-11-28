@@ -1,5 +1,9 @@
+import 'package:flutter/foundation.dart' show TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+// The platform fake exercises the real passenger GPS loader without hardware.
+// ignore: depend_on_referenced_packages
+import 'package:geolocator_platform_interface/geolocator_platform_interface.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:private_drive/demo_map_tile_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +19,46 @@ DemoTripStore makeOrder() {
     departure: DateTime(2026, 11, 18), services: const [],
   ), isTrue);
   return store;
+}
+
+Position passengerFix({
+  double accuracy = 12,
+  bool hasAccuracy = true,
+  Duration age = Duration.zero,
+  double latitude = 54.700001,
+}) => Position(
+  latitude: latitude,
+  longitude: 25.300002,
+  timestamp: DateTime.now().subtract(age),
+  accuracy: accuracy,
+  hasAccuracy: hasAccuracy,
+  altitude: 0,
+  altitudeAccuracy: 0,
+  heading: 0,
+  headingAccuracy: 0,
+  speed: 0,
+  speedAccuracy: 0,
+);
+
+class PassengerLocationPlatform extends GeolocatorPlatform {
+  LocationSettings? requestedSettings;
+
+  @override
+  Future<bool> isLocationServiceEnabled() async => true;
+
+  @override
+  Future<LocationPermission> checkPermission() async =>
+      LocationPermission.whileInUse;
+
+  @override
+  Future<Position> getCurrentPosition({LocationSettings? locationSettings}) async {
+    requestedSettings = locationSettings;
+    return passengerFix();
+  }
+
+  @override
+  Stream<ServiceStatus> getServiceStatusStream() =>
+      const Stream<ServiceStatus>.empty();
 }
 
 void main() {
@@ -83,7 +127,7 @@ void main() {
         enableMapTiles: false,
         currentPositionLoader: () async {
           requests++;
-          return const LatLng(54.700001, 25.300002);
+          return passengerFix();
         },
       ),
     ));
@@ -91,7 +135,7 @@ void main() {
     await tester.tap(find.byKey(const Key('passenger-locate-me')));
     await tester.pumpAndSettle();
     expect(requests, 1);
-    expect(find.byKey(const Key('passenger-locate-me')), findsNothing);
+    expect(find.byKey(const Key('passenger-locate-me')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const Key('passenger-use-current-as-pickup')), 130,
       scrollable: find.byType(Scrollable).first);
@@ -99,8 +143,9 @@ void main() {
         findsOneWidget);
     await tester.tap(find.byKey(const Key('passenger-use-current-as-pickup')));
     await tester.pump();
-    expect(tester.widget<TextField>(
-      find.byKey(const Key('passenger-from'))).controller!.text,
+    final from = find.byKey(const Key('passenger-from'));
+    await tester.scrollUntilVisible(from, 100, scrollable: find.byType(Scrollable).first);
+    expect(tester.widget<TextField>(from).controller!.text,
       '54.700001, 25.300002');
   });
 
@@ -120,6 +165,138 @@ void main() {
     expect(find.byKey(const Key('passenger-location-error')), findsOneWidget);
     expect(find.byKey(const Key('passenger-use-current-as-pickup')),
       findsNothing);
+  });
+
+  testWidgets('Native passenger fix centers the map and shows its accuracy',
+      (tester) async {
+    final savedPlatform = GeolocatorPlatform.instance;
+    final platform = PassengerLocationPlatform();
+    GeolocatorPlatform.instance = platform;
+    addTearDown(() => GeolocatorPlatform.instance = savedPlatform);
+    final map = MapController();
+    addTearDown(map.dispose);
+    await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+      passengerMapController: map,
+      mapConnectivityCheck: () async => null,
+    )));
+    expect(platform.requestedSettings, isNull);
+
+    await tester.tap(find.byKey(const Key('passenger-locate-me')));
+    await tester.pump();
+    await tester.pump();
+
+    const point = LatLng(54.700001, 25.300002);
+    expect(platform.requestedSettings?.accuracy, LocationAccuracy.high);
+    expect(map.camera.center.latitude, closeTo(point.latitude, 0.000001));
+    expect(map.camera.center.longitude, closeTo(point.longitude, 0.000001));
+    final layer = tester.widget<MarkerLayer>(find.byType(MarkerLayer));
+    expect(layer.markers.single.point, point);
+    expect(find.byKey(const Key('passenger-picked-pickup-marker')), findsNothing);
+    expect(find.byKey(const Key('passenger-gps-marker')), findsOneWidget);
+    final circle = tester.widget<CircleLayer>(find.byType(CircleLayer)).circles.single;
+    expect(circle.point, point);
+    expect(circle.useRadiusInMeter, isTrue);
+    expect(circle.radius, 12);
+  }, variant: const TargetPlatformVariant({
+    TargetPlatform.android, TargetPlatform.iOS,
+  }));
+
+  final invalidFixes = <String, Position Function()>{
+    'weak': () => passengerFix(accuracy: 350),
+    'missing accuracy': () => passengerFix(hasAccuracy: false),
+    'zero accuracy': () => passengerFix(accuracy: 0),
+    'non-finite accuracy': () => passengerFix(accuracy: double.nan),
+    'stale': () => passengerFix(age: const Duration(minutes: 1)),
+    'future': () => passengerFix(age: const Duration(seconds: -5)),
+    'invalid coordinates': () => passengerFix(latitude: 91),
+  };
+  for (final entry in invalidFixes.entries) {
+    testWidgets('Passenger rejects a ${entry.key} GPS fix and keeps manual pickup',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+        enableMapTiles: false,
+        currentPositionLoader: () async => entry.value(),
+      )));
+
+      await tester.tap(find.byKey(const Key('passenger-locate-me')));
+      await tester.pumpAndSettle();
+      final error = find.byKey(const Key('passenger-location-error'));
+      await tester.scrollUntilVisible(error, 130,
+        scrollable: find.byType(Scrollable).first);
+      expect(error, findsOneWidget);
+      expect(find.byKey(const Key('passenger-use-current-as-pickup')), findsNothing);
+
+      if (entry.key != 'weak') return;
+      final from = find.byKey(const Key('passenger-from'));
+      await tester.scrollUntilVisible(from, 130,
+        scrollable: find.byType(Scrollable).first);
+      final field = tester.widget<TextField>(from).controller!;
+      expect(field.text, isEmpty);
+      await tester.enterText(from, 'Gedimino pr. 9, Vilnius');
+      await tester.pump();
+      final confirm = find.byKey(const Key('passenger-confirm-pickup-address'));
+      await tester.ensureVisible(confirm);
+      await tester.tap(confirm);
+      await tester.pump();
+      expect(field.text, 'Gedimino pr. 9, Vilnius');
+      expect(confirm, findsNothing);
+    });
+  }
+
+  testWidgets('Expired GPS cannot replace a confirmed pickup', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+      enableMapTiles: false,
+      currentPositionLoader: () async => passengerFix(
+        age: const Duration(seconds: 25),
+      ),
+    )));
+    await tester.tap(find.byKey(const Key('passenger-locate-me')));
+    await tester.pumpAndSettle();
+    final confirm = find.byKey(const Key('passenger-use-current-as-pickup'));
+    await tester.scrollUntilVisible(confirm, 130,
+      scrollable: find.byType(Scrollable).first);
+    await tester.tap(confirm);
+    await tester.pump();
+    final from = find.byKey(const Key('passenger-from'));
+    await tester.scrollUntilVisible(from, 100, scrollable: find.byType(Scrollable).first);
+    final field = tester.widget<TextField>(from).controller!;
+    expect(field.text, '54.700001, 25.300002');
+
+    await tester.pump(const Duration(seconds: 6));
+    expect(confirm, findsNothing);
+    expect(field.text, '54.700001, 25.300002');
+  });
+
+  testWidgets('A map tap previews the exact point until pickup is confirmed',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(home: PassengerDemo(
+      mapConnectivityCheck: () async => null,
+    )));
+    final map = find.byKey(const Key('passenger-map'));
+    final layers = find.byType(MarkerLayer);
+    final picked = find.byKey(const Key('passenger-picked-pickup-marker'));
+    final at = tester.getTopLeft(map) + const Offset(360, 180);
+
+    await tester.tapAt(at);
+    await tester.pump(const Duration(milliseconds: 300));
+    final preview = tester.widget<MarkerLayer>(layers).markers.single.point;
+    expect(picked, findsNothing);
+    expect(find.byKey(const Key('passenger-preview-pickup-marker')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('passenger-cancel-map-pickup')));
+    await tester.pump();
+    expect(tester.widget<MarkerLayer>(layers).markers, isEmpty);
+
+    await tester.tapAt(at);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byKey(const Key('passenger-confirm-map-pickup')));
+    await tester.pump();
+    expect(picked, findsOneWidget);
+    expect(tester.widget<MarkerLayer>(layers).markers.single.point, preview);
+    final from = find.byKey(const Key('passenger-from'));
+    await tester.scrollUntilVisible(from, 100, scrollable: find.byType(Scrollable).first);
+    expect(tester.widget<TextField>(from).controller!.text,
+      '${preview.latitude.toStringAsFixed(6)}, ${preview.longitude.toStringAsFixed(6)}');
   });
 
   testWidgets('Passenger menu opens from the top left without fake features',

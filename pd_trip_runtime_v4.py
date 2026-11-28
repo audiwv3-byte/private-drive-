@@ -440,6 +440,8 @@ def register_payments(app, core, auth, provider, clock, order_row, attach, pilot
                 raise PermissionError('Оплату подтверждает пассажир')
             if r['status'] != 'Новая' or r['payment_status'] == 'Оплачено':
                 raise ValueError('Заявка уже обработана')
+            if r['crypto_pricing']:
+                raise ValueError('Для заказа выбрана криптовалюта')
             amount = money(r['price'])
             old = c.execute('SELECT * FROM pd_booking_capture_v4 WHERE order_id=?', (oid,)).fetchone()
             if old and (old['amount_cents'] != amount or old['mode'] != provider.mode):

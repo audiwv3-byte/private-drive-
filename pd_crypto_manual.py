@@ -1,12 +1,16 @@
 """Order-scoped crypto instructions; receipts are verified manually by admin."""
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from flask import request, jsonify
 
 NETWORKS = {'BTC': 'Bitcoin Mainnet', 'ETH': 'Ethereum Mainnet', 'USDC': 'Ethereum Mainnet (ERC-20)'}
 PRECISION = {'BTC': 8, 'ETH': 18, 'USDC': 6}
+METHOD = 'Криптовалюта'
 WAIT = 'Ожидается криптоперевод'
 CLAIM = 'Криптоперевод на проверке'
+
+def total_with_crypto_surcharge(base_cents):
+    return int((Decimal(base_cents) * Decimal('1.15')).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
 
 def valid_address(currency, address):
     if currency in ('ETH', 'USDC'):
@@ -57,6 +61,7 @@ def register(app,core,auth,cents):
     def payment(oid):
         response=original(oid);data=response.get_json();uid,_=auth()
         with core.db(core.ORDERS_DB) as c:r,p=read(c,oid,uid,True)
+        data['crypto_pricing'] = bool(r['crypto_pricing'])
         if p:
             active=r['status']=='Подтверждена' and p['price_cents']==cents(r['price'])
             data.update(crypto_currency=p['currency'],crypto_amount=p['amount'] if active else '',
@@ -104,7 +109,11 @@ def register(app,core,auth,cents):
         uid=admin_user();data=request.get_json(silent=True) or {}
         with core.db(core.ORDERS_DB) as c:
             c.execute('BEGIN IMMEDIATE');r,p=read(c,oid,uid,True)
-            if request.method=='GET':return jsonify(order_id=oid,price=r['price'],payment=p,currencies=available())
+            if request.method=='GET':
+                total = r['price']
+                if total and not p and not r['crypto_pricing'] and r['status']=='Подтверждена':
+                    total = format(Decimal(total_with_crypto_surcharge(cents(total))) / 100, '.2f')
+                return jsonify(order_id=oid,price=total,payment=p,currencies=available())
             check(r,p)
             if r['payment_status'] not in ('Не оплачено','',WAIT,CLAIM):raise ValueError('Другой платёж уже обрабатывается')
             cur=data.get('currency');amount=quantity(cur,data.get('amount'))
@@ -113,12 +122,22 @@ def register(app,core,auth,cents):
                 raise ValueError('Реквизиты криптоплатежа уже зафиксированы')
             if any(r.get(k) for k in ('stripe_session_id','card_payment_url','crypto_currency','crypto_amount','crypto_txid')) or r.get('stripe_amount_cents') is not None:
                 raise ValueError('Для заказа уже назначен другой платёж')
-            if r['payment_method']=='Банковский перевод':raise ValueError('Для заказа уже выбран банковский перевод')
+            if r['payment_method'] in ('Банковский перевод', 'Банковская карта', 'Онлайн (Stripe)'):
+                raise ValueError('Для заказа уже выбран другой платёж')
+            if any(c.execute('SELECT 1 FROM ' + table + ' WHERE order_id=?', (oid,)).fetchone()
+                   for table in ('pd_prepayments', 'pd_booking_capture_v4')):
+                raise ValueError('Для заказа уже назначен другой платёж')
             if cur not in available():raise ValueError('Адрес для этой валюты не настроен')
             address=core.CRYPTO_ADDRESSES[cur];now=core.now().isoformat()
+            total_cents = cents(r['price'])
+            if not r['crypto_pricing']:
+                total_cents = total_with_crypto_surcharge(total_cents)
+            total = format(Decimal(total_cents) / 100, '.2f')
+            cents(total)
             c.execute('INSERT INTO pd_crypto_payments(order_id,currency,network,address,amount,price_cents,created_at,assigned_by) VALUES(?,?,?,?,?,?,?,?)',
-                      (oid,cur,NETWORKS[cur],address,amount,cents(r['price']),now,uid))
-            c.execute('UPDATE orders SET payment_method=?,payment_status=?,crypto_currency=?,crypto_amount=?,updated_at=? WHERE id=?',('Криптовалюта',WAIT,cur,amount,now,oid))
+                      (oid,cur,NETWORKS[cur],address,amount,total_cents,now,uid))
+            c.execute('UPDATE orders SET payment_method=?,payment_status=?,crypto_currency=?,crypto_amount=?,price=?,crypto_pricing=1,updated_at=? WHERE id=?',
+                      (METHOD,WAIT,cur,amount,total,now,oid))
         return jsonify(ok=True)
 
     @app.post('/api/admin/crypto-payment/<int:oid>/received')

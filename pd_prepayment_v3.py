@@ -123,7 +123,7 @@ def register(app,core,auth,cents):
             if r['status']!='Подтверждена':raise ValueError('Дождитесь подтверждения поездки')
             if r['payment_status'] not in ('Не оплачено','','Ожидается оплата наличными'):
                 raise ValueError('Оплата уже получена или обрабатывается')
-            if any(r[k] for k in ('crypto_currency','crypto_amount','crypto_txid')):
+            if r['crypto_pricing'] or any(r[k] for k in ('crypto_currency','crypto_amount','crypto_txid')):
                 raise ValueError('Для заказа уже выбран другой платёж')
             amount=cents(r['price'])
             existing=c.execute('SELECT * FROM pd_prepayments WHERE order_id=?',(oid,)).fetchone()

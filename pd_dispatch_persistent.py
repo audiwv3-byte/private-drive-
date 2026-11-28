@@ -103,7 +103,7 @@ def connect():
                            connect_timeout=4, options="-c statement_timeout=4000")
 
 
-def store_order(values, *, telegram_id=None, website_contact=None):
+def store_order(values, *, telegram_id=None, website_contact=None, telegram_quote_cents=None):
     """Insert a validated booking or return the matching earlier submission."""
     source, original, *route = values
     digest = fingerprint(values if website_contact is None else (*values, website_contact))
@@ -117,6 +117,10 @@ def store_order(values, *, telegram_id=None, website_contact=None):
         if created and telegram_id is not None:
             db.execute("INSERT INTO public.pd_telegram_order_owners(order_id,telegram_id) VALUES (%s,%s)",
                        (row[0], telegram_id))
+            if telegram_quote_cents is not None:
+                db.execute("""INSERT INTO public.pd_native_order_quotes
+                    (order_id,details,quoted_total_cents,quote_required) VALUES (%s,'{}',%s,false)""",
+                    (row[0], telegram_quote_cents))
         if not created:
             row = db.execute("""SELECT id,status,fingerprint FROM public.pd_dispatch_orders
                 WHERE source=%s AND source_order_id=%s""", (source, original)).fetchone()
@@ -227,6 +231,8 @@ def register(app, authorized):
                     details, cents = quotes[order["id"]]
                     if details.get("ride_type") in ("delivery", "jumpstart"):
                         order.update(service_type=details["ride_type"], service_notes=details.get("preferences", {}).get("wishes", ""), quoted_total_cents=cents)
+                    elif order["source"] == "telegram_miniapp" and cents is not None:
+                        order["quoted_total_cents"] = cents
             if qa33:
                 for order,row in zip(orders,rows):
                     order.update(waiting_seconds=row[10],waiting_active=row[11],stop_charge_cents=row[12])

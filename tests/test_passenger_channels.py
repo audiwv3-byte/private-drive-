@@ -10,7 +10,7 @@ import uuid
 from urllib.parse import urlsplit
 
 import psycopg
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 from werkzeug.security import generate_password_hash
 from werkzeug.test import Client
 from werkzeug.wrappers import Response
@@ -56,6 +56,11 @@ def test_passenger_channels(monkeypatch, tmp_path):
     monkeypatch.setattr(core, "USERS_DB", tmp_path / "users.db")
     monkeypatch.setattr(core, "route", lambda *args: (None, None))
     import miniapp_server
+
+    def offline_route(*args):
+        raise RuntimeError("Route provider disabled for this test")
+
+    monkeypatch.setattr(core, "ors_request", offline_route)
     import isolated_sms_wsgi
     from pd_dispatcher_staging_wsgi import create_app
     mini = miniapp_server.app.test_client()
@@ -95,6 +100,11 @@ def test_passenger_channels(monkeypatch, tmp_path):
         page.locator('#pdObPassengerSubmit').click()
         page.locator('#pdbOrigin').fill('Vilnius')
         page.locator('#pdbDest').fill('Kaunas')
+        page.locator('button[onclick="pdbCalculate()"]').click()
+        page.locator('#pdbPays button[data-method="Банковский перевод"]').click()
+        expect(page.locator('#pdbSend #pdbPrice')).to_have_text('110.00 €')
+        page.locator('#pdbPays button[data-method="Криптовалюта"]').click()
+        expect(page.locator('#pdbSend #pdbPrice')).to_have_text('126.50 €')
         page.locator('#pdbDate').fill(tomorrow.isoformat())
         page.locator('#pdbTime').fill("14:00")
         page.locator('#pdbAgree').check()
@@ -102,10 +112,12 @@ def test_passenger_channels(monkeypatch, tmp_path):
             page.locator('#pdbSend').click()
         receipt = sent.value.json()
         assert sent.value.ok, receipt
+        assert receipt["price"] == "126.50"
         ids[receipt["dispatch_order_id"]] = "telegram_miniapp"
         again = mini.post("/api/order", json=sent.value.request.post_data_json,
                           headers=telegram_header(201, token))
         assert again.json["replayed"] and again.json["dispatch_order_id"] == receipt["dispatch_order_id"]
+        assert again.json["price"] == receipt["price"]
         page.reload()
         page.locator('#pdbSend').wait_for()
         assert not page.locator('#pdObRole,#adminNav,#pdPilotWork,#step10,#step13').count()
@@ -145,7 +157,11 @@ def test_passenger_channels(monkeypatch, tmp_path):
                          data={"csrf":csrf, "password":password}).status_code in (302,303)
         rows = site.get("/dispatch/orders/state", base_url=base).json["orders"]
         assert {r["id"]:r["source"] for r in rows if r["id"] in ids} == ids
+        dispatch_order = next(r for r in rows if r["id"] == receipt["dispatch_order_id"])
+        assert dispatch_order["quoted_total_cents"] == 12650
         assert page.goto(base + "/dispatch").ok
+        order_card = page.get_by_role("article").filter(has_text=dispatch_order["source_order_id"])
+        expect(order_card.get_by_text("Предварительная стоимость · 126.50 €", exact=True)).to_be_visible()
         for oid in ids:
             select = page.get_by_label("Пилот для заказа " + oid)
             select.select_option(uid)
@@ -156,6 +172,45 @@ def test_passenger_channels(monkeypatch, tmp_path):
     assert not browser_errors, browser_errors
     assigned = native.get("/native-pilot-orders", headers=accounts["pilot"])
     assert {r["order_id"] for r in assigned.json["orders"]} == set(ids)
-    assert mini.get("/api/orders", headers=telegram_header(201,token)).json["orders"][0]["dispatch_status"] == "Пилот назначен"
+    headers = telegram_header(201, token)
+    assert mini.get("/api/orders", headers=headers).json["orders"][0]["dispatch_status"] == "Пилот назначен"
+
+    # Complete the same browser booking and issue its invoice with local payment fixtures.
+    monkeypatch.setattr(core, "say", lambda *args, **kwargs: None)
+    monkeypatch.setattr(core, "notify_admins", lambda *args, **kwargs: None)
+    monkeypatch.setitem(core.CRYPTO_ADDRESSES, "ETH", "0x" + "a" * 40)
+    oid = receipt["order_id"]
+
+    def post(path, payload):
+        response = mini.post(path, headers=headers, json=payload)
+        assert response.status_code == 200, response.json
+        return response.json
+
+    post("/api/admin/status", {"id": oid, "status": "Подтверждена"})
+    crypto_path = f"/api/admin/crypto-payment/{oid}"
+    instructions = {"currency": "ETH", "amount": "0.05"}
+    post(crypto_path, instructions)
+    assert post(crypto_path, instructions)["replayed"]
+    txid = "0x" + "b" * 64
+    post(f"/api/payment/{oid}/crypto/claimed", {"txid": txid})
+    post(f"{crypto_path}/received", instructions | {"txid": txid, "verified_on_chain": True})
+    for status in ("В пути", "Выполнена"):
+        post("/api/admin/status", {"id": oid, "status": status})
+    post("/api/admin/invoice-settings", {
+        "seller_name": "Test Private Drive", "seller_address": "Test address 1, Vilnius",
+        "seller_iv": "TEST", "seller_vat": "LT000000000", "tax_mode": "svs",
+        "confirmed": True,
+    })
+    post(f"/api/admin/invoices/{oid}", {
+        "buyer_name": "QA Passenger", "buyer_address": "Test address 2, Vilnius",
+        "tax_confirmed": True,
+    })
+    pdf = mini.get(f"/api/invoices/{oid}/pdf", headers=headers)
+    assert pdf.status_code == 200 and pdf.data.startswith(b"%PDF-")
+    with core.db(core.ORDERS_DB) as conn:
+        invoice = conn.execute("SELECT snapshot, sha256 FROM pd_invoice_files WHERE order_id=?",
+                               (oid,)).fetchone()
+    assert json.loads(invoice["snapshot"])["amounts"]["gross"] == receipt["price"]
+    assert hashlib.sha256(pdf.data).hexdigest() == invoice["sha256"]
     print("PASS Telegram booking as admin via old pilot link, both website forms, Android API, "
-          "idempotent retries, authenticated dispatch, assigned pilot API and passenger status")
+          "idempotent retries, authenticated dispatch, assigned pilot API, passenger status and invoice total")

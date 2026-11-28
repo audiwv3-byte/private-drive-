@@ -18,6 +18,7 @@ register_request_guard(app)
 import pd_languages
 import pd_stops
 import pd_fixed_prices
+import pd_crypto_manual
 import pd_dispatch_persistent as dispatch
 TIMEZONE = ZoneInfo('Europe/Vilnius')
 MAX_AGE = 86400
@@ -102,7 +103,7 @@ def pd_release_hide_card_links(response):
             payload['card_link'] = ''
             uid, _ = auth()
             enabled = app.config.get('PD_PREPAYMENT_AVAILABLE')
-            payload['card_enabled'] = bool(enabled and enabled(uid))
+            payload['card_enabled'] = bool(not payload.get('crypto_pricing') and enabled and enabled(uid))
             response.set_data(app.json.dumps(payload))
     return response
 
@@ -248,7 +249,10 @@ def acknowledge_order(uid, row, replayed=False):
                 'trip_date': datetime.strptime(row['trip_date'], '%d.%m.%Y').date().isoformat(),
                 'trip_time': row['trip_time'],
             })
-            result = dispatch.store_order(values, telegram_id=uid)
+            result = dispatch.store_order(
+                values, telegram_id=uid,
+                telegram_quote_cents=cents_for_order(row['price']) if row['price'] else None,
+            )
         except ValueError:
             return jsonify(error='Данные заказа расходятся с записью диспетчерской.'), 409
         except Exception:
@@ -273,7 +277,7 @@ def create_order():
         import re
         if not isinstance(request_key,str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,80}',request_key):
             raise ValueError('Некорректный идентификатор заявки')
-        fingerprint=hashlib.sha256(json.dumps({k:v for k,v in d.items() if k!='request_key'},ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        fingerprint=hashlib.sha256(json.dumps({k:v for k,v in d.items() if k not in ('request_key', 'quoted_price')},ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         core.initialize()
         with core.db(core.ORDERS_DB) as conn:
             previous=conn.execute('SELECT * FROM orders WHERE telegram_id=? AND request_key=?',(uid,request_key)).fetchone()
@@ -319,7 +323,14 @@ def create_order():
         if km is not None: price=pd_pet_price(fixed_base or core.quote(km,minutes,bool(d.get('roundtrip'))),d)
     except Exception:
         core.LOG.exception('Route not available during booking')
-    st=dict(order_type='Туда и обратно' if d.get('roundtrip') else 'В одну сторону',
+    crypto_pricing = method == pd_crypto_manual.METHOD
+    if price and crypto_pricing:
+        total_cents = pd_crypto_manual.total_with_crypto_surcharge(cents_for_order(price))
+        price = format(Decimal(total_cents) / 100, '.2f')
+        cents_for_order(price)
+    if 'quoted_price' in d and d['quoted_price'] != price:
+        return jsonify(error='Стоимость изменилась. Рассчитайте маршрут ещё раз перед заказом.'), 409
+    st=dict(crypto_pricing=crypto_pricing, order_type='Туда и обратно' if d.get('roundtrip') else 'В одну сторону',
         origin=origin,destination=dest,trip_date=date,trip_time=hour,passengers=passenger_value,luggage=luggage,
         passenger_count_confirmed=int('passengers' in d),details=details,payment_method=method,price=price,
         distance_km=km,duration_min=minutes,route_source='OpenRouteService' if km is not None else '',
@@ -515,7 +526,7 @@ def select_cash(oid):
     if r['stripe_session_id']:
         raise ValueError('Для заказа создана ссылка оплаты картой. Смену способа согласуйте с пилотом.')
     with core.db(core.ORDERS_DB) as conn:
-        changed = conn.execute("UPDATE orders SET payment_method='Наличные', payment_status='Ожидается оплата наличными',updated_at=? WHERE id=? AND payment_status IN ('Не оплачено','','Ожидается оплата наличными')", (core.now().isoformat(), oid))
+        changed = conn.execute("UPDATE orders SET payment_method='Наличные', payment_status='Ожидается оплата наличными',updated_at=? WHERE id=? AND crypto_pricing=0 AND payment_status IN ('Не оплачено','','Ожидается оплата наличными')", (core.now().isoformat(), oid))
         if changed.rowcount != 1:
             raise ValueError('Платёж уже обрабатывается. Обратитесь к администратору.')
     core.notify_admins(f'💶 Заказ №{oid}: пассажир выбрал оплату наличными водителю.')
@@ -944,7 +955,6 @@ pd_invoice_v2.register(app, core, auth)
 import pd_prepayment_v3
 pd_prepayment_v3.register(app, core, auth, cents_for_order)
 
-import pd_crypto_manual
 pd_crypto_manual.register(app, core, auth, cents_for_order)
 
 import pd_tips_widget

@@ -56,7 +56,7 @@ def register(app, core, auth, cents):
         uid,_=auth()
         with core.db(core.ORDERS_DB) as c:
             r=order(c,oid,uid,True)
-            if r['status']!='Подтверждена' or r['payment_status']=='Оплачено':
+            if r['status']!='Подтверждена' or r['payment_status']=='Оплачено' or r['crypto_pricing']:
                 raise ValueError('Проверьте статус заказа')
         return jsonify(accounts=[dict(id=k,bank=v['bank']) for k,v in ACCOUNTS.items()])
 
@@ -70,6 +70,7 @@ def register(app, core, auth, cents):
             amount=cents(r['price'])
             b=c.execute('SELECT * FROM pd_bank_transfers WHERE order_id=?',(oid,)).fetchone()
             if request.method=='POST':
+                if r['crypto_pricing']: raise ValueError('Для заказа выбрана криптовалюта')
                 account_id=(request.get_json(silent=True) or {}).get('account_id', b['account_id'] if b else 'paysera')
                 if not isinstance(account_id,str) or account_id not in ACCOUNTS:
                     raise ValueError('Неизвестный банковский счёт')

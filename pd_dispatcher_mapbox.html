@@ -383,6 +383,10 @@ function renderPersistentOrders(){
      service.textContent=(order.service_type==='delivery'?'Доставка товаров':'Запуск автомобиля')+' · '+(order.quoted_total_cents/100).toFixed(2)+' €';
      card.append(service);
      if(order.service_notes){const notes=document.createElement('p');notes.textContent=order.service_notes;card.append(notes);}
+   }else if(Number.isInteger(order.quoted_total_cents)){
+     const fare=document.createElement('p');
+     fare.textContent='Предварительная стоимость · '+(order.quoted_total_cents/100).toFixed(2)+' €';
+     card.append(fare);
    }
    if(Number.isInteger(order.stop_charge_cents)){
      const meter=document.createElement('p');

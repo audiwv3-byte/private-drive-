@@ -1,0 +1,66 @@
+name: Android QA phone login
+on:
+  push:
+    branches: [qa/phone-passenger-login]
+    paths: [.github/workflows/qa-phone-login.yml]
+permissions:
+  contents: read
+jobs:
+  android-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PD_NATIVE_SMS_LIVE: "NO"
+      PD_PAYMENT_MODE: disabled
+      QA_API_URL: https://private-drive-phone-login-qa.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - name: Verify fail-closed QA endpoint
+        run: test "$QA_API_URL" = https://private-drive-phone-login-qa.onrender.com
+      - name: Generate isolated Android scaffold
+        run: |
+          flutter create --platforms=android --org=lt.privatedrive.qa --project-name=private_drive qa_android
+          cp -R flutter_app/lib/. qa_android/lib/
+          cp -R flutter_app/assets qa_android/assets
+          cp flutter_app/pubspec.yaml qa_android/
+          if test -f flutter_app/pubspec.lock; then cp flutter_app/pubspec.lock qa_android/; fi
+          python3 ops/qa/prepare_android_release.py qa_android
+          sed -i 's/applicationId = "lt.privatedrive.qa.private_drive"/applicationId = "lt.privatedrive.qa.phonelogin"/' qa_android/android/app/build.gradle.kts
+          mkdir -p "$HOME/.android"
+          rm -f "$HOME/.android/debug.keystore"
+          keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 30 -dname "CN=PRIVATE DRIVE isolated QA,O=QA,C=LT"
+      - name: Build phone login QA APK
+        working-directory: qa_android
+        run: |
+          flutter pub get
+          flutter pub deps --json > "$RUNNER_TEMP/qa43-deps.json"
+          flutter build apk --release --no-pub --dart-define="PD_NATIVE_AUTH_API_URL=$QA_API_URL" --dart-define=PD_INTERNAL_QA=false --dart-define=PD_QA28_GPS=false --dart-define=PD_QA_IOS_GPS=false --dart-define=PD_QA29_LOOPBACK=false --dart-define=PD_ISOLATED_WEB_PREVIEW=false --dart-define=PD_ISOLATED_DEVICE_QA=true
+          test -s build/app/outputs/flutter-apk/app-release.apk
+      - name: Verify APK signature, manifest, and package identity
+        run: |
+          SDK_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          APK=qa_android/build/app/outputs/flutter-apk/app-release.apk
+          "$SDK_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          "$SDK_TOOLS/aapt" dump badging "$APK" | tee "$RUNNER_TEMP/badging.txt"
+          grep -F "package: name='lt.privatedrive.qa.phonelogin'" "$RUNNER_TEMP/badging.txt"
+          grep -Fx "targetSdkVersion:'36'" "$RUNNER_TEMP/badging.txt"
+          mkdir -p qa_apk
+          cp "$APK" qa_apk/PRIVATE-DRIVE-QA43-ONLY.apk
+          cp "$RUNNER_TEMP/badging.txt" qa_apk/
+          (cd qa_apk && sha256sum PRIVATE-DRIVE-QA43-ONLY.apk > SHA256SUMS && cat SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-drive-qa43-apk-not-for-store
+          path: qa_apk/
+          retention-days: 14

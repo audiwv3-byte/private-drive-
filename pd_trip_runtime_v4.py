@@ -125,6 +125,20 @@ def register(app, core, auth, provider=None, clock=None):
             if data.get('arrived_at') and not data.get('ended_at'):
                 end = data.get('started_at') or clock()
                 data['wait_cents'] = waiting_cents(data['arrived_at'], data.get('wait_accepted_at'), end)
+            if data['role'] == 'passenger':
+                fields = ('origin', 'stop_address', 'destination', 'trip_date', 'trip_time',
+                          'passengers', 'comment', 'price', 'payment_method', 'payment_status')
+                data['booking'] = {key: r[key] for key in fields if key in r.keys()}
+                data['driver_assigned'] = bool(r['pilot_id'])
+                if r['pilot_id']:
+                    with core.db(core.USERS_DB) as users:
+                        if users.execute("SELECT 1 FROM sqlite_master WHERE name='pd_driver_applications'").fetchone():
+                            driver = users.execute('SELECT name, vehicle, plate, phone FROM pd_driver_applications WHERE telegram_id=?', (r['pilot_id'],)).fetchone()
+                            data['driver'] = dict(driver) if driver else None
+                data['invoice'] = None
+                if c.execute("SELECT 1 FROM sqlite_master WHERE name='pd_invoice_files'").fetchone():
+                    invoice = c.execute('SELECT serial, created_at FROM pd_invoice_files WHERE order_id=?', (oid,)).fetchone()
+                    data['invoice'] = dict(invoice) if invoice else None
             # Sharing stops on completion/cancellation and after reassignment.
             valid_location = (r['status'] in ACTIVE and data.get('location_pilot_id') == r['pilot_id'])
             if not valid_location:

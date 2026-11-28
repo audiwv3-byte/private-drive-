@@ -49,6 +49,22 @@ async function refresh(){
   const id=active,r=await requestTrip(id,passengerOnly?'?view=passenger':'');if(active!==id||!body)return;
   if(map)map.remove();map=null;marker=null;body.replaceChildren();
   p(label('Заказ №','Order #','Užsakymas Nr. ')+id+' · '+r.status);
+  if(r.booking){
+   const b=r.booking;
+   const line=(caption,value)=>{if(value!==undefined && value!==null && value!=='')p(caption+' · '+value)};
+   p([b.origin,b.stop_address,b.destination].filter(Boolean).join(' → '));
+   line(label('Подача','Pickup','Paėmimas'),[b.trip_date,b.trip_time].filter(Boolean).join(' '));
+   line(label('Пассажиры','Passengers','Keleiviai'),b.passengers);
+   line(label('Комментарий','Comment','Pastaba'),b.comment);
+   line(label('Пилот','Pilot','Pilotas'),r.driver?[r.driver.name,r.driver.vehicle,r.driver.plate,r.driver.phone].filter(Boolean).join(' · '):r.driver_assigned?label('Назначен','Assigned','Paskirtas'):label('Ожидаем назначения','Awaiting assignment','Laukiama paskyrimo'));
+   line(label('Стоимость поездки','Trip fare','Kelionės kaina'),r.base_cents?eur(r.base_cents):label('Цена уточняется','Fare pending','Kaina tikslinama'));
+   line(label('Способ оплаты','Payment method','Mokėjimo būdas'),b.payment_method);
+   line(label('Статус оплаты','Payment status','Mokėjimo būsena'),b.payment_status);
+   if(r.invoice){
+    p([r.invoice.serial,r.invoice.created_at].filter(Boolean).join(' · '));
+    body.append(button(label('Скачать фактуру (PDF)','Download invoice (PDF)','Atsisiųsti sąskaitą (PDF)'),()=>pdDownloadInvoice(id)));
+   }else p(label('Фактура ещё не выставлена','Invoice not issued yet','Sąskaita dar neišrašyta'));
+  }
   const live=['Подтверждена','В пути'].includes(r.status);closing(live);
   if(!live&&watchOrder===id)stopPosition();
   if(r.role==='pilot'&&live){
